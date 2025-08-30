@@ -37,16 +37,36 @@ This is the initial prototype implementation in Python, focusing on establishing
 
 ## Installation
 
+### Prerequisites
+- Python 3.8 or higher
+
+### Setup
+
 ```bash
 # Clone the repository
 git clone <repository-url>
 cd grang
 
-# Install in development mode
-pip install -e .
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Linux/Mac
+# or
+.venv\Scripts\activate     # On Windows
 
-# Or install development dependencies
+# Install in development mode with all dependencies
 pip install -e ".[dev]"
+```
+
+### Activating the Environment Later
+
+```bash
+# Navigate to project directory
+cd grang
+
+# Activate virtual environment
+source .venv/bin/activate  # On Linux/Mac
+# or  
+.venv\Scripts\activate     # On Windows
 ```
 
 ## Usage
@@ -68,6 +88,8 @@ python -m glang.repl
 - `x` or `exit` - Exit the REPL
 
 ## Development
+
+**Note:** Make sure your virtual environment is activated before running development commands.
 
 ### Running Tests
 
