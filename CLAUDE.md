@@ -51,10 +51,13 @@ source .venv/bin/activate  # On Linux/Mac
 ## Development Commands
 
 ```bash
-# Run the REPL
+# Run the REPL (with full navigation: ↑/↓ history, tab completion)
 python -m glang.repl
 # or after installation:
 glang
+
+# Quick demo (scripted)
+echo -e "create fruits [apple, banana]\\nnamespace\\nstats\\nexit" | glang
 
 # Run tests
 pytest test/

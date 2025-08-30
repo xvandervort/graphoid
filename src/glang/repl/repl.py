@@ -3,9 +3,17 @@ Core REPL implementation for Glang.
 """
 
 import sys
+import os
 from typing import Dict, Callable, Optional, List
 from glang import __version__, __description__
 from .graph_manager import GraphManager
+
+# Try to import readline for command history and navigation
+try:
+    import readline
+    READLINE_AVAILABLE = True
+except ImportError:
+    READLINE_AVAILABLE = False
 
 
 class REPL:
@@ -25,6 +33,8 @@ class REPL:
             "exit": self._exit_command,
         }
         self.running = True
+        self.command_history: List[str] = []
+        self._setup_readline()
     
     def start(self) -> None:
         """Start the REPL session."""
@@ -38,10 +48,16 @@ class REPL:
             try:
                 user_input = input(self.prompt).strip()
                 if user_input:
+                    # Add to history if using our own tracking
+                    if user_input not in self.command_history[-1:]:  # Avoid duplicate consecutive commands
+                        self.command_history.append(user_input)
                     self._process_input(user_input)
             except (KeyboardInterrupt, EOFError):
                 print("\nGoodbye!")
                 break
+        
+        # Save history when exiting
+        self._save_history()
     
     def _process_input(self, user_input: str) -> None:
         """Process user input and execute appropriate command."""
@@ -127,11 +143,19 @@ class REPL:
         print()
         print("🔍 The 'namespace' command shows how variables are stored as a GRAPH!")
         print()
+        if READLINE_AVAILABLE:
+            print("Navigation:")
+            print("  ↑/↓ arrows    - Command history")
+            print("  ←/→ arrows    - Cursor movement")  
+            print("  Tab           - Auto-completion")
+            print("  Ctrl+C        - Interrupt")
+            print()
         print("Glang is a prototype programming language with graphs as first-class objects.")
     
     def _exit_command(self) -> bool:
         """Exit the REPL."""
         print("Goodbye!")
+        self._save_history()  # Save history on explicit exit too
         return False  # Signal to stop the REPL
     
     def _handle_create_command(self, args: List[str], original_input: str) -> None:
@@ -203,3 +227,75 @@ class REPL:
         
         result = self.graph_manager.execute_graph_operation(current_graph, op_name, *args)
         print(result)
+    
+    def _setup_readline(self) -> None:
+        """Set up readline for command history and tab completion."""
+        if not READLINE_AVAILABLE:
+            return
+        
+        # Set up history file
+        history_file = os.path.expanduser("~/.glang_history")
+        try:
+            readline.read_history_file(history_file)
+        except FileNotFoundError:
+            pass  # History file doesn't exist yet
+        except Exception:
+            pass  # Ignore other readline setup issues
+        
+        # Set history length
+        readline.set_history_length(1000)
+        
+        # Enable tab completion
+        readline.set_completer(self._complete_command)
+        readline.parse_and_bind("tab: complete")
+        
+        # Store history file path for saving later
+        self._history_file = history_file
+    
+    def _complete_command(self, text: str, state: int) -> Optional[str]:
+        """Tab completion for commands."""
+        if state == 0:
+            # First time - generate completions
+            line = readline.get_line_buffer()
+            self._completions = self._get_completions(text, line)
+        
+        try:
+            return self._completions[state]
+        except IndexError:
+            return None
+    
+    def _get_completions(self, text: str, line: str) -> List[str]:
+        """Get list of possible completions."""
+        # Split the line into parts
+        parts = line.strip().split()
+        
+        if not parts or (len(parts) == 1 and not line.endswith(' ')):
+            # Completing first word (command)
+            all_commands = list(self.commands.keys()) + [
+                "create", "show", "graphs", "traverse", "delete", "info",
+                "namespace", "stats", "append", "prepend", "insert", "reverse"
+            ]
+            return [cmd for cmd in all_commands if cmd.startswith(text)]
+        
+        # Completing arguments
+        cmd = parts[0].lower()
+        
+        if cmd in ["show", "traverse", "delete", "info"]:
+            # Complete with variable names
+            variables = self.graph_manager.variable_graph.list_variables()
+            return [var for var in variables if var.startswith(text)]
+        
+        elif cmd == "create" and len(parts) >= 3:
+            # Complete graph types
+            graph_types = ["linear", "directed", "tree", "cyclic", "weighted", "undirected"]
+            return [gt for gt in graph_types if gt.startswith(text)]
+        
+        return []
+    
+    def _save_history(self) -> None:
+        """Save command history to file."""
+        if READLINE_AVAILABLE and hasattr(self, '_history_file'):
+            try:
+                readline.write_history_file(self._history_file)
+            except Exception:
+                pass  # Ignore history save issues
