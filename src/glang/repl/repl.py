@@ -31,7 +31,7 @@ class REPL:
         print(f"Glang {__version__}")
         print(__description__)
         print("Type 'help' for available commands or 'exit' to quit.")
-        print("Try: create mylist [1, 2, 3] or graphs to see examples.")
+        print("✨ Try: create fruits [apple, banana] then 'namespace' to see the magic! ✨")
         print()
         
         while self.running:
@@ -73,6 +73,12 @@ class REPL:
             self._handle_traverse_command(args)
         elif cmd == "delete":
             self._handle_delete_command(args)
+        elif cmd == "info":
+            self._handle_info_command(args)
+        elif cmd == "namespace":
+            print(self.graph_manager.show_variable_graph())
+        elif cmd == "stats":
+            print(self.graph_manager.get_variable_stats())
         # Graph operations
         elif cmd in ["append", "prepend", "insert", "delete_at", "reverse"]:
             self._handle_graph_operation(cmd, args)
@@ -98,6 +104,11 @@ class REPL:
         print("  show [name]           - Show graph structure")
         print("  traverse [name]       - Show graph traversal")
         print("  delete <name>         - Delete a graph")
+        print("  info [name]           - Show detailed variable info")
+        print()
+        print("Variable namespace (meta-graph):")
+        print("  namespace             - Show the variable graph itself")
+        print("  stats                 - Show namespace statistics")
         print()
         print("Graph operations (on current/specified graph):")
         print("  append <value>        - Add to end")
@@ -106,10 +117,15 @@ class REPL:
         print("  reverse               - Reverse the graph")
         print()
         print("Examples:")
-        print("  create nums [1, 2, 3, 4]")
-        print("  show nums")
-        print("  append 5")
-        print("  traverse")
+        print("  create fruits [apple, banana, cherry]")
+        print("  show fruits              # [apple] -> [banana] -> [cherry]")
+        print("  append orange")
+        print("  namespace                # 🤯 Show the variable graph itself!")
+        print("  stats                    # Meta-graph statistics")
+        print("  create numbers [1, 2, 3]")
+        print("  namespace                # Now see TWO variables in the meta-graph")
+        print()
+        print("🔍 The 'namespace' command shows how variables are stored as a GRAPH!")
         print()
         print("Glang is a prototype programming language with graphs as first-class objects.")
     
@@ -167,6 +183,12 @@ class REPL:
             return
         
         result = self.graph_manager.delete_graph(args[0])
+        print(result)
+    
+    def _handle_info_command(self, args: List[str]) -> None:
+        """Handle info command."""
+        name = args[0] if args else None
+        result = self.graph_manager.get_variable_info(name)
         print(result)
     
     def _handle_graph_operation(self, operation: str, args: List[str]) -> None:

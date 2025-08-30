@@ -13,12 +13,17 @@ src/glang/core/edge.py
 src/glang/core/graph.py
 src/glang/core/graph_types.py
 src/glang/core/node.py
+src/glang/core/variable_graph.py
 src/glang/repl/__init__.py
 src/glang/repl/__main__.py
+src/glang/repl/graph_manager.py
 src/glang/repl/repl.py
+src/glang/visualization/__init__.py
+src/glang/visualization/ascii_renderer.py
 test/test_cli.py
 test/test_edge.py
 test/test_graph.py
 test/test_graph_types.py
 test/test_node.py
 test/test_repl.py
+test/test_variable_graph.py
