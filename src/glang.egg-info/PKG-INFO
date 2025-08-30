@@ -1,0 +1,101 @@
+Metadata-Version: 2.4
+Name: glang
+Version: 0.1.0
+Summary: A prototype programming language that uses graphs as first-class objects
+Author: Glang Team
+License: MIT
+Classifier: Development Status :: 2 - Pre-Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+Requires-Dist: black>=22.0; extra == "dev"
+Requires-Dist: flake8>=5.0; extra == "dev"
+Requires-Dist: mypy>=1.0; extra == "dev"
+
+# Glang
+
+A prototype programming language that uses graphs as first-class objects.
+
+## Overview
+
+Glang is designed with the following principles:
+- **Intuitive structure and syntax** - Making graph-based programming accessible
+- **Stability** - Reliable and consistent behavior
+- **Flexibility** - Adaptable to various graph computation needs
+
+This is the initial prototype implementation in Python, focusing on establishing the core REPL infrastructure.
+
+## Installation
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd grang
+
+# Install in development mode
+pip install -e .
+
+# Or install development dependencies
+pip install -e ".[dev]"
+```
+
+## Usage
+
+### Running the REPL
+
+```bash
+# Using the installed command
+glang
+
+# Or run as a Python module
+python -m glang.repl
+```
+
+### Available REPL Commands
+
+- `ver` or `version` - Show version information
+- `h` or `help` - Show help information  
+- `x` or `exit` - Exit the REPL
+
+## Development
+
+### Running Tests
+
+```bash
+pytest test/
+```
+
+### Code Formatting
+
+```bash
+black src/ test/
+```
+
+### Type Checking
+
+```bash
+mypy src/
+```
+
+## Project Status
+
+This is a very early prototype focusing on:
+- [x] Basic REPL infrastructure
+- [x] Core command system (version, help, exit)
+- [ ] Graph data structures
+- [ ] Graph syntax parsing
+- [ ] Graph operations and evaluation
+
+## License
+
+MIT

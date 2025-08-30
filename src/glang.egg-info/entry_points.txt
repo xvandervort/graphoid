@@ -1,0 +1,2 @@
+[console_scripts]
+glang = glang.cli:main

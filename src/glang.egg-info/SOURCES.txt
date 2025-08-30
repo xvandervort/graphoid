@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+src/glang/__init__.py
+src/glang/cli.py
+src/glang.egg-info/PKG-INFO
+src/glang.egg-info/SOURCES.txt
+src/glang.egg-info/dependency_links.txt
+src/glang.egg-info/entry_points.txt
+src/glang.egg-info/requires.txt
+src/glang.egg-info/top_level.txt
+src/glang/repl/__init__.py
+src/glang/repl/__main__.py
+src/glang/repl/repl.py
+test/test_cli.py
+test/test_repl.py
