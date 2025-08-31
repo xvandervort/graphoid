@@ -272,3 +272,12 @@ class GraphManager:
                 lines.append(f"    {graph_type}: {count}")
         
         return "\n".join(lines)
+    
+    def get_variable(self, name: str) -> Optional[Graph]:
+        """Get a graph by name."""
+        return self.variable_graph.get_variable(name)
+    
+    def set_current(self, name: str) -> None:
+        """Set the current graph."""
+        if self.variable_graph.has_variable(name):
+            self.current_graph = name

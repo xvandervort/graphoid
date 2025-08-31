@@ -7,6 +7,9 @@ import os
 from typing import Dict, Callable, Optional, List
 from glang import __version__, __description__
 from .graph_manager import GraphManager
+from ..parser import SyntaxParser, InputType
+from ..display import GraphRenderer, DisplayMode
+from ..methods import MethodDispatcher
 
 # Try to import readline for command history and navigation
 try:
@@ -24,6 +27,9 @@ class REPL:
     def __init__(self) -> None:
         self.prompt = "glang> "
         self.graph_manager = GraphManager()
+        self.syntax_parser = SyntaxParser()
+        self.renderer = GraphRenderer(self.graph_manager)
+        self.method_dispatcher = MethodDispatcher(self.graph_manager)
         self.commands: Dict[str, Callable[[], Optional[bool]]] = {
             "ver": self._version_command,
             "version": self._version_command,
@@ -61,46 +67,22 @@ class REPL:
     
     def _process_input(self, user_input: str) -> None:
         """Process user input and execute appropriate command."""
-        # First check simple commands
-        command = user_input.lower()
-        
-        if command in self.commands:
-            result = self.commands[command]()
-            if result is False:  # Explicit exit request
-                self.running = False
+        # Parse the input using the syntax parser
+        try:
+            parsed = self.syntax_parser.parse_input(user_input)
+        except Exception as e:
+            print(f"Syntax error: {e}")
             return
         
-        # Parse multi-word commands
-        parts = user_input.split()
-        if not parts:
-            return
-        
-        cmd = parts[0].lower()
-        args = parts[1:] if len(parts) > 1 else []
-        
-        # Graph management commands
-        if cmd == "create":
-            self._handle_create_command(args, user_input)
-        elif cmd == "show":
-            self._handle_show_command(args)
-        elif cmd == "graphs":
-            print(self.graph_manager.list_graphs())
-        elif cmd == "traverse":
-            self._handle_traverse_command(args)
-        elif cmd == "delete":
-            self._handle_delete_command(args)
-        elif cmd == "info":
-            self._handle_info_command(args)
-        elif cmd == "namespace":
-            print(self.graph_manager.show_variable_graph())
-        elif cmd == "stats":
-            print(self.graph_manager.get_variable_stats())
-        # Graph operations
-        elif cmd in ["append", "prepend", "insert", "delete_at", "reverse"]:
-            self._handle_graph_operation(cmd, args)
-        else:
-            print(f"Unknown command: {user_input}")
-            print("Type 'help' for available commands.")
+        # Handle based on input type
+        if parsed.input_type == InputType.VARIABLE_DECLARATION:
+            self._handle_variable_declaration(parsed)
+        elif parsed.input_type == InputType.METHOD_CALL:
+            self._handle_method_call(parsed)
+        elif parsed.input_type == InputType.VARIABLE_ACCESS:
+            self._handle_variable_access(parsed)
+        elif parsed.input_type == InputType.LEGACY_COMMAND:
+            self._handle_legacy_command(parsed)
     
     def _version_command(self) -> None:
         """Display version information."""
@@ -115,7 +97,14 @@ class REPL:
         print("  x, exit          - Exit the REPL")
         print()
         print("Graph commands:")
-        print("  create <name> [1,2,3]  - Create graph from list")
+        print("  create <name> [1,2,3]  - Create graph from list (legacy)")
+        print("  list <name> = [1,2,3]  - Create list graph (NEW!)")
+        print("  <name>                 - Show graph contents (NEW!)")
+        print("  <name> --info          - Show detailed variable info (NEW!)")
+        print("  <name> --show-nodes    - Show with node details (NEW!)")
+        print("  <name> --json          - Show as JSON format (NEW!)")
+        print("  <name> --compact       - Compact detailed view (NEW!)")
+        print("  <name>.<method> <args> - Call method on graph (NEW!)")
         print("  graphs                 - List all graphs")
         print("  show [name]           - Show graph structure")
         print("  traverse [name]       - Show graph traversal")
@@ -133,9 +122,12 @@ class REPL:
         print("  reverse               - Reverse the graph")
         print()
         print("Examples:")
-        print("  create fruits [apple, banana, cherry]")
-        print("  show fruits              # [apple] -> [banana] -> [cherry]")
-        print("  append orange")
+        print("  list fruits = [apple, banana, cherry]  # NEW syntax!")
+        print("  fruits                   # Show contents")
+        print("  fruits.append orange     # Method call")
+        print("  create fruits [apple, banana, cherry]  # Legacy syntax")
+        print("  show fruits              # Legacy show")
+        print("  append orange            # Legacy append")
         print("  namespace                # 🤯 Show the variable graph itself!")
         print("  stats                    # Meta-graph statistics")
         print("  create numbers [1, 2, 3]")
@@ -270,12 +262,16 @@ class REPL:
         parts = line.strip().split()
         
         if not parts or (len(parts) == 1 and not line.endswith(' ')):
-            # Completing first word (command)
+            # Completing first word (command or variable)
             all_commands = list(self.commands.keys()) + [
                 "create", "show", "graphs", "traverse", "delete", "info",
-                "namespace", "stats", "append", "prepend", "insert", "reverse"
+                "namespace", "stats", "append", "prepend", "insert", "reverse",
+                "list", "graph", "tree", "directed", "weighted"  # New graph types
             ]
-            return [cmd for cmd in all_commands if cmd.startswith(text)]
+            # Also include existing variables for variable access
+            variables = self.graph_manager.variable_graph.list_variables()
+            all_options = all_commands + variables
+            return [opt for opt in all_options if opt.startswith(text)]
         
         # Completing arguments
         cmd = parts[0].lower()
@@ -299,3 +295,93 @@ class REPL:
                 readline.write_history_file(self._history_file)
             except Exception:
                 pass  # Ignore history save issues
+    
+    def _handle_variable_declaration(self, parsed) -> None:
+        """Handle new-style variable declarations."""
+        # For now, only support 'list' type
+        if parsed.graph_type != 'list':
+            print(f"Graph type '{parsed.graph_type}' not yet implemented")
+            return
+        
+        if parsed.initializer is None:
+            # Empty list
+            parsed.initializer = []
+        
+        result = self.graph_manager.create_from_list(parsed.variable_name, parsed.initializer)
+        print(result)
+    
+    def _handle_method_call(self, parsed) -> None:
+        """Handle method calls on variables."""
+        result = self.method_dispatcher.dispatch_method(
+            parsed.variable_name,
+            parsed.method_name,
+            parsed.arguments
+        )
+        print(result)
+    
+    def _handle_variable_access(self, parsed) -> None:
+        """Handle variable access (display contents)."""
+        graph = self.graph_manager.get_variable(parsed.variable_name)
+        if not graph:
+            print(f"Variable '{parsed.variable_name}' not found")
+            return
+        
+        # Determine display mode from flags
+        mode = DisplayMode.SIMPLE
+        
+        if '--info' in parsed.flags:
+            mode = DisplayMode.META
+        elif '--json' in parsed.flags:
+            mode = DisplayMode.JSON
+        elif '--show-nodes' in parsed.flags:
+            mode = DisplayMode.DETAILED
+        elif '--compact' in parsed.flags:
+            mode = DisplayMode.COMPACT
+        
+        # Render with flags for additional options
+        output = self.renderer.render(
+            graph, 
+            mode, 
+            variable_name=parsed.variable_name,
+            flags=parsed.flags
+        )
+        print(output)
+        
+        # Set as current graph for legacy operations
+        self.graph_manager.set_current(parsed.variable_name)
+    
+    def _handle_legacy_command(self, parsed) -> None:
+        """Handle legacy command format."""
+        command = parsed.command
+        args = parsed.arguments
+        
+        # First check simple commands
+        if command in self.commands:
+            result = self.commands[command]()
+            if result is False:  # Explicit exit request
+                self.running = False
+            return
+        
+        # Graph management commands
+        if command == "create":
+            self._handle_create_command(args, parsed.raw_input)
+        elif command == "show":
+            self._handle_show_command(args)
+        elif command == "graphs":
+            print(self.graph_manager.list_graphs())
+        elif command == "traverse":
+            self._handle_traverse_command(args)
+        elif command == "delete":
+            self._handle_delete_command(args)
+        elif command == "info":
+            self._handle_info_command(args)
+        elif command == "namespace":
+            print(self.graph_manager.show_variable_graph())
+        elif command == "stats":
+            print(self.graph_manager.get_variable_stats())
+        # Graph operations
+        elif command in ["append", "prepend", "insert", "delete_at", "reverse"]:
+            self._handle_graph_operation(command, args)
+        else:
+            print(f"Unknown command: {parsed.raw_input}")
+            print("Type 'help' for available commands.")
