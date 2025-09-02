@@ -94,6 +94,66 @@ echo -e "create fruits [apple, banana]\nnamespace\nstats\nexit" | glang
 - `namespace` - **Show the variable graph itself**
 - `stats` - Show namespace statistics
 
+### Modern Syntax (Phase 4A & 4B)
+
+#### Variable Declarations with Type Constraints
+```bash
+# Basic declarations
+list fruits = [apple, banana, cherry]
+list numbers = [1, 2, 3, 4, 5]
+
+# Type-constrained declarations  
+list<num> scores = [95, 87, 92]
+list<string> names = [alice, bob, charlie]
+list<bool> flags = [true, false, true]
+list<list> matrix = [[1, 2], [3, 4]]
+```
+
+#### Advanced Indexing & Assignment
+```bash
+# Index access
+fruits[0]          # Get first element
+numbers[-1]        # Get last element
+matrix[1][0]       # Multi-dimensional access
+
+# Index assignment
+fruits[0] = mango
+scores[1] = 99
+matrix[0][1] = 42
+
+# Slice access
+numbers[1:4]       # Elements 1 through 3
+data[::2]          # Every 2nd element
+items[2:]          # From index 2 to end
+text[:-1]          # All but last element
+
+# Slice assignment
+fruits[1:3] = [kiwi, orange]
+numbers[::2] = [10, 30, 50]
+```
+
+#### Method Calls with Type Safety
+```bash
+# Basic methods (with constraint enforcement)
+scores.append 88      # ✓ Valid (num)
+scores.append hello   # ✗ Error (string != num constraint)
+
+# Type introspection methods
+scores.constraint()              # Show type constraint
+scores.validate_constraint()     # Validate all elements
+scores.type_summary()           # Count elements by type
+scores.types()                  # List all element types
+mixed.coerce_to_constraint()    # Attempt type coercion
+```
+
+### Legacy Commands (Still Supported)
+- `create <name> [1,2,3]` - Create graph from list
+- `graphs` - List all graphs
+- `show [name]` - Show graph structure
+- `traverse [name]` - Show graph traversal
+- `delete <name>` - Delete a graph
+- `info [name]` - Show detailed variable info
+
 ### Graph Operations
 - `append <value>` - Add to end
 - `prepend <value>` - Add to beginning

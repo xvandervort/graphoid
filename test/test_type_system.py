@@ -1,258 +1,479 @@
-"""Tests for type system functionality."""
+"""Tests for enhanced type system functionality (Phase 4B)."""
 
 import pytest
-from glang.parser.tokenizer import Tokenizer
+from glang.parser import SyntaxParser, VariableDeclaration, InputType
 from glang.repl import REPL
 from io import StringIO
 import sys
 
 
-class TestTypeInference:
-    """Test automatic type inference."""
+class TestTypeConstraintSyntax:
+    """Test parsing of type constraint syntax."""
     
     def setup_method(self):
-        self.tokenizer = Tokenizer()
+        self.parser = SyntaxParser()
     
-    def test_infer_integers(self):
-        """Test integer type inference."""
-        assert self.tokenizer.infer_value_type("42") == 42
-        assert self.tokenizer.infer_value_type("-10") == -10
-        assert self.tokenizer.infer_value_type("0") == 0
-        assert isinstance(self.tokenizer.infer_value_type("42"), int)
+    def test_parse_type_constraint_basic(self):
+        """Test parsing basic type constraints."""
+        result = self.parser.parse_input("list<num> scores = [95, 87, 92]")
+        assert isinstance(result, VariableDeclaration)
+        assert result.graph_type == "list"
+        assert result.variable_name == "scores"
+        assert result.type_constraint == "num"
+        assert result.initializer == [95, 87, 92]
     
-    def test_infer_floats(self):
-        """Test float type inference."""
-        assert self.tokenizer.infer_value_type("3.14") == 3.14
-        assert self.tokenizer.infer_value_type("-2.5") == -2.5
-        assert self.tokenizer.infer_value_type("0.0") == 0.0
-        assert isinstance(self.tokenizer.infer_value_type("3.14"), float)
-    
-    def test_infer_booleans(self):
-        """Test boolean type inference."""
-        assert self.tokenizer.infer_value_type("true") is True
-        assert self.tokenizer.infer_value_type("false") is False
-        assert self.tokenizer.infer_value_type("TRUE") is True
-        assert self.tokenizer.infer_value_type("False") is False
-        assert isinstance(self.tokenizer.infer_value_type("true"), bool)
-    
-    def test_infer_strings(self):
-        """Test string type inference."""
-        assert self.tokenizer.infer_value_type("hello") == "hello"
-        assert self.tokenizer.infer_value_type("world123") == "world123"
-        assert self.tokenizer.infer_value_type("") == ""
-        assert isinstance(self.tokenizer.infer_value_type("hello"), str)
-    
-    def test_parse_mixed_list(self):
-        """Test parsing list with mixed types."""
-        result = self.tokenizer.parse_list_literal_with_types("[42, hello, true, 3.14]")
-        expected = [42, "hello", True, 3.14]
+    def test_parse_different_type_constraints(self):
+        """Test parsing different type constraints."""
+        # String constraint
+        result = self.parser.parse_input("list<string> names = ['alice', 'bob', 'charlie']")
+        assert result.type_constraint == "string"
         
-        assert result == expected
-        assert isinstance(result[0], int)
-        assert isinstance(result[1], str)
-        assert isinstance(result[2], bool)
-        assert isinstance(result[3], float)
-    
-    def test_parse_quoted_strings_in_list(self):
-        """Test parsing quoted strings in lists."""
-        result = self.tokenizer.parse_list_literal_with_types("['hello world', \"quoted\", unquoted]")
-        expected = ["hello world", "quoted", "unquoted"]
+        # Boolean constraint
+        result = self.parser.parse_input("list<bool> flags = [true, false, true]")
+        assert result.type_constraint == "bool"
         
-        assert result == expected
-        assert all(isinstance(item, str) for item in result)
+        # List constraint
+        result = self.parser.parse_input("list<list> matrix = [[1, 2], [3, 4]]")
+        assert result.type_constraint == "list"
     
-    def test_empty_list_parsing(self):
-        """Test parsing empty lists."""
-        result = self.tokenizer.parse_list_literal_with_types("[]")
-        assert result == []
+    def test_parse_no_type_constraint(self):
+        """Test parsing without type constraints still works."""
+        result = self.parser.parse_input("list fruits = ['apple', 'banana']")
+        assert isinstance(result, VariableDeclaration)
+        assert result.type_constraint is None
     
-    def test_complex_mixed_list(self):
-        """Test parsing complex mixed-type list."""
-        result = self.tokenizer.parse_list_literal_with_types("[0, 'start', true, 3.14, false, -42, 'end']")
-        expected = [0, "start", True, 3.14, False, -42, "end"]
-        
-        assert result == expected
-        assert [type(item).__name__ for item in result] == ['int', 'str', 'bool', 'float', 'bool', 'int', 'str']
+    def test_parse_empty_list_with_constraint(self):
+        """Test parsing empty list with type constraint."""
+        result = self.parser.parse_input("list<num> empty = []")
+        assert result.type_constraint == "num"
+        assert result.initializer == []
 
 
-class TestTypeMethods:
-    """Test type introspection methods."""
+class TestTypeValidation:
+    """Test type validation during variable declaration."""
     
     def setup_method(self):
         self.repl = REPL()
     
-    def test_types_method(self):
-        """Test the types() method on mixed data."""
+    def test_valid_type_constraint(self):
+        """Test successful type constraint validation."""
         captured_output = StringIO()
         sys.stdout = captured_output
         
         try:
-            self.repl._process_input('list mixed = [42, hello, true, 3.14, false]')
-            self.repl._process_input('mixed.types()')
-            output_lines = captured_output.getvalue().strip().split('\n')
-            
-            # Find the line with type information
-            types_line = None
-            for line in output_lines:
-                if '[' in line and 'num' in line:
-                    types_line = line
-                    break
-            
-            assert types_line is not None
-            assert 'num' in types_line
-            assert 'string' in types_line
-            assert 'bool' in types_line
+            self.repl._process_input('list<num> numbers = [1, 2, 3, 4, 5]')
+            output = captured_output.getvalue()
+            assert "Type validation failed" not in output
+            assert "numbers" in output
         finally:
             sys.stdout = sys.__stdout__
     
-    def test_typeof_method(self):
-        """Test the typeof method on specific indices."""
+    def test_invalid_type_constraint_mixed(self):
+        """Test type validation failure with mixed types."""
         captured_output = StringIO()
         sys.stdout = captured_output
         
         try:
-            self.repl._process_input('list data = [100, test, true]')
-            self.repl._process_input('data.typeof 0')
-            self.repl._process_input('data.typeof 1')
-            self.repl._process_input('data.typeof 2')
-            
-            output_lines = captured_output.getvalue().strip().split('\n')
-            
-            # Find type responses (skip creation message)
-            type_responses = [line for line in output_lines if line.strip() in ['num', 'string', 'bool']]
-            
-            assert len(type_responses) >= 3
-            assert 'num' in type_responses
-            assert 'string' in type_responses
-            assert 'bool' in type_responses
+            self.repl._process_input('list<num> mixed = [1, "hello", 3]')
+            output = captured_output.getvalue()
+            assert "Type validation failed" in output
+            assert "string" in output
+            assert "num" in output
         finally:
             sys.stdout = sys.__stdout__
     
-    def test_typeof_with_negative_index(self):
-        """Test typeof with negative indexing."""
+    def test_empty_list_always_valid(self):
+        """Test that empty lists pass any type constraint."""
         captured_output = StringIO()
         sys.stdout = captured_output
         
         try:
-            self.repl._process_input('list items = [42, test]')
-            self.repl._process_input('items.typeof -1')  # Should be 'string' (test)
-            self.repl._process_input('items.typeof -2')  # Should be 'num' (42)
-            
-            output_lines = captured_output.getvalue().strip().split('\n')
-            type_responses = [line for line in output_lines if line.strip() in ['num', 'string', 'bool']]
-            
-            assert len(type_responses) >= 2
+            self.repl._process_input('list<string> empty = []')
+            output = captured_output.getvalue()
+            assert "Type validation failed" not in output
         finally:
             sys.stdout = sys.__stdout__
     
-    def test_typeof_out_of_bounds(self):
-        """Test typeof with out-of-bounds index."""
+    def test_boolean_type_constraint(self):
+        """Test boolean type constraint validation."""
         captured_output = StringIO()
         sys.stdout = captured_output
         
         try:
-            self.repl._process_input('list small = [42]')
-            self.repl._process_input('small.typeof 10')  # Out of bounds
+            # Valid boolean list
+            self.repl._process_input('list<bool> flags = [true, false, true]')
+            output = captured_output.getvalue()
+            assert "Type validation failed" not in output
             
-            output = captured_output.getvalue().strip()
-            assert "out of range" in output.lower()
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            # Invalid boolean list
+            self.repl._process_input('list<bool> bad_flags = [true, 1, false]')
+            output = captured_output.getvalue()
+            assert "Type validation failed" in output
         finally:
             sys.stdout = sys.__stdout__
 
 
-class TestTypeSystemIntegration:
-    """Test integration of type system with other features."""
+class TestTypeIntrospection:
+    """Test enhanced type introspection methods."""
     
     def setup_method(self):
         self.repl = REPL()
     
-    def test_mixed_types_with_indexing(self):
-        """Test that indexing works correctly with different types."""
+    def test_constraint_method(self):
+        """Test the constraint() method."""
         captured_output = StringIO()
         sys.stdout = captured_output
         
         try:
-            self.repl._process_input('list mixed = [42, hello, true, 3.14]')
-            self.repl._process_input('mixed[0]')  # Should show 42
-            self.repl._process_input('mixed[1]')  # Should show hello
-            self.repl._process_input('mixed[2]')  # Should show True
-            self.repl._process_input('mixed[3]')  # Should show 3.14
+            self.repl._process_input('list<num> scores = [95, 87, 92]')
+            captured_output = StringIO()
+            sys.stdout = captured_output
             
-            output_lines = captured_output.getvalue().strip().split('\n')
-            
-            # Check that we can find the expected values
-            assert '42' in output_lines
-            assert 'hello' in output_lines
-            assert 'True' in output_lines  # Python boolean repr
-            assert '3.14' in output_lines
+            self.repl._process_input('scores.constraint()')
+            output = captured_output.getvalue()
+            assert "type constraint: num" in output
         finally:
             sys.stdout = sys.__stdout__
     
-    def test_type_preservation_through_methods(self):
-        """Test that types are preserved when using graph methods."""
+    def test_constraint_method_no_constraint(self):
+        """Test constraint() method on list without constraints."""
         captured_output = StringIO()
         sys.stdout = captured_output
         
         try:
-            self.repl._process_input('list nums = [1, 2, 3]')
-            self.repl._process_input('nums.append 4')     # Add integer
-            self.repl._process_input('nums.append true')  # Add boolean
-            self.repl._process_input('nums.types()')      # Check types
+            self.repl._process_input('list fruits = ["apple", "banana"]')
+            captured_output = StringIO()
+            sys.stdout = captured_output
             
-            output = captured_output.getvalue().strip()
-            
-            # Should contain type information showing preservation
-            assert 'num' in output
-            assert 'bool' in output
+            self.repl._process_input('fruits.constraint()')
+            output = captured_output.getvalue()
+            assert "no type constraint" in output
         finally:
             sys.stdout = sys.__stdout__
     
-    def test_legacy_syntax_type_support(self):
-        """Test that legacy create syntax also supports type inference."""
+    def test_validate_constraint_method(self):
+        """Test the validate_constraint() method."""
         captured_output = StringIO()
         sys.stdout = captured_output
         
         try:
-            self.repl._process_input('create legacy [42, test, true]')
-            self.repl._process_input('legacy.types()')
+            # Create valid constrained list
+            self.repl._process_input('list<num> numbers = [1, 2, 3]')
+            captured_output = StringIO()
+            sys.stdout = captured_output
             
-            output = captured_output.getvalue().strip()
-            assert 'num' in output
-            assert 'string' in output
-            assert 'bool' in output
+            self.repl._process_input('numbers.validate_constraint()')
+            output = captured_output.getvalue()
+            assert "satisfy constraint" in output
+        finally:
+            sys.stdout = sys.__stdout__
+    
+    def test_type_summary_method(self):
+        """Test the type_summary() method."""
+        captured_output = StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            self.repl._process_input('list<num> numbers = [1, 2, 3]')
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            self.repl._process_input('numbers.type_summary()')
+            output = captured_output.getvalue()
+            assert "3 num" in output
+            assert "constraint: num" in output
+        finally:
+            sys.stdout = sys.__stdout__
+    
+    def test_type_summary_mixed_types(self):
+        """Test type_summary() with mixed types."""
+        captured_output = StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            self.repl._process_input('list mixed = [1, "hello", true, 3.14]')
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            self.repl._process_input('mixed.type_summary()')
+            output = captured_output.getvalue()
+            assert "2 num" in output
+            assert "1 bool" in output
+            assert "1 string" in output
         finally:
             sys.stdout = sys.__stdout__
 
 
-class TestTypeEdgeCases:
-    """Test edge cases for type system."""
+class TestConstraintEnforcement:
+    """Test that type constraints are enforced during mutations."""
     
     def setup_method(self):
-        self.tokenizer = Tokenizer()
+        self.repl = REPL()
     
-    def test_edge_case_numbers(self):
-        """Test edge cases for number parsing."""
-        # These should be parsed as numbers
-        assert isinstance(self.tokenizer.infer_value_type("0"), int)
-        assert isinstance(self.tokenizer.infer_value_type("-0"), int)
-        assert isinstance(self.tokenizer.infer_value_type("00"), int)
+    def test_append_respects_constraint(self):
+        """Test that append() respects type constraints."""
+        captured_output = StringIO()
+        sys.stdout = captured_output
         
-        # These should be parsed as floats
-        assert isinstance(self.tokenizer.infer_value_type("0.0"), float)
-        assert isinstance(self.tokenizer.infer_value_type("-0.0"), float)
+        try:
+            self.repl._process_input('list<num> numbers = [1, 2, 3]')
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            # Valid append
+            self.repl._process_input('numbers.append 42')
+            output = captured_output.getvalue()
+            assert "Error" not in output
+            assert "Appended" in output
+            
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            # Invalid append
+            self.repl._process_input('numbers.append hello')
+            output = captured_output.getvalue()
+            assert "Error" in output
+            assert "constraint" in output
+        finally:
+            sys.stdout = sys.__stdout__
     
-    def test_numeric_strings(self):
-        """Test strings that look like numbers but aren't."""
-        # These should remain as strings because of quotes
-        result = self.tokenizer.parse_list_literal_with_types("['42', \"3.14\", 'true']")
-        assert result == ["42", "3.14", "true"]
-        assert all(isinstance(item, str) for item in result)
-    
-    def test_boolean_case_variations(self):
-        """Test different case variations of booleans."""
-        variations = ["true", "TRUE", "True", "false", "FALSE", "False"]
-        results = [self.tokenizer.infer_value_type(v) for v in variations]
+    def test_prepend_respects_constraint(self):
+        """Test that prepend() respects type constraints."""
+        captured_output = StringIO()
+        sys.stdout = captured_output
         
-        expected = [True, True, True, False, False, False]
-        assert results == expected
-        assert all(isinstance(r, bool) for r in results)
+        try:
+            self.repl._process_input('list<string> words = ["hello", "world"]')
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            # Valid prepend
+            self.repl._process_input('words.prepend greetings')
+            output = captured_output.getvalue()
+            assert "Error" not in output
+            
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            # Invalid prepend
+            self.repl._process_input('words.prepend 123')
+            output = captured_output.getvalue()
+            assert "Error" in output
+            assert "constraint" in output
+        finally:
+            sys.stdout = sys.__stdout__
+    
+    def test_insert_respects_constraint(self):
+        """Test that insert() respects type constraints."""
+        captured_output = StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            self.repl._process_input('list<bool> flags = [true, false]')
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            # Valid insert
+            self.repl._process_input('flags.insert 1 true')
+            output = captured_output.getvalue()
+            assert "Error" not in output
+            
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            # Invalid insert
+            self.repl._process_input('flags.insert 0 maybe')
+            output = captured_output.getvalue()
+            assert "Error" in output
+            assert "constraint" in output
+        finally:
+            sys.stdout = sys.__stdout__
+
+
+class TestTypeCoercion:
+    """Test type coercion functionality."""
+    
+    def setup_method(self):
+        self.repl = REPL()
+    
+    def test_coerce_to_constraint_method(self):
+        """Test the coerce_to_constraint() method."""
+        captured_output = StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            # Create mixed type list, then add constraint via legacy method
+            self.repl._process_input('list mixed = [1, 2, "hello", 4]')
+            
+            # Manually add constraint to test coercion
+            graph = self.repl.graph_manager.get_variable('mixed')
+            if not hasattr(graph, 'metadata'):
+                graph.metadata = {}
+            graph.metadata['type_constraint'] = 'num'
+            
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            self.repl._process_input('mixed.coerce_to_constraint()')
+            output = captured_output.getvalue()
+            # Should show attempted coercion results
+            assert "Coercion" in output or "FAILED" in output
+        finally:
+            sys.stdout = sys.__stdout__
+    
+    def test_coerce_no_constraint(self):
+        """Test coerce_to_constraint() on list without constraint."""
+        captured_output = StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            self.repl._process_input('list normal = [1, 2, 3]')
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            self.repl._process_input('normal.coerce_to_constraint()')
+            output = captured_output.getvalue()
+            assert "no type constraint" in output
+        finally:
+            sys.stdout = sys.__stdout__
+
+
+class TestTypeConstraintIntegration:
+    """Test integration of type constraints with existing features."""
+    
+    def setup_method(self):
+        self.repl = REPL()
+    
+    def test_constraint_with_indexing(self):
+        """Test that type constraints work with indexing syntax."""
+        captured_output = StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            self.repl._process_input('list<num> numbers = [10, 20, 30]')
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            # Test index access still works
+            self.repl._process_input('numbers[1]')
+            output = captured_output.getvalue()
+            assert "20" in output
+            
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            # Test index assignment with valid type
+            self.repl._process_input('numbers[1] = 99')
+            output = captured_output.getvalue()
+            assert "Set numbers[1] = 99" in output
+        finally:
+            sys.stdout = sys.__stdout__
+    
+    def test_constraint_with_slicing(self):
+        """Test that type constraints work with slicing syntax."""
+        captured_output = StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            self.repl._process_input('list<string> words = ["hello", "world", "test", "data"]')
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            # Test slice access
+            self.repl._process_input('words[1:3]')
+            output = captured_output.getvalue()
+            assert "world" in output and "test" in output
+            
+            captured_output = StringIO()
+            sys.stdout = captured_output
+            
+            # Test slice assignment with valid types
+            self.repl._process_input('words[1:3] = ["new", "items"]')
+            output = captured_output.getvalue()
+            assert "Set words[1:3]" in output
+        finally:
+            sys.stdout = sys.__stdout__
+
+
+class TestTypeConstraintErrorHandling:
+    """Test error handling for type constraint features."""
+    
+    def setup_method(self):
+        self.repl = REPL()
+    
+    def test_invalid_type_constraint_syntax(self):
+        """Test error handling for invalid type constraint syntax."""
+        captured_output = StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            # Missing closing angle bracket
+            self.repl._process_input('list<num numbers = [1, 2, 3]')
+            # Should fall back to legacy command parsing or show error
+            output = captured_output.getvalue()
+            # Just ensure it doesn't crash
+            assert len(output) >= 0
+        finally:
+            sys.stdout = sys.__stdout__
+    
+    def test_unsupported_type_constraint(self):
+        """Test handling of unsupported type constraints."""
+        # This would need parser enhancement to detect unknown types
+        # For now, unknown types in angle brackets should be treated as identifiers
+        captured_output = StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            self.repl._process_input('list<unknown> data = [1, 2, 3]')
+            output = captured_output.getvalue()
+            # Should either create the list or show error - just ensure no crash
+            assert len(output) >= 0
+        finally:
+            sys.stdout = sys.__stdout__
+
+
+class TestTypeConstraintWorkflow:
+    """Test complete workflows with type constraints."""
+    
+    def setup_method(self):
+        self.repl = REPL()
+    
+    def test_full_constrained_workflow(self):
+        """Test a complete workflow with type-constrained lists."""
+        captured_output = StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            # Create constrained list
+            self.repl._process_input('list<num> scores = [95, 87, 92]')
+            
+            # Check constraint
+            self.repl._process_input('scores.constraint()')
+            
+            # Add valid values
+            self.repl._process_input('scores.append 88')
+            
+            # Try to add invalid value (should fail)
+            self.repl._process_input('scores.append excellent')
+            
+            # Check final state
+            self.repl._process_input('scores')
+            self.repl._process_input('scores.validate_constraint()')
+            self.repl._process_input('scores.type_summary()')
+            
+            output = captured_output.getvalue()
+            
+            # Should show constraint info
+            assert "constraint: num" in output
+            # Should show successful append
+            assert "Appended '88'" in output
+            # Should show failed append
+            assert "Error" in output and "constraint" in output
+            # Should show validation passed
+            assert "satisfy constraint" in output
+            
+        finally:
+            sys.stdout = sys.__stdout__

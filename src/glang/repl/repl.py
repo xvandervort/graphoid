@@ -7,7 +7,7 @@ import os
 from typing import Dict, Callable, Optional, List
 from glang import __version__, __description__
 from .graph_manager import GraphManager
-from ..parser import SyntaxParser, InputType, IndexAccess
+from ..parser import SyntaxParser, InputType, IndexAccess, IndexAssignment, SliceAccess, SliceAssignment
 from ..display import GraphRenderer, DisplayMode
 from ..methods import MethodDispatcher
 
@@ -83,6 +83,12 @@ class REPL:
             self._handle_variable_access(parsed)
         elif parsed.input_type == InputType.INDEX_ACCESS:
             self._handle_index_access(parsed)
+        elif parsed.input_type == InputType.INDEX_ASSIGNMENT:
+            self._handle_index_assignment(parsed)
+        elif parsed.input_type == InputType.SLICE_ACCESS:
+            self._handle_slice_access(parsed)
+        elif parsed.input_type == InputType.SLICE_ASSIGNMENT:
+            self._handle_slice_assignment(parsed)
         elif parsed.input_type == InputType.LEGACY_COMMAND:
             self._handle_legacy_command(parsed)
     
@@ -269,23 +275,42 @@ class REPL:
             return None
     
     def _get_completions(self, text: str, line: str) -> List[str]:
-        """Get list of possible completions."""
-        # Split the line into parts
+        """Get list of possible completions with enhanced syntax support."""
+        # Check for method call pattern: variable.method
+        if self._is_method_context(line):
+            return self._get_method_completions(line, text)
+        
+        # Check for type constraint pattern: list<type>
+        if self._is_type_constraint_context(line):
+            return self._get_type_constraint_completions(line, text)
+        
+        # Check for variable declaration: list variable = or graph variable =
+        if self._is_declaring_type(line):
+            return self._get_graph_type_completions(text)
+        
+        # Standard completion logic
         parts = line.strip().split()
         
         if not parts or (len(parts) == 1 and not line.endswith(' ')):
-            # Completing first word (command or variable)
+            # Completing first word (command, graph type, or variable)
             all_commands = list(self.commands.keys()) + [
                 "create", "show", "graphs", "traverse", "delete", "info",
-                "namespace", "stats", "append", "prepend", "insert", "reverse",
-                "list", "graph", "tree", "directed", "weighted"  # New graph types
+                "namespace", "stats", "append", "prepend", "insert", "reverse"
             ]
-            # Also include existing variables for variable access
+            
+            # Add graph types for new syntax
+            graph_types = ["list", "graph", "tree", "directed", "weighted", "string", "num", "bool"]
+            
+            # Add existing variables for variable access
             variables = self.graph_manager.variable_graph.list_variables()
-            all_options = all_commands + variables
-            return [opt for opt in all_options if opt.startswith(text)]
+            
+            all_options = all_commands + graph_types + variables
+            
+            # Filter based on what's being typed
+            current_text = text if text else (parts[0] if parts else "")
+            return [opt for opt in all_options if opt.startswith(current_text)]
         
-        # Completing arguments
+        # Completing arguments for legacy commands
         cmd = parts[0].lower()
         
         if cmd in ["show", "traverse", "delete", "info"]:
@@ -294,11 +319,82 @@ class REPL:
             return [var for var in variables if var.startswith(text)]
         
         elif cmd == "create" and len(parts) >= 3:
-            # Complete graph types
+            # Complete graph types for legacy create command
             graph_types = ["linear", "directed", "tree", "cyclic", "weighted", "undirected"]
             return [gt for gt in graph_types if gt.startswith(text)]
         
         return []
+    
+    def _is_method_context(self, line: str) -> bool:
+        """Check if we're in a method call context (variable.method)."""
+        return '.' in line and not line.strip().endswith('.')
+    
+    def _is_type_constraint_context(self, line: str) -> bool:
+        """Check if we're in a type constraint context (list<type>)."""
+        if '<' not in line or line.strip().endswith('>'):
+            return False
+        
+        # Must have content before < (like 'list<' not just '<')
+        angle_pos = line.find('<')
+        return angle_pos > 0 and line[:angle_pos].strip()
+    
+    def _is_declaring_type(self, line: str) -> bool:
+        """Check if we're declaring a graph type (beginning of line)."""
+        parts = line.strip().split()
+        if len(parts) != 1 or line.endswith(' '):
+            return False
+        
+        # Only consider it type declaration if it starts with a graph type
+        graph_types = ['list', 'graph', 'tree', 'directed', 'weighted', 'undirected']
+        return any(gt.startswith(parts[0]) for gt in graph_types)
+    
+    def _get_method_completions(self, line: str, text: str) -> List[str]:
+        """Get method completions for variable.method pattern."""
+        # Extract variable name from line like "fruits.app"
+        dot_pos = line.rfind('.')
+        if dot_pos == -1:
+            return []
+        
+        var_part = line[:dot_pos].strip().split()[-1]  # Get last word before dot
+        
+        # Get the variable's graph
+        graph = self.graph_manager.get_variable(var_part)
+        if not graph:
+            return []
+        
+        # Get appropriate methods based on graph type
+        methods = []
+        if graph.graph_type.is_linear():
+            methods = [
+                'append', 'prepend', 'insert', 'reverse', 'delete', 
+                'size', 'empty', 'types', 'constraint', 'validate_constraint',
+                'type_summary', 'coerce_to_constraint'
+            ]
+        else:
+            methods = ['size', 'empty', 'nodes', 'edges']
+        
+        # Filter methods that start with the text after the dot
+        method_text = text if text else line[dot_pos + 1:]
+        return [method for method in methods if method.startswith(method_text)]
+    
+    def _get_type_constraint_completions(self, line: str, text: str) -> List[str]:
+        """Get type constraint completions for list<type> pattern."""
+        # Find the position of < to extract what's being typed
+        angle_pos = line.rfind('<')
+        if angle_pos == -1:
+            return []
+        
+        # Available type constraints
+        type_constraints = ['num', 'string', 'bool', 'list']
+        
+        # Get the text after <
+        constraint_text = text if text else line[angle_pos + 1:]
+        return [tc for tc in type_constraints if tc.startswith(constraint_text)]
+    
+    def _get_graph_type_completions(self, text: str) -> List[str]:
+        """Get graph type completions for variable declarations."""
+        graph_types = ['list', 'graph', 'tree', 'directed', 'weighted', 'undirected', 'string', 'num', 'bool']
+        return [gt for gt in graph_types if gt.startswith(text)]
     
     def _save_history(self) -> None:
         """Save command history to file."""
@@ -310,17 +406,192 @@ class REPL:
     
     def _handle_variable_declaration(self, parsed) -> None:
         """Handle new-style variable declarations."""
-        # For now, only support 'list' type
-        if parsed.graph_type != 'list':
+        # Support both collection types (list) and scalar types (string, num, bool)
+        if parsed.graph_type == 'list':
+            self._handle_list_declaration(parsed)
+        elif parsed.graph_type in ['string', 'num', 'bool']:
+            self._handle_scalar_declaration(parsed)
+        else:
             print(f"Graph type '{parsed.graph_type}' not yet implemented")
             return
-        
+    
+    def _handle_list_declaration(self, parsed) -> None:
+        """Handle list variable declarations."""
         if parsed.initializer is None:
             # Empty list
             parsed.initializer = []
         
-        result = self.graph_manager.create_from_list(parsed.variable_name, parsed.initializer)
+        # Validate type constraints if specified
+        if parsed.type_constraint:
+            validation_result = self._validate_type_constraint(parsed.initializer, parsed.type_constraint)
+            if not validation_result[0]:
+                print(f"Type validation failed: {validation_result[1]}")
+                return
+        
+        # Resolve any IDENTIFIER tokens in the initializer to actual variables
+        try:
+            resolved_initializer = self._resolve_identifiers(parsed.initializer)
+        except ValueError as e:
+            print(f"Error: {e}")
+            return
+        
+        result = self.graph_manager.create_from_list(parsed.variable_name, resolved_initializer)
+        
+        # Store type constraint metadata if specified
+        if parsed.type_constraint:
+            graph = self.graph_manager.get_variable(parsed.variable_name)
+            if graph is not None:
+                # Add type constraint as metadata
+                if not hasattr(graph, 'metadata'):
+                    graph.metadata = {}
+                graph.metadata['type_constraint'] = parsed.type_constraint
+        
         print(result)
+    
+    def _handle_scalar_declaration(self, parsed) -> None:
+        """Handle scalar variable declarations (string, num, bool)."""
+        if parsed.initializer is None:
+            print(f"Scalar variable '{parsed.variable_name}' requires an initializer")
+            return
+        
+        # For scalar declarations, the initializer should be a single value
+        if isinstance(parsed.initializer, list) and len(parsed.initializer) == 1:
+            value = parsed.initializer[0]
+        elif isinstance(parsed.initializer, list):
+            print(f"Scalar variable '{parsed.variable_name}' cannot be initialized with a list")
+            return
+        else:
+            value = parsed.initializer
+        
+        # Resolve IDENTIFIER if needed
+        try:
+            if isinstance(value, dict) and value.get('type') == 'IDENTIFIER':
+                var_name = value['name']
+                source_graph = self.graph_manager.get_variable(var_name)
+                if source_graph is None:
+                    print(f"Error: Variable '{var_name}' not found. Use quotes for strings.")
+                    return
+                
+                # Extract value from source graph
+                if len(source_graph) == 1:
+                    current = source_graph._head
+                    value = current.data if current else None
+                    if value is None:
+                        print(f"Error: Variable '{var_name}' has no data")
+                        return
+                else:
+                    print(f"Error: Cannot assign multi-value variable '{var_name}' to scalar")
+                    return
+        except Exception as e:
+            print(f"Error resolving variable: {e}")
+            return
+        
+        # Type validation
+        expected_type = parsed.graph_type
+        try:
+            if not self._validate_scalar_type(value, expected_type):
+                print(f"Error: Value '{value}' is not compatible with type '{expected_type}'")
+                return
+        except Exception as e:
+            print(f"Error during type validation: {e}")
+            print(f"Value: {value}, type: {type(value)}, expected: {expected_type}")
+            return
+        
+        # Create as single-node graph (maintaining "everything is a graph" philosophy)
+        result = self.graph_manager.create_from_list(parsed.variable_name, [value])
+        
+        # Store scalar type metadata
+        graph = self.graph_manager.get_variable(parsed.variable_name)
+        if graph is not None:
+            if not hasattr(graph, 'metadata'):
+                graph.metadata = {}
+            graph.metadata['scalar_type'] = expected_type
+        
+        print(f"Created {expected_type} variable '{parsed.variable_name}' = {self._format_scalar_value(value)}")
+    
+    def _validate_scalar_type(self, value, expected_type: str) -> bool:
+        """Validate that a value matches the expected scalar type."""
+        if expected_type == 'string':
+            return isinstance(value, str)
+        elif expected_type == 'num':
+            return isinstance(value, (int, float))
+        elif expected_type == 'bool':
+            return isinstance(value, bool)
+        return False
+    
+    def _format_scalar_value(self, value) -> str:
+        """Format scalar value for display."""
+        if isinstance(value, str):
+            return f"'{value}'"
+        elif isinstance(value, bool):
+            return 'true' if value else 'false'
+        return str(value)
+    
+    def _resolve_identifiers(self, data_list: List) -> List:
+        """Resolve IDENTIFIER tokens to actual variable values."""
+        if not data_list:
+            return data_list
+        
+        resolved = []
+        for item in data_list:
+            if isinstance(item, dict) and item.get('type') == 'IDENTIFIER':
+                # This is an identifier that needs to be resolved
+                var_name = item['name']
+                graph = self.graph_manager.get_variable(var_name)
+                if graph is None:
+                    raise ValueError(f"Variable '{var_name}' not found. Use quotes for strings.")
+                
+                # For linear graphs, get the data in order
+                if graph.graph_type.is_linear():
+                    data_values = []
+                    current = graph._head
+                    while current:
+                        data_values.append(current.data)
+                        successors = current.get_successors()
+                        current = next(iter(successors)) if successors else None
+                    
+                    # If single value, include it directly; otherwise as a list
+                    if len(data_values) == 1:
+                        resolved.append(data_values[0])
+                    else:
+                        resolved.append(data_values)
+                else:
+                    # For non-linear graphs, get all node data
+                    node_data = [node.data for node in graph.nodes()]
+                    if len(node_data) == 1:
+                        resolved.append(node_data[0])
+                    else:
+                        resolved.append(node_data)
+            elif isinstance(item, list):
+                # Recursively resolve nested lists
+                resolved.append(self._resolve_identifiers(item))
+            else:
+                # Regular value (number, string, boolean)
+                resolved.append(item)
+        
+        return resolved
+    
+    def _validate_type_constraint(self, initializer, type_constraint) -> tuple[bool, str]:
+        """Validate that initializer values match the type constraint.
+        
+        Returns:
+            tuple: (is_valid, error_message)
+        """
+        if not initializer:
+            return True, ""  # Empty lists are always valid
+        
+        for i, value in enumerate(initializer):
+            value_type = self.syntax_parser.tokenizer.get_value_type(value)
+            
+            # Handle nested lists
+            if isinstance(value, list) and type_constraint != 'list':
+                return False, f"Element at index {i} is a list, but constraint requires '{type_constraint}'"
+            elif isinstance(value, list) and type_constraint == 'list':
+                continue  # Nested lists are valid for list constraint
+            elif value_type != type_constraint:
+                return False, f"Element at index {i} ('{value}') is type '{value_type}', but constraint requires '{type_constraint}'"
+        
+        return True, ""
     
     def _handle_method_call(self, parsed) -> None:
         """Handle method calls on variables."""
@@ -334,7 +605,7 @@ class REPL:
     def _handle_variable_access(self, parsed) -> None:
         """Handle variable access (display contents)."""
         graph = self.graph_manager.get_variable(parsed.variable_name)
-        if not graph:
+        if graph is None:
             print(f"Variable '{parsed.variable_name}' not found")
             return
         
@@ -365,7 +636,7 @@ class REPL:
     def _handle_index_access(self, parsed) -> None:
         """Handle index access (variable[index])."""
         graph = self.graph_manager.get_variable(parsed.variable_name)
-        if not graph:
+        if graph is None:
             print(f"Variable '{parsed.variable_name}' not found")
             return
         
@@ -414,11 +685,183 @@ class REPL:
                     # Get the value from the list
                     current_data = current_data[index]
             
-            # Print the final result
-            print(current_data)
+            # Print the final result using consistent formatting
+            from ..display.formatters import GraphFormatter
+            print(GraphFormatter.format_value(current_data))
                 
         except Exception as e:
             print(f"Error accessing index: {e}")
+    
+    def _handle_index_assignment(self, parsed) -> None:
+        """Handle index assignment (variable[index] = value)."""
+        graph = self.graph_manager.get_variable(parsed.variable_name)
+        if graph is None:
+            print(f"Variable '{parsed.variable_name}' not found")
+            return
+        
+        try:
+            # Support both single and multi-dimensional assignment
+            current_data = graph
+            indices = parsed.indices.copy()
+            
+            # Navigate to the location where we want to assign
+            for i, index in enumerate(indices):
+                if i == len(indices) - 1:
+                    # This is the final index - perform the assignment
+                    if i == 0:
+                        # Single-level assignment to graph
+                        if not graph.graph_type.is_linear():
+                            print(f"Assignment only works on linear graphs (current: {graph.graph_type.name})")
+                            return
+                        
+                        # Handle negative indexing for the graph
+                        if index < 0:
+                            index = graph._size + index
+                        
+                        # Check bounds
+                        if index < 0 or index >= graph._size:
+                            print(f"Index {parsed.indices[i]} out of range (graph has {graph._size} elements)")
+                            return
+                        
+                        # Set the value in the graph
+                        success = graph.set(index, parsed.value)
+                        if success:
+                            print(f"Set {parsed.variable_name}[{parsed.indices[i]}] = {parsed.value}")
+                        else:
+                            print(f"Error: Could not set element at index {index}")
+                    else:
+                        # Multi-level assignment to nested list
+                        if not isinstance(current_data, list):
+                            print(f"Cannot assign to index in non-list type: {type(current_data).__name__}")
+                            return
+                        
+                        # Handle negative indexing for the list
+                        if index < 0:
+                            index = len(current_data) + index
+                        
+                        # Check bounds
+                        if index < 0 or index >= len(current_data):
+                            print(f"Index {parsed.indices[i]} out of range (list has {len(current_data)} elements)")
+                            return
+                        
+                        # Assign to the list
+                        current_data[index] = parsed.value
+                        print(f"Set {parsed.variable_name}[{']['.join(map(str, parsed.indices))}] = {parsed.value}")
+                else:
+                    # Navigate deeper into the structure
+                    if i == 0:
+                        # First level - get from graph
+                        if not graph.graph_type.is_linear():
+                            print(f"Indexing only works on linear graphs (current: {graph.graph_type.name})")
+                            return
+                        
+                        # Handle negative indexing for the graph
+                        if index < 0:
+                            index = graph._size + index
+                        
+                        # Check bounds
+                        if index < 0 or index >= graph._size:
+                            print(f"Index {parsed.indices[i]} out of range (graph has {graph._size} elements)")
+                            return
+                        
+                        # Get the value from the graph
+                        current_data = graph.get(index)
+                        if current_data is None:
+                            print(f"Error: Could not get element at index {index}")
+                            return
+                    else:
+                        # Subsequent levels - get from list
+                        if not isinstance(current_data, list):
+                            print(f"Cannot index into non-list type: {type(current_data).__name__}")
+                            return
+                        
+                        # Handle negative indexing for the list
+                        if index < 0:
+                            index = len(current_data) + index
+                        
+                        # Check bounds
+                        if index < 0 or index >= len(current_data):
+                            print(f"Index {parsed.indices[i]} out of range (list has {len(current_data)} elements)")
+                            return
+                        
+                        # Get the value from the list
+                        current_data = current_data[index]
+            
+        except Exception as e:
+            print(f"Error in assignment: {e}")
+    
+    def _handle_slice_access(self, parsed) -> None:
+        """Handle slice access (variable[start:stop:step])."""
+        graph = self.graph_manager.get_variable(parsed.variable_name)
+        if graph is None:
+            print(f"Variable '{parsed.variable_name}' not found")
+            return
+        
+        try:
+            if not graph.graph_type.is_linear():
+                print(f"Slicing only works on linear graphs (current: {graph.graph_type.name})")
+                return
+            
+            # Use Python slicing logic - convert graph to list, slice it, then display
+            data_list = graph.to_list()
+            
+            # Handle None values for Python slice()
+            start = parsed.start
+            stop = parsed.stop
+            step = parsed.step
+            
+            # Create slice object and apply it
+            slice_obj = slice(start, stop, step)
+            sliced_data = data_list[slice_obj]
+            
+            # Display the result using consistent formatting
+            from ..display.formatters import GraphFormatter
+            print(GraphFormatter.format_value(sliced_data))
+            
+        except Exception as e:
+            print(f"Error in slicing: {e}")
+    
+    def _handle_slice_assignment(self, parsed) -> None:
+        """Handle slice assignment (variable[start:stop:step] = values)."""
+        graph = self.graph_manager.get_variable(parsed.variable_name)
+        if graph is None:
+            print(f"Variable '{parsed.variable_name}' not found")
+            return
+        
+        try:
+            if not graph.graph_type.is_linear():
+                print(f"Slice assignment only works on linear graphs (current: {graph.graph_type.name})")
+                return
+            
+            # Get the current data as a list
+            data_list = graph.to_list()
+            
+            # Create slice object
+            slice_obj = slice(parsed.start, parsed.stop, parsed.step)
+            
+            # Assign the new values to the slice
+            if isinstance(parsed.value, list):
+                data_list[slice_obj] = parsed.value
+            else:
+                # Single value assigned to slice - Python will repeat it
+                data_list[slice_obj] = [parsed.value] * len(data_list[slice_obj])
+            
+            # Rebuild the graph from the modified list
+            # Clear the graph and rebuild it
+            graph.clear()
+            for item in data_list:
+                graph.append(item)
+            
+            # Show confirmation
+            slice_notation = f"[{parsed.start or ''}:{parsed.stop or ''}"
+            if parsed.step is not None:
+                slice_notation += f":{parsed.step}"
+            slice_notation += "]"
+            
+            print(f"Set {parsed.variable_name}{slice_notation} = {parsed.value}")
+            
+        except Exception as e:
+            print(f"Error in slice assignment: {e}")
     
     def _handle_legacy_command(self, parsed) -> None:
         """Handle legacy command format."""

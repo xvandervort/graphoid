@@ -19,7 +19,7 @@ class TestSyntaxParser:
     
     def test_variable_declaration_list(self):
         """Test parsing list variable declarations."""
-        input_str = "list fruits = [apple, banana, cherry]"
+        input_str = 'list fruits = ["apple", "banana", "cherry"]'
         parsed = self.parser.parse_input(input_str)
         
         assert isinstance(parsed, VariableDeclaration)
@@ -30,7 +30,7 @@ class TestSyntaxParser:
     
     def test_variable_declaration_with_quotes(self):
         """Test parsing with quoted strings."""
-        input_str = 'list items = ["hello world", \'test item\', unquoted]'
+        input_str = 'list items = ["hello world", \'test item\', "unquoted"]'
         parsed = self.parser.parse_input(input_str)
         
         assert isinstance(parsed, VariableDeclaration)

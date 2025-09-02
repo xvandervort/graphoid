@@ -33,6 +33,10 @@ class MethodDispatcher:
             'slice': LinearGraphMethods.slice,
             'types': LinearGraphMethods.types,
             'typeof': LinearGraphMethods.typeof,
+            'constraint': LinearGraphMethods.constraint,
+            'validate_constraint': LinearGraphMethods.validate_constraint,
+            'type_summary': LinearGraphMethods.type_summary,
+            'coerce_to_constraint': LinearGraphMethods.coerce_to_constraint,
             
             # General graph queries
             'size': GraphMethods.size,

@@ -55,14 +55,14 @@ class TestNestedListParsing:
     
     def test_nested_with_quotes(self):
         """Test nested lists with quoted strings."""
-        result = self.tokenizer.parse_list_literal_with_types("[['hello world', 'test'], ['quoted', test]]")
-        expected = [['hello world', 'test'], ['quoted', 'test']]
+        result = self.tokenizer.parse_list_literal_with_types("[['hello world', 'test'], ['quoted', 'test2']]")
+        expected = [['hello world', 'test'], ['quoted', 'test2']]
         
         assert result == expected
         assert result[0][0] == 'hello world'  # quoted
         assert result[0][1] == 'test'         # quoted
         assert result[1][0] == 'quoted'       # quoted
-        assert result[1][1] == 'test'         # unquoted
+        assert result[1][1] == 'test2'        # quoted
     
     def test_empty_nested_lists(self):
         """Test nested lists with empty sublists."""
@@ -101,7 +101,7 @@ class TestNestedListREPLIntegration:
         sys.stdout = captured_output
         
         try:
-            self.repl._process_input('list data = [[a, b], [c, d]]')
+            self.repl._process_input('list data = [["a", "b"], ["c", "d"]]')
             self.repl._process_input('data[0]')
             self.repl._process_input('data[1]')
             
@@ -109,8 +109,8 @@ class TestNestedListREPLIntegration:
             
             # Look for the list outputs
             list_outputs = [line for line in output_lines if '[' in line and ']' in line]
-            assert len([line for line in list_outputs if "'a', 'b'" in line or "a, b" in line]) >= 1
-            assert len([line for line in list_outputs if "'c', 'd'" in line or "c, d" in line]) >= 1
+            assert len([line for line in list_outputs if "'a', 'b'" in line]) >= 1
+            assert len([line for line in list_outputs if "'c', 'd'" in line]) >= 1
         finally:
             sys.stdout = sys.__stdout__
     
@@ -144,12 +144,12 @@ class TestNestedListREPLIntegration:
         sys.stdout = captured_output
         
         try:
-            self.repl._process_input('list table = [[a, b, c], [x, y, z]]')
+            self.repl._process_input('list table = [["a", "b", "c"], ["x", "y", "z"]]')
             self.repl._process_input('table[-1]')      # Last row: [x, y, z]
             self.repl._process_input('table[-1][-1]')  # Last element: z
             
             output = captured_output.getvalue().strip()
-            assert 'z' in output
+            assert "'z'" in output
         finally:
             sys.stdout = sys.__stdout__
     
@@ -159,7 +159,7 @@ class TestNestedListREPLIntegration:
         sys.stdout = captured_output
         
         try:
-            self.repl._process_input('list nested = [[1, 2], [hello, world]]')
+            self.repl._process_input('list nested = [[1, 2], ["hello", "world"]]')
             self.repl._process_input('nested.types()')
             
             output = captured_output.getvalue().strip()
@@ -181,7 +181,7 @@ class TestNestedListErrorHandling:
         sys.stdout = captured_output
         
         try:
-            self.repl._process_input('list simple = [hello, world]')
+            self.repl._process_input('list simple = ["hello", "world"]')
             self.repl._process_input('simple[0][1]')  # hello[1] - should fail
             
             output = captured_output.getvalue().strip()

@@ -27,7 +27,7 @@ class TestFormatters:
         
         # Test normal list
         result = formatter.format_graph(self.graph)
-        assert result == "[apple, banana, cherry]"
+        assert result == "['apple', 'banana', 'cherry']"
         
         # Test empty list
         result = formatter.format_graph(self.empty_graph)
@@ -42,7 +42,7 @@ class TestFormatters:
         assert "'hello world'" in result
         assert "'123'" in result  # Numbers as strings
         assert "'None'" in result  # Special values
-        assert "simple" in result  # No quotes needed
+        assert "'simple'" in result  # All strings are quoted now
     
     def test_simple_formatter_multiline(self):
         """Test simple formatter with multiline option."""
@@ -73,7 +73,7 @@ class TestFormatters:
         # Test without IDs
         result = formatter.format_graph(self.graph, show_ids=False)
         assert "Node(" not in result
-        assert "[apple]" in result
+        assert "['apple']" in result
     
     def test_detailed_formatter_empty_graph(self):
         """Test detailed formatter with empty graph."""
@@ -100,8 +100,8 @@ class TestFormatters:
         assert "Type: LINEAR" in result
         assert "Nodes: 3" in result
         assert "Edges: 2" in result
-        assert "Head: apple" in result
-        assert "Tail: cherry" in result
+        assert "Head: 'apple'" in result
+        assert "Tail: 'cherry'" in result
         assert "Linear: Yes" in result
     
     def test_meta_formatter_large_graph(self):
@@ -147,7 +147,7 @@ class TestGraphRenderer:
     def test_simple_mode_rendering(self):
         """Test simple mode rendering."""
         result = self.renderer.render(self.graph, DisplayMode.SIMPLE)
-        assert result == "[test, data]"
+        assert result == "['test', 'data']"
     
     def test_detailed_mode_rendering(self):
         """Test detailed mode rendering."""
@@ -169,7 +169,7 @@ class TestGraphRenderer:
         )
         assert "Variable: test_var" in result
         assert "Nodes: 2" in result
-        assert "Head: test" in result
+        assert "Head: 'test'" in result
     
     def test_json_mode_rendering(self):
         """Test JSON mode rendering."""
@@ -191,7 +191,7 @@ class TestGraphRenderer:
         # Should be detailed view without node IDs
         assert "Graph 'test_var'" in result
         assert "Node(" not in result or "show_ids" not in result
-        assert "[test]" in result
+        assert "['test']" in result
     
     def test_flag_parsing(self):
         """Test display flag parsing."""
@@ -252,7 +252,7 @@ class TestDisplayIntegration:
         meta = self.renderer.render(graph, DisplayMode.META, "fruits")
         
         # Verify all modes work
-        assert simple == "[apple, banana]"
+        assert simple == "['apple', 'banana']"
         assert "Graph 'fruits'" in detailed
         assert "Variable: fruits" in meta
     

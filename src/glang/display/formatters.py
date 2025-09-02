@@ -12,14 +12,24 @@ class GraphFormatter:
         """Format a graph for display."""
         raise NotImplementedError
     
+    @staticmethod
+    def format_value(data: Any) -> str:
+        """Format any value for consistent display (static method for easy access)."""
+        if isinstance(data, str):
+            # Always quote strings for consistency and clarity
+            return f"'{data}'"
+        elif isinstance(data, bool):
+            # Use glang boolean literals, not Python ones
+            return 'true' if data else 'false'
+        elif isinstance(data, list):
+            # Format nested lists recursively
+            formatted_items = [GraphFormatter.format_value(item) for item in data]
+            return '[' + ', '.join(formatted_items) + ']'
+        return str(data)
+    
     def format_node_data(self, data: Any) -> str:
         """Format node data for display."""
-        if isinstance(data, str):
-            # Check if it needs quotes for clarity
-            if ' ' in data or data in ['', 'None', 'True', 'False'] or data.isdigit():
-                return f"'{data}'"
-            return data
-        return str(data)
+        return self.format_value(data)
 
 
 class SimpleListFormatter(GraphFormatter):

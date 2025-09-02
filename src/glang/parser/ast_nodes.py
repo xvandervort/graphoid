@@ -11,6 +11,9 @@ class InputType(Enum):
     METHOD_CALL = auto()           # fruits.append value
     VARIABLE_ACCESS = auto()       # fruits
     INDEX_ACCESS = auto()          # fruits[0], fruits[-1]
+    INDEX_ASSIGNMENT = auto()      # fruits[0] = 'mango'
+    SLICE_ACCESS = auto()          # fruits[1:3], fruits[::2]
+    SLICE_ASSIGNMENT = auto()      # fruits[1:3] = [a, b]
     LEGACY_COMMAND = auto()        # create fruits [...]
 
 
@@ -28,10 +31,12 @@ class VariableDeclaration(ParsedCommand):
     Examples:
         list fruits = [apple, banana]
         graph g = directed()
+        list<num> scores = [95, 87, 92]
     """
     graph_type: str = None  # 'list', 'graph', 'directed', etc.
     variable_name: str = None
     initializer: Optional[List[Any]] = None
+    type_constraint: Optional[str] = None  # 'num', 'string', 'bool', etc.
     input_type: InputType = InputType.VARIABLE_DECLARATION
 
 
@@ -82,6 +87,58 @@ class IndexAccess(ParsedCommand):
     def __post_init__(self):
         if self.indices is None:
             self.indices = []
+
+
+@dataclass
+class IndexAssignment(ParsedCommand):
+    """Represents assigning a value to an indexed location.
+    
+    Examples:
+        fruits[0] = 'mango'
+        matrix[1][2] = 42
+        items[-1] = 'last'
+    """
+    variable_name: str = None
+    indices: List[int] = None
+    value: Any = None
+    input_type: InputType = InputType.INDEX_ASSIGNMENT
+    
+    def __post_init__(self):
+        if self.indices is None:
+            self.indices = []
+
+
+@dataclass
+class SliceAccess(ParsedCommand):
+    """Represents accessing a slice of a variable.
+    
+    Examples:
+        fruits[1:3]
+        numbers[::2]
+        items[1:]
+        data[:-1]
+    """
+    variable_name: str = None
+    start: Optional[int] = None
+    stop: Optional[int] = None
+    step: Optional[int] = None
+    input_type: InputType = InputType.SLICE_ACCESS
+
+
+@dataclass
+class SliceAssignment(ParsedCommand):
+    """Represents assigning values to a slice of a variable.
+    
+    Examples:
+        fruits[1:3] = [a, b]
+        numbers[::2] = [1, 3, 5]
+    """
+    variable_name: str = None
+    start: Optional[int] = None
+    stop: Optional[int] = None
+    step: Optional[int] = None
+    value: Any = None
+    input_type: InputType = InputType.SLICE_ASSIGNMENT
 
 
 @dataclass

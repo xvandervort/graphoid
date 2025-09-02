@@ -83,11 +83,11 @@ class TestIndexingIntegration:
         try:
             self.repl._process_input('fruits[0]')
             output = captured_output.getvalue().strip()
-            assert output == 'apple'
+            assert output == "'apple'"
             
             self.repl._process_input('fruits[2]')
             output = captured_output.getvalue().strip().split('\n')[-1]
-            assert output == 'cherry'
+            assert output == "'cherry'"
         finally:
             sys.stdout = sys.__stdout__
     
@@ -99,11 +99,11 @@ class TestIndexingIntegration:
         try:
             self.repl._process_input('fruits[-1]')
             output = captured_output.getvalue().strip()
-            assert output == 'date'
+            assert output == "'date'"
             
             self.repl._process_input('fruits[-2]')
             output = captured_output.getvalue().strip().split('\n')[-1]
-            assert output == 'cherry'
+            assert output == "'cherry'"
         finally:
             sys.stdout = sys.__stdout__
     
@@ -150,7 +150,7 @@ class TestIndexingIntegration:
             assert '2' in output
             
             # Test error case - trying to index into non-list
-            self.repl._process_input('list simple = [hello, world]')
+            self.repl._process_input('list simple = [\"hello\", \"world\"]')
             self.repl._process_input('simple[0][1]')
             output = captured_output.getvalue().strip()
             assert ("cannot index into non-list" in output.lower() or 
@@ -188,17 +188,17 @@ class TestIndexingEdgeCases:
         sys.stdout = captured_output
         
         try:
-            self.repl._process_input('list single = [only]')  # Create single-element list
+            self.repl._process_input('list single = ["only"]')  # Create single-element list
             self.repl._process_input('single[0]')
             output_lines = captured_output.getvalue().strip().split('\n')
             # Find the line with 'only' (should be after creation message)
-            only_line = [line for line in output_lines if line.strip() == 'only']
+            only_line = [line for line in output_lines if line.strip() == "'only'"]
             assert len(only_line) >= 1
             
             self.repl._process_input('single[-1]')
             output_lines = captured_output.getvalue().strip().split('\n')
             # Count occurrences of 'only' - should be at least 2 now
-            only_lines = [line for line in output_lines if line.strip() == 'only']
+            only_lines = [line for line in output_lines if line.strip() == "'only'"]
             assert len(only_lines) >= 2
             
             self.repl._process_input('single[1]')

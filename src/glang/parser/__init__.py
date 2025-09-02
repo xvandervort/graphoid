@@ -8,6 +8,9 @@ from .ast_nodes import (
     MethodCall,
     VariableAccess,
     IndexAccess,
+    IndexAssignment,
+    SliceAccess,
+    SliceAssignment,
     LegacyCommand
 )
 
@@ -19,5 +22,8 @@ __all__ = [
     'MethodCall',
     'VariableAccess',
     'IndexAccess',
+    'IndexAssignment',
+    'SliceAccess',
+    'SliceAssignment',
     'LegacyCommand'
 ]

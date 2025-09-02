@@ -23,6 +23,13 @@ class LinearGraphMethods:
         raw_value = ' '.join(args)
         typed_value = tokenizer.infer_value_type(raw_value)
         
+        # Check type constraint if present
+        if hasattr(graph, 'metadata') and 'type_constraint' in graph.metadata:
+            constraint = graph.metadata['type_constraint']
+            value_type = tokenizer.get_value_type(typed_value)
+            if value_type != constraint:
+                return f"Error: Cannot append '{raw_value}' (type: {value_type}) to {var_name} with constraint: {constraint}"
+        
         graph.append(typed_value)
         return f"Appended '{raw_value}' to {var_name}"
     
@@ -40,6 +47,13 @@ class LinearGraphMethods:
         
         raw_value = ' '.join(args)
         typed_value = tokenizer.infer_value_type(raw_value)
+        
+        # Check type constraint if present
+        if hasattr(graph, 'metadata') and 'type_constraint' in graph.metadata:
+            constraint = graph.metadata['type_constraint']
+            value_type = tokenizer.get_value_type(typed_value)
+            if value_type != constraint:
+                return f"Error: Cannot prepend '{raw_value}' (type: {value_type}) to {var_name} with constraint: {constraint}"
         
         graph.prepend(typed_value)
         return f"Prepended '{raw_value}' to {var_name}"
@@ -61,6 +75,13 @@ class LinearGraphMethods:
             
             raw_value = ' '.join(args[1:])
             typed_value = tokenizer.infer_value_type(raw_value)
+            
+            # Check type constraint if present
+            if hasattr(graph, 'metadata') and 'type_constraint' in graph.metadata:
+                constraint = graph.metadata['type_constraint']
+                value_type = tokenizer.get_value_type(typed_value)
+                if value_type != constraint:
+                    return f"Error: Cannot insert '{raw_value}' (type: {value_type}) to {var_name} with constraint: {constraint}"
             
             graph.insert(index, typed_value)
             return f"Inserted '{raw_value}' at index {index} in {var_name}"
@@ -283,3 +304,120 @@ class LinearGraphMethods:
             return f"Error: Argument to typeof must be a number"
         except Exception as e:
             return f"Error: {str(e)}"
+    
+    @staticmethod
+    def constraint(graph: Graph, var_name: str, args: List[str]) -> str:
+        """Get the type constraint of the graph if it has one."""
+        if hasattr(graph, 'metadata') and 'type_constraint' in graph.metadata:
+            constraint = graph.metadata['type_constraint']
+            return f"{var_name} has type constraint: {constraint}"
+        else:
+            return f"{var_name} has no type constraint"
+    
+    @staticmethod
+    def validate_constraint(graph: Graph, var_name: str, args: List[str]) -> str:
+        """Validate that all elements match the type constraint."""
+        if not hasattr(graph, 'metadata') or 'type_constraint' not in graph.metadata:
+            return f"{var_name} has no type constraint to validate"
+        
+        constraint = graph.metadata['type_constraint']
+        
+        if graph._size == 0:
+            return f"{var_name} is empty - constraint validation passed"
+        
+        from ..parser.tokenizer import Tokenizer
+        tokenizer = Tokenizer()
+        
+        # Validate each element
+        violations = []
+        current = graph._head
+        index = 0
+        
+        while current is not None:
+            value_type = tokenizer.get_value_type(current.data)
+            if value_type != constraint:
+                violations.append(f"index {index}: {current.data} (type: {value_type})")
+            
+            # Move to next node
+            successors = current.get_successors()
+            current = next(iter(successors)) if successors else None
+            index += 1
+        
+        if violations:
+            return f"Type constraint violations for {constraint}:\\n" + "\\n".join(violations)
+        else:
+            return f"All elements in {var_name} satisfy constraint: {constraint}"
+    
+    @staticmethod
+    def type_summary(graph: Graph, var_name: str, args: List[str]) -> str:
+        """Get a summary of types in the graph."""
+        if not graph.graph_type.is_linear():
+            return f"Error: type_summary() only works on linear graphs"
+        
+        if graph._size == 0:
+            return f"{var_name}: empty list"
+        
+        from ..parser.tokenizer import Tokenizer
+        tokenizer = Tokenizer()
+        
+        # Count types
+        type_counts = {}
+        current = graph._head
+        
+        while current is not None:
+            value_type = tokenizer.get_value_type(current.data)
+            type_counts[value_type] = type_counts.get(value_type, 0) + 1
+            
+            # Move to next node
+            successors = current.get_successors()
+            current = next(iter(successors)) if successors else None
+        
+        # Format summary
+        summary_parts = []
+        for type_name, count in sorted(type_counts.items()):
+            summary_parts.append(f"{count} {type_name}")
+        
+        constraint_info = ""
+        if hasattr(graph, 'metadata') and 'type_constraint' in graph.metadata:
+            constraint_info = f" (constraint: {graph.metadata['type_constraint']})"
+        
+        return f"{var_name}: {', '.join(summary_parts)}{constraint_info}"
+    
+    @staticmethod
+    def coerce_to_constraint(graph: Graph, var_name: str, args: List[str]) -> str:
+        """Attempt to coerce all values in the graph to match the type constraint."""
+        if not hasattr(graph, 'metadata') or 'type_constraint' not in graph.metadata:
+            return f"Error: {var_name} has no type constraint to coerce to"
+        
+        constraint = graph.metadata['type_constraint']
+        
+        if graph._size == 0:
+            return f"{var_name} is empty - no coercion needed"
+        
+        from ..parser.tokenizer import Tokenizer
+        tokenizer = Tokenizer()
+        
+        # Collect all nodes that need coercion
+        coercion_results = []
+        current = graph._head
+        index = 0
+        
+        while current is not None:
+            current_type = tokenizer.get_value_type(current.data)
+            if current_type != constraint:
+                success, coerced_value, error_msg = tokenizer.coerce_to_type(current.data, constraint)
+                if success:
+                    current.data = coerced_value
+                    coercion_results.append(f"index {index}: {current_type} -> {constraint}")
+                else:
+                    coercion_results.append(f"index {index}: FAILED - {error_msg}")
+            
+            # Move to next node
+            successors = current.get_successors()
+            current = next(iter(successors)) if successors else None
+            index += 1
+        
+        if not coercion_results:
+            return f"All values in {var_name} already match constraint: {constraint}"
+        else:
+            return f"Coercion results for {var_name}:\\n" + "\\n".join(coercion_results)

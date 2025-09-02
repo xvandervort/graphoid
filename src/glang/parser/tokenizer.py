@@ -20,7 +20,8 @@ class Tokenizer:
     
     # Token patterns
     PATTERNS = [
-        ('GRAPH_TYPE', r'\b(list|graph|tree|directed|weighted)\b'),
+        ('GRAPH_TYPE', r'\b(list|graph|tree|directed|weighted|string|num|bool)\b'),
+        ('TYPE_CONSTRAINT', r'\b(num|string|bool)\b'),  # Removed 'list' to avoid conflicts
         ('IDENTIFIER', r'[a-zA-Z_][a-zA-Z0-9_]*'),
         ('NUMBER', r'-?\d+(\.\d+)?'),
         ('STRING_SINGLE', r"'([^']*)'"),
@@ -29,6 +30,8 @@ class Tokenizer:
         ('DOT', r'\.'),
         ('LBRACKET', r'\['),
         ('RBRACKET', r'\]'),
+        ('LANGLE', r'<'),
+        ('RANGLE', r'>'),
         ('LPAREN', r'\('),
         ('RPAREN', r'\)'),
         ('COMMA', r','),
@@ -150,8 +153,47 @@ class Tokenizer:
         except ValueError:
             pass
         
-        # Everything else is a string
+        # Everything else is a string (fallback for backward compatibility)
         return value
+    
+    def infer_list_item_type(self, value: str):
+        """Infer type for list items - stricter than general value inference."""
+        value = value.strip()
+        
+        # Boolean values
+        if value.lower() in ('true', 'false'):
+            return bool(value.lower() == 'true')
+        
+        # Numbers - check for integer first
+        try:
+            # Try integer first
+            if '.' not in value and 'e' not in value.lower():
+                return int(value)
+            else:
+                # Float
+                return float(value)
+        except ValueError:
+            pass
+        
+        # Check if it's a valid identifier (should be resolved as variable)
+        if self._is_valid_identifier(value):
+            # Return a special marker for identifiers that need variable resolution
+            return {'type': 'IDENTIFIER', 'name': value}
+        
+        # Invalid identifier - this is an error case for list items
+        raise ValueError(f"Invalid identifier or unquoted string: '{value}'. Use quotes for strings.")
+    
+    def _is_valid_identifier(self, value: str) -> bool:
+        """Check if a string is a valid identifier (variable name)."""
+        if not value:
+            return False
+        
+        # Must start with letter or underscore
+        if not (value[0].isalpha() or value[0] == '_'):
+            return False
+        
+        # Rest must be alphanumeric or underscore
+        return all(c.isalnum() or c == '_' for c in value[1:])
     
     def parse_list_literal_with_types(self, text: str) -> Optional[List]:
         """Parse a list literal and infer types for each element, including nested lists."""
@@ -179,8 +221,8 @@ class Tokenizer:
                 nested_list = self.parse_list_literal_with_types(item)
                 typed_items.append(nested_list)
             else:
-                # Unquoted - apply type inference
-                typed_items.append(self.infer_value_type(item))
+                # Unquoted - apply strict list item type inference
+                typed_items.append(self.infer_list_item_type(item))
         
         return typed_items
     
@@ -223,3 +265,54 @@ class Tokenizer:
                 items.append(item)
         
         return items
+    
+    def get_value_type(self, value) -> str:
+        """Get the type string for a given value."""
+        if isinstance(value, bool):
+            return 'bool'
+        elif isinstance(value, int):
+            return 'num'
+        elif isinstance(value, float):
+            return 'num'
+        elif isinstance(value, list):
+            return 'list'
+        else:
+            return 'string'
+    
+    def coerce_to_type(self, value, target_type: str):
+        """Attempt to coerce a value to the target type.
+        
+        Returns:
+            tuple: (success: bool, coerced_value, error_message: str)
+        """
+        current_type = self.get_value_type(value)
+        
+        if current_type == target_type:
+            return True, value, ""
+        
+        try:
+            if target_type == 'num':
+                if current_type == 'string':
+                    # Try to convert string to number
+                    if '.' in str(value):
+                        return True, float(value), ""
+                    else:
+                        return True, int(value), ""
+                elif current_type == 'bool':
+                    return True, 1 if value else 0, ""
+            elif target_type == 'string':
+                return True, str(value), ""
+            elif target_type == 'bool':
+                if current_type == 'num':
+                    return True, bool(value), ""
+                elif current_type == 'string':
+                    if str(value).lower() in ('true', '1', 'yes', 'on'):
+                        return True, True, ""
+                    elif str(value).lower() in ('false', '0', 'no', 'off'):
+                        return True, False, ""
+            
+            # If we reach here, coercion failed
+            return False, value, f"Cannot coerce {current_type} to {target_type}"
+        
+        except (ValueError, TypeError) as e:
+            return False, value, f"Coercion failed: {str(e)}"
