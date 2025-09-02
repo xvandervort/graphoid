@@ -109,38 +109,11 @@ class GraphManager:
         return self.variable_graph.get_variable(graph_name)
     
     def parse_list_syntax(self, input_str: str) -> Optional[List[Any]]:
-        """Parse list syntax like [1, 2, 3] or [a, b, c]."""
-        # Simple parsing for basic list syntax
-        input_str = input_str.strip()
-        if not (input_str.startswith('[') and input_str.endswith(']')):
-            return None
+        """Parse list syntax like [1, 2, 3] or [a, b, c] with type inference."""
+        from ..parser.tokenizer import Tokenizer
         
-        # Remove brackets and split by comma
-        inner = input_str[1:-1].strip()
-        if not inner:
-            return []
-        
-        items = []
-        for item in inner.split(','):
-            item = item.strip()
-            if not item:
-                continue
-            
-            # Try to parse as number
-            try:
-                if '.' in item:
-                    items.append(float(item))
-                else:
-                    items.append(int(item))
-            except ValueError:
-                # Remove quotes if present and treat as string
-                if (item.startswith('"') and item.endswith('"')) or \
-                   (item.startswith("'") and item.endswith("'")):
-                    items.append(item[1:-1])
-                else:
-                    items.append(item)
-        
-        return items
+        tokenizer = Tokenizer()
+        return tokenizer.parse_list_literal_with_types(input_str)
     
     def execute_graph_operation(self, graph_name: str, operation: str, *args) -> str:
         """Execute an operation on a graph."""

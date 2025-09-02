@@ -7,7 +7,7 @@ import os
 from typing import Dict, Callable, Optional, List
 from glang import __version__, __description__
 from .graph_manager import GraphManager
-from ..parser import SyntaxParser, InputType
+from ..parser import SyntaxParser, InputType, IndexAccess
 from ..display import GraphRenderer, DisplayMode
 from ..methods import MethodDispatcher
 
@@ -81,6 +81,8 @@ class REPL:
             self._handle_method_call(parsed)
         elif parsed.input_type == InputType.VARIABLE_ACCESS:
             self._handle_variable_access(parsed)
+        elif parsed.input_type == InputType.INDEX_ACCESS:
+            self._handle_index_access(parsed)
         elif parsed.input_type == InputType.LEGACY_COMMAND:
             self._handle_legacy_command(parsed)
     
@@ -105,6 +107,7 @@ class REPL:
         print("  <name> --json          - Show as JSON format (NEW!)")
         print("  <name> --compact       - Compact detailed view (NEW!)")
         print("  <name>.<method> <args> - Call method on graph (NEW!)")
+        print("  <name>[index]          - Access element by index (NEW!)")
         print("  graphs                 - List all graphs")
         print("  show [name]           - Show graph structure")
         print("  traverse [name]       - Show graph traversal")
@@ -142,6 +145,15 @@ class REPL:
             print("  Tab           - Auto-completion")
             print("  Ctrl+C        - Interrupt")
             print()
+        print("Data types (auto-detected):")
+        print("  Numbers: 42, 3.14 → num")
+        print("  Booleans: true, false → bool")  
+        print("  Strings: hello, 'quoted text' → string")
+        print()
+        print("Type introspection methods:")
+        print("  <list>.types()         - Show types of all elements")
+        print("  <list>.typeof <index>  - Show type of specific element")
+        print()
         print("Glang is a prototype programming language with graphs as first-class objects.")
     
     def _exit_command(self) -> bool:
@@ -349,6 +361,64 @@ class REPL:
         
         # Set as current graph for legacy operations
         self.graph_manager.set_current(parsed.variable_name)
+    
+    def _handle_index_access(self, parsed) -> None:
+        """Handle index access (variable[index])."""
+        graph = self.graph_manager.get_variable(parsed.variable_name)
+        if not graph:
+            print(f"Variable '{parsed.variable_name}' not found")
+            return
+        
+        try:
+            # Support both single and multi-dimensional indexing
+            current_data = graph
+            current_indices = parsed.indices.copy()
+            
+            # Process each index in sequence
+            for i, index in enumerate(current_indices):
+                # For the first access, use the graph's get method
+                if i == 0:
+                    if not graph.graph_type.is_linear():
+                        print(f"Indexing only works on linear graphs (current: {graph.graph_type.name})")
+                        return
+                    
+                    # Handle negative indexing for the graph
+                    if index < 0:
+                        index = graph._size + index
+                    
+                    # Check bounds
+                    if index < 0 or index >= graph._size:
+                        print(f"Index {parsed.indices[i]} out of range (graph has {graph._size} elements)")
+                        return
+                    
+                    # Get the value from the graph
+                    current_data = graph.get(index)
+                    if current_data is None:
+                        print(f"Error: Could not get element at index {index}")
+                        return
+                else:
+                    # For subsequent accesses, the current data should be a list
+                    if not isinstance(current_data, list):
+                        print(f"Cannot index into non-list type: {type(current_data).__name__}")
+                        return
+                    
+                    # Handle negative indexing for the list
+                    if index < 0:
+                        index = len(current_data) + index
+                    
+                    # Check bounds
+                    if index < 0 or index >= len(current_data):
+                        print(f"Index {parsed.indices[i]} out of range (list has {len(current_data)} elements)")
+                        return
+                    
+                    # Get the value from the list
+                    current_data = current_data[index]
+            
+            # Print the final result
+            print(current_data)
+                
+        except Exception as e:
+            print(f"Error accessing index: {e}")
     
     def _handle_legacy_command(self, parsed) -> None:
         """Handle legacy command format."""

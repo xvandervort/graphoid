@@ -8,6 +8,7 @@ from .ast_nodes import (
     VariableDeclaration,
     MethodCall,
     VariableAccess,
+    IndexAccess,
     LegacyCommand
 )
 from .tokenizer import Tokenizer
@@ -49,6 +50,10 @@ class SyntaxParser:
         if self._is_method_call(tokens):
             return self._parse_method_call(input_str)
         
+        # Check for index access: fruits[0]
+        if self._is_index_access(input_str):
+            return self._parse_index_access(input_str)
+        
         # Check for legacy command
         if self._is_legacy_command(tokens):
             return self._parse_legacy_command(input_str)
@@ -79,6 +84,12 @@ class SyntaxParser:
             return tokens[0].value.lower() in self.legacy_commands
         return False
     
+    def _is_index_access(self, input_str: str) -> bool:
+        """Check if input represents an index access."""
+        # Pattern: variable[index] or variable[index1][index2]
+        pattern = r'^\w+(\[[-]?\d+\])+$'
+        return bool(re.match(pattern, input_str.strip()))
+    
     def _parse_declaration(self, input_str: str) -> VariableDeclaration:
         """Parse a variable declaration.
         
@@ -103,8 +114,8 @@ class SyntaxParser:
         remaining = input_str[tokens[2].position + 1:].strip()
         
         if remaining.startswith('['):
-            # List literal
-            initializer = self.tokenizer.parse_list_literal(remaining)
+            # List literal with type inference
+            initializer = self.tokenizer.parse_list_literal_with_types(remaining)
         elif remaining.endswith('()'):
             # Constructor call (empty initialization)
             initializer = []
@@ -172,6 +183,38 @@ class SyntaxParser:
             raw_input=input_str,
             variable_name=variable_name,
             flags=flags
+        )
+    
+    def _parse_index_access(self, input_str: str) -> IndexAccess:
+        """Parse an index access.
+        
+        Examples:
+            fruits[0]
+            numbers[-1]
+            matrix[1][2]
+        """
+        input_str = input_str.strip()
+        
+        # Extract variable name and indices using regex
+        pattern = r'^(\w+)((?:\[[-]?\d+\])+)$'
+        match = re.match(pattern, input_str)
+        
+        if not match:
+            raise ValueError(f"Invalid index access syntax: {input_str}")
+        
+        variable_name = match.group(1)
+        indices_str = match.group(2)
+        
+        # Extract all indices
+        indices = []
+        index_pattern = r'\[([-]?\d+)\]'
+        for match in re.finditer(index_pattern, indices_str):
+            indices.append(int(match.group(1)))
+        
+        return IndexAccess(
+            raw_input=input_str,
+            variable_name=variable_name,
+            indices=indices
         )
     
     def _parse_legacy_command(self, input_str: str) -> LegacyCommand:

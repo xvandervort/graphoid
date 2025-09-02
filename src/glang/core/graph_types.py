@@ -48,3 +48,8 @@ class GraphType(Enum):
     def is_weighted(self) -> bool:
         """Check if this graph type uses meaningful weights."""
         return self == GraphType.WEIGHTED
+    
+    def is_directed(self) -> bool:
+        """Check if this is a directed graph type."""
+        return self in {GraphType.LINEAR, GraphType.TREE, GraphType.CYCLIC, 
+                       GraphType.WEIGHTED, GraphType.DIRECTED}

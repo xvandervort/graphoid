@@ -347,3 +347,230 @@ glang> groceries
 - Performance optimization
 
 This plan transforms glang from a graph manipulation tool into a true graph-based programming language while maintaining all existing functionality and the core "everything is a graph" philosophy!
+
+## Phase 4: Advanced Data Access & Types
+
+### 4.1 Array/List Indexing Syntax
+
+#### Current vs Proposed
+```bash
+# Current (method-based)
+glang> fruits.get 0
+apple
+glang> fruits.get 2  
+cherry
+
+# Proposed (direct indexing)
+glang> fruits[0]
+apple
+glang> fruits[2]
+cherry
+glang> fruits[-1]    # Negative indexing
+cherry
+```
+
+#### Implementation Requirements
+- **Parser enhancement**: Recognize `variable[index]` pattern
+- **Index validation**: Bounds checking with proper error messages
+- **Negative indexing**: Support Python-style negative indices
+- **Assignment support** (future): `fruits[0] = 'mango'`
+
+### 4.2 Type System for Elements
+
+#### Data Type Support
+```bash
+# Mixed types in lists
+glang> list mixed = [42, 'hello', 3.14, true]
+glang> mixed[0]
+42 (num)
+glang> mixed[1]
+'hello' (string)
+
+# Type introspection
+glang> mixed.types()
+[num, string, num, bool]
+glang> mixed[0].type()
+num
+```
+
+#### Core Types to Implement
+1. **Numbers** (`num`): Integers and floats
+   - Auto-detection: `42` → int, `3.14` → float
+   - Mathematical operations support
+   
+2. **Strings** (`string`): Text values
+   - Quote handling: `'text'` or `"text"`
+   - Multi-word without quotes for backward compatibility
+   
+3. **Booleans** (`bool`): `true`/`false`
+   
+4. **Lists** (`list`): Nested graph structures (see 4.3)
+
+#### Type Inference Rules
+```bash
+# Automatic type detection
+glang> list data = [42, hello, 'multi word', 3.14]
+# Interpreted as:
+#   42 → num (integer)
+#   hello → string (unquoted single word)
+#   'multi word' → string (quoted)
+#   3.14 → num (float)
+```
+
+### 4.3 Nested Lists/Graphs
+
+#### Nested List Support
+```bash
+# Lists containing lists
+glang> list matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+glang> matrix[0]
+[1, 2, 3]
+glang> matrix[0][1]
+2
+
+# Mixed nesting
+glang> list data = [1, [a, b, c], 'text', [x, [y, z]]]
+glang> data[1]
+[a, b, c]
+glang> data[3][1]
+[y, z]
+```
+
+#### Graph Representation
+```
+# Internal structure for nested list
+matrix (LINEAR graph)
+  ├─ Node(data=[1,2,3], type=list) → points to another LINEAR graph
+  ├─ Node(data=[4,5,6], type=list) → points to another LINEAR graph
+  └─ Node(data=[7,8,9], type=list) → points to another LINEAR graph
+```
+
+#### Implementation Considerations
+- **Recursive parsing**: Handle arbitrary nesting depth
+- **Memory management**: Subgraphs as node values
+- **Display formatting**: Pretty-print nested structures
+- **Type checking**: `is_nested()`, `depth()` methods
+
+### 4.4 Implementation Plan
+
+#### Parser Updates
+```python
+class EnhancedParser:
+    def parse_index_access(self, input_str: str):
+        # Parse: fruits[0], matrix[1][2]
+        pattern = r'(\w+)(\[[-?\d+\])+'
+        # Extract variable and indices
+        
+    def parse_nested_list(self, list_str: str):
+        # Parse: [[1,2], [3,4]]
+        # Recursive parsing for nested structures
+        
+    def infer_type(self, value: str):
+        # Type detection logic
+        if value.isdigit():
+            return ('num', int(value))
+        elif '.' in value and is_float(value):
+            return ('num', float(value))
+        elif value in ['true', 'false']:
+            return ('bool', value == 'true')
+        elif value.startswith('['):
+            return ('list', self.parse_nested_list(value))
+        else:
+            return ('string', value)
+```
+
+#### Graph Extensions
+```python
+class TypedNode(Node):
+    """Node that tracks data type."""
+    def __init__(self, data, data_type=None):
+        super().__init__(data)
+        self.data_type = data_type or self.infer_type(data)
+    
+    def is_list(self):
+        return self.data_type == 'list'
+    
+    def is_num(self):
+        return self.data_type == 'num'
+
+class Graph:
+    def __getitem__(self, index):
+        """Support indexing: graph[0]"""
+        if not self.graph_type.is_linear():
+            raise TypeError("Indexing only supported for linear graphs")
+        return self.get_at_index(index)
+    
+    def get_element_types(self):
+        """Return list of element types."""
+        return [node.data_type for node in self.nodes]
+```
+
+### 4.5 Future Enhancements (Phase 5+)
+
+After implementing the above, consider:
+
+1. **Slice notation**: `fruits[1:3]`, `fruits[::2]`
+2. **Multi-dimensional indexing**: `matrix[0, 1]` as shorthand for `matrix[0][1]`
+3. **Type constraints**: `list<num> scores = [95, 87, 92]`
+4. **Graph references**: Nodes can reference other graphs
+5. **Lazy evaluation**: Large nested structures evaluated on-demand
+6. **Pattern matching**: `case fruits[0] of 'apple' -> ...`
+7. **Comprehensions**: `[x*2 for x in numbers if x > 5]`
+
+### 4.6 Testing Requirements
+
+#### New Test Categories
+1. **Indexing tests**
+   - Valid indices (positive, negative)
+   - Out of bounds handling
+   - Chained indexing for nested structures
+
+2. **Type system tests**
+   - Type inference accuracy
+   - Mixed type lists
+   - Type introspection methods
+
+3. **Nested structure tests**
+   - Parse nested lists correctly
+   - Access nested elements
+   - Modify nested structures
+   - Display nested structures
+
+4. **Performance tests**
+   - Large nested structures
+   - Deep nesting levels
+   - Memory usage with subgraphs
+
+### 4.7 User Experience Examples
+
+```bash
+# Natural indexing
+glang> list fruits = [apple, banana, cherry, date]
+glang> fruits[0]
+apple
+glang> fruits[-1]
+date
+
+# Type awareness
+glang> list mixed = [42, 'hello', [1, 2, 3]]
+glang> mixed[0] * 2
+84
+glang> mixed[1].upper()
+HELLO
+glang> mixed[2][1]
+2
+
+# Nested structures
+glang> list table = [['Name', 'Age'], ['Alice', 30], ['Bob', 25]]
+glang> table[0]
+['Name', 'Age']
+glang> table[1][0]
+Alice
+
+# Future: assignment
+glang> fruits[0] = 'mango'
+glang> fruits
+[mango, banana, cherry, date]
+```
+
+This enhancement phase will make glang feel more like a complete programming language with natural data access patterns while maintaining the graph-based architecture underneath!

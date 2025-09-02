@@ -10,6 +10,7 @@ class InputType(Enum):
     VARIABLE_DECLARATION = auto()  # list fruits = [...]
     METHOD_CALL = auto()           # fruits.append value
     VARIABLE_ACCESS = auto()       # fruits
+    INDEX_ACCESS = auto()          # fruits[0], fruits[-1]
     LEGACY_COMMAND = auto()        # create fruits [...]
 
 
@@ -63,6 +64,24 @@ class VariableAccess(ParsedCommand):
     def __post_init__(self):
         if self.flags is None:
             self.flags = []
+
+
+@dataclass
+class IndexAccess(ParsedCommand):
+    """Represents accessing an element of a variable by index.
+    
+    Examples:
+        fruits[0]
+        numbers[-1]
+        matrix[1][2]
+    """
+    variable_name: str = None
+    indices: List[int] = None
+    input_type: InputType = InputType.INDEX_ACCESS
+    
+    def __post_init__(self):
+        if self.indices is None:
+            self.indices = []
 
 
 @dataclass

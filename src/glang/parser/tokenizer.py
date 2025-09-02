@@ -130,3 +130,96 @@ class Tokenizer:
                 items.append(item)
         
         return items
+    
+    def infer_value_type(self, value: str):
+        """Infer the type and convert a string value to the appropriate type."""
+        value = value.strip()
+        
+        # Boolean values
+        if value.lower() in ('true', 'false'):
+            return bool(value.lower() == 'true')
+        
+        # Numbers - check for integer first
+        try:
+            # Try integer first
+            if '.' not in value and 'e' not in value.lower():
+                return int(value)
+            else:
+                # Float
+                return float(value)
+        except ValueError:
+            pass
+        
+        # Everything else is a string
+        return value
+    
+    def parse_list_literal_with_types(self, text: str) -> Optional[List]:
+        """Parse a list literal and infer types for each element, including nested lists."""
+        text = text.strip()
+        if not text.startswith('[') or not text.endswith(']'):
+            return None
+        
+        # Extract content between brackets
+        content = text[1:-1].strip()
+        if not content:
+            return []
+        
+        # Parse comma-separated values with proper bracket nesting
+        items = self._parse_nested_items(content)
+        
+        # Process each item - quoted items stay as strings, nested lists are parsed recursively
+        typed_items = []
+        for item in items:
+            if (item.startswith('"') and item.endswith('"')) or \
+               (item.startswith("'") and item.endswith("'")):
+                # Quoted string - remove quotes and keep as string
+                typed_items.append(item[1:-1])
+            elif item.startswith('[') and item.endswith(']'):
+                # Nested list - parse recursively
+                nested_list = self.parse_list_literal_with_types(item)
+                typed_items.append(nested_list)
+            else:
+                # Unquoted - apply type inference
+                typed_items.append(self.infer_value_type(item))
+        
+        return typed_items
+    
+    def _parse_nested_items(self, content: str) -> List[str]:
+        """Parse items from list content while respecting nested brackets and quotes."""
+        items = []
+        current = []
+        bracket_depth = 0
+        in_string = False
+        string_char = None
+        
+        for char in content:
+            if char in ('"', "'") and not in_string:
+                in_string = True
+                string_char = char
+                current.append(char)
+            elif char == string_char and in_string:
+                in_string = False
+                string_char = None
+                current.append(char)
+            elif char == '[' and not in_string:
+                bracket_depth += 1
+                current.append(char)
+            elif char == ']' and not in_string:
+                bracket_depth -= 1
+                current.append(char)
+            elif char == ',' and not in_string and bracket_depth == 0:
+                # Only split on comma if we're not inside nested brackets
+                item = ''.join(current).strip()
+                if item:
+                    items.append(item)
+                current = []
+            else:
+                current.append(char)
+        
+        # Add last item
+        if current:
+            item = ''.join(current).strip()
+            if item:
+                items.append(item)
+        
+        return items

@@ -7,6 +7,7 @@ from .ast_nodes import (
     VariableDeclaration,
     MethodCall,
     VariableAccess,
+    IndexAccess,
     LegacyCommand
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     'VariableDeclaration',
     'MethodCall',
     'VariableAccess',
+    'IndexAccess',
     'LegacyCommand'
 ]
