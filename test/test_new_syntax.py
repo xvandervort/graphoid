@@ -93,8 +93,8 @@ class TestSyntaxParser:
         assert parsed.flags == ["--show-nodes"]
     
     def test_legacy_command_create(self):
-        """Test parsing legacy create command."""
-        input_str = "create fruits [apple, banana]"
+        """Test parsing legacy create command with slash prefix."""
+        input_str = "/create fruits [apple, banana]"
         parsed = self.parser.parse_input(input_str)
         
         assert isinstance(parsed, LegacyCommand)
@@ -104,8 +104,8 @@ class TestSyntaxParser:
         assert "[apple, banana]" in " ".join(parsed.arguments)
     
     def test_legacy_command_show(self):
-        """Test parsing legacy show command."""
-        input_str = "show fruits"
+        """Test parsing legacy show command with slash prefix."""
+        input_str = "/show fruits"
         parsed = self.parser.parse_input(input_str)
         
         assert isinstance(parsed, LegacyCommand)
@@ -113,9 +113,9 @@ class TestSyntaxParser:
         assert parsed.arguments == ["fruits"]
     
     def test_legacy_command_simple(self):
-        """Test parsing simple legacy commands."""
+        """Test parsing simple legacy commands with slash prefix."""
         for cmd in ["help", "exit", "version", "namespace", "stats"]:
-            parsed = self.parser.parse_input(cmd)
+            parsed = self.parser.parse_input(f"/{cmd}")
             assert isinstance(parsed, LegacyCommand)
             assert parsed.command == cmd
             assert parsed.arguments == []

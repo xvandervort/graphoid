@@ -50,8 +50,8 @@ class TestREPL:
         assert "Goodbye!" in captured.out
     
     def test_process_input_known_command(self, capsys):
-        """Test processing of known commands."""
-        self.repl._process_input("ver")
+        """Test processing of known commands with slash prefix."""
+        self.repl._process_input("/ver")
         captured = capsys.readouterr()
         assert __version__ in captured.out
     
@@ -65,21 +65,21 @@ class TestREPL:
                 "Unknown command: unknown" in captured.out)
     
     def test_process_input_case_insensitive(self, capsys):
-        """Test that commands are case insensitive."""
-        self.repl._process_input("VER")
+        """Test that commands are case insensitive with slash prefix."""
+        self.repl._process_input("/VER")
         captured = capsys.readouterr()
         assert __version__ in captured.out
     
     def test_exit_command_stops_repl(self):
         """Test that exit command stops the REPL."""
-        self.repl._process_input("exit")
+        self.repl._process_input("/exit")
         assert self.repl.running is False
     
     @patch('builtins.input')
     @patch('builtins.print')
     def test_start_with_exit(self, mock_print, mock_input):
         """Test REPL start and exit flow."""
-        mock_input.side_effect = ["exit"]
+        mock_input.side_effect = ["/exit"]
         self.repl.start()
         assert not self.repl.running
     

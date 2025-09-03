@@ -39,6 +39,10 @@ class SyntaxParser:
         if not input_str:
             return LegacyCommand(raw_input=input_str, command='', arguments=[])
         
+        # Check for slash-prefixed commands first (highest priority)
+        if input_str.startswith('/'):
+            return self._parse_slash_command(input_str)
+        
         # Quick peek at first tokens to determine input type (need 6 for type constraints)
         tokens = self.tokenizer.peek_first_tokens(input_str, 6)
         
@@ -69,9 +73,8 @@ class SyntaxParser:
         if self._is_index_access(input_str):
             return self._parse_index_access(input_str)
         
-        # Check for legacy command
-        if self._is_legacy_command(tokens):
-            return self._parse_legacy_command(input_str)
+        # Commands without slash prefix are not recognized
+        # All commands MUST use slash prefix for clarity
         
         # Default to variable access
         return self._parse_variable_access(input_str)
@@ -106,9 +109,12 @@ class SyntaxParser:
         return False
     
     def _is_legacy_command(self, tokens: List) -> bool:
-        """Check if tokens represent a legacy command."""
-        if tokens and tokens[0].type == 'IDENTIFIER':
-            return tokens[0].value.lower() in self.legacy_commands
+        """Check if tokens represent a legacy command.
+        
+        Note: This is now deprecated since commands require slash prefix.
+        Kept for compatibility but always returns False.
+        """
+        # Commands now always require slash prefix, so this always returns False
         return False
     
     def _is_index_access(self, input_str: str) -> bool:
@@ -427,6 +433,46 @@ class SyntaxParser:
     def _parse_legacy_command(self, input_str: str) -> LegacyCommand:
         """Parse a legacy command format."""
         parts = input_str.split(None, 1)
+        command = parts[0].lower() if parts else ''
+        arguments = []
+        
+        if len(parts) > 1:
+            # Parse the rest as arguments
+            args_str = parts[1]
+            # Special handling for create command with list literal
+            if command == 'create' and '[' in args_str:
+                # Extract variable name and list
+                match = re.match(r'(\w+)\s*(\[.+\])', args_str)
+                if match:
+                    var_name = match.group(1)
+                    list_str = match.group(2)
+                    arguments = [var_name, list_str]
+                else:
+                    arguments = [args_str]
+            else:
+                arguments = args_str.split()
+        
+        return LegacyCommand(
+            raw_input=input_str,
+            command=command,
+            arguments=arguments
+        )
+    
+    def _parse_slash_command(self, input_str: str) -> LegacyCommand:
+        """Parse a slash-prefixed command (/command args)."""
+        # Remove the leading slash
+        command_str = input_str[1:].strip()
+        
+        # If empty after removing slash, treat as invalid command
+        if not command_str:
+            return LegacyCommand(
+                raw_input=input_str,
+                command='',
+                arguments=[]
+            )
+        
+        # Parse the command just like a legacy command
+        parts = command_str.split(None, 1)
         command = parts[0].lower() if parts else ''
         arguments = []
         
