@@ -1,7 +1,8 @@
 """Enhanced method dispatcher for graph operations."""
 
-from typing import List, Optional, Dict, Callable
+from typing import List, Optional, Dict, Callable, Union
 from ..core.graph import Graph
+from ..core.atomic_value import AtomicValue
 from .linear_methods import LinearGraphMethods
 from .graph_methods import GraphMethods, ConversionMethods
 
@@ -72,12 +73,19 @@ class MethodDispatcher:
     def dispatch_method(self, variable_name: str, method_name: str, 
                        arguments: List[str]) -> str:
         """Dispatch a method call to the appropriate handler."""
-        # Get the graph
-        graph = self.graph_manager.get_variable(variable_name)
-        if graph is None:
+        # Get the variable (can be Graph or AtomicValue)
+        variable = self.graph_manager.get_variable(variable_name)
+        if variable is None:
             # Debug: List available variables
             available = self.graph_manager.variable_graph.list_variables() if hasattr(self.graph_manager, 'variable_graph') else 'No variable_graph'
             return f"Error: Variable '{variable_name}' not found (available: {available})"
+        
+        # Check if trying to call graph methods on atomic values
+        if isinstance(variable, AtomicValue):
+            return self._handle_atomic_method_call(variable, method_name, arguments)
+        
+        # For Graph objects, continue with existing logic
+        graph = variable
         
         # Find method handler
         method_handler = self.all_methods.get(method_name)
@@ -119,6 +127,53 @@ class MethodDispatcher:
             return f"Error: {method_name}() requires a non-empty graph"
         
         return None
+    
+    def _handle_atomic_method_call(self, atomic_value: AtomicValue, method_name: str, arguments: List[str]) -> str:
+        """Handle method calls on atomic values (with restricted methods)."""
+        # Only allow conversion methods on atomic values
+        allowed_atomic_methods = {
+            'to_string': self._atomic_to_string,
+            'to_num': self._atomic_to_num,  
+            'to_bool': self._atomic_to_bool
+        }
+        
+        if method_name not in allowed_atomic_methods:
+            # Provide helpful error message for common graph methods
+            graph_methods = ['append', 'prepend', 'insert', 'reverse', 'delete', 'get', 'set']
+            if method_name in graph_methods:
+                return f"Error: Cannot call {method_name}() on atomic value. Atomic values are immutable scalars, not collections."
+            else:
+                available = ', '.join(allowed_atomic_methods.keys())
+                return f"Error: Method '{method_name}' not available on atomic values. Available: {available}"
+        
+        # Call the appropriate atomic method
+        try:
+            return allowed_atomic_methods[method_name](atomic_value, arguments)
+        except Exception as e:
+            return f"Error in {method_name}: {str(e)}"
+    
+    def _atomic_to_string(self, atomic_value: AtomicValue, arguments: List[str]) -> str:
+        """Convert atomic value to string."""
+        if arguments:
+            return "Error: to_string() takes no arguments"
+        return atomic_value.to_string()
+    
+    def _atomic_to_num(self, atomic_value: AtomicValue, arguments: List[str]) -> str:
+        """Convert atomic value to number."""
+        if arguments:
+            return "Error: to_num() takes no arguments"
+        try:
+            result = atomic_value.to_num()
+            return str(result)
+        except ValueError as e:
+            return f"Error: {str(e)}"
+    
+    def _atomic_to_bool(self, atomic_value: AtomicValue, arguments: List[str]) -> str:
+        """Convert atomic value to boolean."""
+        if arguments:
+            return "Error: to_bool() takes no arguments"
+        result = atomic_value.to_bool()
+        return 'true' if result else 'false'
     
     def _suggest_similar_methods(self, method_name: str) -> str:
         """Suggest similar method names when method not found."""

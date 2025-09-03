@@ -506,17 +506,9 @@ class REPL:
             print(f"Value: {value}, type: {type(value)}, expected: {expected_type}")
             return
         
-        # Create as single-node graph (maintaining "everything is a graph" philosophy)
-        result = self.graph_manager.create_from_list(parsed.variable_name, [value])
-        
-        # Store scalar type metadata
-        graph = self.graph_manager.get_variable(parsed.variable_name)
-        if graph is not None:
-            if not hasattr(graph, 'metadata'):
-                graph.metadata = {}
-            graph.metadata['scalar_type'] = expected_type
-        
-        print(f"Created {expected_type} variable '{parsed.variable_name}' = {self._format_scalar_value(value)}")
+        # Create as AtomicValue (proper scalar storage)
+        result = self.graph_manager.create_atomic_value(parsed.variable_name, value, expected_type)
+        print(result)
     
     def _validate_scalar_type(self, value, expected_type: str) -> bool:
         """Validate that a value matches the expected scalar type."""
@@ -613,10 +605,23 @@ class REPL:
     
     def _handle_variable_access(self, parsed) -> None:
         """Handle variable access (display contents)."""
-        graph = self.graph_manager.get_variable(parsed.variable_name)
-        if graph is None:
+        from ..core import AtomicValue
+        
+        variable = self.graph_manager.get_variable(parsed.variable_name)
+        if variable is None:
             print(f"Variable '{parsed.variable_name}' not found")
             return
+        
+        # Handle AtomicValue display
+        if isinstance(variable, AtomicValue):
+            if '--info' in parsed.flags:
+                print(f"AtomicValue: {variable.atomic_type} = {variable}")
+            else:
+                print(str(variable))
+            return
+        
+        # Handle Graph display (existing logic)
+        graph = variable
         
         # Determine display mode from flags
         mode = DisplayMode.SIMPLE

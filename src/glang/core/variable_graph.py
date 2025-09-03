@@ -4,11 +4,12 @@ Variable storage system using graphs for Glang.
 In glang, everything is a graph - including the variable namespace itself.
 """
 
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Union
 from .graph import Graph
 from .node import Node
 from .edge import Edge
 from .graph_types import GraphType
+from .atomic_value import AtomicValue
 
 
 class VariableNode(Node):
@@ -23,7 +24,7 @@ class VariableNode(Node):
         Initialize a variable node.
         
         Args:
-            data: The data stored (variable name string or Graph value)
+            data: The data stored (variable name string, Graph value, or AtomicValue)
             node_type: Either "name" or "value" 
             node_id: Optional custom ID
         """
@@ -88,8 +89,8 @@ class VariableGraph(Graph):
         assignment_edge.set_metadata("assignment", True)
         assignment_edge.set_metadata("variable_name", name)
     
-    def get_variable(self, name: str) -> Optional[Graph]:
-        """Get the value of a variable."""
+    def get_variable(self, name: str) -> Optional[Union[Graph, AtomicValue]]:
+        """Get the value of a variable (can be Graph or AtomicValue)."""
         if name not in self._name_nodes:
             return None
         
@@ -145,13 +146,23 @@ class VariableGraph(Graph):
         if value is None:
             return None
         
-        return {
-            "name": name,
-            "type": str(value.graph_type),
-            "size": value.size,
-            "edges": value.edge_count,
-            "value": value
-        }
+        if isinstance(value, AtomicValue):
+            return {
+                "name": name,
+                "type": f"atomic_{value.atomic_type}",
+                "size": 1,
+                "edges": 0,
+                "value": value
+            }
+        else:
+            # Graph object
+            return {
+                "name": name,
+                "type": str(value.graph_type),
+                "size": value.size,
+                "edges": value.edge_count,
+                "value": value
+            }
     
     def visualize_namespace(self) -> str:
         """
@@ -171,7 +182,10 @@ class VariableGraph(Graph):
         for name, name_node in self._name_nodes.items():
             value = self.get_variable(name)
             if value is not None:
-                lines.append(f"  📛 {name} -> 📊 {value.graph_type} graph ({value.size} nodes)")
+                if isinstance(value, AtomicValue):
+                    lines.append(f"  📛 {name} -> 💎 atomic_{value.atomic_type} = {value}")
+                else:
+                    lines.append(f"  📛 {name} -> 📊 {value.graph_type} graph ({value.size} nodes)")
             else:
                 lines.append(f"  📛 {name} -> ❌ undefined")
         

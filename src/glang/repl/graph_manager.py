@@ -5,7 +5,7 @@ Graph management for the REPL.
 from typing import Dict, Optional, List, Any, Union
 import ast
 import re
-from glang.core import Graph, GraphType, VariableGraph
+from glang.core import Graph, GraphType, VariableGraph, AtomicValue
 from glang.visualization import render_graph
 from glang.visualization.ascii_renderer import render_traversal
 
@@ -42,6 +42,19 @@ class GraphManager:
         except Exception as e:
             return f"Error creating graph: {e}"
     
+    def create_atomic_value(self, name: str, value: Any, atomic_type: str) -> str:
+        """Create an atomic value (scalar)."""
+        if self.variable_graph.has_variable(name):
+            return f"Variable '{name}' already exists."
+        
+        try:
+            atomic_value = AtomicValue(value, atomic_type)
+            self.variable_graph.assign_variable(name, atomic_value)
+            # Atomic values don't become "current" since they're not graphs
+            return f"Created {atomic_type} variable '{name}' = {atomic_value}"
+        except Exception as e:
+            return f"Error creating atomic value: {e}"
+    
     def delete_graph(self, name: str) -> str:
         """Delete a graph."""
         if not self.variable_graph.has_variable(name):
@@ -64,10 +77,14 @@ class GraphManager:
         
         lines = ["Available graphs:"]
         for name in var_names:
-            graph = self.variable_graph.get_variable(name)
+            variable = self.variable_graph.get_variable(name)
             current_marker = " *" if name == self.current_graph else "  "
-            if graph:
-                lines.append(f"{current_marker} {name}: {graph.graph_type} ({graph.size} nodes)")
+            if variable:
+                if isinstance(variable, AtomicValue):
+                    lines.append(f"{current_marker} {name}: atomic_{variable.atomic_type} = {variable}")
+                else:
+                    # Graph object
+                    lines.append(f"{current_marker} {name}: {variable.graph_type} ({variable.size} nodes)")
             else:
                 lines.append(f"{current_marker} {name}: undefined")
         
@@ -80,10 +97,16 @@ class GraphManager:
             available = self.variable_graph.list_variables()
             return f"Graph not found. Available: {available}" if available else "No graphs available"
         
-        graph = self.variable_graph.get_variable(graph_name)
-        if not graph:
-            return f"Graph '{graph_name}' is undefined"
-            
+        variable = self.variable_graph.get_variable(graph_name)
+        if not variable:
+            return f"Variable '{graph_name}' is undefined"
+        
+        # Handle AtomicValue (not a graph)
+        if isinstance(variable, AtomicValue):
+            return f"Variable '{graph_name}' is an atomic {variable.atomic_type} value: {variable}\nUse '{graph_name}' (without /show) to display atomic values."
+        
+        # Handle Graph objects
+        graph = variable
         header = f"Graph '{graph_name}' ({graph.graph_type}):"
         visualization = render_graph(graph)
         
@@ -95,10 +118,15 @@ class GraphManager:
         if not graph_name or not self.variable_graph.has_variable(graph_name):
             return "No graph selected or graph not found"
         
-        graph = self.variable_graph.get_variable(graph_name)
-        if not graph:
-            return f"Graph '{graph_name}' is undefined"
-            
+        variable = self.variable_graph.get_variable(graph_name)
+        if not variable:
+            return f"Variable '{graph_name}' is undefined"
+        
+        # Handle AtomicValue (not a graph)
+        if isinstance(variable, AtomicValue):
+            return f"Cannot traverse atomic value '{graph_name}'. Traversal is only available for graphs."
+        
+        graph = variable
         return render_traversal(graph)
     
     def get_graph(self, name: Optional[str] = None) -> Optional[Graph]:
@@ -201,8 +229,10 @@ class GraphManager:
             f"Edges: {info['edges']}",
         ]
         
-        # Add sample data for linear graphs
-        if info['value'].graph_type.is_linear() and info['size'] > 0:
+        # Add sample data for graphs (not atomic values)
+        if isinstance(info['value'], AtomicValue):
+            lines.append(f"Value: {info['value']}")
+        elif hasattr(info['value'], 'graph_type') and info['value'].graph_type.is_linear() and info['size'] > 0:
             sample_data = info['value'].to_list()[:5]
             if info['size'] > 5:
                 lines.append(f"Sample data: {sample_data}... (showing first 5)")
@@ -223,12 +253,18 @@ class GraphManager:
         type_counts = {}
         
         for name in self.variable_graph.list_variables():
-            graph = self.variable_graph.get_variable(name)
-            if graph:
-                total_nodes += graph.size
-                total_edges += graph.edge_count
-                graph_type = str(graph.graph_type)
-                type_counts[graph_type] = type_counts.get(graph_type, 0) + 1
+            variable = self.variable_graph.get_variable(name)
+            if variable:
+                if isinstance(variable, AtomicValue):
+                    total_nodes += 1
+                    total_edges += 0
+                    var_type = f"atomic_{variable.atomic_type}"
+                    type_counts[var_type] = type_counts.get(var_type, 0) + 1
+                else:
+                    total_nodes += variable.size
+                    total_edges += variable.edge_count
+                    graph_type = str(variable.graph_type)
+                    type_counts[graph_type] = type_counts.get(graph_type, 0) + 1
         
         lines = [
             f"Variable namespace statistics:",
@@ -246,8 +282,8 @@ class GraphManager:
         
         return "\n".join(lines)
     
-    def get_variable(self, name: str) -> Optional[Graph]:
-        """Get a graph by name."""
+    def get_variable(self, name: str) -> Optional[Union[Graph, AtomicValue]]:
+        """Get a variable by name (can be Graph or AtomicValue)."""
         return self.variable_graph.get_variable(name)
     
     def set_current(self, name: str) -> None:
