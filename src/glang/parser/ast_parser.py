@@ -1,0 +1,418 @@
+"""AST parser for glang - builds properly typed Abstract Syntax Trees."""
+
+from typing import List, Optional, Union
+from ..lexer.tokenizer import Token, TokenType, Tokenizer
+from ..ast.nodes import *
+
+class ParseError(Exception):
+    """Error during AST parsing."""
+    def __init__(self, message: str, token: Optional[Token] = None):
+        self.message = message
+        self.token = token
+        if token:
+            super().__init__(f"{message} at line {token.line}, column {token.column}")
+        else:
+            super().__init__(message)
+
+class ASTParser:
+    """
+    Recursive descent parser that builds a properly typed AST.
+    
+    This parser creates AST nodes where each argument and expression 
+    is properly typed, eliminating the need for runtime string parsing.
+    """
+    
+    def __init__(self):
+        self.tokenizer = Tokenizer()
+        self.tokens: List[Token] = []
+        self.current = 0
+    
+    def parse(self, input_str: str) -> Statement:
+        """
+        Parse input string into AST.
+        
+        Args:
+            input_str: The glang code to parse
+            
+        Returns:
+            A Statement AST node
+            
+        Raises:
+            ParseError: If the input has syntax errors
+        """
+        self.tokens = self.tokenizer.tokenize(input_str)
+        self.current = 0
+        
+        # Skip leading newlines
+        while self.match(TokenType.NEWLINE):
+            pass
+            
+        if self.is_at_end():
+            raise ParseError("Empty input")
+        
+        return self.parse_statement()
+    
+    def parse_statement(self) -> Statement:
+        """Parse a statement."""
+        
+        # Check for slash commands first (legacy support)
+        if self.check(TokenType.SLASH):
+            return self.parse_legacy_command()
+        
+        # Variable declaration: type name = expr
+        if self.check_variable_declaration():
+            return self.parse_variable_declaration()
+        
+        # Try to parse as expression (could be method call, variable access, etc.)
+        expr = self.parse_expression()
+        
+        # Check if it's an assignment
+        if isinstance(expr, IndexAccess) and self.match(TokenType.EQUALS):
+            value = self.parse_expression()
+            return IndexAssignment(expr, value)
+        
+        if isinstance(expr, SliceAccess) and self.match(TokenType.EQUALS):
+            value = self.parse_expression()
+            return SliceAssignment(expr, value)
+        
+        # Simple variable assignment: variable = value
+        if isinstance(expr, VariableRef) and self.match(TokenType.EQUALS):
+            value = self.parse_expression()
+            return Assignment(expr, value, SourcePosition(self.previous().line, self.previous().column))
+        
+        # Check for malformed variable declaration (type keyword followed by = without variable name)  
+        if isinstance(expr, VariableRef) and expr.name in {'list', 'string', 'num', 'bool'} and self.check(TokenType.EQUALS):
+            raise ParseError(f"Missing variable name after type '{expr.name}'", self.peek())
+        
+        # Check for malformed variable declaration (type followed by identifier but no equals)
+        if isinstance(expr, VariableRef) and expr.name in {'list', 'string', 'num', 'bool'} and self.check(TokenType.IDENTIFIER):
+            raise ParseError(f"Missing '=' after variable name in declaration", self.peek())
+        
+        # Check for invalid type in declaration pattern (identifier identifier =)
+        if isinstance(expr, VariableRef) and expr.name not in {'list', 'string', 'num', 'bool'} and self.check(TokenType.IDENTIFIER):
+            # Look ahead to see if there's an equals after the second identifier
+            saved_pos = self.current
+            try:
+                self.advance()  # consume the identifier
+                if self.check(TokenType.EQUALS):
+                    raise ParseError(f"Invalid type '{expr.name}' in variable declaration", expr.position)
+            finally:
+                self.current = saved_pos
+        
+        # Check if it's a method call (convert expression to statement)
+        if isinstance(expr, MethodCallExpression):
+            return MethodCall(expr.target, expr.method_name, expr.arguments)
+        
+        # Otherwise it's an expression statement
+        return ExpressionStatement(expr)
+    
+    def check_variable_declaration(self) -> bool:
+        """Check if current tokens form a variable declaration."""
+        if not self.check_type_keyword():
+            return False
+            
+        # Look ahead for: type [constraint] identifier =
+        saved_pos = self.current
+        
+        try:
+            self.advance()  # consume type
+            
+            # Optional type constraint: <type>
+            if self.match(TokenType.LANGLE):
+                if not (self.check_type_keyword() or self.check(TokenType.IDENTIFIER)):
+                    return False
+                self.advance()  # consume constraint type
+                if not self.match(TokenType.RANGLE):
+                    return False
+            
+            # identifier =
+            if not self.check(TokenType.IDENTIFIER):
+                return False
+            self.advance()
+            
+            return self.check(TokenType.EQUALS)
+            
+        finally:
+            self.current = saved_pos
+    
+    def parse_variable_declaration(self) -> VariableDeclaration:
+        """Parse variable declaration: type [<constraint>] name = expr"""
+        
+        # Parse type
+        type_token = self.consume_type_keyword("Expected variable type")
+        var_type = type_token.value
+        pos = SourcePosition(type_token.line, type_token.column)
+        
+        # Optional type constraint
+        type_constraint = None
+        if self.match(TokenType.LANGLE):
+            constraint_token = self.advance()
+            if constraint_token.type not in [TokenType.STRING, TokenType.NUM, 
+                                           TokenType.BOOL, TokenType.LIST]:
+                if constraint_token.type != TokenType.IDENTIFIER:
+                    raise ParseError(f"Invalid type constraint '{constraint_token.value}'", 
+                                   constraint_token)
+            type_constraint = constraint_token.value
+            self.consume(TokenType.RANGLE, "Expected '>' after type constraint")
+        
+        # Variable name
+        name_token = self.consume(TokenType.IDENTIFIER, "Expected variable name")
+        name = name_token.value
+        
+        # Equals
+        self.consume(TokenType.EQUALS, "Expected '=' after variable name")
+        
+        # Initializer expression
+        initializer = self.parse_expression()
+        
+        return VariableDeclaration(
+            var_type=var_type,
+            name=name, 
+            initializer=initializer,
+            type_constraint=type_constraint,
+            position=pos
+        )
+    
+    def parse_expression(self) -> Expression:
+        """Parse an expression."""
+        return self.parse_method_call()
+    
+    def parse_method_call(self) -> Expression:
+        """Parse method calls: expr.method(args)"""
+        expr = self.parse_index_access()
+        
+        while self.match(TokenType.DOT):
+            method_token = self.consume(TokenType.IDENTIFIER, "Expected method name")
+            method_name = method_token.value
+            pos = SourcePosition(method_token.line, method_token.column)
+            
+            # Optional parentheses for method calls
+            self.match(TokenType.LPAREN)
+            
+            # Parse arguments
+            arguments = []
+            if not self.check(TokenType.RPAREN) and not self.is_at_end() and \
+               not self.check(TokenType.NEWLINE) and not self.check(TokenType.EOF):
+                arguments.append(self.parse_expression())
+                
+                # Arguments can be comma-separated or space-separated
+                while self.match(TokenType.COMMA):
+                    arguments.append(self.parse_expression())
+            
+            # Optional closing paren
+            self.match(TokenType.RPAREN)
+            
+            # Create method call expression
+            expr = MethodCallExpression(expr, method_name, arguments, pos)
+        
+        return expr
+    
+    def parse_index_access(self) -> Expression:
+        """Parse index/slice access: expr[index] or expr[start:stop:step]"""
+        expr = self.parse_primary()
+        
+        while self.match(TokenType.LBRACKET):
+            # Check if this is a slice (contains :)
+            if self.check_slice_syntax():
+                start = None
+                if not self.check(TokenType.COLON):
+                    start = self.parse_expression()
+                
+                self.consume(TokenType.COLON, "Expected ':'")
+                
+                stop = None
+                if not self.check(TokenType.COLON) and not self.check(TokenType.RBRACKET):
+                    stop = self.parse_expression()
+                
+                step = None
+                if self.match(TokenType.COLON):
+                    if not self.check(TokenType.RBRACKET):
+                        step = self.parse_expression()
+                
+                self.consume(TokenType.RBRACKET, "Expected ']'")
+                expr = SliceAccess(expr, start, stop, step)
+            else:
+                # Regular index access - support chaining
+                index = self.parse_expression()
+                self.consume(TokenType.RBRACKET, "Expected ']'")
+                
+                # For now, treat each [index] as a separate IndexAccess
+                # This allows for natural chaining: arr[i][j] -> IndexAccess(IndexAccess(arr, [i]), [j])
+                expr = IndexAccess(expr, [index])
+        
+        return expr
+    
+    def parse_primary(self) -> Expression:
+        """Parse primary expressions."""
+        
+        # Boolean literals
+        if self.match(TokenType.TRUE):
+            token = self.previous()
+            return BooleanLiteral(True, SourcePosition(token.line, token.column))
+        if self.match(TokenType.FALSE):
+            token = self.previous()
+            return BooleanLiteral(False, SourcePosition(token.line, token.column))
+        
+        # Number literals
+        if self.check(TokenType.NUMBER_LITERAL):
+            token = self.advance()
+            value = float(token.value) if '.' in token.value else int(token.value)
+            return NumberLiteral(value, SourcePosition(token.line, token.column))
+        
+        # String literals
+        if self.check(TokenType.STRING_LITERAL):
+            token = self.advance()
+            # Remove quotes and handle escape sequences
+            value = self.process_string_literal(token.value)
+            return StringLiteral(value, SourcePosition(token.line, token.column))
+        
+        # List literals
+        if self.match(TokenType.LBRACKET):
+            bracket_token = self.previous()
+            elements = []
+            
+            if not self.check(TokenType.RBRACKET):
+                elements.append(self.parse_expression())
+                
+                while self.match(TokenType.COMMA):
+                    elements.append(self.parse_expression())
+            
+            self.consume(TokenType.RBRACKET, "Expected ']' after list elements")
+            return ListLiteral(elements, SourcePosition(bracket_token.line, bracket_token.column))
+        
+        # Variable references (including keywords used as variables)
+        if self.check(TokenType.IDENTIFIER) or self.check_type_keyword():
+            token = self.advance()
+            return VariableRef(token.value, SourcePosition(token.line, token.column))
+        
+        # Parenthesized expressions
+        if self.match(TokenType.LPAREN):
+            expr = self.parse_expression()
+            self.consume(TokenType.RPAREN, "Expected ')' after expression")
+            return expr
+        
+        # Error case
+        current_token = self.peek()
+        raise ParseError(f"Unexpected token: {current_token.value}", current_token)
+    
+    def parse_legacy_command(self) -> LegacyCommand:
+        """Parse slash-prefixed legacy commands: /help, /show, etc."""
+        slash_token = self.consume(TokenType.SLASH, "Expected '/' for legacy command")
+        pos = SourcePosition(slash_token.line, slash_token.column)
+        
+        if self.is_at_end() or self.check(TokenType.NEWLINE):
+            return LegacyCommand("", [], "/", pos)
+        
+        # Get command name
+        if not self.check(TokenType.IDENTIFIER):
+            raise ParseError("Expected command name after '/'")
+        
+        command_token = self.advance()
+        command = command_token.value
+        
+        # Get arguments (rest of the line as strings)
+        arguments = []
+        while not self.check(TokenType.NEWLINE) and not self.is_at_end():
+            token = self.advance()
+            if token.type != TokenType.EOF:
+                arguments.append(token.value)
+        
+        raw_input = f"/{command}" + (" " + " ".join(arguments) if arguments else "")
+        return LegacyCommand(command, arguments, raw_input, pos)
+    
+    def process_string_literal(self, literal: str) -> str:
+        """Process string literal, removing quotes and handling escapes."""
+        # Remove surrounding quotes
+        content = literal[1:-1]
+        
+        # Handle basic escape sequences
+        content = content.replace('\\"', '"')
+        content = content.replace("\\'", "'")
+        content = content.replace('\\\\', '\\')
+        content = content.replace('\\n', '\n')
+        content = content.replace('\\t', '\t')
+        
+        return content
+    
+    # Helper methods for parsing
+    def match(self, *types: TokenType) -> bool:
+        """Check if current token matches any of the given types."""
+        for token_type in types:
+            if self.check(token_type):
+                self.advance()
+                return True
+        return False
+    
+    def check(self, token_type: TokenType) -> bool:
+        """Check if current token is of given type."""
+        if self.is_at_end():
+            return False
+        return self.peek().type == token_type
+    
+    def advance(self) -> Token:
+        """Consume current token and return it."""
+        if not self.is_at_end():
+            self.current += 1
+        return self.previous()
+    
+    def is_at_end(self) -> bool:
+        """Check if we're at end of tokens."""
+        return self.peek().type == TokenType.EOF
+    
+    def peek(self) -> Token:
+        """Return current token without consuming it."""
+        return self.tokens[self.current]
+    
+    def previous(self) -> Token:
+        """Return previous token."""
+        return self.tokens[self.current - 1]
+    
+    def consume(self, token_type: TokenType, message: str) -> Token:
+        """Consume token of expected type or raise error."""
+        if self.check(token_type):
+            return self.advance()
+        
+        current_token = self.peek()
+        raise ParseError(f"{message}. Got '{current_token.value}'", current_token)
+    
+    def check_type_keyword(self) -> bool:
+        """Check if current token is a type keyword."""
+        return self.check(TokenType.LIST) or self.check(TokenType.STRING) or \
+               self.check(TokenType.NUM) or self.check(TokenType.BOOL)
+    
+    def consume_type_keyword(self, message: str) -> Token:
+        """Consume a type keyword token."""
+        if self.check_type_keyword():
+            return self.advance()
+        current = self.peek()
+        raise ParseError(f"{message}. Got '{current.value}'", current)
+    
+    def check_slice_syntax(self) -> bool:
+        """Look ahead to see if this is slice syntax (contains : before ])"""
+        saved_pos = self.current
+        try:
+            # Look for : before ]
+            paren_depth = 0
+            bracket_depth = 0
+            
+            while not self.is_at_end():
+                token_type = self.peek().type
+                
+                if token_type == TokenType.RBRACKET and bracket_depth == 0:
+                    return False  # Found ] without :
+                elif token_type == TokenType.COLON and bracket_depth == 0 and paren_depth == 0:
+                    return True   # Found : at the right level
+                elif token_type == TokenType.LBRACKET:
+                    bracket_depth += 1
+                elif token_type == TokenType.RBRACKET:
+                    bracket_depth -= 1
+                elif token_type == TokenType.LPAREN:
+                    paren_depth += 1
+                elif token_type == TokenType.RPAREN:
+                    paren_depth -= 1
+                
+                self.advance()
+                
+            return False
+        finally:
+            self.current = saved_pos
