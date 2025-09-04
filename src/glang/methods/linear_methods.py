@@ -19,9 +19,39 @@ class LinearGraphMethods:
         from ..parser.tokenizer import Tokenizer
         tokenizer = Tokenizer()
         
-        # Join args in case of multi-word values, then infer type
+        # Join args in case of multi-word values
         raw_value = ' '.join(args)
-        typed_value = tokenizer.infer_value_type(raw_value)
+        
+        # Check if this is a list value from expression evaluation
+        if raw_value.startswith('__LIST__'):
+            # Extract the list from the special format
+            import ast
+            try:
+                list_str = raw_value[8:]  # Remove '__LIST__' prefix
+                typed_value = ast.literal_eval(list_str)
+                
+                # For append with a list, we should extend (add all elements) rather than append the list as one element
+                # This matches the expected behavior described by the user
+                if isinstance(typed_value, list):
+                    # Extend the graph with all elements from the list
+                    for item in typed_value:
+                        # Check type constraint for each item if present
+                        if hasattr(graph, 'metadata') and 'type_constraint' in graph.metadata:
+                            constraint = graph.metadata['type_constraint']
+                            item_type = tokenizer.get_value_type(item)
+                            if item_type != constraint:
+                                return f"Error: Cannot append {item_type} '{item}' to {constraint}-constrained list"
+                        
+                        graph.append(item)
+                    
+                    return f"Extended {var_name} with {len(typed_value)} elements"
+                    
+            except (ValueError, SyntaxError):
+                # If parsing fails, fall back to treating as literal string
+                typed_value = raw_value
+        else:
+            # Apply normal type inference
+            typed_value = tokenizer.infer_value_type(raw_value)
         
         # Check type constraint if present
         if hasattr(graph, 'metadata') and 'type_constraint' in graph.metadata:

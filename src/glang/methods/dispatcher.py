@@ -12,6 +12,9 @@ class MethodDispatcher:
     
     def __init__(self, graph_manager):
         self.graph_manager = graph_manager
+        # Import here to avoid circular imports
+        from ..parser.expression_evaluator import ExpressionEvaluator
+        self.expression_evaluator = ExpressionEvaluator(graph_manager)
         
         # Method categories for better organization
         self.mutating_methods = {
@@ -97,9 +100,15 @@ class MethodDispatcher:
         if error_msg:
             return error_msg
         
+        # Evaluate arguments before calling method handler
+        try:
+            evaluated_args = self._evaluate_arguments(arguments)
+        except Exception as e:
+            return f"Error evaluating arguments: {str(e)}"
+        
         # Call the method handler
         try:
-            result = method_handler(graph, variable_name, arguments)
+            result = method_handler(graph, variable_name, evaluated_args)
             
             # Update current graph if it was a mutating operation
             if method_name in self.mutating_methods:
@@ -108,6 +117,58 @@ class MethodDispatcher:
             return result
         except Exception as e:
             return f"Error in {method_name}: {str(e)}"
+    
+    def _evaluate_arguments(self, arguments: List[str]) -> List[str]:
+        """Evaluate method arguments, resolving variable references and expressions."""
+        evaluated = []
+        
+        for arg in arguments:
+            # Join in case of multi-word arguments  
+            arg = arg.strip()
+            
+            # Try to evaluate as expression (variable reference or index expression)
+            try:
+                # Check if it looks like a variable reference or expression
+                if (self.expression_evaluator._is_simple_variable(arg) or 
+                    self.expression_evaluator._is_index_expression(arg)):
+                    # Evaluate the expression
+                    value = self.expression_evaluator.evaluate_expression(arg, allow_multi_element=True)
+                    
+                    # Convert evaluated value back to string for method handler
+                    # (method handlers expect string arguments and do their own type inference)
+                    if isinstance(value, str):
+                        evaluated.append(value)
+                    elif isinstance(value, bool):
+                        evaluated.append('true' if value else 'false')
+                    elif isinstance(value, (int, float)):
+                        evaluated.append(str(value))
+                    elif isinstance(value, list):
+                        # For list values, we need to convert them to a format the method can understand
+                        # This is tricky - for now, let's convert to a readable list format
+                        # The append method will need to handle this specially
+                        evaluated.append(f"__LIST__{value}")
+                    else:
+                        evaluated.append(str(value))
+                else:
+                    # Not a variable/expression - treat as literal
+                    # Apply standard type inference for literals  
+                    from ..parser.tokenizer import Tokenizer
+                    tokenizer = Tokenizer()
+                    typed_value = tokenizer.infer_value_type(arg)
+                    
+                    # Convert back to string representation for method handler
+                    if isinstance(typed_value, str):
+                        evaluated.append(typed_value)
+                    elif isinstance(typed_value, bool):
+                        evaluated.append('true' if typed_value else 'false')
+                    else:
+                        evaluated.append(str(typed_value))
+                        
+            except ValueError:
+                # If evaluation fails, treat as literal string
+                evaluated.append(arg)
+        
+        return evaluated
     
     def _validate_method_compatibility(self, graph: Graph, method_name: str) -> Optional[str]:
         """Validate that a method is compatible with the graph type."""

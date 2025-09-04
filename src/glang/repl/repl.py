@@ -7,7 +7,7 @@ import os
 from typing import Dict, Callable, Optional, List
 from glang import __version__, __description__
 from .graph_manager import GraphManager
-from ..parser import SyntaxParser, InputType, IndexAccess, IndexAssignment, SliceAccess, SliceAssignment
+from ..parser import SyntaxParser, ExpressionEvaluator, InputType, IndexAccess, IndexAssignment, SliceAccess, SliceAssignment
 from ..display import GraphRenderer, DisplayMode
 from ..methods import MethodDispatcher
 
@@ -28,6 +28,7 @@ class REPL:
         self.prompt = "glang> "
         self.graph_manager = GraphManager()
         self.syntax_parser = SyntaxParser()
+        self.expression_evaluator = ExpressionEvaluator(self.graph_manager)
         self.renderer = GraphRenderer(self.graph_manager)
         self.method_dispatcher = MethodDispatcher(self.graph_manager)
         self.commands: Dict[str, Callable[[], Optional[bool]]] = {
@@ -465,34 +466,38 @@ class REPL:
         
         # For scalar declarations, the initializer should be a single value
         if isinstance(parsed.initializer, list) and len(parsed.initializer) == 1:
-            value = parsed.initializer[0]
+            raw_value = parsed.initializer[0]
         elif isinstance(parsed.initializer, list):
             print(f"Scalar variable '{parsed.variable_name}' cannot be initialized with a list")
             return
         else:
-            value = parsed.initializer
+            raw_value = parsed.initializer
         
-        # Resolve IDENTIFIER if needed
+        # Evaluate the initializer expression
         try:
-            if isinstance(value, dict) and value.get('type') == 'IDENTIFIER':
-                var_name = value['name']
-                source_graph = self.graph_manager.get_variable(var_name)
-                if source_graph is None:
-                    print(f"Error: Variable '{var_name}' not found. Use quotes for strings.")
-                    return
-                
-                # Extract value from source graph
-                if len(source_graph) == 1:
-                    current = source_graph._head
-                    value = current.data if current else None
-                    if value is None:
-                        print(f"Error: Variable '{var_name}' has no data")
-                        return
+            if isinstance(raw_value, dict) and raw_value.get('type') == 'IDENTIFIER':
+                # This is a variable reference - extract the name and evaluate
+                var_name = raw_value['name']
+                value = self.expression_evaluator.evaluate_expression(var_name)
+            elif isinstance(raw_value, str):
+                # This might be an expression or a literal string
+                # Check if it looks like an index expression
+                if self.expression_evaluator._is_index_expression(raw_value):
+                    # Definitely an index expression - evaluate it (errors should propagate)
+                    value = self.expression_evaluator.evaluate_expression(raw_value)
                 else:
-                    print(f"Error: Cannot assign multi-value variable '{var_name}' to scalar")
-                    return
+                    # Try to evaluate as simple variable or treat as literal string
+                    try:
+                        value = self.expression_evaluator.evaluate_expression(raw_value)
+                    except ValueError:
+                        # If evaluation fails, treat as literal string
+                        value = raw_value
+            else:
+                # Already a typed value (number, boolean, etc.)
+                value = raw_value
+                
         except Exception as e:
-            print(f"Error resolving variable: {e}")
+            print(f"Error: {e}")
             return
         
         # Type validation
