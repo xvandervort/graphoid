@@ -7,9 +7,10 @@ import os
 from typing import Dict, Callable, Optional, List
 from glang import __version__, __description__
 from .graph_manager import GraphManager
-from ..parser import SyntaxParser, ExpressionEvaluator, InputType, IndexAccess, IndexAssignment, SliceAccess, SliceAssignment
+from ..parser import SyntaxParser, ExpressionEvaluator, InputType, LegacyIndexAccess, LegacyIndexAssignment, LegacySliceAccess, LegacySliceAssignment
 from ..display import GraphRenderer, DisplayMode
 from ..methods import MethodDispatcher
+from ..execution import ExecutionSession, ExecutionPipeline, ExecutionResult
 
 # Try to import readline for command history and navigation
 try:
@@ -31,6 +32,10 @@ class REPL:
         self.expression_evaluator = ExpressionEvaluator(self.graph_manager)
         self.renderer = GraphRenderer(self.graph_manager)
         self.method_dispatcher = MethodDispatcher(self.graph_manager)
+        
+        # NEW: AST-based execution system
+        self.execution_session = ExecutionSession()
+        
         self.commands: Dict[str, Callable[[], Optional[bool]]] = {
             "ver": self._version_command,
             "version": self._version_command,
@@ -68,7 +73,31 @@ class REPL:
     
     def _process_input(self, user_input: str) -> None:
         """Process user input and execute appropriate command."""
-        # Parse the input using the syntax parser
+        
+        # Try AST-based execution first
+        try:
+            result = self.execution_session.execute_statement(user_input)
+            
+            if result.success:
+                # Display result if there's a meaningful value
+                if result.value is not None:
+                    print(result.value)
+                return
+            else:
+                # If AST execution fails, check if it's a legacy command
+                if user_input.startswith('/'):
+                    self._handle_legacy_command_fallback(user_input)
+                    return
+                else:
+                    # Show the AST execution error
+                    print(f"Error: {result.error}")
+                    return
+                    
+        except Exception as e:
+            # If AST execution completely fails, fall back to legacy parsing
+            pass
+        
+        # FALLBACK: Legacy syntax parser for compatibility
         try:
             parsed = self.syntax_parser.parse_input(user_input)
         except Exception as e:
@@ -92,6 +121,37 @@ class REPL:
             self._handle_slice_assignment(parsed)
         elif parsed.input_type == InputType.LEGACY_COMMAND:
             self._handle_legacy_command(parsed)
+    
+    def _handle_legacy_command_fallback(self, user_input: str) -> None:
+        """Handle legacy commands when AST execution fails."""
+        # Remove leading slash and parse as legacy command
+        command_str = user_input[1:] if user_input.startswith('/') else user_input
+        
+        # Split into command and arguments
+        parts = command_str.split()
+        if not parts:
+            return
+            
+        command = parts[0]
+        args = parts[1:] if len(parts) > 1 else []
+        
+        # First check simple commands
+        if command in self.commands:
+            result = self.commands[command]()
+            if result is False:  # Explicit exit request
+                self.running = False
+            return
+        
+        # Handle legacy commands directly
+        if command == "graphs":
+            print(self.graph_manager.list_graphs())
+        elif command == "namespace":
+            print(self.graph_manager.show_variable_graph())
+        elif command == "stats":
+            print(self.graph_manager.get_variable_stats())
+        else:
+            print(f"Unknown command: /{command}")
+            print("Type '/help' for available commands.")
     
     def _version_command(self) -> None:
         """Display version information."""
