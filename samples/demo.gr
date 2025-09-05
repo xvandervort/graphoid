@@ -1,0 +1,7 @@
+# Glang program file
+# Generated on 2025-09-04 21:21:18
+
+# Variable declarations
+string project = "Glang Demo"
+num version = 1.0
+list features = ["file-import", "type-inference", "ast-execution"]

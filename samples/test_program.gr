@@ -1,0 +1,22 @@
+# Test glang program file
+# This demonstrates the .gr file format
+
+# String variables
+string greeting = "Hello, World!"
+name = "Alice"
+
+# Numeric variables
+num age = 25
+count = 10
+
+# Boolean variables
+bool is_active = true
+flag = false
+
+# List variables
+list fruits = ["apple", "banana", "cherry"]
+list<num> scores = [95, 87, 92]
+
+# Method calls
+fruits.append("orange")
+scores.append(100)

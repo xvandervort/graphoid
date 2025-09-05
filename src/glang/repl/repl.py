@@ -11,6 +11,7 @@ from ..parser import SyntaxParser, ExpressionEvaluator, InputType, LegacyIndexAc
 from ..display import GraphRenderer, DisplayMode
 from ..methods import MethodDispatcher
 from ..execution import ExecutionSession, ExecutionPipeline, ExecutionResult
+from ..files import FileManager, FileOperationError
 
 # Try to import readline for command history and navigation
 try:
@@ -35,6 +36,9 @@ class REPL:
         
         # NEW: AST-based execution system
         self.execution_session = ExecutionSession()
+        
+        # File management system
+        self.file_manager = FileManager()
         
         self.commands: Dict[str, Callable[[], Optional[bool]]] = {
             "ver": self._version_command,
@@ -149,6 +153,13 @@ class REPL:
             print(self.graph_manager.show_variable_graph())
         elif command == "stats":
             print(self.graph_manager.get_variable_stats())
+        # File operations
+        elif command == "load":
+            self._handle_load_command(args)
+        elif command == "save":
+            self._handle_save_command(args)
+        elif command == "run":
+            self._handle_run_command(args)
         else:
             print(f"Unknown command: /{command}")
             print("Type '/help' for available commands.")
@@ -200,6 +211,11 @@ class REPL:
         print("  /insert <index> <val> - Insert at position")
         print("  /reverse              - Reverse the graph")
         print()
+        print("File operations (.gr files):")
+        print("  /load \"filename.gr\"   - Load and execute file in current namespace")
+        print("  /save \"filename.gr\"   - Save current variables to file")
+        print("  /run \"filename.gr\"    - Execute file in fresh namespace")
+        print()
         print("Examples:")
         print("  list fruits = [apple, banana, cherry]  # NEW syntax!")
         print("  fruits                     # Show contents")
@@ -237,6 +253,70 @@ class REPL:
         print("Goodbye!")
         self._save_history()  # Save history on explicit exit too
         return False  # Signal to stop the REPL
+    
+    def _handle_load_command(self, args: List[str]) -> None:
+        """Handle /load command to execute .gr file in current namespace."""
+        if len(args) != 1:
+            print("Usage: /load \"filename.gr\"")
+            print("Load and execute a .gr file in the current namespace.")
+            print("Example: /load \"my_program.gr\"")
+            return
+        
+        filename = args[0].strip('"\'')  # Remove quotes
+        
+        try:
+            result = self.file_manager.load_file(filename, self.execution_session)
+            if result.success:
+                print(result.value)
+            else:
+                print(f"Failed to load file: {result.error}")
+        except FileOperationError as e:
+            print(f"Error: {e}")
+        except Exception as e:
+            print(f"Unexpected error loading file: {e}")
+    
+    def _handle_save_command(self, args: List[str]) -> None:
+        """Handle /save command to save current namespace to .gr file."""
+        if len(args) != 1:
+            print("Usage: /save \"filename.gr\"")
+            print("Save current variables to a .gr file.")
+            print("Example: /save \"my_program.gr\"")
+            return
+        
+        filename = args[0].strip('"\'')  # Remove quotes
+        
+        try:
+            success = self.file_manager.save_file(filename, self.execution_session)
+            if success:
+                print(f"Successfully saved current namespace to {filename}")
+            else:
+                print(f"Failed to save to {filename}")
+        except FileOperationError as e:
+            print(f"Error: {e}")
+        except Exception as e:
+            print(f"Unexpected error saving file: {e}")
+    
+    def _handle_run_command(self, args: List[str]) -> None:
+        """Handle /run command to execute .gr file in fresh namespace."""
+        if len(args) != 1:
+            print("Usage: /run \"filename.gr\"")
+            print("Execute a .gr file in a fresh namespace (doesn't affect current variables).")
+            print("Example: /run \"test_program.gr\"")
+            return
+        
+        filename = args[0].strip('"\'')  # Remove quotes
+        
+        try:
+            result = self.file_manager.run_file(filename)
+            if result.success:
+                print(f"Successfully executed {filename}")
+                print(result.value)
+            else:
+                print(f"Failed to run file: {result.error}")
+        except FileOperationError as e:
+            print(f"Error: {e}")
+        except Exception as e:
+            print(f"Unexpected error running file: {e}")
     
     def _handle_create_command(self, args: List[str], original_input: str) -> None:
         """Handle create command."""
