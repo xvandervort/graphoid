@@ -190,3 +190,8 @@ def python_to_glang_value(python_value: Any, position: Optional[SourcePosition] 
 def glang_value_to_python(glang_value: GlangValue) -> Any:
     """Convert GlangValue to Python equivalent."""
     return glang_value.to_python()
+
+
+def infer_type_from_value(value: GlangValue) -> str:
+    """Infer glang type name from GlangValue for display purposes."""
+    return value.get_type()

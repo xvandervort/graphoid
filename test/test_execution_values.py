@@ -240,5 +240,60 @@ class TestValueStringRepresentation:
         assert "hello" in display
 
 
+class TestTypeInferenceHelpers:
+    """Test helper functions for type inference."""
+    
+    def test_infer_type_from_value(self):
+        """Test the infer_type_from_value helper function."""
+        # Test all basic types
+        string_val = StringValue("hello")
+        assert infer_type_from_value(string_val) == "string"
+        
+        num_val = NumberValue(42)
+        assert infer_type_from_value(num_val) == "num"
+        
+        bool_val = BooleanValue(True)
+        assert infer_type_from_value(bool_val) == "bool"
+        
+        list_val = ListValue([StringValue("a"), StringValue("b")])
+        assert infer_type_from_value(list_val) == "list"
+        
+        # Test constrained list
+        constrained_list = ListValue([NumberValue(1), NumberValue(2)], "num")
+        assert infer_type_from_value(constrained_list) == "list"
+    
+    def test_python_to_glang_value_type_inference(self):
+        """Test that python_to_glang_value correctly infers types."""
+        # String
+        glang_str = python_to_glang_value("hello")
+        assert isinstance(glang_str, StringValue)
+        assert infer_type_from_value(glang_str) == "string"
+        
+        # Number (int)
+        glang_int = python_to_glang_value(42)
+        assert isinstance(glang_int, NumberValue)
+        assert infer_type_from_value(glang_int) == "num"
+        
+        # Number (float)
+        glang_float = python_to_glang_value(3.14)
+        assert isinstance(glang_float, NumberValue)
+        assert infer_type_from_value(glang_float) == "num"
+        
+        # Boolean (True)
+        glang_true = python_to_glang_value(True)
+        assert isinstance(glang_true, BooleanValue)
+        assert infer_type_from_value(glang_true) == "bool"
+        
+        # Boolean (False)
+        glang_false = python_to_glang_value(False)
+        assert isinstance(glang_false, BooleanValue)
+        assert infer_type_from_value(glang_false) == "bool"
+        
+        # List
+        glang_list = python_to_glang_value(["a", "b", "c"])
+        assert isinstance(glang_list, ListValue)
+        assert infer_type_from_value(glang_list) == "list"
+
+
 if __name__ == '__main__':
     pytest.main([__file__])

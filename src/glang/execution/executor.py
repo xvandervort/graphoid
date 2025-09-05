@@ -99,19 +99,22 @@ class ASTExecutor(ASTVisitor):
             
             # Check if variable exists
             if not self.context.has_variable(var_name):
-                raise VariableNotFoundError(var_name, node.target.position)
-            
-            # Get existing variable to check constraints
-            existing_var = self.context.get_variable(var_name)
-            if isinstance(existing_var, ListValue) and existing_var.constraint:
-                if not existing_var.validate_constraint(value):
-                    raise TypeConstraintError(
-                        f"Cannot assign {value.get_type()} to {existing_var.get_type()}<{existing_var.constraint}>",
-                        node.position
-                    )
-            
-            self.context.set_variable(var_name, value)
-            self.result = f"Assigned {value.to_display_string()} to {var_name}"
+                # NEW: Type inference - create variable with inferred type
+                self.context.set_variable(var_name, value)
+                inferred_type = value.get_type()
+                self.result = f"Declared {inferred_type} variable '{var_name}' (inferred)"
+            else:
+                # Variable exists - check constraints and assign
+                existing_var = self.context.get_variable(var_name)
+                if isinstance(existing_var, ListValue) and existing_var.constraint:
+                    if not existing_var.validate_constraint(value):
+                        raise TypeConstraintError(
+                            f"Cannot assign {value.get_type()} to {existing_var.get_type()}<{existing_var.constraint}>",
+                            node.position
+                        )
+                
+                self.context.set_variable(var_name, value)
+                self.result = f"Assigned {value.to_display_string()} to {var_name}"
         
         elif isinstance(node.target, IndexAccess):
             # Index assignment like arr[0] = value

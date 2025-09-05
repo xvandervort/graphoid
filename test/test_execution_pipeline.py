@@ -94,6 +94,20 @@ class TestExecutionPipeline:
         
         assert result.success is False
         assert "Semantic analysis failed" in str(result.error)
+    
+    def test_undefined_variable_error_formatting(self):
+        """Test that undefined variable errors are properly formatted in pipeline."""
+        code = 'undefined_variable'
+        result = self.pipeline.execute_code(code)
+        
+        assert result.success is False
+        # Check that the error message is properly formatted (not a TypeError)
+        error_str = str(result.error)
+        assert "Semantic analysis failed" in error_str
+        assert "undefined_variable" in error_str
+        assert "Undefined variable" in error_str
+        # Ensure no formatting errors like "TypeError: sequence item"
+        assert "TypeError" not in error_str
 
 
 class TestExecutionSession:

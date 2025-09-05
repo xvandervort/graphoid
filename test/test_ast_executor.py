@@ -210,6 +210,68 @@ class TestASTExecutor:
         assert isinstance(updated_value, StringValue)
         assert updated_value.value == "new_value"
     
+    def test_type_inference_assignment(self):
+        """Test assignment to undefined variable creates new variable with inferred type."""
+        # Create assignment to undefined variable: new_var = "hello"
+        target = VariableRef("new_var", SourcePosition(1, 1))
+        value = StringLiteral('"hello"', SourcePosition(1, 11))
+        assignment = Assignment(target, value, SourcePosition(1, 1))
+        
+        result = self.executor.execute(assignment)
+        
+        # Check that result indicates type inference
+        assert result == "Declared string variable 'new_var' (inferred)"
+        
+        # Check that variable was created with correct type
+        created_value = self.context.get_variable("new_var")
+        assert isinstance(created_value, StringValue)
+        assert created_value.value == "hello"
+        assert created_value.get_type() == "string"
+    
+    def test_type_inference_number_assignment(self):
+        """Test type inference for number assignment."""
+        target = VariableRef("count", SourcePosition(1, 1))
+        value = NumberLiteral(42, SourcePosition(1, 9))
+        assignment = Assignment(target, value, SourcePosition(1, 1))
+        
+        result = self.executor.execute(assignment)
+        
+        assert result == "Declared num variable 'count' (inferred)"
+        created_value = self.context.get_variable("count")
+        assert isinstance(created_value, NumberValue)
+        assert created_value.value == 42
+        assert created_value.get_type() == "num"
+    
+    def test_type_inference_boolean_assignment(self):
+        """Test type inference for boolean assignment."""
+        target = VariableRef("flag", SourcePosition(1, 1))
+        value = BooleanLiteral(True, SourcePosition(1, 8))
+        assignment = Assignment(target, value, SourcePosition(1, 1))
+        
+        result = self.executor.execute(assignment)
+        
+        assert result == "Declared bool variable 'flag' (inferred)"
+        created_value = self.context.get_variable("flag")
+        assert isinstance(created_value, BooleanValue)
+        assert created_value.value == True
+        assert created_value.get_type() == "bool"
+    
+    def test_type_inference_list_assignment(self):
+        """Test type inference for list assignment."""
+        target = VariableRef("items", SourcePosition(1, 1))
+        elements = [StringLiteral('"a"', SourcePosition(1, 10)), StringLiteral('"b"', SourcePosition(1, 15))]
+        value = ListLiteral(elements, SourcePosition(1, 9))
+        assignment = Assignment(target, value, SourcePosition(1, 1))
+        
+        result = self.executor.execute(assignment)
+        
+        assert result == "Declared list variable 'items' (inferred)"
+        created_value = self.context.get_variable("items")
+        assert isinstance(created_value, ListValue)
+        assert len(created_value.elements) == 2
+        assert created_value.get_type() == "list"
+        assert created_value.constraint is None  # No constraint inferred
+    
     def test_index_assignment(self):
         """Test index assignment."""
         # Create list variable

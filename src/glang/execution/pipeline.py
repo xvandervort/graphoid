@@ -104,7 +104,7 @@ class ExecutionSession:
                 None,
                 self.execution_context,
                 False,
-                Exception(f"Semantic analysis failed: {', '.join(analysis_result.errors)}")
+                Exception(f"Semantic analysis failed: {', '.join(str(e) for e in analysis_result.errors)}")
             )
         
         # Now execute the AST

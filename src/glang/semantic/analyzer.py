@@ -130,17 +130,28 @@ class SemanticAnalyzer(ASTVisitor):
     
     def visit_assignment(self, node: Assignment) -> None:
         """Analyze simple assignment statements."""
-        # Analyze the target (usually a variable reference)
-        node.target.accept(self)
         
-        # Analyze the value
-        node.value.accept(self)
-        
-        # For variable assignments, check type compatibility if needed
+        # Special handling for variable assignments to support type inference
         if isinstance(node.target, VariableRef):
-            symbol = self.symbol_table.lookup_symbol(node.target.name)
-            # Note: No need to report undefined variable error here since
-            # visit_variable_ref already handles that when analyzing the target
+            var_name = node.target.name
+            symbol = self.symbol_table.lookup_symbol(var_name)
+            
+            if not symbol:
+                # NEW: Type inference - treat as implicit variable declaration
+                # Analyze the value to ensure it's valid
+                node.value.accept(self)
+                
+                # Create a symbol for the new variable (type will be inferred at runtime)
+                inferred_symbol = Symbol(var_name, "inferred", None, node.target.position)
+                self.symbol_table.declare_symbol(inferred_symbol)
+            else:
+                # Variable exists - analyze normally
+                node.target.accept(self)
+                node.value.accept(self)
+        else:
+            # Non-variable assignment (index assignment, etc.) - analyze normally
+            node.target.accept(self)
+            node.value.accept(self)
     
     def visit_index_assignment(self, node: IndexAssignment) -> None:
         """Analyze index assignments."""

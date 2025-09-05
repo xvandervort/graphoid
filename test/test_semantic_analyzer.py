@@ -369,5 +369,106 @@ class TestSemanticAnalyzer:
         assert not result2.symbol_table.symbol_exists("var1")  # Previous var not there
 
 
+class TestTypeInferenceSemanticAnalysis:
+    """Test semantic analysis for type inference assignments."""
+    
+    def setup_method(self):
+        self.analyzer = SemanticAnalyzer()
+        self.parser = ASTParser()
+    
+    def analyze_code(self, code: str) -> AnalysisResult:
+        """Helper to parse and analyze code."""
+        ast = self.parser.parse(code)
+        return self.analyzer.analyze(ast)
+    
+    def test_type_inference_assignment_success(self):
+        """Test that assignment to undefined variable succeeds with type inference."""
+        result = self.analyze_code('name = "Alice"')
+        
+        assert result.success
+        assert len(result.errors) == 0
+        
+        # Check that an inferred symbol was created
+        assert result.symbol_table.symbol_exists("name")
+        symbol = result.symbol_table.lookup_symbol("name")
+        assert symbol is not None
+        assert symbol.symbol_type == "inferred"
+        assert symbol.name == "name"
+    
+    def test_multiple_type_inference_assignments(self):
+        """Test multiple type inference assignments in sequence."""
+        # This tests persistent state within one analysis
+        from glang.semantic.pipeline import SemanticSession
+        session = SemanticSession()
+        
+        # First assignment
+        result1 = session.analyze_statement('age = 25')
+        assert result1.success
+        
+        # Second assignment
+        result2 = session.analyze_statement('name = "Bob"')
+        assert result2.success
+        
+        # Check that both symbols exist
+        symbol_table = session.get_symbol_table()
+        assert symbol_table.symbol_exists("age")
+        assert symbol_table.symbol_exists("name")
+        
+        age_symbol = symbol_table.lookup_symbol("age")
+        name_symbol = symbol_table.lookup_symbol("name")
+        assert age_symbol.symbol_type == "inferred"
+        assert name_symbol.symbol_type == "inferred"
+    
+    def test_type_inference_vs_explicit_declaration(self):
+        """Test that explicit declarations still work alongside type inference."""
+        # Test sequence: explicit then inferred
+        from glang.semantic.pipeline import SemanticSession
+        session = SemanticSession()
+        
+        # Explicit declaration
+        result1 = session.analyze_statement('string title = "Engineer"')
+        assert result1.success
+        
+        # Type inference
+        result2 = session.analyze_statement('age = 30')
+        assert result2.success
+        
+        # Check symbols
+        symbol_table = session.get_symbol_table()
+        title_symbol = symbol_table.lookup_symbol("title")
+        age_symbol = symbol_table.lookup_symbol("age")
+        
+        assert title_symbol.symbol_type == "string"  # Explicit
+        assert age_symbol.symbol_type == "inferred"  # Inferred
+    
+    def test_assignment_to_existing_variable(self):
+        """Test that assignment to existing variable works normally."""
+        from glang.semantic.pipeline import SemanticSession
+        session = SemanticSession()
+        
+        # Create variable with type inference
+        result1 = session.analyze_statement('count = 10')
+        assert result1.success
+        
+        # Assign to existing variable
+        result2 = session.analyze_statement('count = 20')
+        assert result2.success
+        
+        # Should still have just one symbol
+        symbol_table = session.get_symbol_table()
+        symbols = symbol_table.get_all_symbols()
+        assert len(symbols) == 1
+        assert "count" in symbols
+    
+    def test_undefined_variable_access_still_fails(self):
+        """Test that accessing undefined variables still produces errors."""
+        result = self.analyze_code('undefined_var')
+        
+        assert not result.success
+        assert len(result.errors) == 1
+        assert isinstance(result.errors[0], UndefinedVariableError)
+        assert "undefined_var" in str(result.errors[0])
+
+
 if __name__ == '__main__':
     pytest.main([__file__])
