@@ -67,3 +67,12 @@ class IndexError(RuntimeError):
     
     def __init__(self, message: str, position: Optional[SourcePosition] = None):
         super().__init__(message, position)
+
+
+class LoadRequest(Exception):
+    """Special exception to request file loading from execution session."""
+    
+    def __init__(self, filename: str, position: Optional[SourcePosition] = None):
+        self.filename = filename
+        self.position = position
+        super().__init__(f"Load request: {filename}")

@@ -180,6 +180,15 @@ class ExpressionStatement(Statement):
     def accept(self, visitor):
         return visitor.visit_expression_statement(self)
 
+@dataclass
+class LoadStatement(Statement):
+    """Load statement: load "filename.gr" """
+    filename: str  # The file to load
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_load_statement(self)
+
 @dataclass 
 class LegacyCommand(Statement):
     """Legacy slash commands: /help, /show, etc."""
@@ -271,6 +280,11 @@ class ASTVisitor(ABC):
         pass
     
     @abstractmethod
+    def visit_load_statement(self, node: LoadStatement):
+        """Visit a load statement."""
+        pass
+    
+    @abstractmethod
     def visit_legacy_command(self, node: LegacyCommand):
         """Visit a legacy command."""
         pass
@@ -348,6 +362,9 @@ class BaseASTVisitor(ASTVisitor):
     
     def visit_expression_statement(self, node: ExpressionStatement):
         node.expression.accept(self)
+        return node
+    
+    def visit_load_statement(self, node: LoadStatement):
         return node
     
     def visit_legacy_command(self, node: LegacyCommand):

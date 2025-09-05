@@ -46,8 +46,9 @@ class ExecutionContext:
 class ASTExecutor(ASTVisitor):
     """Executes semantically analyzed AST nodes."""
     
-    def __init__(self, context: ExecutionContext):
+    def __init__(self, context: ExecutionContext, file_manager=None):
         self.context = context
+        self.file_manager = file_manager
         self.result = None
     
     def execute(self, node: ASTNode) -> Any:
@@ -375,6 +376,16 @@ class ASTExecutor(ASTVisitor):
         """Visit method call in expression context."""
         # Same as method call statement, but in expression context
         self.visit_method_call(node)
+    
+    def visit_load_statement(self, node: LoadStatement) -> None:
+        """Visit load statement - include file in current namespace."""
+        if not self.file_manager:
+            raise RuntimeError("File manager not available for load operation", node.position)
+        
+        # For load statements within the AST executor, we need to delegate back to the execution session
+        # This is handled by raising a special exception that the execution session can catch
+        from .errors import LoadRequest
+        raise LoadRequest(node.filename, node.position)
     
     def visit_legacy_command(self, node) -> None:
         """Visit legacy command (not supported in new system)."""

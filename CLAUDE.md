@@ -4,37 +4,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Glang** is a prototype programming language where **everything is a graph**. This fundamental philosophy permeates every aspect of the language:
+**Glang** is a modern programming language with powerful type inference, built on a clean AST-based architecture. The language provides:
 
-### Core Philosophy: "Graphs All The Way Down"
-- **Data structures** are graphs (lists, trees, databases)
-- **Variable storage** is a graph (namespace meta-graph)
-- **Runtime environment** uses graph-based relationships
-- **Future features** will extend this to modules, functions, and program structure
+### Core Features
+- **Strong type system** with optional type inference
+- **Modern syntax** for variables, lists, and method calls
+- **File loading system** for modular programming
+- **Clean AST-based execution** for reliability and extensibility
 
 ### Design Principles:
-- **Intuitive structure and syntax** - Graph concepts should feel natural
-- **Stability** - Consistent graph-based behavior at all levels
-- **Flexibility** - Easy transformation between graph types
-- **Introspection** - Ability to examine graph structures at runtime
-
-This prototype is implemented in Python for rapid development and testing.
+- **Intuitive syntax** - Natural programming constructs that feel familiar
+- **Type safety** - Comprehensive type checking with helpful error messages  
+- **Extensibility** - Clean AST architecture for future language features
+- **Developer experience** - Excellent error messages and REPL environment
 
 ## Repository Structure
 
 - `src/glang/` - Main language package
-  - `core/` - Core graph data structures
-    - `node.py` - Graph nodes with unique IDs and data
-    - `edge.py` - Directed edges with metadata
-    - `graph.py` - Graph container with linear list operations
-    - `variable_graph.py` - Meta-graph for variable namespace
-    - `graph_types.py` - Extensible graph type system
-  - `repl/` - REPL implementation
-    - `repl.py` - Main REPL with graph commands
-    - `graph_manager.py` - Variable management using VariableGraph
-  - `visualization/` - Graph rendering and display
+  - `ast/` - Abstract syntax tree nodes and visitor pattern
+  - `lexer/` - Modern tokenizer for language lexing
+  - `parser/` - AST parser for building typed syntax trees
+  - `semantic/` - Semantic analysis and type checking
+  - `execution/` - AST execution engine with type-safe runtime
+  - `files/` - File loading/saving system for .gr programs
+  - `repl/` - Modern REPL implementation
   - `cli.py` - Command-line interface
-- `test/` - Comprehensive test suite (60+ tests, 67% coverage)
+- `test/` - Comprehensive test suite (194 tests, 71% coverage)
 - `doc/` - Documentation files
 
 ## Development Setup
@@ -57,7 +52,7 @@ python -m glang.repl
 glang
 
 # Quick demo (scripted)
-echo -e "create fruits [apple, banana]\\nnamespace\\nstats\\nexit" | glang
+echo -e "string name = \"Alice\"\\nname\\n/namespace\\n/exit" | glang
 
 # Run tests
 pytest test/
@@ -71,131 +66,112 @@ black src/ test/
 # Type checking
 mypy src/
 
-# Demonstrate the philosophy
-echo -e "create fruits [apple, banana]\nnamespace\nstats\nexit" | glang
+# Demonstrate the language
+echo -e "string greeting = \"Hello World\"\nlist items = [1, 2, 3]\nitems.append(4)\n/namespace\n/exit" | glang
 ```
 
 ## REPL Commands
 
 ### Basic Commands
-- `ver`/`version` - Show version information
-- `h`/`help` - Show help information  
-- `x`/`exit` - Exit the REPL
+- `/help` or `/h` - Show help information
+- `/version` or `/ver` - Show version information  
+- `/exit` or `/x` - Exit the REPL
 
-### Graph Management
-- `create <name> [1,2,3]` - Create graph from list
-- `graphs` - List all graphs
-- `show [name]` - Show graph structure
-- `traverse [name]` - Show graph traversal
-- `delete <name>` - Delete a graph
-- `info [name]` - Show detailed variable info
+### File Operations
+- `/load <file>` - Load and execute a .gr file
+- `/save <file>` - Save current session to .gr file
+- `/run <file>` - Run .gr file in fresh session
 
-### Variable Namespace (Meta-Graph)
-- `namespace` - **Show the variable graph itself**
-- `stats` - Show namespace statistics
+### Session Management
+- `/namespace` or `/ns` - Show all current variables
+- `/stats` - Show session statistics
+- `/clear` - Clear all variables
 
-### Modern Syntax (Phase 4A & 4B)
+## Language Syntax
 
-#### Variable Declarations with Type Constraints
-```bash
-# Basic declarations
-list fruits = [apple, banana, cherry]
-list numbers = [1, 2, 3, 4, 5]
+### Variable Declarations
+```glang
+# Explicit type declarations
+string name = "Alice"
+num age = 25
+bool active = true
+list items = [1, 2, 3]
 
-# Type-constrained declarations  
+# Type-constrained lists
 list<num> scores = [95, 87, 92]
-list<string> names = [alice, bob, charlie]
+list<string> names = ["alice", "bob", "charlie"]
 list<bool> flags = [true, false, true]
-list<list> matrix = [[1, 2], [3, 4]]
+
+# Type inference (new!)
+name = "Bob"           # Infers string type
+count = 42             # Infers num type  
+data = [1, 2, 3]       # Infers list type
 ```
 
-#### Advanced Indexing & Assignment
-```bash
+### Advanced Operations
+```glang
 # Index access
-fruits[0]          # Get first element
-numbers[-1]        # Get last element
-matrix[1][0]       # Multi-dimensional access
+items[0]           # Get first element
+items[-1]          # Get last element (if supported)
 
-# Index assignment
-fruits[0] = mango
-scores[1] = 99
-matrix[0][1] = 42
+# Index assignment  
+items[0] = 99      # Set first element
+scores[1] = 100    # Update element
 
-# Slice access
-numbers[1:4]       # Elements 1 through 3
-data[::2]          # Every 2nd element
-items[2:]          # From index 2 to end
-text[:-1]          # All but last element
-
-# Slice assignment
-fruits[1:3] = [kiwi, orange]
-numbers[::2] = [10, 30, 50]
+# Method calls
+items.append(4)    # Add element to list
+names.append("dave") # Type-checked append
 ```
 
-#### Method Calls with Type Safety
-```bash
-# Basic methods (with constraint enforcement)
-scores.append 88      # ✓ Valid (num)
-scores.append hello   # ✗ Error (string != num constraint)
+### File Loading
+```glang
+# Load another .gr file (language-level)
+load "config.gr"     # Variables from config.gr are now available
 
-# Type introspection methods
-scores.constraint()              # Show type constraint
-scores.validate_constraint()     # Validate all elements
-scores.type_summary()           # Count elements by type
-scores.types()                  # List all element types
-mixed.coerce_to_constraint()    # Attempt type coercion
+# Example config.gr:
+# debug = true
+# max_items = 100
+
+# After loading, use variables directly:
+if debug {
+    print("Debug mode enabled")
+}
 ```
-
-### Legacy Commands (Still Supported)
-- `create <name> [1,2,3]` - Create graph from list
-- `graphs` - List all graphs
-- `show [name]` - Show graph structure
-- `traverse [name]` - Show graph traversal
-- `delete <name>` - Delete a graph
-- `info [name]` - Show detailed variable info
-
-### Graph Operations
-- `append <value>` - Add to end
-- `prepend <value>` - Add to beginning
-- `insert <index> <val>` - Insert at position
-- `reverse` - Reverse the graph
 
 ## Architecture Notes
 
-### Graph-Based Development Philosophy
+### Modern AST-Based Design
 
-When developing glang features, **think in graphs**:
+Glang uses a clean, modern architecture:
 
-1. **Variable Storage**: Variables aren't stored in a hash table - they're nodes in a VariableGraph with assignment edges connecting names to values.
+1. **Lexical Analysis**: Modern tokenizer with position tracking and comprehensive token types
 
-2. **Data Structures**: A list `[1,2,3]` is internally `Node(1) -> Node(2) -> Node(3)` - a simple directed graph.
+2. **AST Parsing**: Recursive descent parser builds properly typed abstract syntax trees
 
-3. **Extensibility**: New features should leverage the graph infrastructure. Examples:
-   - Functions could be graph nodes with parameter/return edges
-   - Modules could be subgraphs with import/export edges
-   - Error handling could use exception graphs
+3. **Semantic Analysis**: Type checking, symbol table management, and error detection
 
-4. **Introspection**: Users can examine the meta-structure:
-   ```bash
-   glang> create nums [1,2,3]
-   glang> namespace  # Shows variable graph structure
-   glang> stats      # Shows meta-graph statistics
-   ```
+4. **Execution**: AST visitor pattern with type-safe runtime values
 
-5. **Testing**: Test both data-level graphs AND meta-level graph structures.
+5. **File System**: Modular loading system with .gr file format
 
-### Current Implementation Status
-- ✅ Core graph infrastructure (Node, Edge, Graph classes)
-- ✅ Linear graphs (list operations)
-- ✅ Variable namespace as VariableGraph  
-- ✅ REPL with graph visualization
-- ✅ Comprehensive test suite
-- 🚧 Tree structures, weighted graphs, cyclic graphs
-- 🚧 Graph query language
-- 🚧 Cross-graph references and dependencies
+### Development Philosophy
+- **Type Safety First**: Every operation is type-checked at parse time
+- **Clear Error Messages**: Comprehensive error reporting with source positions
+- **Extensible Design**: Clean visitor pattern allows easy language extensions
+- **Testing Focus**: 194 tests with 71% coverage ensure reliability
+
+### Current Implementation Status  
+- ✅ Modern lexer and AST parser
+- ✅ Complete semantic analysis with symbol tables
+- ✅ Type-safe execution engine
+- ✅ File loading system with .gr format
+- ✅ Type inference for variable declarations
+- ✅ Method calls with type constraint enforcement
+- ✅ Index access and assignment
+- ✅ Comprehensive test suite (194 tests, 71% coverage)
 
 ### Development Guidelines
-- **New features should be graph-native** - don't bolt graphs onto traditional structures
-- **Maintain the "everything is a graph" philosophy** at all levels
-- **Provide introspection capabilities** for any new graph structures
-- **Test both functional behavior and graph structure integrity**
+- **AST-first development** - All new features should extend the AST system
+- **Type safety everywhere** - Every operation must be type-checked
+- **Comprehensive testing** - New features require full test coverage  
+- **Clean error messages** - Users should understand exactly what went wrong

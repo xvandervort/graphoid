@@ -19,7 +19,8 @@ from glang.semantic.pipeline import SemanticPipeline, SemanticSession, AnalysisR
 from glang.semantic.symbol_table import SymbolTable
 from .executor import ASTExecutor, ExecutionContext
 from .values import GlangValue
-from .errors import RuntimeError as GlangRuntimeError
+from .errors import RuntimeError as GlangRuntimeError, LoadRequest
+from glang.files import FileManager
 
 
 @dataclass
@@ -85,10 +86,12 @@ class ExecutionPipeline:
 class ExecutionSession:
     """Session with persistent execution context for REPL-like behavior."""
     
-    def __init__(self):
+    def __init__(self, file_manager: Optional[FileManager] = None):
         self.semantic_session = SemanticSession()
         # Create execution context that shares the symbol table
         self.execution_context = ExecutionContext(self.semantic_session.get_symbol_table())
+        # File manager for load operations
+        self.file_manager = file_manager or FileManager()
     
     def execute_statement(self, input_str: str) -> ExecutionResult:
         """Execute statement in persistent context."""
@@ -108,11 +111,22 @@ class ExecutionSession:
             )
         
         # Now execute the AST
-        executor = ASTExecutor(self.execution_context)
+        executor = ASTExecutor(self.execution_context, self.file_manager)
         
         try:
             result = executor.execute(analysis_result.ast)
             return ExecutionResult(result, self.execution_context, True)
+        except LoadRequest as load_req:
+            # Handle load request by loading the file and continuing
+            try:
+                load_result = self.file_manager.load_file(load_req.filename, self)
+                if not load_result.success:
+                    return ExecutionResult(None, self.execution_context, False, 
+                                         GlangRuntimeError(f"Failed to load {load_req.filename}: {load_result.error}", load_req.position))
+                return ExecutionResult(f"Loaded {load_req.filename}", self.execution_context, True)
+            except Exception as e:
+                return ExecutionResult(None, self.execution_context, False,
+                                     GlangRuntimeError(f"Error loading {load_req.filename}: {str(e)}", load_req.position))
         except GlangRuntimeError as e:
             return ExecutionResult(None, self.execution_context, False, e)
         except Exception as e:

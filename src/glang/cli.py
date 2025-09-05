@@ -33,7 +33,7 @@ def main() -> None:
     else:
         # Start interactive REPL
         repl = REPL()
-        repl.start()
+        repl.run()
 
 
 if __name__ == "__main__":

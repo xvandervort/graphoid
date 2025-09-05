@@ -177,6 +177,16 @@ class SemanticAnalyzer(ASTVisitor):
         """Analyze expression statements."""
         node.expression.accept(self)
     
+    def visit_load_statement(self, node: LoadStatement) -> None:
+        """Analyze load statements."""
+        # For load statements, we just need to validate the filename is a string
+        # The actual file loading is handled at execution time
+        if not isinstance(node.filename, str):
+            self.errors.append(SemanticError(
+                f"Load statement filename must be a string, got {type(node.filename).__name__}",
+                node.position
+            ))
+    
     def visit_legacy_command(self, node: LegacyCommand) -> None:
         """Analyze legacy commands (no semantic checks needed)."""
         pass

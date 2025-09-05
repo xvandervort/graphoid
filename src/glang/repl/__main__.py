@@ -8,7 +8,7 @@ from .repl import REPL
 def main() -> None:
     """Main entry point for the REPL."""
     repl = REPL()
-    repl.start()
+    repl.run()
 
 
 if __name__ == "__main__":

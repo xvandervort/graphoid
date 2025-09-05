@@ -1,16 +1,18 @@
 """Namespace serialization for saving glang programs to .gr files."""
 
-from typing import Dict, List
+from typing import Dict, List, TYPE_CHECKING
 from datetime import datetime
 
-from ..execution import ExecutionSession
 from ..execution.values import GlangValue, StringValue, NumberValue, BooleanValue, ListValue
+
+if TYPE_CHECKING:
+    from ..execution import ExecutionSession
 
 
 class NamespaceSerializer:
     """Serializes execution session namespace to .gr file format."""
     
-    def serialize_namespace(self, execution_session: ExecutionSession) -> str:
+    def serialize_namespace(self, execution_session: 'ExecutionSession') -> str:
         """
         Serialize the execution session namespace to .gr file format.
         

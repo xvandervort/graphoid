@@ -2,11 +2,14 @@
 
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from datetime import datetime
 
 from .errors import FileOperationError, FileNotFoundError, FilePermissionError, InvalidFileFormatError
-from ..execution import ExecutionSession, ExecutionResult
+
+# Use TYPE_CHECKING to avoid circular imports
+if TYPE_CHECKING:
+    from ..execution import ExecutionSession, ExecutionResult
 
 
 class FileManager:
@@ -15,7 +18,7 @@ class FileManager:
     def __init__(self):
         self.supported_extensions = {'.gr'}
     
-    def load_file(self, filepath: str, execution_session: ExecutionSession) -> ExecutionResult:
+    def load_file(self, filepath: str, execution_session: 'ExecutionSession') -> 'ExecutionResult':
         """
         Load and execute a .gr file in the current execution session.
         
@@ -70,7 +73,7 @@ class FileManager:
         except (OSError, IOError) as e:
             raise FileOperationError(f"Failed to read file: {str(e)}", filepath, e)
     
-    def run_file(self, filepath: str) -> ExecutionResult:
+    def run_file(self, filepath: str) -> 'ExecutionResult':
         """
         Execute a .gr file in a fresh execution session.
         
@@ -81,6 +84,7 @@ class FileManager:
             ExecutionResult with execution results
         """
         # Create fresh session
+        from ..execution import ExecutionSession
         fresh_session = ExecutionSession()
         
         try:
@@ -88,7 +92,7 @@ class FileManager:
         except FileOperationError:
             raise  # Re-raise as-is
     
-    def save_file(self, filepath: str, execution_session: ExecutionSession) -> bool:
+    def save_file(self, filepath: str, execution_session: 'ExecutionSession') -> bool:
         """
         Save the current execution session namespace to a .gr file.
         

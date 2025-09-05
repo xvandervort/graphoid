@@ -59,6 +59,10 @@ class ASTParser:
         if self.check(TokenType.SLASH):
             return self.parse_legacy_command()
         
+        # Load statement: load "filename.gr"
+        if self.check(TokenType.IDENTIFIER) and self.peek().value == "load":
+            return self.parse_load_statement()
+        
         # Variable declaration: type name = expr
         if self.check_variable_declaration():
             return self.parse_variable_declaration()
@@ -172,6 +176,22 @@ class ASTParser:
             type_constraint=type_constraint,
             position=pos
         )
+    
+    def parse_load_statement(self) -> LoadStatement:
+        """Parse load statement: load \"filename.gr\" """
+        
+        # Parse 'load' keyword
+        load_token = self.consume(TokenType.IDENTIFIER, "Expected 'load'")
+        pos = SourcePosition(load_token.line, load_token.column)
+        
+        if load_token.value != "load":
+            raise ParseError(f"Expected 'load', got '{load_token.value}'", load_token)
+        
+        # Parse filename (must be a string literal)
+        filename_token = self.consume(TokenType.STRING_LITERAL, "Expected filename string after 'load'")
+        filename = self.process_string_literal(filename_token.value)
+        
+        return LoadStatement(filename=filename, position=pos)
     
     def parse_expression(self) -> Expression:
         """Parse an expression."""
