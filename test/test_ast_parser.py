@@ -206,21 +206,6 @@ class TestASTParser:
         assert isinstance(ast.value, ListLiteral)
         assert len(ast.value.elements) == 2
     
-    def test_parse_legacy_commands(self):
-        """Test parsing legacy slash commands."""
-        ast = self.parser.parse('/help')
-        
-        assert isinstance(ast, LegacyCommand)
-        assert ast.command == "help"
-        assert ast.arguments == []
-        assert ast.raw_input == "/help"
-        
-        # Command with arguments
-        ast = self.parser.parse('/show variable_name')
-        assert ast.command == "show"
-        assert ast.arguments == ["variable_name"]
-        assert ast.raw_input == "/show variable_name"
-    
     def test_complex_expressions(self):
         """Test parsing complex nested expressions."""
         # Method call with index access argument

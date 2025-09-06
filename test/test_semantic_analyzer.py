@@ -319,13 +319,6 @@ class TestSemanticAnalyzer:
         result = self.analyze_code('true')
         assert result.success
     
-    def test_legacy_command_analysis(self):
-        """Test legacy command analysis."""
-        result = self.analyze_code('/help')
-        
-        assert result.success
-        assert len(result.errors) == 0
-    
     def test_multiple_errors(self):
         """Test handling multiple errors in one analysis."""
         # This is tricky with single statements, but we can test

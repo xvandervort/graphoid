@@ -189,17 +189,6 @@ class LoadStatement(Statement):
     def accept(self, visitor):
         return visitor.visit_load_statement(self)
 
-@dataclass 
-class LegacyCommand(Statement):
-    """Legacy slash commands: /help, /show, etc."""
-    command: str
-    arguments: List[str]
-    raw_input: str
-    position: Optional[SourcePosition] = None
-    
-    def accept(self, visitor):
-        return visitor.visit_legacy_command(self)
-
 @dataclass
 class NoOp(Statement):
     """No-operation statement (e.g., comment-only lines, empty lines)."""
@@ -292,10 +281,6 @@ class ASTVisitor(ABC):
         """Visit a load statement."""
         pass
     
-    @abstractmethod
-    def visit_legacy_command(self, node: LegacyCommand):
-        """Visit a legacy command."""
-        pass
     
     @abstractmethod
     def visit_noop(self, node: NoOp):
@@ -380,8 +365,6 @@ class BaseASTVisitor(ASTVisitor):
     def visit_load_statement(self, node: LoadStatement):
         return node
     
-    def visit_legacy_command(self, node: LegacyCommand):
-        return node
     
     def visit_noop(self, node: NoOp):
         return node

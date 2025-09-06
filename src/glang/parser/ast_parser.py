@@ -56,9 +56,6 @@ class ASTParser:
     def parse_statement(self) -> Statement:
         """Parse a statement."""
         
-        # Check for slash commands first (legacy support)
-        if self.check(TokenType.SLASH):
-            return self.parse_legacy_command()
         
         # Load statement: load "filename.gr"
         if self.check(TokenType.IDENTIFIER) and self.peek().value == "load":
@@ -316,30 +313,6 @@ class ASTParser:
         current_token = self.peek()
         raise ParseError(f"Unexpected token: {current_token.value}", current_token)
     
-    def parse_legacy_command(self) -> LegacyCommand:
-        """Parse slash-prefixed legacy commands: /help, /show, etc."""
-        slash_token = self.consume(TokenType.SLASH, "Expected '/' for legacy command")
-        pos = SourcePosition(slash_token.line, slash_token.column)
-        
-        if self.is_at_end() or self.check(TokenType.NEWLINE):
-            return LegacyCommand("", [], "/", pos)
-        
-        # Get command name
-        if not self.check(TokenType.IDENTIFIER):
-            raise ParseError("Expected command name after '/'")
-        
-        command_token = self.advance()
-        command = command_token.value
-        
-        # Get arguments (rest of the line as strings)
-        arguments = []
-        while not self.check(TokenType.NEWLINE) and not self.is_at_end():
-            token = self.advance()
-            if token.type != TokenType.EOF:
-                arguments.append(token.value)
-        
-        raw_input = f"/{command}" + (" " + " ".join(arguments) if arguments else "")
-        return LegacyCommand(command, arguments, raw_input, pos)
     
     def process_string_literal(self, literal: str) -> str:
         """Process string literal, removing quotes and handling escapes."""

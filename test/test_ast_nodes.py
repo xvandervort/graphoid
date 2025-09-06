@@ -176,13 +176,6 @@ class TestASTNodes:
         assert isinstance(stmt.expression, VariableRef)
         assert stmt.expression.name == "myvar"
     
-    def test_legacy_command(self):
-        """Test LegacyCommand node."""
-        cmd = LegacyCommand("help", ["topic"], "/help topic")
-        
-        assert cmd.command == "help"
-        assert cmd.arguments == ["topic"]
-        assert cmd.raw_input == "/help topic"
 
 class TestBaseVisitor:
     """Test the BaseASTVisitor implementation."""

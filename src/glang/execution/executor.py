@@ -387,10 +387,6 @@ class ASTExecutor(BaseASTVisitor):
         from .errors import LoadRequest
         raise LoadRequest(node.filename, node.position)
     
-    def visit_legacy_command(self, node) -> None:
-        """Visit legacy command (not supported in new system)."""
-        raise RuntimeError("Legacy commands not supported in AST execution", node.position)
-    
     def visit_noop(self, node) -> None:
         """Visit no-op statement - do nothing."""
         return None
