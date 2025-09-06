@@ -279,6 +279,23 @@ class SemanticAnalyzer(BaseASTVisitor):
         for arg in node.arguments:
             arg.accept(self)
     
+    def visit_binary_operation(self, node: BinaryOperation) -> None:
+        """Analyze binary operations."""
+        # Analyze both operands
+        node.left.accept(self)
+        node.right.accept(self)
+        
+        # TODO: Add type checking for binary operations
+        # For now, we just validate that operands are analyzed
+    
+    def visit_unary_operation(self, node: UnaryOperation) -> None:
+        """Analyze unary operations."""
+        # Analyze operand
+        node.operand.accept(self)
+        
+        # TODO: Add type checking for unary operations
+        # For now, we just validate that operand is analyzed
+    
     # Helper methods
     
     def _validate_method_call(self, method_name: str, target_type: str, 

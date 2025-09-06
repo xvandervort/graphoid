@@ -89,21 +89,21 @@ class ASTParser:
         expr = self.parse_expression()
         
         # Check if it's an assignment
-        if isinstance(expr, IndexAccess) and self.match(TokenType.EQUALS):
+        if isinstance(expr, IndexAccess) and self.match(TokenType.ASSIGN):
             value = self.parse_expression()
             return IndexAssignment(expr, value)
         
-        if isinstance(expr, SliceAccess) and self.match(TokenType.EQUALS):
+        if isinstance(expr, SliceAccess) and self.match(TokenType.ASSIGN):
             value = self.parse_expression()
             return SliceAssignment(expr, value)
         
         # Simple variable assignment: variable = value
-        if isinstance(expr, VariableRef) and self.match(TokenType.EQUALS):
+        if isinstance(expr, VariableRef) and self.match(TokenType.ASSIGN):
             value = self.parse_expression()
             return Assignment(expr, value, SourcePosition(self.previous().line, self.previous().column))
         
         # Check for malformed variable declaration (type keyword followed by = without variable name)  
-        if isinstance(expr, VariableRef) and self.is_type_keyword_name(expr.name) and self.check(TokenType.EQUALS):
+        if isinstance(expr, VariableRef) and self.is_type_keyword_name(expr.name) and self.check(TokenType.ASSIGN):
             raise ParseError(f"Missing variable name after type '{expr.name}'", self.peek())
         
         # Check for malformed variable declaration (type followed by identifier but no equals)
@@ -116,7 +116,7 @@ class ASTParser:
             saved_pos = self.current
             try:
                 self.advance()  # consume the identifier
-                if self.check(TokenType.EQUALS):
+                if self.check(TokenType.ASSIGN):
                     raise ParseError(f"Invalid type '{expr.name}' in variable declaration", expr.position)
             finally:
                 self.current = saved_pos
@@ -140,11 +140,11 @@ class ASTParser:
             self.advance()  # consume type
             
             # Optional type constraint: <type>
-            if self.match(TokenType.LANGLE):
+            if self.match(TokenType.LESS):
                 if not (self.check_type_keyword() or self.check(TokenType.IDENTIFIER)):
                     return False
                 self.advance()  # consume constraint type
-                if not self.match(TokenType.RANGLE):
+                if not self.match(TokenType.GREATER):
                     return False
             
             # identifier =
@@ -152,7 +152,7 @@ class ASTParser:
                 return False
             self.advance()
             
-            return self.check(TokenType.EQUALS)
+            return self.check(TokenType.ASSIGN)
             
         finally:
             self.current = saved_pos
@@ -167,7 +167,7 @@ class ASTParser:
         
         # Optional type constraint
         type_constraint = None
-        if self.match(TokenType.LANGLE):
+        if self.match(TokenType.LESS):
             constraint_token = self.advance()
             if constraint_token.type not in [TokenType.STRING, TokenType.NUM, 
                                            TokenType.BOOL, TokenType.LIST]:
@@ -175,14 +175,14 @@ class ASTParser:
                     raise ParseError(f"Invalid type constraint '{constraint_token.value}'", 
                                    constraint_token)
             type_constraint = constraint_token.value
-            self.consume(TokenType.RANGLE, "Expected '>' after type constraint")
+            self.consume(TokenType.GREATER, "Expected '>' after type constraint")
         
         # Variable name
         name_token = self.consume(TokenType.IDENTIFIER, "Expected variable name")
         name = name_token.value
         
         # Equals
-        self.consume(TokenType.EQUALS, "Expected '=' after variable name")
+        self.consume(TokenType.ASSIGN, "Expected '=' after variable name")
         
         # Initializer expression
         initializer = self.parse_expression()
@@ -282,6 +282,56 @@ class ASTParser:
     
     def parse_expression(self) -> Expression:
         """Parse an expression."""
+        return self.parse_comparison()
+    
+    def parse_comparison(self) -> Expression:
+        """Parse comparison operators: >, <, >=, <=, ==, !=, !>, !<"""
+        expr = self.parse_term()
+        
+        while self.check(TokenType.GREATER) or self.check(TokenType.LESS) or \
+              self.check(TokenType.GREATER_EQUAL) or self.check(TokenType.LESS_EQUAL) or \
+              self.check(TokenType.EQUAL) or self.check(TokenType.NOT_EQUAL) or \
+              self.check(TokenType.NOT_GREATER) or self.check(TokenType.NOT_LESS):
+            
+            operator_token = self.advance()
+            right = self.parse_term()
+            pos = SourcePosition(operator_token.line, operator_token.column)
+            expr = BinaryOperation(expr, operator_token.value, right, pos)
+        
+        return expr
+    
+    def parse_term(self) -> Expression:
+        """Parse addition and subtraction: +, -"""
+        expr = self.parse_factor()
+        
+        while self.match(TokenType.PLUS) or self.match(TokenType.MINUS):
+            operator_token = self.previous()
+            right = self.parse_factor()
+            pos = SourcePosition(operator_token.line, operator_token.column)
+            expr = BinaryOperation(expr, operator_token.value, right, pos)
+        
+        return expr
+    
+    def parse_factor(self) -> Expression:
+        """Parse multiplication, division, and modulo: *, /, %"""
+        expr = self.parse_unary()
+        
+        while self.match(TokenType.MULTIPLY) or self.match(TokenType.SLASH) or self.match(TokenType.MODULO):
+            operator_token = self.previous()
+            right = self.parse_unary()
+            pos = SourcePosition(operator_token.line, operator_token.column)
+            expr = BinaryOperation(expr, operator_token.value, right, pos)
+        
+        return expr
+    
+    def parse_unary(self) -> Expression:
+        """Parse unary operators: -, !"""
+        if self.match(TokenType.MINUS) or self.match(TokenType.NOT):
+            operator_token = self.previous()
+            expr = self.parse_unary()  # Right associative
+            pos = SourcePosition(operator_token.line, operator_token.column)
+            return UnaryOperation(operator_token.value, expr, pos)
+        
         return self.parse_method_call()
     
     def parse_method_call(self) -> Expression:

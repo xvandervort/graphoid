@@ -100,10 +100,10 @@ class TestTokenizer:
         tokens = self.tokenizer.tokenize("= . , [ ] ( ) < > : /")
         
         expected_types = [
-            TokenType.EQUALS, TokenType.DOT, TokenType.COMMA,
+            TokenType.ASSIGN, TokenType.DOT, TokenType.COMMA,
             TokenType.LBRACKET, TokenType.RBRACKET,
             TokenType.LPAREN, TokenType.RPAREN,
-            TokenType.LANGLE, TokenType.RANGLE,
+            TokenType.LESS, TokenType.GREATER,
             TokenType.COLON, TokenType.SLASH,
             TokenType.NEWLINE, TokenType.EOF
         ]
@@ -161,11 +161,11 @@ line3"""
         
         expected_sequence = [
             (TokenType.LIST, "list"),
-            (TokenType.LANGLE, "<"),
+            (TokenType.LESS, "<"),
             (TokenType.NUM, "num"), 
-            (TokenType.RANGLE, ">"),
+            (TokenType.GREATER, ">"),
             (TokenType.IDENTIFIER, "numbers"),
-            (TokenType.EQUALS, "="),
+            (TokenType.ASSIGN, "="),
             (TokenType.LBRACKET, "["),
             (TokenType.NUMBER_LITERAL, "1"),
             (TokenType.COMMA, ","),

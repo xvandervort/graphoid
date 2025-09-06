@@ -26,13 +26,24 @@ def _create_dynamic_token_type():
         # Operators & Punctuation  
         "DOT": "DOT",                    # .
         "COMMA": "COMMA",                # ,
-        "EQUALS": "EQUALS",              # =
+        "ASSIGN": "ASSIGN",              # =
+        "PLUS": "PLUS",                  # +
+        "MINUS": "MINUS",                # -
+        "MULTIPLY": "MULTIPLY",          # *
+        "MODULO": "MODULO",              # %
+        "GREATER": "GREATER",            # >
+        "LESS": "LESS",                  # <
+        "GREATER_EQUAL": "GREATER_EQUAL", # >=
+        "LESS_EQUAL": "LESS_EQUAL",      # <=
+        "EQUAL": "EQUAL",                # ==
+        "NOT_EQUAL": "NOT_EQUAL",        # !=
+        "NOT_GREATER": "NOT_GREATER",    # !> (intuitive)
+        "NOT_LESS": "NOT_LESS",          # !< (intuitive)
+        "NOT": "NOT",                    # !
         "LBRACKET": "LBRACKET",          # [
         "RBRACKET": "RBRACKET",          # ]
         "LPAREN": "LPAREN",              # (
         "RPAREN": "RPAREN",              # )
-        "LANGLE": "LANGLE",              # <
-        "RANGLE": "RANGLE",              # >
         "COLON": "COLON",                # :
         "SLASH": "SLASH",                # /
         
@@ -102,18 +113,28 @@ class Tokenizer:
             (r'[a-zA-Z_][a-zA-Z0-9_]*', TokenType.IDENTIFIER),
             
             # Multi-character operators (before single character ones)
-            (r'==', TokenType.EQUALS),  # Future: comparison operator
+            (r'>=', TokenType.GREATER_EQUAL),
+            (r'<=', TokenType.LESS_EQUAL),
+            (r'==', TokenType.EQUAL),
+            (r'!=', TokenType.NOT_EQUAL),
+            (r'!>', TokenType.NOT_GREATER),  # Intuitive "not greater than"
+            (r'!<', TokenType.NOT_LESS),    # Intuitive "not less than"
             
             # Single-character operators & punctuation
-            (r'=', TokenType.EQUALS),
+            (r'=', TokenType.ASSIGN),
+            (r'\+', TokenType.PLUS),
+            (r'-', TokenType.MINUS),
+            (r'\*', TokenType.MULTIPLY),
+            (r'%', TokenType.MODULO),
+            (r'>', TokenType.GREATER),
+            (r'<', TokenType.LESS),
+            (r'!', TokenType.NOT),
             (r'\.', TokenType.DOT),
             (r',', TokenType.COMMA),
             (r'\[', TokenType.LBRACKET),
             (r'\]', TokenType.RBRACKET),
             (r'\(', TokenType.LPAREN),
             (r'\)', TokenType.RPAREN),
-            (r'<', TokenType.LANGLE),
-            (r'>', TokenType.RANGLE),
             (r':', TokenType.COLON),
             (r'/', TokenType.SLASH),
             

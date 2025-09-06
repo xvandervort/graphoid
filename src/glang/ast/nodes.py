@@ -110,6 +110,27 @@ class MethodCallExpression(Expression):
     def accept(self, visitor):
         return visitor.visit_method_call_expression(self)
 
+@dataclass
+class BinaryOperation(Expression):
+    """Binary operation: left op right (e.g., 5 + 3, a > b)"""
+    left: Expression
+    operator: str  # "+", "-", "*", "/", "%", ">", "<", "==", "!=", ">=", "<=", "!>", "!<"
+    right: Expression
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_binary_operation(self)
+
+@dataclass
+class UnaryOperation(Expression):
+    """Unary operation: op operand (e.g., -5, !flag)"""
+    operator: str  # "-", "!"
+    operand: Expression
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_unary_operation(self)
+
 # =============================================================================
 # Statement Nodes - represent actions and declarations
 # =============================================================================

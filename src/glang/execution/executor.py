@@ -437,7 +437,68 @@ class ASTExecutor(BaseASTVisitor):
     def visit_method_call_expression(self, node) -> None:
         """Visit method call in expression context."""
         # Same as method call statement, but in expression context
-        self.visit_method_call(node)
+        return self.visit_method_call(node)
+    
+    def visit_binary_operation(self, node: BinaryOperation) -> None:
+        """Execute binary operation (arithmetic, comparison)."""
+        left_value = self.execute(node.left)
+        right_value = self.execute(node.right)
+        
+        # Convert to GlangValues if needed
+        if not isinstance(left_value, GlangValue):
+            left_value = python_to_glang_value(left_value)
+        if not isinstance(right_value, GlangValue):
+            right_value = python_to_glang_value(right_value)
+        
+        # Perform the operation based on operator
+        if node.operator == "+":
+            self.result = self.perform_addition(left_value, right_value)
+        elif node.operator == "-":
+            self.result = self.perform_subtraction(left_value, right_value)
+        elif node.operator == "*":
+            self.result = self.perform_multiplication(left_value, right_value)
+        elif node.operator == "/":
+            self.result = self.perform_division(left_value, right_value)
+        elif node.operator == "%":
+            self.result = self.perform_modulo(left_value, right_value)
+        elif node.operator == ">":
+            self.result = self.perform_comparison(left_value, right_value, "greater")
+        elif node.operator == "<":
+            self.result = self.perform_comparison(left_value, right_value, "less")
+        elif node.operator == ">=":
+            self.result = self.perform_comparison(left_value, right_value, "greater_equal")
+        elif node.operator == "<=":
+            self.result = self.perform_comparison(left_value, right_value, "less_equal")
+        elif node.operator == "==":
+            self.result = self.perform_comparison(left_value, right_value, "equal")
+        elif node.operator == "!=":
+            self.result = self.perform_comparison(left_value, right_value, "not_equal")
+        elif node.operator == "!>":  # Intuitive "not greater than" = less than or equal
+            self.result = self.perform_comparison(left_value, right_value, "less_equal")
+        elif node.operator == "!<":  # Intuitive "not less than" = greater than or equal
+            self.result = self.perform_comparison(left_value, right_value, "greater_equal")
+        else:
+            raise RuntimeError(f"Unknown binary operator: {node.operator}", node.position)
+    
+    def visit_unary_operation(self, node: UnaryOperation) -> None:
+        """Execute unary operation."""
+        operand_value = self.execute(node.operand)
+        
+        if not isinstance(operand_value, GlangValue):
+            operand_value = python_to_glang_value(operand_value)
+        
+        if node.operator == "-":
+            if isinstance(operand_value, NumberValue):
+                self.result = NumberValue(-operand_value.value)
+            else:
+                raise RuntimeError(f"Cannot negate non-numeric value: {operand_value.get_type()}", node.position)
+        elif node.operator == "!":
+            if isinstance(operand_value, BooleanValue):
+                self.result = BooleanValue(not operand_value.value)
+            else:
+                raise RuntimeError(f"Cannot negate non-boolean value: {operand_value.get_type()}", node.position)
+        else:
+            raise RuntimeError(f"Unknown unary operator: {node.operator}", node.position)
     
     def visit_load_statement(self, node: LoadStatement) -> None:
         """Visit load statement - include file in current namespace."""
@@ -476,3 +537,85 @@ class ASTExecutor(BaseASTVisitor):
     def visit_noop(self, node) -> None:
         """Visit no-op statement - do nothing."""
         return None
+    
+    # =============================================================================
+    # Arithmetic Operations
+    # =============================================================================
+    
+    def perform_addition(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform addition operation."""
+        if isinstance(left, NumberValue) and isinstance(right, NumberValue):
+            return NumberValue(left.value + right.value)
+        elif isinstance(left, StringValue) and isinstance(right, StringValue):
+            return StringValue(left.value + right.value)
+        else:
+            raise RuntimeError(f"Cannot add {left.get_type()} and {right.get_type()}")
+    
+    def perform_subtraction(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform subtraction operation."""
+        if isinstance(left, NumberValue) and isinstance(right, NumberValue):
+            return NumberValue(left.value - right.value)
+        else:
+            raise RuntimeError(f"Cannot subtract {right.get_type()} from {left.get_type()}")
+    
+    def perform_multiplication(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform multiplication operation."""
+        if isinstance(left, NumberValue) and isinstance(right, NumberValue):
+            return NumberValue(left.value * right.value)
+        else:
+            raise RuntimeError(f"Cannot multiply {left.get_type()} and {right.get_type()}")
+    
+    def perform_division(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform division operation."""
+        if isinstance(left, NumberValue) and isinstance(right, NumberValue):
+            if right.value == 0:
+                raise RuntimeError("Division by zero")
+            return NumberValue(left.value / right.value)
+        else:
+            raise RuntimeError(f"Cannot divide {left.get_type()} by {right.get_type()}")
+    
+    def perform_modulo(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform modulo operation."""
+        if isinstance(left, NumberValue) and isinstance(right, NumberValue):
+            if right.value == 0:
+                raise RuntimeError("Modulo by zero")
+            return NumberValue(left.value % right.value)
+        else:
+            raise RuntimeError(f"Cannot perform modulo on {left.get_type()} and {right.get_type()}")
+    
+    def perform_comparison(self, left: GlangValue, right: GlangValue, operation: str) -> BooleanValue:
+        """Perform comparison operations."""
+        if isinstance(left, NumberValue) and isinstance(right, NumberValue):
+            if operation == "greater":
+                return BooleanValue(left.value > right.value)
+            elif operation == "less":
+                return BooleanValue(left.value < right.value)
+            elif operation == "greater_equal":
+                return BooleanValue(left.value >= right.value)
+            elif operation == "less_equal":
+                return BooleanValue(left.value <= right.value)
+            elif operation == "equal":
+                return BooleanValue(left.value == right.value)
+            elif operation == "not_equal":
+                return BooleanValue(left.value != right.value)
+        elif isinstance(left, StringValue) and isinstance(right, StringValue):
+            if operation == "equal":
+                return BooleanValue(left.value == right.value)
+            elif operation == "not_equal":
+                return BooleanValue(left.value != right.value)
+            # String comparisons (lexicographic)
+            elif operation == "greater":
+                return BooleanValue(left.value > right.value)
+            elif operation == "less":
+                return BooleanValue(left.value < right.value)
+            elif operation == "greater_equal":
+                return BooleanValue(left.value >= right.value)
+            elif operation == "less_equal":
+                return BooleanValue(left.value <= right.value)
+        elif isinstance(left, BooleanValue) and isinstance(right, BooleanValue):
+            if operation == "equal":
+                return BooleanValue(left.value == right.value)
+            elif operation == "not_equal":
+                return BooleanValue(left.value != right.value)
+        
+        raise RuntimeError(f"Cannot compare {left.get_type()} and {right.get_type()} with {operation}")
