@@ -3,6 +3,7 @@
 from typing import List, Optional, Union
 from ..lexer.tokenizer import Token, TokenType, Tokenizer
 from ..ast.nodes import *
+from ..language import KEYWORD_REGISTRY, get_parser_method_name, KeywordCategory
 
 class ParseError(Exception):
     """Error during AST parsing."""
@@ -56,25 +57,29 @@ class ASTParser:
     def parse_statement(self) -> Statement:
         """Parse a statement."""
         
-        # Import statement: import "filename.gr" as module_name (or /import for compatibility)
-        if self.check(TokenType.IDENTIFIER) and self.peek().value == "import":
-            return self.parse_import_statement_without_slash()
+        # Registry-driven statement keyword dispatch!
+        current_token = self.peek()
+        if current_token and current_token.type != TokenType.EOF:
+            # Check if current token corresponds to a statement keyword
+            statement_keywords = KEYWORD_REGISTRY.get_keywords_by_category(KeywordCategory.STATEMENT)
+            for keyword_name, definition in statement_keywords.items():
+                token_type_name = definition.get_token_type_name()
+                if hasattr(TokenType, token_type_name):
+                    expected_token_type = getattr(TokenType, token_type_name)
+                    if self.check(expected_token_type):
+                        # Get the parser method name and call it dynamically
+                        parser_method_name = definition.parser_method
+                        parser_method = getattr(self, parser_method_name, None)
+                        if parser_method:
+                            return parser_method()
+                        else:
+                            raise ParseError(f"Parser method '{parser_method_name}' not implemented for keyword '{keyword_name}'", current_token)
+        
+        # Legacy slash-prefixed import for compatibility
         if self.check(TokenType.SLASH):
             next_token = self.tokens[self.current + 1] if self.current + 1 < len(self.tokens) else None
-            if next_token and next_token.type == TokenType.IDENTIFIER and next_token.value == "import":
+            if next_token and next_token.type == TokenType.IMPORT:
                 return self.parse_import_statement()
-        
-        # Module declaration: module module_name
-        if self.check(TokenType.IDENTIFIER) and self.peek().value == "module":
-            return self.parse_module_declaration()
-        
-        # Alias declaration: alias short_name
-        if self.check(TokenType.IDENTIFIER) and self.peek().value == "alias":
-            return self.parse_alias_declaration()
-        
-        # Load statement: load "filename.gr"
-        if self.check(TokenType.IDENTIFIER) and self.peek().value == "load":
-            return self.parse_load_statement()
         
         # Variable declaration: type name = expr
         if self.check_variable_declaration():
@@ -98,15 +103,15 @@ class ASTParser:
             return Assignment(expr, value, SourcePosition(self.previous().line, self.previous().column))
         
         # Check for malformed variable declaration (type keyword followed by = without variable name)  
-        if isinstance(expr, VariableRef) and expr.name in {'list', 'string', 'num', 'bool'} and self.check(TokenType.EQUALS):
+        if isinstance(expr, VariableRef) and self.is_type_keyword_name(expr.name) and self.check(TokenType.EQUALS):
             raise ParseError(f"Missing variable name after type '{expr.name}'", self.peek())
         
         # Check for malformed variable declaration (type followed by identifier but no equals)
-        if isinstance(expr, VariableRef) and expr.name in {'list', 'string', 'num', 'bool'} and self.check(TokenType.IDENTIFIER):
+        if isinstance(expr, VariableRef) and self.is_type_keyword_name(expr.name) and self.check(TokenType.IDENTIFIER):
             raise ParseError(f"Missing '=' after variable name in declaration", self.peek())
         
         # Check for invalid type in declaration pattern (identifier identifier =)
-        if isinstance(expr, VariableRef) and expr.name not in {'list', 'string', 'num', 'bool'} and self.check(TokenType.IDENTIFIER):
+        if isinstance(expr, VariableRef) and not self.is_type_keyword_name(expr.name) and self.check(TokenType.IDENTIFIER):
             # Look ahead to see if there's an equals after the second identifier
             saved_pos = self.current
             try:
@@ -198,9 +203,7 @@ class ASTParser:
         pos = SourcePosition(slash_token.line, slash_token.column)
         
         # Parse 'import' keyword
-        import_token = self.consume(TokenType.IDENTIFIER, "Expected 'import' after '/'")
-        if import_token.value != "import":
-            raise ParseError(f"Expected 'import' after '/', got '{import_token.value}'", import_token)
+        import_token = self.consume(TokenType.IMPORT, "Expected 'import' after '/'")
         
         # Parse filename (must be a string literal)
         filename_token = self.consume(TokenType.STRING_LITERAL, "Expected filename string after 'import'")
@@ -219,11 +222,8 @@ class ASTParser:
         """Parse import statement: import "filename.gr" as module_name"""
         
         # Parse 'import' keyword
-        import_token = self.consume(TokenType.IDENTIFIER, "Expected 'import'")
+        import_token = self.consume(TokenType.IMPORT, "Expected 'import'")
         pos = SourcePosition(import_token.line, import_token.column)
-        
-        if import_token.value != "import":
-            raise ParseError(f"Expected 'import', got '{import_token.value}'", import_token)
         
         # Parse filename (must be a string literal)
         filename_token = self.consume(TokenType.STRING_LITERAL, "Expected filename string after 'import'")
@@ -245,11 +245,8 @@ class ASTParser:
         """Parse module declaration: module module_name"""
         
         # Parse 'module' keyword
-        module_token = self.consume(TokenType.IDENTIFIER, "Expected 'module'")
+        module_token = self.consume(TokenType.MODULE, "Expected 'module'")
         pos = SourcePosition(module_token.line, module_token.column)
-        
-        if module_token.value != "module":
-            raise ParseError(f"Expected 'module', got '{module_token.value}'", module_token)
         
         # Parse module name (must be an identifier)
         name_token = self.consume(TokenType.IDENTIFIER, "Expected module name after 'module'")
@@ -261,11 +258,8 @@ class ASTParser:
         """Parse alias declaration: alias short_name"""
         
         # Parse 'alias' keyword
-        alias_token = self.consume(TokenType.IDENTIFIER, "Expected 'alias'")
+        alias_token = self.consume(TokenType.ALIAS, "Expected 'alias'")
         pos = SourcePosition(alias_token.line, alias_token.column)
-        
-        if alias_token.value != "alias":
-            raise ParseError(f"Expected 'alias', got '{alias_token.value}'", alias_token)
         
         # Parse alias name (must be an identifier)
         name_token = self.consume(TokenType.IDENTIFIER, "Expected alias name after 'alias'")
@@ -277,11 +271,8 @@ class ASTParser:
         """Parse load statement: load \"filename.gr\" """
         
         # Parse 'load' keyword
-        load_token = self.consume(TokenType.IDENTIFIER, "Expected 'load'")
+        load_token = self.consume(TokenType.LOAD, "Expected 'load'")
         pos = SourcePosition(load_token.line, load_token.column)
-        
-        if load_token.value != "load":
-            raise ParseError(f"Expected 'load', got '{load_token.value}'", load_token)
         
         # Parse filename (must be a string literal)
         filename_token = self.consume(TokenType.STRING_LITERAL, "Expected filename string after 'load'")
@@ -469,8 +460,24 @@ class ASTParser:
     
     def check_type_keyword(self) -> bool:
         """Check if current token is a type keyword."""
-        return self.check(TokenType.LIST) or self.check(TokenType.STRING) or \
-               self.check(TokenType.NUM) or self.check(TokenType.BOOL)
+        current_token = self.peek()
+        if not current_token or current_token.type == TokenType.EOF:
+            return False
+        
+        # Use registry to check type keywords
+        type_keywords = KEYWORD_REGISTRY.get_keywords_by_category(KeywordCategory.TYPE)
+        for keyword_name in type_keywords:
+            token_type_name = KEYWORD_REGISTRY.get_token_type_name(keyword_name)
+            if hasattr(TokenType, token_type_name):
+                expected_token_type = getattr(TokenType, token_type_name)
+                if self.check(expected_token_type):
+                    return True
+        return False
+    
+    def is_type_keyword_name(self, name: str) -> bool:
+        """Check if a string name is a type keyword."""
+        type_keywords = KEYWORD_REGISTRY.get_keywords_by_category(KeywordCategory.TYPE)
+        return name.lower() in type_keywords
     
     def consume_type_keyword(self, message: str) -> Token:
         """Consume a type keyword token."""

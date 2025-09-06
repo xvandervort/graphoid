@@ -2,44 +2,64 @@
 
 from enum import Enum
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 import re
+import sys
+import os
 
-class TokenType(Enum):
-    """Token types for glang language."""
+# Add src to path for imports 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
+
+from glang.language import KEYWORD_REGISTRY, get_token_type_name
+
+def _create_dynamic_token_type():
+    """Create TokenType enum with both fixed and dynamic keyword tokens."""
     
-    # Literals
-    IDENTIFIER = "IDENTIFIER"
-    STRING_LITERAL = "STRING_LITERAL"
-    NUMBER_LITERAL = "NUMBER_LITERAL" 
-    BOOLEAN_LITERAL = "BOOLEAN_LITERAL"
+    # Base token types that are always present
+    base_tokens = {
+        # Literals
+        "IDENTIFIER": "IDENTIFIER",
+        "STRING_LITERAL": "STRING_LITERAL", 
+        "NUMBER_LITERAL": "NUMBER_LITERAL",
+        "BOOLEAN_LITERAL": "BOOLEAN_LITERAL",
+        
+        # Operators & Punctuation  
+        "DOT": "DOT",                    # .
+        "COMMA": "COMMA",                # ,
+        "EQUALS": "EQUALS",              # =
+        "LBRACKET": "LBRACKET",          # [
+        "RBRACKET": "RBRACKET",          # ]
+        "LPAREN": "LPAREN",              # (
+        "RPAREN": "RPAREN",              # )
+        "LANGLE": "LANGLE",              # <
+        "RANGLE": "RANGLE",              # >
+        "COLON": "COLON",                # :
+        "SLASH": "SLASH",                # /
+        
+        # Special
+        "NEWLINE": "NEWLINE",            # \n
+        "EOF": "EOF",                    # End of input
+    }
     
-    # Operators & Punctuation
-    DOT = "DOT"                    # .
-    COMMA = "COMMA"                # ,
-    EQUALS = "EQUALS"              # =
-    LBRACKET = "LBRACKET"          # [
-    RBRACKET = "RBRACKET"          # ]
-    LPAREN = "LPAREN"              # (
-    RPAREN = "RPAREN"              # )
-    LANGLE = "LANGLE"              # <
-    RANGLE = "RANGLE"              # >
-    COLON = "COLON"                # :
-    SLASH = "SLASH"                # /
+    # Add dynamic keyword tokens from registry
+    keyword_tokens = {}
+    for keyword_text, definition in KEYWORD_REGISTRY.get_all_keywords().items():
+        token_name = definition.get_token_type_name()
+        keyword_tokens[token_name] = token_name
     
-    # Keywords (type keywords)
-    LIST = "LIST"                  # list
-    STRING = "STRING"              # string  
-    NUM = "NUM"                    # num
-    BOOL = "BOOL"                  # bool
+    # Combine base and keyword tokens
+    all_tokens = {**base_tokens, **keyword_tokens}
     
-    # Boolean literals (handled as keywords initially)
-    TRUE = "TRUE"                  # true
-    FALSE = "FALSE"                # false
-    
-    # Special
-    NEWLINE = "NEWLINE"            # \n
-    EOF = "EOF"                    # End of input
+    # Create the enum class dynamically
+    return Enum('TokenType', all_tokens)
+
+# Create the TokenType enum with dynamic keyword support
+TokenType = _create_dynamic_token_type()
+
+def _refresh_token_type():
+    """Refresh TokenType enum when new keywords are added."""
+    global TokenType
+    TokenType = _create_dynamic_token_type()
 
 @dataclass
 class Token:
@@ -78,18 +98,7 @@ class Tokenizer:
             (r'-?\d+\.\d+', TokenType.NUMBER_LITERAL),
             (r'-?\d+', TokenType.NUMBER_LITERAL),
             
-            # Keywords (must come before identifiers!)
-            # Boolean literals
-            (r'\btrue\b', TokenType.TRUE),
-            (r'\bfalse\b', TokenType.FALSE),
-            
-            # Type keywords
-            (r'\blist\b', TokenType.LIST),
-            (r'\bstring\b', TokenType.STRING),
-            (r'\bnum\b', TokenType.NUM),
-            (r'\bbool\b', TokenType.BOOL),
-            
-            # Identifiers (variable names, method names, etc.)
+            # Identifiers (variable names, method names, and keywords - post-processed)
             (r'[a-zA-Z_][a-zA-Z0-9_]*', TokenType.IDENTIFIER),
             
             # Multi-character operators (before single character ones)
@@ -152,6 +161,12 @@ class Tokenizer:
                         
                         # Skip None token types (comments, whitespace)
                         if token_type is not None:
+                            # Post-process identifiers to convert keywords to proper token types
+                            if token_type == TokenType.IDENTIFIER:
+                                keyword_type = self.get_keyword_token_type(value)
+                                if keyword_type:
+                                    token_type = keyword_type
+                            
                             token = Token(token_type, value, line_num, column)
                             tokens.append(token)
                         
@@ -189,28 +204,43 @@ class Tokenizer:
     
     def is_keyword(self, value: str) -> bool:
         """Check if a string value is a keyword."""
-        keyword_values = {
-            'list', 'string', 'num', 'bool', 'true', 'false'
-        }
-        return value.lower() in keyword_values
+        return KEYWORD_REGISTRY.is_keyword(value)
+    
+    def get_keyword_token_type(self, value: str) -> Optional[TokenType]:
+        """Get the token type for a keyword, or None if not a keyword."""
+        token_type_name = KEYWORD_REGISTRY.get_token_type_name(value)
+        if token_type_name:
+            # Get the token type by name from our dynamic enum
+            return getattr(TokenType, token_type_name, None)
+        return None
     
     def is_literal_token(self, token_type: TokenType) -> bool:
         """Check if a token type represents a literal value."""
-        return token_type in {
-            TokenType.STRING_LITERAL,
-            TokenType.NUMBER_LITERAL, 
-            TokenType.TRUE,
-            TokenType.FALSE
-        }
+        # Base literal types
+        base_literals = {TokenType.STRING_LITERAL, TokenType.NUMBER_LITERAL}
+        
+        # Add boolean literal keywords from registry
+        from glang.language import KeywordCategory
+        boolean_keywords = KEYWORD_REGISTRY.get_keywords_by_category(KeywordCategory.LITERAL)
+        for keyword_name in boolean_keywords:
+            token_type_name = KEYWORD_REGISTRY.get_token_type_name(keyword_name)
+            if hasattr(TokenType, token_type_name):
+                base_literals.add(getattr(TokenType, token_type_name))
+        
+        return token_type in base_literals
     
     def is_type_keyword(self, token_type: TokenType) -> bool:
         """Check if a token type is a type keyword."""
-        return token_type in {
-            TokenType.LIST,
-            TokenType.STRING,
-            TokenType.NUM,
-            TokenType.BOOL
-        }
+        from glang.language import KeywordCategory
+        type_keywords = KEYWORD_REGISTRY.get_keywords_by_category(KeywordCategory.TYPE)
+        
+        type_token_types = set()
+        for keyword_name in type_keywords:
+            token_type_name = KEYWORD_REGISTRY.get_token_type_name(keyword_name)
+            if hasattr(TokenType, token_type_name):
+                type_token_types.add(getattr(TokenType, token_type_name))
+        
+        return token_type in type_token_types
 
 # Utility functions for working with tokens
 def format_tokens(tokens: List[Token]) -> str:
