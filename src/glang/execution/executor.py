@@ -387,6 +387,14 @@ class ASTExecutor(BaseASTVisitor):
         from .errors import LoadRequest
         raise LoadRequest(node.filename, node.position)
     
+    def visit_import_statement(self, node: ImportStatement) -> None:
+        """Visit import statement - load module into namespace."""
+        # For now, raise an error as module system is not yet implemented
+        raise NotImplementedError(
+            f"Module imports not yet implemented. Use 'load \"{node.filename}\"' instead",
+            node.position
+        )
+    
     def visit_noop(self, node) -> None:
         """Visit no-op statement - do nothing."""
         return None

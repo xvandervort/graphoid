@@ -23,6 +23,7 @@ from .nodes import (
     IndexAssignment,
     SliceAssignment,
     ExpressionStatement,
+    ImportStatement,
     
     # Visitor pattern
     ASTVisitor
@@ -51,6 +52,7 @@ __all__ = [
     'IndexAssignment',
     'SliceAssignment',
     'ExpressionStatement',
+    'ImportStatement',
     
     # Visitor pattern
     'ASTVisitor'

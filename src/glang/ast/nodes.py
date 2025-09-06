@@ -190,6 +190,16 @@ class LoadStatement(Statement):
         return visitor.visit_load_statement(self)
 
 @dataclass
+class ImportStatement(Statement):
+    """Import statement: /import "filename.gr" as module_name"""
+    filename: str  # The file to import
+    alias: Optional[str] = None  # Optional alias (e.g., 'as math')
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_import_statement(self)
+
+@dataclass
 class NoOp(Statement):
     """No-operation statement (e.g., comment-only lines, empty lines)."""
     position: Optional[SourcePosition] = None
@@ -281,6 +291,11 @@ class ASTVisitor(ABC):
         """Visit a load statement."""
         pass
     
+    @abstractmethod
+    def visit_import_statement(self, node: ImportStatement):
+        """Visit an import statement."""
+        pass
+    
     
     @abstractmethod
     def visit_noop(self, node: NoOp):
@@ -363,6 +378,9 @@ class BaseASTVisitor(ASTVisitor):
         return node
     
     def visit_load_statement(self, node: LoadStatement):
+        return node
+    
+    def visit_import_statement(self, node: ImportStatement):
         return node
     
     

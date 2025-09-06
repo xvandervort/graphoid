@@ -56,6 +56,11 @@ class ASTParser:
     def parse_statement(self) -> Statement:
         """Parse a statement."""
         
+        # Import statement: /import "filename.gr" as module_name
+        if self.check(TokenType.SLASH):
+            next_token = self.tokens[self.current + 1] if self.current + 1 < len(self.tokens) else None
+            if next_token and next_token.type == TokenType.IDENTIFIER and next_token.value == "import":
+                return self.parse_import_statement()
         
         # Load statement: load "filename.gr"
         if self.check(TokenType.IDENTIFIER) and self.peek().value == "load":
@@ -174,6 +179,31 @@ class ASTParser:
             type_constraint=type_constraint,
             position=pos
         )
+    
+    def parse_import_statement(self) -> ImportStatement:
+        """Parse import statement: /import "filename.gr" as module_name"""
+        
+        # Parse '/' prefix
+        slash_token = self.consume(TokenType.SLASH, "Expected '/'")
+        pos = SourcePosition(slash_token.line, slash_token.column)
+        
+        # Parse 'import' keyword
+        import_token = self.consume(TokenType.IDENTIFIER, "Expected 'import' after '/'")
+        if import_token.value != "import":
+            raise ParseError(f"Expected 'import' after '/', got '{import_token.value}'", import_token)
+        
+        # Parse filename (must be a string literal)
+        filename_token = self.consume(TokenType.STRING_LITERAL, "Expected filename string after 'import'")
+        filename = self.process_string_literal(filename_token.value)
+        
+        # Check for optional 'as' alias
+        alias = None
+        if self.check(TokenType.IDENTIFIER) and self.peek().value == "as":
+            self.advance()  # consume 'as'
+            alias_token = self.consume(TokenType.IDENTIFIER, "Expected module name after 'as'")
+            alias = alias_token.value
+        
+        return ImportStatement(filename=filename, alias=alias, position=pos)
     
     def parse_load_statement(self) -> LoadStatement:
         """Parse load statement: load \"filename.gr\" """

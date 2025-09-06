@@ -42,7 +42,7 @@ class TestASTNodes:
             def visit_slice_assignment(self, node): pass
             def visit_expression_statement(self, node): pass
             def visit_load_statement(self, node): pass
-            def visit_legacy_command(self, node): pass
+            def visit_import_statement(self, node): pass
             def visit_noop(self, node): pass
             
         visitor = TestVisitor()
