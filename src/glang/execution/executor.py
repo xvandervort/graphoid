@@ -181,23 +181,53 @@ class ASTExecutor(BaseASTVisitor):
     
     def visit_method_call(self, node: MethodCall) -> None:
         """Execute method call."""
-        # Get target value
-        target_value = self.execute(node.target)
+        # Check if this might be a module-qualified variable access (e.g., math.pi)
+        # Use string comparison instead of isinstance to avoid import issues
+        is_variable_ref = type(node.target).__name__ == 'VariableRef'
+        if (is_variable_ref and 
+            len(node.arguments) == 0 and  # No arguments means it's likely a property access
+            self.context.module_manager):
+            
+            # Try to resolve as module.symbol first
+            module_name = node.target.name
+            symbol_name = node.method_name
+            module = self.context.module_manager.get_module(module_name)
+            
+            if module:
+                symbol_value = module.namespace.get_symbol(symbol_name)
+                if symbol_value is not None:
+                    self.result = symbol_value
+                    return
         
-        if not isinstance(target_value, GlangValue):
-            target_value = python_to_glang_value(target_value, node.position)
-        
-        # Execute arguments
-        arg_values = []
-        for arg in node.arguments:
-            arg_value = self.execute(arg)
-            if not isinstance(arg_value, GlangValue):
-                arg_value = python_to_glang_value(arg_value, arg.position)
-            arg_values.append(arg_value)
-        
-        # Dispatch method call
-        result = self._dispatch_method(target_value, node.method_name, arg_values, node.position)
-        self.result = result
+        # Fall back to regular method call execution
+        try:
+            # Get target value
+            target_value = self.execute(node.target)
+            
+            if not isinstance(target_value, GlangValue):
+                target_value = python_to_glang_value(target_value, node.position)
+            
+            # Execute arguments
+            arg_values = []
+            for arg in node.arguments:
+                arg_value = self.execute(arg)
+                if not isinstance(arg_value, GlangValue):
+                    arg_value = python_to_glang_value(arg_value, arg.position)
+                arg_values.append(arg_value)
+            
+            # Dispatch method call
+            result = self._dispatch_method(target_value, node.method_name, arg_values, node.position)
+            self.result = result
+        except VariableNotFoundError:
+            # If the target variable doesn't exist, give a more helpful error message
+            if isinstance(node.target, VariableRef) and self.context.module_manager:
+                module_name = node.target.name
+                symbol_name = node.method_name
+                if self.context.module_manager.get_module(module_name):
+                    # Module exists but symbol doesn't
+                    from ..modules.errors import ModuleSymbolError
+                    raise ModuleSymbolError(module_name, symbol_name, node.position)
+            raise
     
     # Expression evaluation
     def visit_variable_ref(self, node: VariableRef) -> None:

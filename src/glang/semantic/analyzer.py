@@ -256,18 +256,28 @@ class SemanticAnalyzer(BaseASTVisitor):
     
     def visit_method_call_expression(self, node: MethodCallExpression) -> None:
         """Analyze method call expressions."""
-        # Analyze target
-        node.target.accept(self)
+        # Check if this might be module-qualified access (e.g., math.pi with no arguments)
+        from ..ast.nodes import VariableRef
+        is_module_qualified = (isinstance(node.target, VariableRef) and 
+                             len(node.arguments) == 0)
         
-        # Analyze arguments
+        if is_module_qualified:
+            # For potential module access, we don't analyze the target as a variable
+            # The execution system will handle module resolution
+            pass
+        else:
+            # Analyze target for regular method calls
+            node.target.accept(self)
+            
+            # Check method validity
+            if isinstance(node.target, VariableRef):
+                symbol = self.symbol_table.lookup_symbol(node.target.name)
+                if symbol:
+                    self._validate_method_call(node.method_name, symbol.symbol_type, node.position)
+        
+        # Always analyze arguments
         for arg in node.arguments:
             arg.accept(self)
-        
-        # Check method validity
-        if isinstance(node.target, VariableRef):
-            symbol = self.symbol_table.lookup_symbol(node.target.name)
-            if symbol:
-                self._validate_method_call(node.method_name, symbol.symbol_type, node.position)
     
     # Helper methods
     

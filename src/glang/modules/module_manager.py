@@ -79,6 +79,7 @@ class ModuleManager:
         self.loaded_modules: Dict[str, Module] = {}  # filename -> Module
         self.module_aliases: Dict[str, Module] = {}  # alias -> Module
         self.import_stack: list = []  # For circular dependency detection
+        self.current_file_context: Optional[str] = None  # Current file being processed
     
     def import_module(self, filename: str, alias: Optional[str] = None, 
                      position: Optional[SourcePosition] = None) -> Module:
@@ -201,27 +202,76 @@ class ModuleManager:
         self.module_aliases.clear()
         self.import_stack.clear()
     
+    def set_current_file_context(self, filepath: str):
+        """Set the current file being processed for relative path resolution."""
+        self.current_file_context = os.path.abspath(filepath)
+    
+    def clear_current_file_context(self):
+        """Clear the current file context."""
+        self.current_file_context = None
+    
     def _normalize_path(self, filename: str) -> str:
         """Normalize a file path for consistent module identification."""
         # Ensure .gr extension
         if not filename.endswith('.gr'):
             filename = f"{filename}.gr"
         
-        # Convert to Path and resolve (but don't require it to exist yet)
-        path = Path(filename)
+        # If it's already absolute, return as is
+        if os.path.isabs(filename):
+            return filename
         
-        # If it's a relative path, keep it relative for now
-        # The file manager will handle resolving it
-        return str(path)
+        # Try to resolve relative to current file context
+        if self.current_file_context:
+            context_dir = os.path.dirname(self.current_file_context)
+            candidate = os.path.join(context_dir, filename)
+            if os.path.exists(candidate):
+                return os.path.abspath(candidate)
+        
+        # If we're currently processing a file (in import stack),
+        # resolve relative to that file's directory
+        if self.import_stack:
+            for import_path in reversed(self.import_stack):
+                if os.path.isabs(import_path):
+                    import_dir = os.path.dirname(import_path)
+                    candidate = os.path.join(import_dir, filename)
+                    if os.path.exists(candidate):
+                        return os.path.abspath(candidate)
+        
+        # Try current directory
+        if os.path.exists(filename):
+            return os.path.abspath(filename)
+        
+        # Return as is if we can't resolve it (let the error handling catch it)
+        return filename
     
     def _file_exists(self, filename: str) -> bool:
         """Check if a module file exists."""
-        # Try current directory first
+        # If it's already an absolute path, just check if it exists
+        if os.path.isabs(filename):
+            return os.path.exists(filename)
+        
+        # Try relative to current file context first
+        if self.current_file_context:
+            context_dir = os.path.dirname(self.current_file_context)
+            candidate = os.path.join(context_dir, filename)
+            if os.path.exists(candidate):
+                return True
+        
+        # Try current directory
         if os.path.exists(filename):
             return True
         
+        # If we're currently processing a file (in import stack),
+        # try relative to that file's directory
+        if self.import_stack:
+            for import_path in reversed(self.import_stack):
+                if os.path.isabs(import_path):
+                    import_dir = os.path.dirname(import_path)
+                    candidate = os.path.join(import_dir, filename)
+                    if os.path.exists(candidate):
+                        return True
+        
         # Could add more search paths here (e.g., lib/, modules/, etc.)
-        # For now, just check current directory
         return False
     
     def _extract_module_declarations(self, filename: str) -> tuple[Optional[str], Optional[str]]:

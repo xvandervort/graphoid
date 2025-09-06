@@ -39,37 +39,44 @@ class FileManager:
         self._validate_file_readable(resolved_path)
         
         try:
-            # Read file contents
-            with open(resolved_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # Set current file context for module resolution
+            execution_session.module_manager.set_current_file_context(resolved_path)
             
-            # Execute each line in the session
-            lines = self._parse_file_content(content)
-            
-            results = []
-            for line_num, line in enumerate(lines, 1):
-                if line.strip():  # Skip empty lines
-                    try:
-                        result = execution_session.execute_statement(line)
-                        results.append(result)
-                        
-                        # If any statement fails, stop execution
-                        if not result.success:
-                            error_msg = f"Execution failed at line {line_num}: {result.error}"
-                            raise FileOperationError(error_msg, filepath, result.error)
+            try:
+                # Read file contents
+                with open(resolved_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Execute each line in the session
+                lines = self._parse_file_content(content)
+                
+                results = []
+                for line_num, line in enumerate(lines, 1):
+                    if line.strip():  # Skip empty lines
+                        try:
+                            result = execution_session.execute_statement(line)
+                            results.append(result)
                             
-                    except Exception as e:
-                        error_msg = f"Error at line {line_num}: {str(e)}"
-                        raise FileOperationError(error_msg, filepath, e)
-            
-            # Return overall success
-            from ..execution import ExecutionResult
-            return ExecutionResult(
-                f"Successfully loaded {len(lines)} statements from {os.path.basename(filepath)}", 
-                execution_session.execution_context, 
-                True
-            )
-            
+                            # If any statement fails, stop execution
+                            if not result.success:
+                                error_msg = f"Execution failed at line {line_num}: {result.error}"
+                                raise FileOperationError(error_msg, filepath, result.error)
+                                
+                        except Exception as e:
+                            error_msg = f"Error at line {line_num}: {str(e)}"
+                            raise FileOperationError(error_msg, filepath, e)
+                
+                # Return overall success
+                from ..execution import ExecutionResult
+                return ExecutionResult(
+                    f"Successfully loaded {len(lines)} statements from {os.path.basename(filepath)}", 
+                    execution_session.execution_context, 
+                    True
+                )
+            finally:
+                # Always clear the file context
+                execution_session.module_manager.clear_current_file_context()
+                
         except (OSError, IOError) as e:
             raise FileOperationError(f"Failed to read file: {str(e)}", filepath, e)
     

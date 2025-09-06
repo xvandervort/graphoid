@@ -187,8 +187,20 @@ class ExecutionSession:
                     import_req.position
                 )
                 
-                # Load the module file and execute it in the module's namespace
-                load_result = self.file_manager.load_file(import_req.filename, self)
+                # Capture variables before loading module
+                vars_before = set(self.execution_context.variables.keys())
+                
+                # Save current file context before loading module
+                current_context = self.module_manager.current_file_context
+                
+                # Load the module file using the resolved filename and execute it in the current context
+                load_result = self.file_manager.load_file(module.filename, self)
+                
+                # Restore file context after loading module
+                if current_context:
+                    self.module_manager.set_current_file_context(current_context)
+                else:
+                    self.module_manager.clear_current_file_context()
                 if not load_result.success:
                     return ExecutionResult(
                         None, 
@@ -199,13 +211,17 @@ class ExecutionSession:
                         "<input>"
                     )
                 
-                # Move variables from main context to module namespace
-                # This is a simplified approach - in reality we'd execute in a separate context
-                for var_name in list(self.execution_context.variables.keys()):
+                # Move variables that were created by the module to the module namespace
+                # and remove them from main context
+                vars_after = set(self.execution_context.variables.keys())
+                new_vars = vars_after - vars_before
+                
+                for var_name in new_vars:
                     if var_name not in ['_temp_vars_before_import']:  # Skip internal variables
                         value = self.execution_context.variables[var_name]
                         module.namespace.set_symbol(var_name, value)
-                        # Don't remove from main context for now to keep load compatibility
+                        # Remove from main context since it belongs to the module
+                        del self.execution_context.variables[var_name]
                 
                 module_name = module.name
                 return ExecutionResult(f"Imported {import_req.filename} as {module_name}", self.execution_context, True)
