@@ -76,3 +76,12 @@ class LoadRequest(Exception):
         self.filename = filename
         self.position = position
         super().__init__(f"Load request: {filename}")
+
+class ImportRequest(Exception):
+    """Special exception to request module import from execution session."""
+    
+    def __init__(self, filename: str, alias: Optional[str] = None, position: Optional[SourcePosition] = None):
+        self.filename = filename
+        self.alias = alias
+        self.position = position
+        super().__init__(f"Import request: {filename} as {alias}")

@@ -62,6 +62,14 @@ class ASTParser:
             if next_token and next_token.type == TokenType.IDENTIFIER and next_token.value == "import":
                 return self.parse_import_statement()
         
+        # Module declaration: module module_name
+        if self.check(TokenType.IDENTIFIER) and self.peek().value == "module":
+            return self.parse_module_declaration()
+        
+        # Alias declaration: alias short_name
+        if self.check(TokenType.IDENTIFIER) and self.peek().value == "alias":
+            return self.parse_alias_declaration()
+        
         # Load statement: load "filename.gr"
         if self.check(TokenType.IDENTIFIER) and self.peek().value == "load":
             return self.parse_load_statement()
@@ -204,6 +212,38 @@ class ASTParser:
             alias = alias_token.value
         
         return ImportStatement(filename=filename, alias=alias, position=pos)
+    
+    def parse_module_declaration(self) -> ModuleDeclaration:
+        """Parse module declaration: module module_name"""
+        
+        # Parse 'module' keyword
+        module_token = self.consume(TokenType.IDENTIFIER, "Expected 'module'")
+        pos = SourcePosition(module_token.line, module_token.column)
+        
+        if module_token.value != "module":
+            raise ParseError(f"Expected 'module', got '{module_token.value}'", module_token)
+        
+        # Parse module name (must be an identifier)
+        name_token = self.consume(TokenType.IDENTIFIER, "Expected module name after 'module'")
+        module_name = name_token.value
+        
+        return ModuleDeclaration(name=module_name, position=pos)
+    
+    def parse_alias_declaration(self) -> AliasDeclaration:
+        """Parse alias declaration: alias short_name"""
+        
+        # Parse 'alias' keyword
+        alias_token = self.consume(TokenType.IDENTIFIER, "Expected 'alias'")
+        pos = SourcePosition(alias_token.line, alias_token.column)
+        
+        if alias_token.value != "alias":
+            raise ParseError(f"Expected 'alias', got '{alias_token.value}'", alias_token)
+        
+        # Parse alias name (must be an identifier)
+        name_token = self.consume(TokenType.IDENTIFIER, "Expected alias name after 'alias'")
+        alias_name = name_token.value
+        
+        return AliasDeclaration(name=alias_name, position=pos)
     
     def parse_load_statement(self) -> LoadStatement:
         """Parse load statement: load \"filename.gr\" """

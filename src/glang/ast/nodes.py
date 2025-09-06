@@ -200,6 +200,24 @@ class ImportStatement(Statement):
         return visitor.visit_import_statement(self)
 
 @dataclass
+class ModuleDeclaration(Statement):
+    """Module declaration: module module_name"""
+    name: str  # The declared module name
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_module_declaration(self)
+
+@dataclass
+class AliasDeclaration(Statement):
+    """Alias declaration: alias short_name"""
+    name: str  # The alias/short name for the module
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_alias_declaration(self)
+
+@dataclass
 class NoOp(Statement):
     """No-operation statement (e.g., comment-only lines, empty lines)."""
     position: Optional[SourcePosition] = None
@@ -296,6 +314,15 @@ class ASTVisitor(ABC):
         """Visit an import statement."""
         pass
     
+    @abstractmethod
+    def visit_module_declaration(self, node: ModuleDeclaration):
+        """Visit a module declaration."""
+        pass
+    
+    @abstractmethod
+    def visit_alias_declaration(self, node: AliasDeclaration):
+        """Visit an alias declaration."""
+        pass
     
     @abstractmethod
     def visit_noop(self, node: NoOp):
@@ -383,6 +410,11 @@ class BaseASTVisitor(ASTVisitor):
     def visit_import_statement(self, node: ImportStatement):
         return node
     
+    def visit_module_declaration(self, node: ModuleDeclaration):
+        return node
+    
+    def visit_alias_declaration(self, node: AliasDeclaration):
+        return node
     
     def visit_noop(self, node: NoOp):
         return node

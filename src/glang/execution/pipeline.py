@@ -19,7 +19,7 @@ from glang.semantic.pipeline import SemanticPipeline, SemanticSession, AnalysisR
 from glang.semantic.symbol_table import SymbolTable
 from .executor import ASTExecutor, ExecutionContext
 from .values import GlangValue
-from .errors import RuntimeError as GlangRuntimeError, LoadRequest
+from .errors import RuntimeError as GlangRuntimeError, LoadRequest, ImportRequest
 from glang.files import FileManager
 
 
@@ -104,10 +104,13 @@ class ExecutionSession:
     
     def __init__(self, file_manager: Optional[FileManager] = None):
         self.semantic_session = SemanticSession()
-        # Create execution context that shares the symbol table
-        self.execution_context = ExecutionContext(self.semantic_session.get_symbol_table())
         # File manager for load operations
         self.file_manager = file_manager or FileManager()
+        # Module manager for import operations
+        from ..modules import ModuleManager
+        self.module_manager = ModuleManager(self.file_manager)
+        # Create execution context that shares the symbol table
+        self.execution_context = ExecutionContext(self.semantic_session.get_symbol_table(), self.module_manager)
     
     def execute_statement(self, input_str: str) -> ExecutionResult:
         """Execute statement in persistent context."""
@@ -172,6 +175,47 @@ class ExecutionSession:
                     self.execution_context, 
                     False,
                     GlangRuntimeError(f"Error loading {load_req.filename}: {str(e)}", load_req.position),
+                    input_str,
+                    "<input>"
+                )
+        except ImportRequest as import_req:
+            # Handle import request by importing the module
+            try:
+                module = self.module_manager.import_module(
+                    import_req.filename, 
+                    import_req.alias, 
+                    import_req.position
+                )
+                
+                # Load the module file and execute it in the module's namespace
+                load_result = self.file_manager.load_file(import_req.filename, self)
+                if not load_result.success:
+                    return ExecutionResult(
+                        None, 
+                        self.execution_context, 
+                        False, 
+                        GlangRuntimeError(f"Failed to import {import_req.filename}: {load_result.error}", import_req.position),
+                        input_str,
+                        "<input>"
+                    )
+                
+                # Move variables from main context to module namespace
+                # This is a simplified approach - in reality we'd execute in a separate context
+                for var_name in list(self.execution_context.variables.keys()):
+                    if var_name not in ['_temp_vars_before_import']:  # Skip internal variables
+                        value = self.execution_context.variables[var_name]
+                        module.namespace.set_symbol(var_name, value)
+                        # Don't remove from main context for now to keep load compatibility
+                
+                module_name = module.name
+                return ExecutionResult(f"Imported {import_req.filename} as {module_name}", self.execution_context, True)
+                
+            except Exception as e:
+                return ExecutionResult(
+                    None, 
+                    self.execution_context, 
+                    False,
+                    GlangRuntimeError(f"Error importing {import_req.filename}: {str(e)}", import_req.position),
                     input_str,
                     "<input>"
                 )

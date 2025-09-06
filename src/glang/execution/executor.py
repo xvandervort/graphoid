@@ -22,20 +22,52 @@ from .errors import RuntimeError, VariableNotFoundError, TypeConstraintError
 class ExecutionContext:
     """Context for AST execution with variable storage."""
     
-    def __init__(self, symbol_table: SymbolTable):
+    def __init__(self, symbol_table: SymbolTable, module_manager=None):
         self.symbol_table = symbol_table
         self.variables: Dict[str, GlangValue] = {}
+        self.module_manager = module_manager  # Will be set by execution pipeline
     
     def get_variable(self, name: str) -> Optional[GlangValue]:
-        """Get variable value by name."""
+        """Get variable value by name.
+        
+        Supports module-qualified names like 'math.pi'.
+        """
+        # Check for module-qualified name
+        if '.' in name:
+            parts = name.split('.', 1)
+            module_name = parts[0]
+            symbol_name = parts[1]
+            
+            if self.module_manager:
+                module = self.module_manager.get_module(module_name)
+                if module:
+                    return module.namespace.get_symbol(symbol_name)
+            return None
+        
+        # Regular variable lookup
         return self.variables.get(name)
     
     def set_variable(self, name: str, value: GlangValue) -> None:
         """Set variable value."""
+        # Module-qualified names cannot be set directly
+        if '.' in name:
+            raise RuntimeError(f"Cannot assign to module-qualified name: {name}")
         self.variables[name] = value
     
     def has_variable(self, name: str) -> bool:
         """Check if variable exists in context."""
+        # Check for module-qualified name
+        if '.' in name:
+            parts = name.split('.', 1)
+            module_name = parts[0]
+            symbol_name = parts[1]
+            
+            if self.module_manager:
+                module = self.module_manager.get_module(module_name)
+                if module:
+                    return module.namespace.get_symbol(symbol_name) is not None
+            return False
+        
         return name in self.variables
     
     def list_variables(self) -> List[str]:
@@ -389,11 +421,27 @@ class ASTExecutor(BaseASTVisitor):
     
     def visit_import_statement(self, node: ImportStatement) -> None:
         """Visit import statement - load module into namespace."""
-        # For now, raise an error as module system is not yet implemented
-        raise NotImplementedError(
-            f"Module imports not yet implemented. Use 'load \"{node.filename}\"' instead",
-            node.position
-        )
+        if not self.context.module_manager:
+            raise RuntimeError("Module manager not available for import operation", node.position)
+        
+        # Similar to load statements, we need to delegate back to the execution session
+        # This is handled by raising a special exception
+        from .errors import ImportRequest
+        raise ImportRequest(node.filename, node.alias, node.position)
+    
+    def visit_module_declaration(self, node: ModuleDeclaration) -> None:
+        """Visit module declaration - store module name for current file."""
+        # Store the declared module name
+        if not hasattr(self.context, '_module_name'):
+            self.context._module_name = node.name
+        return None
+    
+    def visit_alias_declaration(self, node: AliasDeclaration) -> None:
+        """Visit alias declaration - store alias for current module."""
+        # Store the declared alias
+        if not hasattr(self.context, '_module_alias'):
+            self.context._module_alias = node.name
+        return None
     
     def visit_noop(self, node) -> None:
         """Visit no-op statement - do nothing."""

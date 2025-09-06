@@ -24,6 +24,8 @@ from .nodes import (
     SliceAssignment,
     ExpressionStatement,
     ImportStatement,
+    ModuleDeclaration,
+    AliasDeclaration,
     
     # Visitor pattern
     ASTVisitor
@@ -53,6 +55,8 @@ __all__ = [
     'SliceAssignment',
     'ExpressionStatement',
     'ImportStatement',
+    'ModuleDeclaration',
+    'AliasDeclaration',
     
     # Visitor pattern
     'ASTVisitor'
