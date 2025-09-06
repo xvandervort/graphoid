@@ -12,25 +12,49 @@ class TestImportStatementParsing:
         """Setup for each test."""
         self.parser = ASTParser()
     
-    def test_parse_simple_import(self):
-        """Test parsing /import "file.gr" """
+    def test_parse_simple_import_with_slash(self):
+        """Test parsing /import "file.gr" (compatibility)"""
         ast = self.parser.parse('/import "math.gr"')
         
         assert isinstance(ast, ImportStatement)
         assert ast.filename == "math.gr"
         assert ast.alias is None
     
-    def test_parse_import_with_alias(self):
-        """Test parsing /import "file.gr" as alias"""
+    def test_parse_simple_import_without_slash(self):
+        """Test parsing import "file.gr" (primary syntax)"""
+        ast = self.parser.parse('import "math.gr"')
+        
+        assert isinstance(ast, ImportStatement)
+        assert ast.filename == "math.gr"
+        assert ast.alias is None
+    
+    def test_parse_import_with_alias_with_slash(self):
+        """Test parsing /import "file.gr" as alias (compatibility)"""
         ast = self.parser.parse('/import "utilities.gr" as utils')
         
         assert isinstance(ast, ImportStatement)
         assert ast.filename == "utilities.gr"
         assert ast.alias == "utils"
     
-    def test_parse_import_with_path(self):
-        """Test parsing import with file path."""
+    def test_parse_import_with_alias_without_slash(self):
+        """Test parsing import "file.gr" as alias (primary syntax)"""
+        ast = self.parser.parse('import "utilities.gr" as utils')
+        
+        assert isinstance(ast, ImportStatement)
+        assert ast.filename == "utilities.gr"
+        assert ast.alias == "utils"
+    
+    def test_parse_import_with_path_with_slash(self):
+        """Test parsing import with file path (compatibility)."""
         ast = self.parser.parse('/import "lib/math.gr" as math')
+        
+        assert isinstance(ast, ImportStatement)
+        assert ast.filename == "lib/math.gr"
+        assert ast.alias == "math"
+    
+    def test_parse_import_with_path_without_slash(self):
+        """Test parsing import with file path (primary syntax)."""
+        ast = self.parser.parse('import "lib/math.gr" as math')
         
         assert isinstance(ast, ImportStatement)
         assert ast.filename == "lib/math.gr"

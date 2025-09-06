@@ -26,7 +26,7 @@ class TestProgramImports:
         
         # Create a main program that imports the math library
         with tempfile.NamedTemporaryFile(mode='w', suffix='.gr', delete=False) as f:
-            f.write('/import "{}"\n'.format(os.path.basename(math_file)))
+            f.write('import "{}"\n'.format(os.path.basename(math_file)))
             f.write('num result = math.pi\n')
             f.write('num doubled = math.two\n')
             main_file = f.name
@@ -68,7 +68,7 @@ class TestProgramImports:
         
         # Create a main program that uses module-qualified access
         with tempfile.NamedTemporaryFile(mode='w', suffix='.gr', delete=False) as f:
-            f.write('/import "{}"\n'.format(os.path.basename(utils_file)))
+            f.write('import "{}"\n'.format(os.path.basename(utils_file)))
             # Test module-qualified access
             f.write('string msg = utils.greeting\n') 
             f.write('num number = utils.count\n')
@@ -112,8 +112,8 @@ class TestProgramImports:
         
         # Create main program with multiple imports
         with tempfile.NamedTemporaryFile(mode='w', suffix='.gr', delete=False) as f:
-            f.write('/import "{}"\n'.format(os.path.basename(math_file)))
-            f.write('/import "{}"\n'.format(os.path.basename(text_file)))
+            f.write('import "{}"\n'.format(os.path.basename(math_file)))
+            f.write('import "{}"\n'.format(os.path.basename(text_file)))
             f.write('num my_pi = math.pi\n')
             f.write('string my_text = text.hello\n')
             main_file = f.name
@@ -152,7 +152,7 @@ class TestProgramImports:
         
         # Create main program with explicit alias override
         with tempfile.NamedTemporaryFile(mode='w', suffix='.gr', delete=False) as f:
-            f.write('/import "{}" as custom\n'.format(os.path.basename(lib_file)))
+            f.write('import "{}" as custom\n'.format(os.path.basename(lib_file)))
             f.write('num my_value = custom.value\n')
             main_file = f.name
         
@@ -186,7 +186,7 @@ class TestProgramImports:
         
         # Create intermediate library that imports the base
         with tempfile.NamedTemporaryFile(mode='w', suffix='.gr', delete=False) as f:
-            f.write('/import "{}"\n'.format(os.path.basename(base_file)))
+            f.write('import "{}"\n'.format(os.path.basename(base_file)))
             f.write('module advanced_operations\n') 
             f.write('alias ops\n')
             f.write('num circle_area = math.pi\n')  # Uses imported math
@@ -194,7 +194,7 @@ class TestProgramImports:
         
         # Create main program that imports the intermediate
         with tempfile.NamedTemporaryFile(mode='w', suffix='.gr', delete=False) as f:
-            f.write('/import "{}"\n'.format(os.path.basename(intermediate_file)))
+            f.write('import "{}"\n'.format(os.path.basename(intermediate_file)))
             f.write('num area = ops.circle_area\n')
             main_file = f.name
         

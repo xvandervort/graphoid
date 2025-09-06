@@ -56,7 +56,9 @@ class ASTParser:
     def parse_statement(self) -> Statement:
         """Parse a statement."""
         
-        # Import statement: /import "filename.gr" as module_name
+        # Import statement: import "filename.gr" as module_name (or /import for compatibility)
+        if self.check(TokenType.IDENTIFIER) and self.peek().value == "import":
+            return self.parse_import_statement_without_slash()
         if self.check(TokenType.SLASH):
             next_token = self.tokens[self.current + 1] if self.current + 1 < len(self.tokens) else None
             if next_token and next_token.type == TokenType.IDENTIFIER and next_token.value == "import":
@@ -210,6 +212,32 @@ class ASTParser:
             self.advance()  # consume 'as'
             alias_token = self.consume(TokenType.IDENTIFIER, "Expected module name after 'as'")
             alias = alias_token.value
+        
+        return ImportStatement(filename=filename, alias=alias, position=pos)
+    
+    def parse_import_statement_without_slash(self) -> ImportStatement:
+        """Parse import statement: import "filename.gr" as module_name"""
+        
+        # Parse 'import' keyword
+        import_token = self.consume(TokenType.IDENTIFIER, "Expected 'import'")
+        pos = SourcePosition(import_token.line, import_token.column)
+        
+        if import_token.value != "import":
+            raise ParseError(f"Expected 'import', got '{import_token.value}'", import_token)
+        
+        # Parse filename (must be a string literal)
+        filename_token = self.consume(TokenType.STRING_LITERAL, "Expected filename string after 'import'")
+        filename = self.process_string_literal(filename_token.value)
+        
+        # Check for optional 'as' alias
+        alias = None
+        if self.check(TokenType.IDENTIFIER) and self.peek().value == "as":
+            self.advance()  # consume 'as'
+            alias_token = self.consume(TokenType.IDENTIFIER, "Expected module name after 'as'")
+            alias = alias_token.value
+            
+            if not alias.replace('_', '').isalnum() or alias[0].isdigit():
+                raise ParseError(f"Invalid module name: {alias}. Must be a valid identifier", alias_token)
         
         return ImportStatement(filename=filename, alias=alias, position=pos)
     
