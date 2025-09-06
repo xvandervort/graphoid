@@ -30,11 +30,27 @@ class ExecutionResult:
     context: ExecutionContext
     success: bool
     error: Optional[Exception] = None
+    source_code: Optional[str] = None
+    source_name: Optional[str] = None
     
     def __str__(self) -> str:
         if not self.success:
             return f"Execution failed: {self.error}"
         return str(self.value) if self.value is not None else "No result"
+    
+    def get_formatted_error(self) -> Optional[str]:
+        """Get formatted error message with context if available."""
+        if self.success or not self.error:
+            return None
+        
+        if self.source_code and self.source_name:
+            from ..errors import ErrorFormatter
+            return ErrorFormatter.format_error_with_context(
+                self.error, self.source_code, self.source_name
+            )
+        else:
+            from ..errors import ErrorFormatter
+            return ErrorFormatter.format_error_simple(self.error)
 
 
 class ExecutionPipeline:
@@ -100,14 +116,34 @@ class ExecutionSession:
         try:
             analysis_result = self.semantic_session.analyze_statement(input_str)
         except Exception as e:
-            return ExecutionResult(None, self.execution_context, False, e)
+            return ExecutionResult(
+                None, 
+                self.execution_context, 
+                False, 
+                e, 
+                input_str, 
+                "<input>"
+            )
         
         if not analysis_result.success:
+            # Handle multiple semantic errors
+            if len(analysis_result.errors) == 1:
+                error = analysis_result.errors[0]
+            else:
+                from ..errors import ErrorFormatter
+                formatted_errors = ErrorFormatter.format_multiple_errors(
+                    analysis_result.errors, input_str, "<input>"
+                )
+                # Create a wrapper exception with the formatted message
+                error = Exception(formatted_errors)
+            
             return ExecutionResult(
                 None,
                 self.execution_context,
                 False,
-                Exception(f"Semantic analysis failed: {', '.join(str(e) for e in analysis_result.errors)}")
+                error,
+                input_str,
+                "<input>"
             )
         
         # Now execute the AST
@@ -121,17 +157,29 @@ class ExecutionSession:
             try:
                 load_result = self.file_manager.load_file(load_req.filename, self)
                 if not load_result.success:
-                    return ExecutionResult(None, self.execution_context, False, 
-                                         GlangRuntimeError(f"Failed to load {load_req.filename}: {load_result.error}", load_req.position))
+                    return ExecutionResult(
+                        None, 
+                        self.execution_context, 
+                        False, 
+                        GlangRuntimeError(f"Failed to load {load_req.filename}: {load_result.error}", load_req.position),
+                        input_str,
+                        "<input>"
+                    )
                 return ExecutionResult(f"Loaded {load_req.filename}", self.execution_context, True)
             except Exception as e:
-                return ExecutionResult(None, self.execution_context, False,
-                                     GlangRuntimeError(f"Error loading {load_req.filename}: {str(e)}", load_req.position))
+                return ExecutionResult(
+                    None, 
+                    self.execution_context, 
+                    False,
+                    GlangRuntimeError(f"Error loading {load_req.filename}: {str(e)}", load_req.position),
+                    input_str,
+                    "<input>"
+                )
         except GlangRuntimeError as e:
-            return ExecutionResult(None, self.execution_context, False, e)
+            return ExecutionResult(None, self.execution_context, False, e, input_str, "<input>")
         except Exception as e:
             wrapped_error = GlangRuntimeError(f"Unexpected execution error: {str(e)}")
-            return ExecutionResult(None, self.execution_context, False, wrapped_error)
+            return ExecutionResult(None, self.execution_context, False, wrapped_error, input_str, "<input>")
     
     def get_variable_value(self, name: str) -> Optional[GlangValue]:
         """Get current value of a variable."""

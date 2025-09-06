@@ -103,8 +103,12 @@ class REPL:
                 if result.value is not None:
                     print(result.value)
             else:
-                # Show execution error
-                print(f"Error: {result.error}")
+                # Show execution error with enhanced formatting
+                formatted_error = result.get_formatted_error()
+                if formatted_error:
+                    print(formatted_error)
+                else:
+                    print(f"Error: {result.error}")
                 
         except Exception as e:
             print(f"Unexpected error: {e}")
