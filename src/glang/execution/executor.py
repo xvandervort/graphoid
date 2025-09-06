@@ -43,7 +43,7 @@ class ExecutionContext:
         return list(self.variables.keys())
 
 
-class ASTExecutor(ASTVisitor):
+class ASTExecutor(BaseASTVisitor):
     """Executes semantically analyzed AST nodes."""
     
     def __init__(self, context: ExecutionContext, file_manager=None):
@@ -390,3 +390,7 @@ class ASTExecutor(ASTVisitor):
     def visit_legacy_command(self, node) -> None:
         """Visit legacy command (not supported in new system)."""
         raise RuntimeError("Legacy commands not supported in AST execution", node.position)
+    
+    def visit_noop(self, node) -> None:
+        """Visit no-op statement - do nothing."""
+        return None

@@ -26,7 +26,7 @@ class AnalysisResult:
         self.success = False
 
 
-class SemanticAnalyzer(ASTVisitor):
+class SemanticAnalyzer(BaseASTVisitor):
     """Semantic analyzer using visitor pattern."""
     
     def __init__(self):
@@ -187,9 +187,6 @@ class SemanticAnalyzer(ASTVisitor):
                 node.position
             ))
     
-    def visit_legacy_command(self, node: LegacyCommand) -> None:
-        """Analyze legacy commands (no semantic checks needed)."""
-        pass
     
     # Expression visitors
     

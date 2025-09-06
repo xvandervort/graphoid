@@ -200,6 +200,14 @@ class LegacyCommand(Statement):
     def accept(self, visitor):
         return visitor.visit_legacy_command(self)
 
+@dataclass
+class NoOp(Statement):
+    """No-operation statement (e.g., comment-only lines, empty lines)."""
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_noop(self)
+
 # =============================================================================
 # Visitor Pattern for AST Traversal
 # =============================================================================
@@ -288,6 +296,11 @@ class ASTVisitor(ABC):
     def visit_legacy_command(self, node: LegacyCommand):
         """Visit a legacy command."""
         pass
+    
+    @abstractmethod
+    def visit_noop(self, node: NoOp):
+        """Visit a no-op statement."""
+        pass
 
 # =============================================================================
 # Utility Classes  
@@ -368,4 +381,7 @@ class BaseASTVisitor(ASTVisitor):
         return node
     
     def visit_legacy_command(self, node: LegacyCommand):
+        return node
+    
+    def visit_noop(self, node: NoOp):
         return node

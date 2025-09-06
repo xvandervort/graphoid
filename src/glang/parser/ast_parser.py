@@ -48,7 +48,8 @@ class ASTParser:
             pass
             
         if self.is_at_end():
-            raise ParseError("Empty input")
+            # Return NoOp for empty input (e.g., comment-only lines)
+            return NoOp(SourcePosition(1, 1))
         
         return self.parse_statement()
     
