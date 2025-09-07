@@ -302,19 +302,22 @@ class SemanticAnalyzer(BaseASTVisitor):
                             position: Optional[SourcePosition]) -> None:
         """Validate that a method call is valid for the target type."""
         # Define valid methods for each type
+        # Universal reflection methods available on all types
+        universal_methods = {'type', 'methods', 'can', 'inspect', 'size'}
+        
         valid_methods = {
             'list': {
                 'append', 'prepend', 'insert', 'remove', 'pop', 'clear', 'reverse',
                 'size', 'empty', 'constraint', 'validate_constraint', 'type_summary',
                 'types', 'coerce_to_constraint'
-            },
+            } | universal_methods,
             'string': {
                 'size', 'empty', 'upper', 'lower', 'split',
                 'length', 'contains', 'up', 'toUpper', 'down', 'toLower',
                 'reverse', 'unique', 'chars'
-            },
-            'num': {'abs', 'round', 'to'},
-            'bool': {'flip', 'toggle', 'numify', 'toNum'}
+            } | universal_methods,
+            'num': {'abs', 'round', 'to'} | universal_methods,
+            'bool': {'flip', 'toggle', 'numify', 'toNum'} | universal_methods
         }
         
         if target_type not in valid_methods:

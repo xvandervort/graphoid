@@ -398,6 +398,59 @@ class ASTExecutor(BaseASTVisitor):
             target.elements.reverse()
             return "Reversed list"
         
+        # Universal reflection methods
+        elif method_name == "type":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"type() takes no arguments, got {len(args)}", position)
+            
+            return StringValue(target.get_type(), position)
+        
+        elif method_name == "methods":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"methods() takes no arguments, got {len(args)}", position)
+            
+            available_methods = [
+                'append', 'prepend', 'insert', 'reverse',
+                'type', 'methods', 'can', 'inspect', 'size'
+            ]
+            method_strings = [StringValue(method, position) for method in available_methods]
+            return ListValue(method_strings, "string", position)
+        
+        elif method_name == "can":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"can() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"can() argument must be string, got {args[0].get_type()}", position)
+            
+            method_to_check = args[0].value
+            available_methods = [
+                'append', 'prepend', 'insert', 'reverse',
+                'type', 'methods', 'can', 'inspect', 'size'
+            ]
+            return BooleanValue(method_to_check in available_methods, position)
+        
+        elif method_name == "inspect":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"inspect() takes no arguments, got {len(args)}", position)
+            
+            constraint_info = f"<{target.constraint}>" if target.constraint else ""
+            info = f"list{constraint_info} with {len(target.elements)} elements"
+            return StringValue(info, position)
+        
+        elif method_name == "size":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"size() takes no arguments, got {len(args)}", position)
+            
+            # For lists: graph size is number of element nodes
+            return NumberValue(len(target.elements), position)
+        
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "list", position)
@@ -460,6 +513,59 @@ class ASTExecutor(BaseASTVisitor):
             parts = target.value.split(delimiter)
             string_values = [StringValue(part, position) for part in parts]
             return ListValue(string_values, "string", position)
+        
+        # Universal reflection methods
+        elif method_name == "type":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"type() takes no arguments, got {len(args)}", position)
+            
+            return StringValue(target.get_type(), position)
+        
+        elif method_name == "methods":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"methods() takes no arguments, got {len(args)}", position)
+            
+            # Get available methods from semantic analyzer
+            available_methods = [
+                'length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split',
+                'reverse', 'unique', 'chars', 'type', 'methods', 'can', 'inspect', 'size'
+            ]
+            method_strings = [StringValue(method, position) for method in available_methods]
+            return ListValue(method_strings, "string", position)
+        
+        elif method_name == "can":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"can() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"can() argument must be string, got {args[0].get_type()}", position)
+            
+            method_to_check = args[0].value
+            available_methods = [
+                'length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split',
+                'reverse', 'unique', 'chars', 'type', 'methods', 'can', 'inspect', 'size'
+            ]
+            return BooleanValue(method_to_check in available_methods, position)
+        
+        elif method_name == "inspect":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"inspect() takes no arguments, got {len(args)}", position)
+            
+            info = f'"{target.value}" (string, {len(target.value)} chars)'
+            return StringValue(info, position)
+        
+        elif method_name == "size":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"size() takes no arguments, got {len(args)}", position)
+            
+            # For strings: graph size is number of character nodes
+            return NumberValue(len(target.value), position)
         
         # Graph operations that work on character level
         elif method_name == "reverse":
@@ -532,6 +638,52 @@ class ASTExecutor(BaseASTVisitor):
             
             return NumberValue(truncated, position)
         
+        # Universal reflection methods
+        elif method_name == "type":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"type() takes no arguments, got {len(args)}", position)
+            
+            return StringValue(target.get_type(), position)
+        
+        elif method_name == "methods":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"methods() takes no arguments, got {len(args)}", position)
+            
+            available_methods = ['to', 'type', 'methods', 'can', 'inspect', 'size']
+            method_strings = [StringValue(method, position) for method in available_methods]
+            return ListValue(method_strings, "string", position)
+        
+        elif method_name == "can":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"can() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"can() argument must be string, got {args[0].get_type()}", position)
+            
+            method_to_check = args[0].value
+            available_methods = ['to', 'type', 'methods', 'can', 'inspect', 'size']
+            return BooleanValue(method_to_check in available_methods, position)
+        
+        elif method_name == "inspect":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"inspect() takes no arguments, got {len(args)}", position)
+            
+            info = f"{target.value} (num)"
+            return StringValue(info, position)
+        
+        elif method_name == "size":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"size() takes no arguments, got {len(args)}", position)
+            
+            # For numbers: atomic values have graph size of 1 (single node)
+            return NumberValue(1, position)
+        
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "num", position)
@@ -555,6 +707,52 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"{method_name}() takes no arguments, got {len(args)}", position)
             
             return NumberValue(1 if target.value else 0, position)
+        
+        # Universal reflection methods
+        elif method_name == "type":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"type() takes no arguments, got {len(args)}", position)
+            
+            return StringValue(target.get_type(), position)
+        
+        elif method_name == "methods":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"methods() takes no arguments, got {len(args)}", position)
+            
+            available_methods = ['flip', 'toggle', 'numify', 'toNum', 'type', 'methods', 'can', 'inspect', 'size']
+            method_strings = [StringValue(method, position) for method in available_methods]
+            return ListValue(method_strings, "string", position)
+        
+        elif method_name == "can":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"can() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"can() argument must be string, got {args[0].get_type()}", position)
+            
+            method_to_check = args[0].value
+            available_methods = ['flip', 'toggle', 'numify', 'toNum', 'type', 'methods', 'can', 'inspect', 'size']
+            return BooleanValue(method_to_check in available_methods, position)
+        
+        elif method_name == "inspect":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"inspect() takes no arguments, got {len(args)}", position)
+            
+            info = f"{str(target.value).lower()} (bool)"
+            return StringValue(info, position)
+        
+        elif method_name == "size":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"size() takes no arguments, got {len(args)}", position)
+            
+            # For booleans: atomic values have graph size of 1 (single node)
+            return NumberValue(1, position)
         
         else:
             from .errors import MethodNotFoundError
