@@ -309,7 +309,7 @@ class SemanticAnalyzer(BaseASTVisitor):
             'list': {
                 'append', 'prepend', 'insert', 'remove', 'pop', 'clear', 'reverse',
                 'size', 'empty', 'constraint', 'validate_constraint', 'type_summary',
-                'types', 'coerce_to_constraint'
+                'types', 'coerce_to_constraint', 'indexOf', 'count', 'min', 'max', 'sum', 'sort'
             } | universal_methods,
             'string': {
                 'size', 'empty', 'upper', 'lower', 'split',

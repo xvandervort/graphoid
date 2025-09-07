@@ -301,10 +301,11 @@ class ASTParser:
         return expr
     
     def parse_term(self) -> Expression:
-        """Parse addition and subtraction: +, -"""
+        """Parse addition, subtraction, and intersection: +, -, &"""
         expr = self.parse_factor()
         
-        while self.match(TokenType.PLUS) or self.match(TokenType.MINUS):
+        while (self.match(TokenType.PLUS) or self.match(TokenType.MINUS) or 
+               self.match(TokenType.AMPERSAND)):
             operator_token = self.previous()
             right = self.parse_factor()
             pos = SourcePosition(operator_token.line, operator_token.column)

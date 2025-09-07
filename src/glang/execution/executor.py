@@ -417,7 +417,7 @@ class ASTExecutor(BaseASTVisitor):
         
         # Type-specific methods
         type_methods = {
-            'list': ['append', 'prepend', 'insert', 'reverse'],
+            'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort'],
             'string': ['length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split', 'reverse', 'unique', 'chars'],
             'num': ['to'],
             'bool': ['flip', 'toggle', 'numify', 'toNum']
@@ -484,8 +484,125 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"reverse() takes no arguments, got {len(args)}", position)
             
-            target.elements.reverse()
-            return "Reversed list"
+            # Create a copy and reverse it (immutable operation)
+            reversed_elements = target.elements.copy()
+            reversed_elements.reverse()
+            return ListValue(reversed_elements, target.constraint, position)
+        
+        # List analysis methods
+        elif method_name == "indexOf":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"indexOf() takes 1 argument, got {len(args)}", position)
+            
+            search_value = args[0]
+            for i, element in enumerate(target.elements):
+                if element == search_value:
+                    return NumberValue(i, position)
+            
+            # Return -1 if not found (following common convention)
+            return NumberValue(-1, position)
+        
+        elif method_name == "count":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"count() takes 1 argument, got {len(args)}", position)
+            
+            search_value = args[0]
+            count = sum(1 for element in target.elements if element == search_value)
+            return NumberValue(count, position)
+        
+        elif method_name == "min":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"min() takes no arguments, got {len(args)}", position)
+            
+            if len(target.elements) == 0:
+                from .errors import RuntimeError
+                raise RuntimeError("Cannot find minimum of empty list", position)
+            
+            # Check that all elements are numbers
+            for element in target.elements:
+                if not isinstance(element, NumberValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"min() requires all elements to be numbers, found {element.get_type()}", position)
+            
+            min_element = min(target.elements, key=lambda x: x.value)
+            return NumberValue(min_element.value, position)
+        
+        elif method_name == "max":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"max() takes no arguments, got {len(args)}", position)
+            
+            if len(target.elements) == 0:
+                from .errors import RuntimeError
+                raise RuntimeError("Cannot find maximum of empty list", position)
+            
+            # Check that all elements are numbers
+            for element in target.elements:
+                if not isinstance(element, NumberValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"max() requires all elements to be numbers, found {element.get_type()}", position)
+            
+            max_element = max(target.elements, key=lambda x: x.value)
+            return NumberValue(max_element.value, position)
+        
+        elif method_name == "sum":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"sum() takes no arguments, got {len(args)}", position)
+            
+            if len(target.elements) == 0:
+                return NumberValue(0, position)  # Sum of empty list is 0
+            
+            # Check that all elements are numbers
+            for element in target.elements:
+                if not isinstance(element, NumberValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"sum() requires all elements to be numbers, found {element.get_type()}", position)
+            
+            total = sum(element.value for element in target.elements)
+            return NumberValue(total, position)
+        
+        # List transformation methods
+        elif method_name == "sort":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"sort() takes no arguments, got {len(args)}", position)
+            
+            if len(target.elements) == 0:
+                # Return new empty list with same constraint
+                return ListValue([], target.constraint, position)
+            
+            # Check that all elements are the same type and comparable
+            first_element = target.elements[0]
+            element_type = type(first_element)
+            
+            for element in target.elements:
+                if type(element) != element_type:
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"sort() requires all elements to be the same type", position)
+            
+            # Create a copy of elements for sorting (immutable operation)
+            sorted_elements = target.elements.copy()
+            
+            # Sort based on element type
+            if isinstance(first_element, NumberValue):
+                sorted_elements.sort(key=lambda x: x.value)
+            elif isinstance(first_element, StringValue):
+                sorted_elements.sort(key=lambda x: x.value)
+            elif isinstance(first_element, BooleanValue):
+                sorted_elements.sort(key=lambda x: x.value)  # False < True
+            else:
+                from .errors import ArgumentError
+                raise ArgumentError(f"sort() does not support {first_element.get_type()} elements", position)
+            
+            # Return new sorted list
+            return ListValue(sorted_elements, target.constraint, position)
+        
+        # Note: map, filter, reduce will be implemented when lambda functions are available
+        # For now, we skip these advanced functional programming methods
         
         else:
             from .errors import MethodNotFoundError
@@ -778,6 +895,8 @@ class ASTExecutor(BaseASTVisitor):
             self.result = self.perform_comparison(left_value, right_value, "less_equal")
         elif node.operator == "!<":  # Intuitive "not less than" = greater than or equal
             self.result = self.perform_comparison(left_value, right_value, "greater_equal")
+        elif node.operator == "&":
+            self.result = self.perform_intersection(left_value, right_value)
         else:
             raise RuntimeError(f"Unknown binary operator: {node.operator}", node.position)
     
@@ -849,6 +968,12 @@ class ASTExecutor(BaseASTVisitor):
             return NumberValue(left.value + right.value)
         elif isinstance(left, StringValue) and isinstance(right, StringValue):
             return StringValue(left.value + right.value)
+        elif isinstance(left, ListValue) and isinstance(right, ListValue):
+            # List union (concatenation) - combine all elements
+            combined_elements = left.elements + right.elements
+            # Use the constraint from the left list (or None if both have different constraints)
+            constraint = left.constraint if left.constraint == right.constraint else None
+            return ListValue(combined_elements, constraint, left.position)
         else:
             raise RuntimeError(f"Cannot add {left.get_type()} and {right.get_type()}")
     
@@ -856,6 +981,13 @@ class ASTExecutor(BaseASTVisitor):
         """Perform subtraction operation."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
             return NumberValue(left.value - right.value)
+        elif isinstance(left, ListValue) and isinstance(right, ListValue):
+            # List difference - remove elements from left that are in right
+            result_elements = []
+            for element in left.elements:
+                if element not in right.elements:
+                    result_elements.append(element)
+            return ListValue(result_elements, left.constraint, left.position)
         else:
             raise RuntimeError(f"Cannot subtract {right.get_type()} from {left.get_type()}")
     
@@ -883,6 +1015,18 @@ class ASTExecutor(BaseASTVisitor):
             return NumberValue(left.value % right.value)
         else:
             raise RuntimeError(f"Cannot perform modulo on {left.get_type()} and {right.get_type()}")
+    
+    def perform_intersection(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform intersection operation."""
+        if isinstance(left, ListValue) and isinstance(right, ListValue):
+            # List intersection - keep elements that appear in both lists
+            result_elements = []
+            for element in left.elements:
+                if element in right.elements and element not in result_elements:
+                    result_elements.append(element)
+            return ListValue(result_elements, left.constraint, left.position)
+        else:
+            raise RuntimeError(f"Cannot perform intersection on {left.get_type()} and {right.get_type()}")
     
     def perform_comparison(self, left: GlangValue, right: GlangValue, operation: str) -> BooleanValue:
         """Perform comparison operations."""
