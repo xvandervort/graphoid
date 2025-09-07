@@ -322,7 +322,20 @@ class ASTExecutor(BaseASTVisitor):
     # Helper methods
     def _dispatch_method(self, target: GlangValue, method_name: str, 
                         args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
-        """Dispatch method call to appropriate handler."""
+        """Dispatch method call to appropriate handler.
+        
+        Resolution order:
+        1. Universal methods (inherited from GlangValue)  
+        2. Type-specific methods (in dispatchers)
+        """
+        # First check for universal methods
+        if method_name in ['type', 'size', 'inspect']:
+            return self._dispatch_universal_method(target, method_name, args, position)
+        elif method_name in ['methods', 'can']:
+            # These need access to the method registry, so handled specially
+            return self._dispatch_registry_method(target, method_name, args, position)
+        
+        # Then check type-specific methods
         target_type = target.get_type()
         
         if target_type == "list":
@@ -336,6 +349,82 @@ class ASTExecutor(BaseASTVisitor):
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, target_type, position)
+    
+    def _dispatch_universal_method(self, target: GlangValue, method_name: str,
+                                  args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
+        """Handle universal methods that all nodes inherit."""
+        
+        if method_name == "type":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"type() takes no arguments, got {len(args)}", position)
+            return target.universal_type()
+        
+        elif method_name == "size":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"size() takes no arguments, got {len(args)}", position)
+            return target.universal_size()
+        
+        elif method_name == "inspect":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"inspect() takes no arguments, got {len(args)}", position)
+            return target.universal_inspect()
+        
+        else:
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, target.get_type(), position)
+    
+    def _dispatch_registry_method(self, target: GlangValue, method_name: str,
+                                 args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
+        """Handle methods that need access to the method registry."""
+        
+        if method_name == "methods":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"methods() takes no arguments, got {len(args)}", position)
+            
+            # Provide method registry to the target for universal_methods() call
+            target_type = target.get_type()
+            available_methods = self._get_available_methods(target_type)
+            method_strings = [StringValue(method, position) for method in available_methods]
+            return ListValue(method_strings, "string", position)
+        
+        elif method_name == "can":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"can() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"can() argument must be string, got {args[0].get_type()}", position)
+            
+            # Provide method registry to the target for universal_can() call
+            method_to_check = args[0].value
+            target_type = target.get_type()
+            available_methods = self._get_available_methods(target_type)
+            return BooleanValue(method_to_check in available_methods, position)
+        
+        else:
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, target.get_type(), position)
+    
+    def _get_available_methods(self, target_type: str) -> List[str]:
+        """Get list of available methods for a given type."""
+        # Universal methods available on all types
+        universal_methods = ['type', 'methods', 'can', 'inspect', 'size']
+        
+        # Type-specific methods
+        type_methods = {
+            'list': ['append', 'prepend', 'insert', 'reverse'],
+            'string': ['length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split', 'reverse', 'unique', 'chars'],
+            'num': ['to'],
+            'bool': ['flip', 'toggle', 'numify', 'toNum']
+        }
+        
+        specific_methods = type_methods.get(target_type, [])
+        return universal_methods + specific_methods
     
     def _dispatch_list_method(self, target: ListValue, method_name: str, 
                              args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
@@ -397,59 +486,6 @@ class ASTExecutor(BaseASTVisitor):
             
             target.elements.reverse()
             return "Reversed list"
-        
-        # Universal reflection methods
-        elif method_name == "type":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"type() takes no arguments, got {len(args)}", position)
-            
-            return StringValue(target.get_type(), position)
-        
-        elif method_name == "methods":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"methods() takes no arguments, got {len(args)}", position)
-            
-            available_methods = [
-                'append', 'prepend', 'insert', 'reverse',
-                'type', 'methods', 'can', 'inspect', 'size'
-            ]
-            method_strings = [StringValue(method, position) for method in available_methods]
-            return ListValue(method_strings, "string", position)
-        
-        elif method_name == "can":
-            if len(args) != 1:
-                from .errors import ArgumentError
-                raise ArgumentError(f"can() takes 1 argument, got {len(args)}", position)
-            
-            if not isinstance(args[0], StringValue):
-                from .errors import ArgumentError
-                raise ArgumentError(f"can() argument must be string, got {args[0].get_type()}", position)
-            
-            method_to_check = args[0].value
-            available_methods = [
-                'append', 'prepend', 'insert', 'reverse',
-                'type', 'methods', 'can', 'inspect', 'size'
-            ]
-            return BooleanValue(method_to_check in available_methods, position)
-        
-        elif method_name == "inspect":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"inspect() takes no arguments, got {len(args)}", position)
-            
-            constraint_info = f"<{target.constraint}>" if target.constraint else ""
-            info = f"list{constraint_info} with {len(target.elements)} elements"
-            return StringValue(info, position)
-        
-        elif method_name == "size":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"size() takes no arguments, got {len(args)}", position)
-            
-            # For lists: graph size is number of element nodes
-            return NumberValue(len(target.elements), position)
         
         else:
             from .errors import MethodNotFoundError
@@ -514,58 +550,6 @@ class ASTExecutor(BaseASTVisitor):
             string_values = [StringValue(part, position) for part in parts]
             return ListValue(string_values, "string", position)
         
-        # Universal reflection methods
-        elif method_name == "type":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"type() takes no arguments, got {len(args)}", position)
-            
-            return StringValue(target.get_type(), position)
-        
-        elif method_name == "methods":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"methods() takes no arguments, got {len(args)}", position)
-            
-            # Get available methods from semantic analyzer
-            available_methods = [
-                'length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split',
-                'reverse', 'unique', 'chars', 'type', 'methods', 'can', 'inspect', 'size'
-            ]
-            method_strings = [StringValue(method, position) for method in available_methods]
-            return ListValue(method_strings, "string", position)
-        
-        elif method_name == "can":
-            if len(args) != 1:
-                from .errors import ArgumentError
-                raise ArgumentError(f"can() takes 1 argument, got {len(args)}", position)
-            
-            if not isinstance(args[0], StringValue):
-                from .errors import ArgumentError
-                raise ArgumentError(f"can() argument must be string, got {args[0].get_type()}", position)
-            
-            method_to_check = args[0].value
-            available_methods = [
-                'length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split',
-                'reverse', 'unique', 'chars', 'type', 'methods', 'can', 'inspect', 'size'
-            ]
-            return BooleanValue(method_to_check in available_methods, position)
-        
-        elif method_name == "inspect":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"inspect() takes no arguments, got {len(args)}", position)
-            
-            info = f'"{target.value}" (string, {len(target.value)} chars)'
-            return StringValue(info, position)
-        
-        elif method_name == "size":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"size() takes no arguments, got {len(args)}", position)
-            
-            # For strings: graph size is number of character nodes
-            return NumberValue(len(target.value), position)
         
         # Graph operations that work on character level
         elif method_name == "reverse":
@@ -638,51 +622,6 @@ class ASTExecutor(BaseASTVisitor):
             
             return NumberValue(truncated, position)
         
-        # Universal reflection methods
-        elif method_name == "type":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"type() takes no arguments, got {len(args)}", position)
-            
-            return StringValue(target.get_type(), position)
-        
-        elif method_name == "methods":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"methods() takes no arguments, got {len(args)}", position)
-            
-            available_methods = ['to', 'type', 'methods', 'can', 'inspect', 'size']
-            method_strings = [StringValue(method, position) for method in available_methods]
-            return ListValue(method_strings, "string", position)
-        
-        elif method_name == "can":
-            if len(args) != 1:
-                from .errors import ArgumentError
-                raise ArgumentError(f"can() takes 1 argument, got {len(args)}", position)
-            
-            if not isinstance(args[0], StringValue):
-                from .errors import ArgumentError
-                raise ArgumentError(f"can() argument must be string, got {args[0].get_type()}", position)
-            
-            method_to_check = args[0].value
-            available_methods = ['to', 'type', 'methods', 'can', 'inspect', 'size']
-            return BooleanValue(method_to_check in available_methods, position)
-        
-        elif method_name == "inspect":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"inspect() takes no arguments, got {len(args)}", position)
-            
-            info = f"{target.value} (num)"
-            return StringValue(info, position)
-        
-        elif method_name == "size":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"size() takes no arguments, got {len(args)}", position)
-            
-            # For numbers: atomic values have graph size of 1 (single node)
-            return NumberValue(1, position)
         
         else:
             from .errors import MethodNotFoundError
@@ -708,51 +647,6 @@ class ASTExecutor(BaseASTVisitor):
             
             return NumberValue(1 if target.value else 0, position)
         
-        # Universal reflection methods
-        elif method_name == "type":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"type() takes no arguments, got {len(args)}", position)
-            
-            return StringValue(target.get_type(), position)
-        
-        elif method_name == "methods":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"methods() takes no arguments, got {len(args)}", position)
-            
-            available_methods = ['flip', 'toggle', 'numify', 'toNum', 'type', 'methods', 'can', 'inspect', 'size']
-            method_strings = [StringValue(method, position) for method in available_methods]
-            return ListValue(method_strings, "string", position)
-        
-        elif method_name == "can":
-            if len(args) != 1:
-                from .errors import ArgumentError
-                raise ArgumentError(f"can() takes 1 argument, got {len(args)}", position)
-            
-            if not isinstance(args[0], StringValue):
-                from .errors import ArgumentError
-                raise ArgumentError(f"can() argument must be string, got {args[0].get_type()}", position)
-            
-            method_to_check = args[0].value
-            available_methods = ['flip', 'toggle', 'numify', 'toNum', 'type', 'methods', 'can', 'inspect', 'size']
-            return BooleanValue(method_to_check in available_methods, position)
-        
-        elif method_name == "inspect":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"inspect() takes no arguments, got {len(args)}", position)
-            
-            info = f"{str(target.value).lower()} (bool)"
-            return StringValue(info, position)
-        
-        elif method_name == "size":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"size() takes no arguments, got {len(args)}", position)
-            
-            # For booleans: atomic values have graph size of 1 (single node)
-            return NumberValue(1, position)
         
         else:
             from .errors import MethodNotFoundError

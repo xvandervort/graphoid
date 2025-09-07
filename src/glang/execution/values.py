@@ -43,6 +43,46 @@ class GlangValue(ABC):
     
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.to_python()!r})"
+    
+    # Universal reflection methods - inherited by all node types
+    def universal_type(self) -> 'StringValue':
+        """Return the type name of this node."""
+        return StringValue(self.get_type(), self.position)
+    
+    def universal_size(self) -> 'NumberValue':
+        """Return the graph size (node count) of this value. 
+        Default implementation: atomic nodes have size 1.
+        Override in collection types for element count.
+        """
+        return NumberValue(1, self.position)
+    
+    def universal_inspect(self) -> 'StringValue':
+        """Return detailed inspection information about this node.
+        Default implementation shows value and type.
+        Override in specific types for more details.
+        """
+        info = f"{self.to_display_string()} ({self.get_type()})"
+        return StringValue(info, self.position)
+    
+    def universal_methods(self) -> 'ListValue':
+        """Return list of all available methods for this node type.
+        Must be implemented to return actual available methods.
+        """
+        # This will be implemented by the method resolution system
+        # that has access to the full method registry
+        raise NotImplementedError("universal_methods requires method registry access")
+    
+    def universal_can(self, method_name: str) -> 'BooleanValue':
+        """Check if this node can execute the given method.
+        Default implementation checks against the methods() list.
+        """
+        try:
+            methods_list = self.universal_methods()
+            method_names = [elem.value for elem in methods_list.elements]
+            return BooleanValue(method_name in method_names, self.position)
+        except NotImplementedError:
+            # Fallback if methods() not available
+            return BooleanValue(False, self.position)
 
 
 class CharNode(GlangValue):
@@ -101,6 +141,16 @@ class StringValue(GlangValue):
     def clear_char_cache(self):
         """Clear the character node cache."""
         self._char_nodes = None
+    
+    # Override universal methods for string-specific behavior
+    def universal_size(self) -> 'NumberValue':
+        """For strings: size is the number of character nodes."""
+        return NumberValue(len(self.value), self.position)
+    
+    def universal_inspect(self) -> 'StringValue':
+        """String-specific inspection showing character count."""
+        info = f'"{self.value}" (string, {len(self.value)} chars)'
+        return StringValue(info, self.position)
 
 
 class NumberValue(GlangValue):
@@ -141,6 +191,12 @@ class BooleanValue(GlangValue):
     
     def __eq__(self, other) -> bool:
         return isinstance(other, BooleanValue) and self.value == other.value
+    
+    # Override universal methods for boolean-specific behavior
+    def universal_inspect(self) -> 'StringValue':
+        """Boolean-specific inspection."""
+        info = f"{str(self.value).lower()} (bool)"
+        return StringValue(info, self.position)
 
 
 class ListValue(GlangValue):
@@ -207,6 +263,17 @@ class ListValue(GlangValue):
         return (isinstance(other, ListValue) and 
                 self.elements == other.elements and
                 self.constraint == other.constraint)
+    
+    # Override universal methods for list-specific behavior
+    def universal_size(self) -> 'NumberValue':
+        """For lists: size is the number of element nodes."""
+        return NumberValue(len(self.elements), self.position)
+    
+    def universal_inspect(self) -> 'StringValue':
+        """List-specific inspection showing constraint and element count."""
+        constraint_info = f"<{self.constraint}>" if self.constraint else ""
+        info = f"list{constraint_info} with {len(self.elements)} elements"
+        return StringValue(info, self.position)
 
 
 def python_to_glang_value(python_value: Any, position: Optional[SourcePosition] = None) -> GlangValue:
