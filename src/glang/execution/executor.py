@@ -279,19 +279,45 @@ class ASTExecutor(BaseASTVisitor):
         
         index_value = self.execute(node.indices[0])
         
-        if not isinstance(target_value, ListValue):
+        # Handle list indexing
+        if isinstance(target_value, ListValue):
+            if not isinstance(index_value, NumberValue) or not isinstance(index_value.value, int):
+                raise RuntimeError(
+                    f"List index must be integer, got {index_value.get_type()}",
+                    node.indices[0].position
+                )
+            self.result = target_value.get_element(index_value.value)
+        
+        # Handle string indexing
+        elif isinstance(target_value, StringValue):
+            if not isinstance(index_value, NumberValue) or not isinstance(index_value.value, int):
+                raise RuntimeError(
+                    f"String index must be integer, got {index_value.get_type()}",
+                    node.indices[0].position
+                )
+            
+            idx = index_value.value
+            string_val = target_value.value
+            
+            # Handle negative indices
+            if idx < 0:
+                idx = len(string_val) + idx
+            
+            # Check bounds
+            if idx < 0 or idx >= len(string_val):
+                raise RuntimeError(
+                    f"String index {index_value.value} out of range for string of length {len(string_val)}",
+                    node.indices[0].position
+                )
+            
+            # Return character as a string
+            self.result = StringValue(string_val[idx], node.position)
+        
+        else:
             raise RuntimeError(
                 f"Cannot index {target_value.get_type()}", 
                 node.position
             )
-        
-        if not isinstance(index_value, NumberValue) or not isinstance(index_value.value, int):
-            raise RuntimeError(
-                f"List index must be integer, got {index_value.get_type()}",
-                node.indices[0].position
-            )
-        
-        self.result = target_value.get_element(index_value.value)
     
     # Helper methods
     def _dispatch_method(self, target: GlangValue, method_name: str, 
@@ -303,6 +329,10 @@ class ASTExecutor(BaseASTVisitor):
             return self._dispatch_list_method(target, method_name, args, position)
         elif target_type == "string":
             return self._dispatch_string_method(target, method_name, args, position)
+        elif target_type == "num":
+            return self._dispatch_num_method(target, method_name, args, position)
+        elif target_type == "bool":
+            return self._dispatch_bool_method(target, method_name, args, position)
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, target_type, position)
@@ -376,7 +406,7 @@ class ASTExecutor(BaseASTVisitor):
                                args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle string method calls."""
         
-        # For now, just provide basic string methods
+        # Length method
         if method_name == "length":
             if len(args) != 0:
                 from .errors import ArgumentError
@@ -384,9 +414,115 @@ class ASTExecutor(BaseASTVisitor):
             
             return NumberValue(len(target.value), position)
         
+        # Contains method
+        elif method_name == "contains":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"contains() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"contains() argument must be string, got {args[0].get_type()}", position)
+            
+            return BooleanValue(args[0].value in target.value, position)
+        
+        # Upper case methods (up and toUpper as alias)
+        elif method_name in ["up", "toUpper"]:
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"{method_name}() takes no arguments, got {len(args)}", position)
+            
+            return StringValue(target.value.upper(), position)
+        
+        # Lower case methods (down and toLower as alias)
+        elif method_name in ["down", "toLower"]:
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"{method_name}() takes no arguments, got {len(args)}", position)
+            
+            return StringValue(target.value.lower(), position)
+        
+        # Split method
+        elif method_name == "split":
+            if len(args) > 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"split() takes 0 or 1 argument, got {len(args)}", position)
+            
+            # Default delimiter is space
+            delimiter = " "
+            if len(args) == 1:
+                if not isinstance(args[0], StringValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"split() argument must be string, got {args[0].get_type()}", position)
+                delimiter = args[0].value
+            
+            # Split the string and convert to list of StringValues
+            parts = target.value.split(delimiter)
+            string_values = [StringValue(part, position) for part in parts]
+            return ListValue(string_values, "string", position)
+        
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "string", position)
+    
+    def _dispatch_num_method(self, target: NumberValue, method_name: str,
+                            args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
+        """Handle number method calls."""
+        
+        # to() method for precision truncation
+        if method_name == "to":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], NumberValue) or not isinstance(args[0].value, int):
+                from .errors import ArgumentError
+                raise ArgumentError(f"to() argument must be integer, got {args[0].get_type()}", position)
+            
+            digits = args[0].value
+            if digits < 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to() argument must be non-negative, got {digits}", position)
+            
+            # Truncate to specified decimal places (not rounding)
+            value = target.value
+            if digits == 0:
+                # Truncate to integer
+                truncated = int(value)
+            else:
+                # Truncate to specified decimal places
+                multiplier = 10 ** digits
+                truncated = int(value * multiplier) / multiplier
+            
+            return NumberValue(truncated, position)
+        
+        else:
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, "num", position)
+    
+    def _dispatch_bool_method(self, target: BooleanValue, method_name: str,
+                             args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
+        """Handle boolean method calls."""
+        
+        # flip() and toggle() methods (aliases)
+        if method_name in ["flip", "toggle"]:
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"{method_name}() takes no arguments, got {len(args)}", position)
+            
+            return BooleanValue(not target.value, position)
+        
+        # numify() and toNum() methods (aliases)
+        elif method_name in ["numify", "toNum"]:
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"{method_name}() takes no arguments, got {len(args)}", position)
+            
+            return NumberValue(1 if target.value else 0, position)
+        
+        else:
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, "bool", position)
     
     # Additional visitor methods that need to be implemented
     def visit_expression_statement(self, node) -> None:
@@ -431,8 +567,45 @@ class ASTExecutor(BaseASTVisitor):
         raise RuntimeError("Slice assignment not yet implemented", node.position)
     
     def visit_slice_access(self, node) -> None:
-        """Visit slice access (not yet fully implemented)."""
-        raise RuntimeError("Slice access not yet implemented", node.position)
+        """Visit slice access for strings and lists."""
+        target_value = self.execute(node.target)
+        
+        # Evaluate slice parameters
+        start = None if node.start is None else self.execute(node.start)
+        stop = None if node.stop is None else self.execute(node.stop)
+        step = None if node.step is None else self.execute(node.step)
+        
+        # Validate slice parameters are integers or None
+        for param, name in [(start, "start"), (stop, "stop"), (step, "step")]:
+            if param is not None:
+                if not isinstance(param, NumberValue) or not isinstance(param.value, int):
+                    raise RuntimeError(
+                        f"Slice {name} must be integer, got {param.get_type()}",
+                        node.position
+                    )
+        
+        # Extract integer values or None
+        start_val = None if start is None else start.value
+        stop_val = None if stop is None else stop.value
+        step_val = None if step is None else step.value
+        
+        # Handle string slicing
+        if isinstance(target_value, StringValue):
+            string_val = target_value.value
+            sliced = string_val[start_val:stop_val:step_val]
+            self.result = StringValue(sliced, node.position)
+        
+        # Handle list slicing
+        elif isinstance(target_value, ListValue):
+            elements = target_value.elements
+            sliced_elements = elements[start_val:stop_val:step_val]
+            self.result = ListValue(sliced_elements, target_value.element_type, node.position)
+        
+        else:
+            raise RuntimeError(
+                f"Cannot slice {target_value.get_type()}", 
+                node.position
+            )
     
     def visit_method_call_expression(self, node) -> None:
         """Visit method call in expression context."""

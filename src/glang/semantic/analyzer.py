@@ -308,9 +308,12 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'size', 'empty', 'constraint', 'validate_constraint', 'type_summary',
                 'types', 'coerce_to_constraint'
             },
-            'string': {'size', 'empty', 'upper', 'lower', 'split'},
-            'num': {'abs', 'round'},
-            'bool': {}  # Boolean values don't have methods currently
+            'string': {
+                'size', 'empty', 'upper', 'lower', 'split',
+                'length', 'contains', 'up', 'toUpper', 'down', 'toLower'
+            },
+            'num': {'abs', 'round', 'to'},
+            'bool': {'flip', 'toggle', 'numify', 'toNum'}
         }
         
         if target_type not in valid_methods:
