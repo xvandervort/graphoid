@@ -310,7 +310,8 @@ class SemanticAnalyzer(BaseASTVisitor):
             },
             'string': {
                 'size', 'empty', 'upper', 'lower', 'split',
-                'length', 'contains', 'up', 'toUpper', 'down', 'toLower'
+                'length', 'contains', 'up', 'toUpper', 'down', 'toLower',
+                'reverse', 'unique', 'chars'
             },
             'num': {'abs', 'round', 'to'},
             'bool': {'flip', 'toggle', 'numify', 'toNum'}

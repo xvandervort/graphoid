@@ -461,6 +461,42 @@ class ASTExecutor(BaseASTVisitor):
             string_values = [StringValue(part, position) for part in parts]
             return ListValue(string_values, "string", position)
         
+        # Graph operations that work on character level
+        elif method_name == "reverse":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"reverse() takes no arguments, got {len(args)}", position)
+            
+            # Use char nodes for graph-like operation
+            char_nodes = target.to_char_nodes()
+            reversed_nodes = list(reversed(char_nodes))
+            return target.from_char_nodes(reversed_nodes)
+        
+        elif method_name == "unique":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"unique() takes no arguments, got {len(args)}", position)
+            
+            # Use char nodes to remove duplicate characters while preserving order
+            char_nodes = target.to_char_nodes()
+            seen = set()
+            unique_nodes = []
+            for node in char_nodes:
+                if node.value not in seen:
+                    seen.add(node.value)
+                    unique_nodes.append(node)
+            return target.from_char_nodes(unique_nodes)
+        
+        elif method_name == "chars":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"chars() takes no arguments, got {len(args)}", position)
+            
+            # Return list of individual characters as strings
+            char_nodes = target.to_char_nodes()
+            char_strings = [StringValue(node.value, position) for node in char_nodes]
+            return ListValue(char_strings, "string", position)
+        
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "string", position)

@@ -45,12 +45,35 @@ class GlangValue(ABC):
         return f"{self.__class__.__name__}({self.to_python()!r})"
 
 
+class CharNode(GlangValue):
+    """Runtime character node for graph-based string operations."""
+    
+    def __init__(self, value: str, position: Optional[SourcePosition] = None):
+        super().__init__(position)
+        if len(value) != 1:
+            raise ValueError("CharNode must contain exactly one character")
+        self.value = value
+    
+    def to_python(self) -> str:
+        return self.value
+    
+    def get_type(self) -> str:
+        return "char"
+    
+    def to_display_string(self) -> str:
+        return self.value
+    
+    def __eq__(self, other) -> bool:
+        return isinstance(other, CharNode) and self.value == other.value
+
+
 class StringValue(GlangValue):
-    """Runtime string value."""
+    """Runtime string value with graph operation support."""
     
     def __init__(self, value: str, position: Optional[SourcePosition] = None):
         super().__init__(position)
         self.value = value
+        self._char_nodes = None  # Lazy conversion cache
     
     def to_python(self) -> str:
         return self.value
@@ -63,6 +86,21 @@ class StringValue(GlangValue):
     
     def __eq__(self, other) -> bool:
         return isinstance(other, StringValue) and self.value == other.value
+    
+    def to_char_nodes(self) -> List['CharNode']:
+        """Convert string to list of character nodes for graph operations."""
+        if self._char_nodes is None:
+            self._char_nodes = [CharNode(char, self.position) for char in self.value]
+        return self._char_nodes
+    
+    def from_char_nodes(self, char_nodes: List['CharNode']) -> 'StringValue':
+        """Create new StringValue from list of character nodes."""
+        result_string = ''.join(node.value for node in char_nodes)
+        return StringValue(result_string, self.position)
+    
+    def clear_char_cache(self):
+        """Clear the character node cache."""
+        self._char_nodes = None
 
 
 class NumberValue(GlangValue):
