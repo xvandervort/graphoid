@@ -67,7 +67,7 @@ black src/ test/
 mypy src/
 
 # Demonstrate the language
-echo -e "string greeting = \"Hello World\"\nlist items = [1, 2, 3]\nitems.append(4)\n/namespace\n/exit" | glang
+echo -e "string greeting = \"Hello World\"\nlist items = [1, 2, 3]\ndata user = { \"name\": \"Alice\" }\nmap config = { \"host\": \"localhost\", \"port\": 8080 }\nitems.append(4)\nconfig[\"debug\"] = true\n/namespace\n/exit" | glang
 ```
 
 ## REPL Commands
@@ -102,6 +102,14 @@ list<num> scores = [95, 87, 92]
 list<string> names = ["alice", "bob", "charlie"]
 list<bool> flags = [true, false, true]
 
+# Data nodes (key-value pairs)
+data user = { "name": "Alice" }
+data<num> score = { "final": 95 }
+
+# Maps (collections of data nodes)
+map config = { "host": "localhost", "port": 8080, "debug": true }
+map<string> settings = { "theme": "dark", "lang": "en" }
+
 # Type inference (new!)
 name = "Bob"           # Infers string type
 count = 42             # Infers num type  
@@ -111,16 +119,25 @@ data = [1, 2, 3]       # Infers list type
 ### Advanced Operations
 ```glang
 # Index access
-items[0]           # Get first element
+items[0]           # Get first element from list
 items[-1]          # Get last element (if supported)
+config["host"]     # Get data node from map: { "host": "localhost" }
 
 # Index assignment  
-items[0] = 99      # Set first element
+items[0] = 99      # Set first element in list
 scores[1] = 100    # Update element
+config["port"] = 9000  # Create/update data node in map
 
 # Method calls
 items.append(4)    # Add element to list
 names.append("dave") # Type-checked append
+config.get("host") # Get data node: { "host": "localhost" }
+config.has_key("debug")  # Check if key exists: true/false
+config.count_values("localhost")  # Count occurrences: 1
+
+# Data node operations
+user.key()         # Get key: "name"
+user.value()       # Get value: "Alice"
 ```
 
 ### File Loading
@@ -167,8 +184,10 @@ Glang uses a clean, modern architecture:
 - ✅ File loading system with .gr format
 - ✅ Type inference for variable declarations
 - ✅ Method calls with type constraint enforcement
-- ✅ Index access and assignment
-- ✅ Comprehensive test suite (194 tests, 71% coverage)
+- ✅ Index access and assignment for lists, strings, and maps
+- ✅ Data nodes with key-value semantics and type constraints
+- ✅ Maps as collections of data nodes with Ruby hash-like syntax
+- ✅ Comprehensive test suite (230+ tests, 39% coverage)
 
 ### Development Guidelines
 - **AST-first development** - All new features should extend the AST system
