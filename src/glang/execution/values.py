@@ -199,6 +199,67 @@ class BooleanValue(GlangValue):
         return StringValue(info, self.position)
 
 
+class DataValue(GlangValue):
+    """Runtime data node value with immutable key and mutable value."""
+    
+    def __init__(self, key: str, value: GlangValue, constraint: Optional[str] = None,
+                 position: Optional[SourcePosition] = None):
+        super().__init__(position)
+        self.key = key  # Immutable string key
+        self.value = value  # Mutable value
+        self.constraint = constraint  # Optional type constraint for value
+    
+    def to_python(self) -> dict:
+        return {self.key: self.value.to_python()}
+    
+    def get_type(self) -> str:
+        return "data"
+    
+    def to_display_string(self) -> str:
+        return f'{{ "{self.key}": {self.value.to_display_string()} }}'
+    
+    def validate_constraint(self, value: GlangValue) -> bool:
+        """Check if value matches data node constraint."""
+        if not self.constraint:
+            return True
+        return value.get_type() == self.constraint
+    
+    def set_value(self, new_value: GlangValue) -> None:
+        """Set the value (with constraint validation)."""
+        if not self.validate_constraint(new_value):
+            from .errors import TypeConstraintError
+            raise TypeConstraintError(
+                f"Cannot assign {new_value.get_type()} to data<{self.constraint}>",
+                new_value.position
+            )
+        self.value = new_value
+    
+    def get_key(self) -> StringValue:
+        """Get the key as a StringValue."""
+        return StringValue(self.key, self.position)
+    
+    def get_value(self) -> GlangValue:
+        """Get the value."""
+        return self.value
+    
+    def __eq__(self, other) -> bool:
+        return (isinstance(other, DataValue) and 
+                self.key == other.key and
+                self.value == other.value and
+                self.constraint == other.constraint)
+    
+    # Override universal methods for data-specific behavior
+    def universal_size(self) -> 'NumberValue':
+        """For data nodes: size is always 1 (single key-value pair)."""
+        return NumberValue(1, self.position)
+    
+    def universal_inspect(self) -> 'StringValue':
+        """Data-specific inspection showing key and value type."""
+        constraint_info = f"<{self.constraint}>" if self.constraint else ""
+        info = f'data{constraint_info} {{ "{self.key}": {self.value.get_type()} }}'
+        return StringValue(info, self.position)
+
+
 class ListValue(GlangValue):
     """Runtime list value with optional type constraints."""
     
@@ -284,6 +345,15 @@ def python_to_glang_value(python_value: Any, position: Optional[SourcePosition] 
         return BooleanValue(python_value, position)
     elif isinstance(python_value, (int, float)):
         return NumberValue(python_value, position)
+    elif isinstance(python_value, dict):
+        # For dict, we only handle single key-value pairs as DataValue
+        if len(python_value) == 1:
+            key = list(python_value.keys())[0]
+            value = python_to_glang_value(python_value[key], position)
+            return DataValue(key, value, None, position)
+        else:
+            # Multi-key dicts will become datamap in the future
+            raise ValueError("Multi-key dictionaries not yet supported")
     elif isinstance(python_value, list):
         elements = [python_to_glang_value(elem, position) for elem in python_value]
         return ListValue(elements, None, position)

@@ -68,21 +68,21 @@ class SemanticAnalyzer(BaseASTVisitor):
     def visit_variable_declaration(self, node: VariableDeclaration) -> None:
         """Analyze variable declarations."""
         # Validate type
-        valid_types = {'list', 'string', 'num', 'bool'}
+        valid_types = {'list', 'string', 'num', 'bool', 'data'}
         if node.var_type not in valid_types:
             self.report_error(InvalidTypeError(node.var_type, node.position))
             return
         
         # Validate constraint if present
         if node.type_constraint:
-            valid_constraints = {'string', 'num', 'bool', 'list'}
+            valid_constraints = {'string', 'num', 'bool', 'list', 'data'}
             if node.type_constraint not in valid_constraints:
                 self.report_error(InvalidConstraintError(
                     node.type_constraint, node.var_type, node.position))
                 return
             
-            # Only list type supports constraints currently
-            if node.var_type != 'list':
+            # Only list and data types support constraints currently
+            if node.var_type not in ['list', 'data']:
                 self.report_error(InvalidConstraintError(
                     node.type_constraint, node.var_type, node.position))
                 return
@@ -232,6 +232,12 @@ class SemanticAnalyzer(BaseASTVisitor):
         
         # TODO: Check type consistency if this is for a constrained list
     
+    def visit_data_node_literal(self, node: DataNodeLiteral) -> None:
+        """Analyze data node literals."""
+        # Analyze the value expression
+        node.value.accept(self)
+        # Key is a string literal, no need to validate further
+    
     def visit_index_access(self, node: IndexAccess) -> None:
         """Analyze index access expressions."""
         # Analyze target
@@ -334,7 +340,8 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'reverse', 'unique', 'chars'
             } | universal_methods,
             'num': {'abs', 'round', 'to'} | universal_methods,
-            'bool': {'flip', 'toggle', 'numify', 'toNum'} | universal_methods
+            'bool': {'flip', 'toggle', 'numify', 'toNum'} | universal_methods,
+            'data': {'key', 'value'} | universal_methods
         }
         
         if target_type not in valid_methods:

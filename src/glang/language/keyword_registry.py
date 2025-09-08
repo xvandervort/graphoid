@@ -87,6 +87,14 @@ class LanguageKeywordRegistry:
             syntax_example="list<string> items = [\"a\", \"b\"]"
         ))
         
+        self._register_keyword(KeywordDefinition(
+            keyword="data",
+            category=KeywordCategory.TYPE,
+            parser_method="parse_type_keyword",
+            description="Data node type declaration",
+            syntax_example="data node = { \"key\": \"value\" }"
+        ))
+        
         # Statement keywords
         self._register_keyword(KeywordDefinition(
             keyword="import",

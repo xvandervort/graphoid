@@ -32,9 +32,13 @@ class TestASTNodes:
             def visit_number_literal(self, node): pass
             def visit_boolean_literal(self, node): pass
             def visit_list_literal(self, node): pass
+            def visit_data_node_literal(self, node): pass
             def visit_index_access(self, node): pass
             def visit_slice_access(self, node): pass
             def visit_method_call_expression(self, node): pass
+            def visit_print_expression(self, node): pass
+            def visit_binary_operation(self, node): pass
+            def visit_unary_operation(self, node): pass
             def visit_variable_declaration(self, node): pass
             def visit_method_call(self, node): pass
             def visit_assignment(self, node): pass
@@ -42,6 +46,7 @@ class TestASTNodes:
             def visit_slice_assignment(self, node): pass
             def visit_expression_statement(self, node): pass
             def visit_load_statement(self, node): pass
+            def visit_print_statement(self, node): pass
             def visit_import_statement(self, node): pass
             def visit_module_declaration(self, node): pass
             def visit_alias_declaration(self, node): pass

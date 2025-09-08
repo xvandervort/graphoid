@@ -147,8 +147,8 @@ class ASTParser:
                 if not self.match(TokenType.GREATER):
                     return False
             
-            # identifier =
-            if not self.check(TokenType.IDENTIFIER):
+            # identifier = (allow keywords as variable names)
+            if not (self.check(TokenType.IDENTIFIER) or self.check_type_keyword()):
                 return False
             self.advance()
             
@@ -177,9 +177,12 @@ class ASTParser:
             type_constraint = constraint_token.value
             self.consume(TokenType.GREATER, "Expected '>' after type constraint")
         
-        # Variable name
-        name_token = self.consume(TokenType.IDENTIFIER, "Expected variable name")
-        name = name_token.value
+        # Variable name (allow keywords as variable names)
+        if self.check(TokenType.IDENTIFIER) or self.check_type_keyword():
+            name_token = self.advance()
+            name = name_token.value
+        else:
+            raise ParseError("Expected variable name", self.peek())
         
         # Equals
         self.consume(TokenType.ASSIGN, "Expected '=' after variable name")
@@ -401,6 +404,19 @@ class ASTParser:
             method_name = method_token.value
             pos = SourcePosition(method_token.line, method_token.column)
             
+            # Check for property assignment attempt (obj.prop = value)
+            if self.check(TokenType.ASSIGN):
+                # Provide specific error message for property assignment attempts
+                if hasattr(expr, 'name'):  # VariableRef has a name attribute
+                    var_name = expr.name
+                    if method_name in ['key', 'value']:
+                        # Special message for data node properties
+                        raise ParseError(f"Assignment to data node property '{method_name}' is not allowed. Data node keys are immutable and values cannot be assigned directly.", self.peek())
+                    else:
+                        raise ParseError(f"Property assignment '{var_name}.{method_name} = ...' is not supported. Use method calls like '{var_name}.{method_name}()' instead.", self.peek())
+                else:
+                    raise ParseError(f"Property assignment is not supported in this language. Use method calls instead.", self.peek())
+            
             # Optional parentheses for method calls
             self.match(TokenType.LPAREN)
             
@@ -494,6 +510,27 @@ class ASTParser:
             
             self.consume(TokenType.RBRACKET, "Expected ']' after list elements")
             return ListLiteral(elements, SourcePosition(bracket_token.line, bracket_token.column))
+        
+        # Data node literals: { "key": value }
+        if self.match(TokenType.LBRACE):
+            brace_token = self.previous()
+            
+            # Parse the key (must be a string literal)
+            if not self.check(TokenType.STRING_LITERAL):
+                raise ParseError("Data node key must be a string literal", self.peek())
+            key_token = self.advance()
+            key = self.process_string_literal(key_token.value)
+            
+            # Expect colon
+            self.consume(TokenType.COLON, "Expected ':' after data node key")
+            
+            # Parse the value (any expression)
+            value = self.parse_expression()
+            
+            # Expect closing brace
+            self.consume(TokenType.RBRACE, "Expected '}' after data node value")
+            
+            return DataNodeLiteral(key, value, SourcePosition(brace_token.line, brace_token.column))
         
         # Special print function call
         if self.check(TokenType.IDENTIFIER) and self.peek().value == "print":

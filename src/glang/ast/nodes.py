@@ -140,6 +140,16 @@ class UnaryOperation(Expression):
     def accept(self, visitor):
         return visitor.visit_unary_operation(self)
 
+@dataclass
+class DataNodeLiteral(Expression):
+    """Data node literal: { "key": value }"""
+    key: str  # The key (must be a string literal)
+    value: Expression  # The value (can be any expression)
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_data_node_literal(self)
+
 # =============================================================================
 # Statement Nodes - represent actions and declarations
 # =============================================================================
@@ -312,6 +322,26 @@ class ASTVisitor(ABC):
         """Visit a method call in expression context."""
         pass
     
+    @abstractmethod
+    def visit_print_expression(self, node: PrintExpression):
+        """Visit a print expression."""
+        pass
+    
+    @abstractmethod
+    def visit_binary_operation(self, node: BinaryOperation):
+        """Visit a binary operation."""
+        pass
+    
+    @abstractmethod
+    def visit_unary_operation(self, node: UnaryOperation):
+        """Visit a unary operation."""
+        pass
+    
+    @abstractmethod
+    def visit_data_node_literal(self, node: DataNodeLiteral):
+        """Visit a data node literal."""
+        pass
+    
     # Statement visitors
     @abstractmethod
     def visit_variable_declaration(self, node: VariableDeclaration): 
@@ -346,6 +376,11 @@ class ASTVisitor(ABC):
     @abstractmethod
     def visit_load_statement(self, node: LoadStatement):
         """Visit a load statement."""
+        pass
+    
+    @abstractmethod
+    def visit_print_statement(self, node: PrintStatement):
+        """Visit a print statement."""
         pass
     
     @abstractmethod
@@ -414,6 +449,24 @@ class BaseASTVisitor(ASTVisitor):
             arg.accept(self)
         return node
     
+    def visit_print_expression(self, node: PrintExpression):
+        for arg in node.arguments:
+            arg.accept(self)
+        return node
+    
+    def visit_binary_operation(self, node: BinaryOperation):
+        node.left.accept(self)
+        node.right.accept(self)
+        return node
+    
+    def visit_unary_operation(self, node: UnaryOperation):
+        node.operand.accept(self)
+        return node
+    
+    def visit_data_node_literal(self, node: DataNodeLiteral):
+        node.value.accept(self)
+        return node
+    
     def visit_variable_declaration(self, node: VariableDeclaration):
         node.initializer.accept(self)
         return node
@@ -444,6 +497,11 @@ class BaseASTVisitor(ASTVisitor):
         return node
     
     def visit_load_statement(self, node: LoadStatement):
+        return node
+    
+    def visit_print_statement(self, node: PrintStatement):
+        for arg in node.arguments:
+            arg.accept(self)
         return node
     
     def visit_import_statement(self, node: ImportStatement):

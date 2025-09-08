@@ -111,6 +111,17 @@ class ASTExecutor(BaseASTVisitor):
                             elem.position or node.position
                         )
         
+        # For data declarations, set constraint if specified
+        elif node.var_type == "data" and isinstance(initializer_value, DataValue):
+            if node.type_constraint:
+                initializer_value.constraint = node.type_constraint
+                # Validate existing value against constraint
+                if not initializer_value.validate_constraint(initializer_value.value):
+                    raise TypeConstraintError(
+                        f"Value {initializer_value.value.to_display_string()} violates data<{node.type_constraint}> constraint",
+                        initializer_value.value.position or node.position
+                    )
+        
         # Store in context
         self.context.set_variable(node.name, initializer_value)
         
@@ -266,6 +277,16 @@ class ASTExecutor(BaseASTVisitor):
         
         self.result = ListValue(elements, None, node.position)
     
+    def visit_data_node_literal(self, node: DataNodeLiteral) -> None:
+        """Evaluate data node literal."""
+        # Evaluate the value expression
+        value = self.execute(node.value)
+        if not isinstance(value, GlangValue):
+            value = python_to_glang_value(value, node.value.position)
+        
+        # Create DataValue with the key and evaluated value
+        self.result = DataValue(node.key, value, None, node.position)
+    
     def visit_index_access(self, node: IndexAccess) -> None:
         """Evaluate index access."""
         target_value = self.execute(node.target)
@@ -346,6 +367,8 @@ class ASTExecutor(BaseASTVisitor):
             return self._dispatch_num_method(target, method_name, args, position)
         elif target_type == "bool":
             return self._dispatch_bool_method(target, method_name, args, position)
+        elif target_type == "data":
+            return self._dispatch_data_method(target, method_name, args, position)
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, target_type, position)
@@ -420,7 +443,8 @@ class ASTExecutor(BaseASTVisitor):
             'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort'],
             'string': ['length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split', 'trim', 'join', 'matches', 'replace', 'findAll', 'reverse', 'unique', 'chars'],
             'num': ['to'],
-            'bool': ['flip', 'toggle', 'numify', 'toNum']
+            'bool': ['flip', 'toggle', 'numify', 'toNum'],
+            'data': ['key', 'value']
         }
         
         specific_methods = type_methods.get(target_type, [])
@@ -852,6 +876,30 @@ class ASTExecutor(BaseASTVisitor):
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "bool", position)
+    
+    def _dispatch_data_method(self, target: DataValue, method_name: str,
+                             args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
+        """Handle data node method calls."""
+        
+        if method_name == "key":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"key() takes no arguments, got {len(args)}", position)
+            
+            # Return the key as a StringValue
+            return target.get_key()
+        
+        elif method_name == "value":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"value() takes no arguments, got {len(args)}", position)
+            
+            # Return the value
+            return target.get_value()
+        
+        else:
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, "data", position)
     
     # Additional visitor methods that need to be implemented
     def visit_expression_statement(self, node) -> None:

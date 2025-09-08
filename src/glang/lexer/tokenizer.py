@@ -45,6 +45,8 @@ def _create_dynamic_token_type():
         "RBRACKET": "RBRACKET",          # ]
         "LPAREN": "LPAREN",              # (
         "RPAREN": "RPAREN",              # )
+        "LBRACE": "LBRACE",              # {
+        "RBRACE": "RBRACE",              # }
         "COLON": "COLON",                # :
         "SLASH": "SLASH",                # /
         
@@ -151,6 +153,8 @@ class Tokenizer:
             (r'\]', TokenType.RBRACKET),
             (r'\(', TokenType.LPAREN),
             (r'\)', TokenType.RPAREN),
+            (r'\{', TokenType.LBRACE),
+            (r'\}', TokenType.RBRACE),
             (r':', TokenType.COLON),
             (r'/', TokenType.SLASH),
             
