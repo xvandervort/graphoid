@@ -48,6 +48,13 @@ def _create_dynamic_token_type():
         "COLON": "COLON",                # :
         "SLASH": "SLASH",                # /
         
+        # Element-wise arithmetic operators
+        "PLUS_DOT": "PLUS_DOT",          # +.
+        "MINUS_DOT": "MINUS_DOT",        # -.
+        "MULTIPLY_DOT": "MULTIPLY_DOT",  # *.
+        "DIVIDE_DOT": "DIVIDE_DOT",      # /.
+        "MODULO_DOT": "MODULO_DOT",      # %.
+        
         # Special
         "NEWLINE": "NEWLINE",            # \n
         "EOF": "EOF",                    # End of input
@@ -120,6 +127,13 @@ class Tokenizer:
             (r'!=', TokenType.NOT_EQUAL),
             (r'!>', TokenType.NOT_GREATER),  # Intuitive "not greater than"
             (r'!<', TokenType.NOT_LESS),    # Intuitive "not less than"
+            
+            # Element-wise arithmetic operators
+            (r'\+\.', TokenType.PLUS_DOT),    # +.
+            (r'-\.', TokenType.MINUS_DOT),    # -.
+            (r'\*\.', TokenType.MULTIPLY_DOT), # *.
+            (r'/\.', TokenType.DIVIDE_DOT),   # /.
+            (r'%\.', TokenType.MODULO_DOT),   # %.
             
             # Single-character operators & punctuation
             (r'=', TokenType.ASSIGN),

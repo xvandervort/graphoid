@@ -981,6 +981,16 @@ class ASTExecutor(BaseASTVisitor):
             self.result = self.perform_comparison(left_value, right_value, "greater_equal")
         elif node.operator == "&":
             self.result = self.perform_intersection(left_value, right_value)
+        elif node.operator == "+.":
+            self.result = self.perform_elementwise_addition(left_value, right_value)
+        elif node.operator == "-.":
+            self.result = self.perform_elementwise_subtraction(left_value, right_value)
+        elif node.operator == "*.":
+            self.result = self.perform_elementwise_multiplication(left_value, right_value)
+        elif node.operator == "/.":
+            self.result = self.perform_elementwise_division(left_value, right_value)
+        elif node.operator == "%.":
+            self.result = self.perform_elementwise_modulo(left_value, right_value)
         else:
             raise RuntimeError(f"Unknown binary operator: {node.operator}", node.position)
     
@@ -1096,6 +1106,15 @@ class ASTExecutor(BaseASTVisitor):
     # Arithmetic Operations
     # =============================================================================
     
+    def _is_numeric_list(self, list_value: ListValue) -> bool:
+        """Check if a list contains all numeric elements."""
+        if list_value.constraint == "num":
+            return True
+        if list_value.constraint is not None and list_value.constraint != "num":
+            return False
+        # For unconstrained lists, check if all elements are numeric
+        return all(isinstance(elem, NumberValue) for elem in list_value.elements)
+    
     def perform_addition(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform addition operation."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
@@ -1103,11 +1122,12 @@ class ASTExecutor(BaseASTVisitor):
         elif isinstance(left, StringValue) and isinstance(right, StringValue):
             return StringValue(left.value + right.value)
         elif isinstance(left, ListValue) and isinstance(right, ListValue):
-            # List union (concatenation) - combine all elements
+            # List concatenation/union - combine all elements
             combined_elements = left.elements + right.elements
             # Use the constraint from the left list (or None if both have different constraints)
             constraint = left.constraint if left.constraint == right.constraint else None
             return ListValue(combined_elements, constraint, left.position)
+        # Note: List-scalar arithmetic moved to +. operator
         else:
             raise RuntimeError(f"Cannot add {left.get_type()} and {right.get_type()}")
     
@@ -1116,39 +1136,40 @@ class ASTExecutor(BaseASTVisitor):
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
             return NumberValue(left.value - right.value)
         elif isinstance(left, ListValue) and isinstance(right, ListValue):
-            # List difference - remove elements from left that are in right
+            # List set difference - remove elements from left that are in right
             result_elements = []
             for element in left.elements:
                 if element not in right.elements:
                     result_elements.append(element)
             return ListValue(result_elements, left.constraint, left.position)
+        # Note: List-scalar arithmetic moved to -. operator
         else:
             raise RuntimeError(f"Cannot subtract {right.get_type()} from {left.get_type()}")
     
     def perform_multiplication(self, left: GlangValue, right: GlangValue) -> GlangValue:
-        """Perform multiplication operation."""
+        """Perform multiplication operation (numbers only - use *. for element-wise)."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
             return NumberValue(left.value * right.value)
         else:
-            raise RuntimeError(f"Cannot multiply {left.get_type()} and {right.get_type()}")
+            raise RuntimeError(f"Cannot multiply {left.get_type()} and {right.get_type()} - use *. for element-wise operations")
     
     def perform_division(self, left: GlangValue, right: GlangValue) -> GlangValue:
-        """Perform division operation."""
+        """Perform division operation (numbers only - use /. for element-wise)."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
             if right.value == 0:
                 raise RuntimeError("Division by zero")
             return NumberValue(left.value / right.value)
         else:
-            raise RuntimeError(f"Cannot divide {left.get_type()} by {right.get_type()}")
+            raise RuntimeError(f"Cannot divide {left.get_type()} by {right.get_type()} - use /. for element-wise operations")
     
     def perform_modulo(self, left: GlangValue, right: GlangValue) -> GlangValue:
-        """Perform modulo operation."""
+        """Perform modulo operation (numbers only - use %. for element-wise)."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
             if right.value == 0:
                 raise RuntimeError("Modulo by zero")
             return NumberValue(left.value % right.value)
         else:
-            raise RuntimeError(f"Cannot perform modulo on {left.get_type()} and {right.get_type()}")
+            raise RuntimeError(f"Cannot perform modulo on {left.get_type()} and {right.get_type()} - use %. for element-wise operations")
     
     def perform_intersection(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform intersection operation."""
@@ -1161,6 +1182,242 @@ class ASTExecutor(BaseASTVisitor):
             return ListValue(result_elements, left.constraint, left.position)
         else:
             raise RuntimeError(f"Cannot perform intersection on {left.get_type()} and {right.get_type()}")
+    
+    # =============================================================================
+    # Element-wise Arithmetic Operations (Dot Operators)  
+    # =============================================================================
+    
+    def perform_elementwise_addition(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform element-wise addition using +. operator."""
+        if isinstance(left, ListValue) and isinstance(right, ListValue):
+            if not self._is_numeric_list(left) or not self._is_numeric_list(right):
+                raise RuntimeError("Element-wise addition requires numeric lists")
+            if len(left.elements) != len(right.elements):
+                raise RuntimeError(f"Element-wise addition requires lists of same length ({len(left.elements)} != {len(right.elements)})")
+            
+            result_elements = []
+            for i in range(len(left.elements)):
+                left_elem = left.elements[i]
+                right_elem = right.elements[i]
+                if isinstance(left_elem, NumberValue) and isinstance(right_elem, NumberValue):
+                    result_elements.append(NumberValue(left_elem.value + right_elem.value, left_elem.position))
+                else:
+                    raise RuntimeError("Element-wise addition requires all elements to be numbers")
+            return ListValue(result_elements, "num", left.position)
+        elif isinstance(left, ListValue) and isinstance(right, NumberValue):
+            # List-scalar element-wise addition
+            if not self._is_numeric_list(left):
+                raise RuntimeError(f"Cannot perform element-wise addition on list of {left.constraint or 'mixed types'}")
+            
+            result_elements = []
+            for element in left.elements:
+                if isinstance(element, NumberValue):
+                    result_elements.append(NumberValue(element.value + right.value, element.position))
+                else:
+                    raise RuntimeError("Cannot add number to non-numeric list element")
+            return ListValue(result_elements, "num", left.position)
+        elif isinstance(left, NumberValue) and isinstance(right, ListValue):
+            # Scalar-list element-wise addition
+            if not self._is_numeric_list(right):
+                raise RuntimeError(f"Cannot perform element-wise addition on list of {right.constraint or 'mixed types'}")
+            
+            result_elements = []
+            for element in right.elements:
+                if isinstance(element, NumberValue):
+                    result_elements.append(NumberValue(left.value + element.value, element.position))
+                else:
+                    raise RuntimeError("Cannot add number to non-numeric list element")
+            return ListValue(result_elements, "num", right.position)
+        else:
+            raise RuntimeError(f"Element-wise addition not supported for {left.get_type()} and {right.get_type()}")
+    
+    def perform_elementwise_subtraction(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform element-wise subtraction using -. operator."""
+        if isinstance(left, ListValue) and isinstance(right, ListValue):
+            if not self._is_numeric_list(left) or not self._is_numeric_list(right):
+                raise RuntimeError("Element-wise subtraction requires numeric lists")
+            if len(left.elements) != len(right.elements):
+                raise RuntimeError(f"Element-wise subtraction requires lists of same length ({len(left.elements)} != {len(right.elements)})")
+            
+            result_elements = []
+            for i in range(len(left.elements)):
+                left_elem = left.elements[i]
+                right_elem = right.elements[i]
+                if isinstance(left_elem, NumberValue) and isinstance(right_elem, NumberValue):
+                    result_elements.append(NumberValue(left_elem.value - right_elem.value, left_elem.position))
+                else:
+                    raise RuntimeError("Element-wise subtraction requires all elements to be numbers")
+            return ListValue(result_elements, "num", left.position)
+        elif isinstance(left, ListValue) and isinstance(right, NumberValue):
+            # List-scalar element-wise subtraction
+            if not self._is_numeric_list(left):
+                raise RuntimeError(f"Cannot perform element-wise subtraction on list of {left.constraint or 'mixed types'}")
+            
+            result_elements = []
+            for element in left.elements:
+                if isinstance(element, NumberValue):
+                    result_elements.append(NumberValue(element.value - right.value, element.position))
+                else:
+                    raise RuntimeError("Cannot subtract number from non-numeric list element")
+            return ListValue(result_elements, "num", left.position)
+        elif isinstance(left, NumberValue) and isinstance(right, ListValue):
+            # Scalar-list element-wise subtraction
+            if not self._is_numeric_list(right):
+                raise RuntimeError(f"Cannot perform element-wise subtraction on list of {right.constraint or 'mixed types'}")
+            
+            result_elements = []
+            for element in right.elements:
+                if isinstance(element, NumberValue):
+                    result_elements.append(NumberValue(left.value - element.value, element.position))
+                else:
+                    raise RuntimeError("Cannot subtract non-numeric list element from number")
+            return ListValue(result_elements, "num", right.position)
+        else:
+            raise RuntimeError(f"Element-wise subtraction not supported for {left.get_type()} and {right.get_type()}")
+    
+    def perform_elementwise_multiplication(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform element-wise multiplication using *. operator."""
+        if isinstance(left, ListValue) and isinstance(right, ListValue):
+            if not self._is_numeric_list(left) or not self._is_numeric_list(right):
+                raise RuntimeError("Element-wise multiplication requires numeric lists")
+            if len(left.elements) != len(right.elements):
+                raise RuntimeError(f"Element-wise multiplication requires lists of same length ({len(left.elements)} != {len(right.elements)})")
+            
+            result_elements = []
+            for i in range(len(left.elements)):
+                left_elem = left.elements[i]
+                right_elem = right.elements[i]
+                if isinstance(left_elem, NumberValue) and isinstance(right_elem, NumberValue):
+                    result_elements.append(NumberValue(left_elem.value * right_elem.value, left_elem.position))
+                else:
+                    raise RuntimeError("Element-wise multiplication requires all elements to be numbers")
+            return ListValue(result_elements, "num", left.position)
+        elif isinstance(left, ListValue) and isinstance(right, NumberValue):
+            # List-scalar element-wise multiplication
+            if not self._is_numeric_list(left):
+                raise RuntimeError(f"Cannot perform element-wise multiplication on list of {left.constraint or 'mixed types'}")
+            
+            result_elements = []
+            for element in left.elements:
+                if isinstance(element, NumberValue):
+                    result_elements.append(NumberValue(element.value * right.value, element.position))
+                else:
+                    raise RuntimeError("Cannot multiply non-numeric list element with number")
+            return ListValue(result_elements, "num", left.position)
+        elif isinstance(left, NumberValue) and isinstance(right, ListValue):
+            # Scalar-list element-wise multiplication
+            if not self._is_numeric_list(right):
+                raise RuntimeError(f"Cannot perform element-wise multiplication on list of {right.constraint or 'mixed types'}")
+            
+            result_elements = []
+            for element in right.elements:
+                if isinstance(element, NumberValue):
+                    result_elements.append(NumberValue(left.value * element.value, element.position))
+                else:
+                    raise RuntimeError("Cannot multiply number with non-numeric list element")
+            return ListValue(result_elements, "num", right.position)
+        else:
+            raise RuntimeError(f"Element-wise multiplication not supported for {left.get_type()} and {right.get_type()}")
+    
+    def perform_elementwise_division(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform element-wise division using /. operator."""
+        if isinstance(left, ListValue) and isinstance(right, ListValue):
+            if not self._is_numeric_list(left) or not self._is_numeric_list(right):
+                raise RuntimeError("Element-wise division requires numeric lists")
+            if len(left.elements) != len(right.elements):
+                raise RuntimeError(f"Element-wise division requires lists of same length ({len(left.elements)} != {len(right.elements)})")
+            
+            result_elements = []
+            for i in range(len(left.elements)):
+                left_elem = left.elements[i]
+                right_elem = right.elements[i]
+                if isinstance(left_elem, NumberValue) and isinstance(right_elem, NumberValue):
+                    if right_elem.value == 0:
+                        raise RuntimeError("Division by zero in element-wise division")
+                    result_elements.append(NumberValue(left_elem.value / right_elem.value, left_elem.position))
+                else:
+                    raise RuntimeError("Element-wise division requires all elements to be numbers")
+            return ListValue(result_elements, "num", left.position)
+        elif isinstance(left, ListValue) and isinstance(right, NumberValue):
+            # List-scalar element-wise division
+            if not self._is_numeric_list(left):
+                raise RuntimeError(f"Cannot perform element-wise division on list of {left.constraint or 'mixed types'}")
+            if right.value == 0:
+                raise RuntimeError("Division by zero")
+            
+            result_elements = []
+            for element in left.elements:
+                if isinstance(element, NumberValue):
+                    result_elements.append(NumberValue(element.value / right.value, element.position))
+                else:
+                    raise RuntimeError("Cannot divide non-numeric list element by number")
+            return ListValue(result_elements, "num", left.position)
+        elif isinstance(left, NumberValue) and isinstance(right, ListValue):
+            # Scalar-list element-wise division
+            if not self._is_numeric_list(right):
+                raise RuntimeError(f"Cannot perform element-wise division on list of {right.constraint or 'mixed types'}")
+            
+            result_elements = []
+            for element in right.elements:
+                if isinstance(element, NumberValue):
+                    if element.value == 0:
+                        raise RuntimeError("Division by zero in element-wise division")
+                    result_elements.append(NumberValue(left.value / element.value, element.position))
+                else:
+                    raise RuntimeError("Cannot divide number by non-numeric list element")
+            return ListValue(result_elements, "num", right.position)
+        else:
+            raise RuntimeError(f"Element-wise division not supported for {left.get_type()} and {right.get_type()}")
+    
+    def perform_elementwise_modulo(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform element-wise modulo using %. operator."""
+        if isinstance(left, ListValue) and isinstance(right, ListValue):
+            if not self._is_numeric_list(left) or not self._is_numeric_list(right):
+                raise RuntimeError("Element-wise modulo requires numeric lists")
+            if len(left.elements) != len(right.elements):
+                raise RuntimeError(f"Element-wise modulo requires lists of same length ({len(left.elements)} != {len(right.elements)})")
+            
+            result_elements = []
+            for i in range(len(left.elements)):
+                left_elem = left.elements[i]
+                right_elem = right.elements[i]
+                if isinstance(left_elem, NumberValue) and isinstance(right_elem, NumberValue):
+                    if right_elem.value == 0:
+                        raise RuntimeError("Modulo by zero in element-wise modulo")
+                    result_elements.append(NumberValue(left_elem.value % right_elem.value, left_elem.position))
+                else:
+                    raise RuntimeError("Element-wise modulo requires all elements to be numbers")
+            return ListValue(result_elements, "num", left.position)
+        elif isinstance(left, ListValue) and isinstance(right, NumberValue):
+            # List-scalar element-wise modulo
+            if not self._is_numeric_list(left):
+                raise RuntimeError(f"Cannot perform element-wise modulo on list of {left.constraint or 'mixed types'}")
+            if right.value == 0:
+                raise RuntimeError("Modulo by zero")
+            
+            result_elements = []
+            for element in left.elements:
+                if isinstance(element, NumberValue):
+                    result_elements.append(NumberValue(element.value % right.value, element.position))
+                else:
+                    raise RuntimeError("Cannot perform modulo on non-numeric list element with number")
+            return ListValue(result_elements, "num", left.position)
+        elif isinstance(left, NumberValue) and isinstance(right, ListValue):
+            # Scalar-list element-wise modulo
+            if not self._is_numeric_list(right):
+                raise RuntimeError(f"Cannot perform element-wise modulo on list of {right.constraint or 'mixed types'}")
+            
+            result_elements = []
+            for element in right.elements:
+                if isinstance(element, NumberValue):
+                    if element.value == 0:
+                        raise RuntimeError("Modulo by zero in element-wise modulo")
+                    result_elements.append(NumberValue(left.value % element.value, element.position))
+                else:
+                    raise RuntimeError("Cannot perform modulo on number with non-numeric list element")
+            return ListValue(result_elements, "num", right.position)
+        else:
+            raise RuntimeError(f"Element-wise modulo not supported for {left.get_type()} and {right.get_type()}")
     
     def perform_comparison(self, left: GlangValue, right: GlangValue, operation: str) -> BooleanValue:
         """Perform comparison operations."""

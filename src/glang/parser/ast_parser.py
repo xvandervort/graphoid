@@ -359,7 +359,8 @@ class ASTParser:
         expr = self.parse_factor()
         
         while (self.match(TokenType.PLUS) or self.match(TokenType.MINUS) or 
-               self.match(TokenType.AMPERSAND)):
+               self.match(TokenType.AMPERSAND) or self.match(TokenType.PLUS_DOT) or 
+               self.match(TokenType.MINUS_DOT)):
             operator_token = self.previous()
             right = self.parse_factor()
             pos = SourcePosition(operator_token.line, operator_token.column)
@@ -371,7 +372,9 @@ class ASTParser:
         """Parse multiplication, division, and modulo: *, /, %"""
         expr = self.parse_unary()
         
-        while self.match(TokenType.MULTIPLY) or self.match(TokenType.SLASH) or self.match(TokenType.MODULO):
+        while (self.match(TokenType.MULTIPLY) or self.match(TokenType.SLASH) or 
+               self.match(TokenType.MODULO) or self.match(TokenType.MULTIPLY_DOT) or 
+               self.match(TokenType.DIVIDE_DOT) or self.match(TokenType.MODULO_DOT)):
             operator_token = self.previous()
             right = self.parse_unary()
             pos = SourcePosition(operator_token.line, operator_token.column)

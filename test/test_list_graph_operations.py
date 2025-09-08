@@ -262,38 +262,66 @@ class TestListCombinationOperations:
     """Test list combination operations (union, intersection, difference)."""
     
     def test_list_union_addition(self):
-        """Test list union using + operator."""
+        """Test list union using + operator (different length lists)."""
         session = ExecutionSession()
         
         result = session.execute_statement('list<num> list1 = [1, 2, 3]')
         assert result.success
         
-        result = session.execute_statement('list<num> list2 = [4, 5, 6]')
+        result = session.execute_statement('list<num> list2 = [4, 5]')  # Different length to force concatenation
         assert result.success
         
         result = session.execute_statement('list1 + list2')
         assert result.success
         
-        expected_elements = [1, 2, 3, 4, 5, 6]
+        expected_elements = [1, 2, 3, 4, 5]
         actual_values = [elem.value for elem in result.value.elements]
         assert actual_values == expected_elements
     
     def test_list_union_preserves_duplicates(self):
-        """Test that union preserves all elements including duplicates."""
+        """Test that union preserves all elements including duplicates (different lengths)."""
         session = ExecutionSession()
         
         result = session.execute_statement('list<num> list1 = [1, 2, 2]')
         assert result.success
         
-        result = session.execute_statement('list<num> list2 = [2, 3, 3]')
+        result = session.execute_statement('list<num> list2 = [3, 3]')  # Different length to force concatenation
         assert result.success
         
         result = session.execute_statement('list1 + list2')
         assert result.success
         
-        expected_elements = [1, 2, 2, 2, 3, 3]
+        expected_elements = [1, 2, 2, 3, 3]
         actual_values = [elem.value for elem in result.value.elements]
         assert actual_values == expected_elements
+    
+    def test_list_concatenation_always_consistent(self):
+        """Test that + always concatenates lists (no more length-dependent behavior)."""
+        session = ExecutionSession()
+        
+        # Same-length numeric lists now also concatenate (consistent behavior)
+        result = session.execute_statement('list<num> same_a = [1, 2]')
+        assert result.success
+        result = session.execute_statement('list<num> same_b = [10, 20]')
+        assert result.success
+        result = session.execute_statement('same_a + same_b')
+        assert result.success
+        
+        expected_concat = [1, 2, 10, 20]  # Always concatenation now
+        actual_values = [elem.value for elem in result.value.elements]
+        assert actual_values == expected_concat
+        
+        # Different-length lists also concatenate (same behavior)
+        result = session.execute_statement('list<num> diff_a = [1, 2, 3]')
+        assert result.success
+        result = session.execute_statement('list<num> diff_b = [10, 20]')
+        assert result.success
+        result = session.execute_statement('diff_a + diff_b')
+        assert result.success
+        
+        expected_concat2 = [1, 2, 3, 10, 20]  # Concatenation
+        actual_values = [elem.value for elem in result.value.elements]
+        assert actual_values == expected_concat2
     
     def test_list_difference_subtraction(self):
         """Test list difference using - operator."""
