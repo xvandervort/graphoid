@@ -7,7 +7,7 @@ proper operations and constraint validation.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional, Union, Tuple
 import sys
 import os
 
@@ -257,6 +257,87 @@ class DataValue(GlangValue):
         """Data-specific inspection showing key and value type."""
         constraint_info = f"<{self.constraint}>" if self.constraint else ""
         info = f'data{constraint_info} {{ "{self.key}": {self.value.get_type()} }}'
+        return StringValue(info, self.position)
+
+
+class MapValue(GlangValue):
+    """Runtime map value - collection of data nodes (key-value pairs)."""
+    
+    def __init__(self, pairs: List[Tuple[str, GlangValue]], constraint: Optional[str] = None,
+                 position: Optional[SourcePosition] = None):
+        super().__init__(position)
+        # Store as ordered dictionary to maintain insertion order
+        self.pairs = dict(pairs)  # Convert to dict for efficient key lookup
+        self.constraint = constraint  # Optional type constraint for all values
+    
+    def to_python(self) -> dict:
+        return {key: value.to_python() for key, value in self.pairs.items()}
+    
+    def get_type(self) -> str:
+        return "map"
+    
+    def to_display_string(self) -> str:
+        if not self.pairs:
+            return "{}"
+        
+        pair_strs = []
+        for key, value in self.pairs.items():
+            pair_strs.append(f'"{key}": {value.to_display_string()}')
+        return "{ " + ", ".join(pair_strs) + " }"
+    
+    def validate_constraint(self, value: GlangValue) -> bool:
+        """Check if value matches map constraint."""
+        if not self.constraint:
+            return True
+        return value.get_type() == self.constraint
+    
+    def get(self, key: str) -> Optional[GlangValue]:
+        """Get value by key."""
+        return self.pairs.get(key)
+    
+    def set(self, key: str, value: GlangValue) -> None:
+        """Set value for key (with constraint validation)."""
+        if not self.validate_constraint(value):
+            from .errors import TypeConstraintError
+            raise TypeConstraintError(
+                f"Cannot assign {value.get_type()} to map<{self.constraint}>",
+                value.position
+            )
+        self.pairs[key] = value
+    
+    def has_key(self, key: str) -> bool:
+        """Check if key exists in map."""
+        return key in self.pairs
+    
+    def keys(self) -> List[str]:
+        """Get all keys."""
+        return list(self.pairs.keys())
+    
+    def values(self) -> List[GlangValue]:
+        """Get all values."""
+        return list(self.pairs.values())
+    
+    def remove(self, key: str) -> bool:
+        """Remove key-value pair. Returns True if key existed."""
+        if key in self.pairs:
+            del self.pairs[key]
+            return True
+        return False
+    
+    def __eq__(self, other) -> bool:
+        return (isinstance(other, MapValue) and 
+                self.pairs == other.pairs and
+                self.constraint == other.constraint)
+    
+    # Override universal methods for map-specific behavior
+    def universal_size(self) -> 'NumberValue':
+        """For maps: size is the number of key-value pairs."""
+        return NumberValue(len(self.pairs), self.position)
+    
+    def universal_inspect(self) -> 'StringValue':
+        """Map-specific inspection showing constraint and size."""
+        constraint_info = f"<{self.constraint}>" if self.constraint else ""
+        info = f'map{constraint_info} ({len(self.pairs)} pairs)'
         return StringValue(info, self.position)
 
 

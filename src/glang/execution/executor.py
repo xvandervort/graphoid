@@ -122,6 +122,25 @@ class ASTExecutor(BaseASTVisitor):
                         initializer_value.value.position or node.position
                     )
         
+        # For map declarations, handle both MapValue and DataValue (single pair) initializers
+        elif node.var_type == "map":
+            if isinstance(initializer_value, DataValue):
+                # Convert single DataValue to MapValue for map declarations
+                pairs = [(initializer_value.key, initializer_value.value)]
+                initializer_value = MapValue(pairs, node.type_constraint, initializer_value.position)
+            elif isinstance(initializer_value, MapValue):
+                if node.type_constraint:
+                    initializer_value.constraint = node.type_constraint
+            
+            # Validate constraint if specified
+            if node.type_constraint and isinstance(initializer_value, MapValue):
+                for key, value in initializer_value.pairs.items():
+                    if not initializer_value.validate_constraint(value):
+                        raise TypeConstraintError(
+                            f"Value {value.to_display_string()} for key '{key}' violates map<{node.type_constraint}> constraint",
+                            value.position or node.position
+                        )
+        
         # Store in context
         self.context.set_variable(node.name, initializer_value)
         
@@ -325,6 +344,19 @@ class ASTExecutor(BaseASTVisitor):
         # Create DataValue with the key and evaluated value
         self.result = DataValue(node.key, value, None, node.position)
     
+    def visit_map_literal(self, node: MapLiteral) -> None:
+        """Evaluate map literal."""
+        # Evaluate all value expressions
+        evaluated_pairs = []
+        for key, value_expr in node.pairs:
+            value = self.execute(value_expr)
+            if not isinstance(value, GlangValue):
+                value = python_to_glang_value(value, value_expr.position)
+            evaluated_pairs.append((key, value))
+        
+        # Create MapValue with the evaluated pairs
+        self.result = MapValue(evaluated_pairs, None, node.position)
+    
     def visit_index_access(self, node: IndexAccess) -> None:
         """Evaluate index access."""
         target_value = self.execute(node.target)
@@ -372,6 +404,27 @@ class ASTExecutor(BaseASTVisitor):
             # Return character as a string
             self.result = StringValue(string_val[idx], node.position)
         
+        # Handle map indexing - returns data node, not raw value
+        elif isinstance(target_value, MapValue):
+            if not isinstance(index_value, StringValue):
+                raise RuntimeError(
+                    f"Map index must be string, got {index_value.get_type()}",
+                    node.indices[0].position
+                )
+            
+            key = index_value.value
+            value = target_value.get(key)
+            
+            if value is None:
+                raise RuntimeError(
+                    f"Key '{key}' not found in map",
+                    node.indices[0].position
+                )
+            
+            # Return as data node, not raw value (this is the key change!)
+            from .values import DataValue
+            self.result = DataValue(key, value, target_value.constraint, node.position)
+        
         else:
             raise RuntimeError(
                 f"Cannot index {target_value.get_type()}", 
@@ -407,6 +460,8 @@ class ASTExecutor(BaseASTVisitor):
             return self._dispatch_bool_method(target, method_name, args, position)
         elif target_type == "data":
             return self._dispatch_data_method(target, method_name, args, position)
+        elif target_type == "map":
+            return self._dispatch_map_method(target, method_name, args, position)
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, target_type, position)
@@ -482,7 +537,8 @@ class ASTExecutor(BaseASTVisitor):
             'string': ['length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split', 'trim', 'join', 'matches', 'replace', 'findAll', 'reverse', 'unique', 'chars'],
             'num': ['to'],
             'bool': ['flip', 'toggle', 'numify', 'toNum'],
-            'data': ['key', 'value']
+            'data': ['key', 'value'],
+            'map': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop']
         }
         
         specific_methods = type_methods.get(target_type, [])
@@ -939,6 +995,187 @@ class ASTExecutor(BaseASTVisitor):
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "data", position)
     
+    def _dispatch_map_method(self, target: MapValue, method_name: str,
+                            args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
+        """Handle map method calls."""
+        
+        if method_name == "get":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get() takes 1 argument, got {len(args)}", position)
+            
+            key_arg = args[0]
+            if not isinstance(key_arg, StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"Map key must be string, got {key_arg.get_type()}", position)
+            
+            value = target.get(key_arg.value)
+            if value is None:
+                return StringValue("", position)  # Return empty string for missing keys
+            
+            # Return as data node, not raw value - consistent with index access
+            from .values import DataValue
+            return DataValue(key_arg.value, value, target.constraint, position)
+        
+        elif method_name == "set":
+            if len(args) != 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"set() takes 2 arguments, got {len(args)}", position)
+            
+            key_arg = args[0]
+            value_arg = args[1]
+            if not isinstance(key_arg, StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"Map key must be string, got {key_arg.get_type()}", position)
+            
+            target.set(key_arg.value, value_arg)
+            return StringValue(f"Set {key_arg.value}", position)
+        
+        elif method_name == "has_key":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"has_key() takes 1 argument, got {len(args)}", position)
+            
+            key_arg = args[0]
+            if not isinstance(key_arg, StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"Map key must be string, got {key_arg.get_type()}", position)
+            
+            return BooleanValue(target.has_key(key_arg.value), position)
+        
+        elif method_name == "count_values":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"count_values() takes 1 argument, got {len(args)}", position)
+            
+            search_value = args[0]
+            count = 0
+            for value in target.values():
+                # Compare the actual values (using Python equality)
+                if value.to_python() == search_value.to_python():
+                    count += 1
+            
+            return NumberValue(count, position)
+        
+        elif method_name == "keys":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"keys() takes no arguments, got {len(args)}", position)
+            
+            key_strings = [StringValue(key, position) for key in target.keys()]
+            return ListValue(key_strings, None, position)
+        
+        elif method_name == "values":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"values() takes no arguments, got {len(args)}", position)
+            
+            return ListValue(target.values(), None, position)
+        
+        elif method_name == "remove":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"remove() takes 1 argument, got {len(args)}", position)
+            
+            key_arg = args[0]
+            if not isinstance(key_arg, StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"Map key must be string, got {key_arg.get_type()}", position)
+            
+            existed = target.remove(key_arg.value)
+            return BooleanValue(existed, position)
+        
+        elif method_name == "empty":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"empty() takes no arguments, got {len(args)}", position)
+            
+            return BooleanValue(len(target.pairs) == 0, position)
+        
+        elif method_name == "merge":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"merge() takes 1 argument, got {len(args)}", position)
+            
+            other_map = args[0]
+            if not isinstance(other_map, MapValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"merge() requires a map argument, got {other_map.get_type()}", position)
+            
+            # Check constraint compatibility
+            if target.constraint and other_map.constraint and target.constraint != other_map.constraint:
+                from .errors import TypeConstraintError
+                raise TypeConstraintError(
+                    f"Cannot merge map<{other_map.constraint}> into map<{target.constraint}>",
+                    position
+                )
+            
+            # Merge the other map into this map
+            for key, value in other_map.pairs.items():
+                # Validate constraint if target has one
+                if not target.validate_constraint(value):
+                    from .errors import TypeConstraintError
+                    raise TypeConstraintError(
+                        f"Value {value.to_display_string()} for key '{key}' violates map<{target.constraint}> constraint",
+                        value.position or position
+                    )
+                target.set(key, value)
+            
+            return StringValue(f"Merged {len(other_map.pairs)} pairs", position)
+        
+        elif method_name == "push":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"push() takes 1 argument, got {len(args)}", position)
+            
+            data_node = args[0]
+            from .values import DataValue
+            if not isinstance(data_node, DataValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"push() requires a data node argument, got {data_node.get_type()}", position)
+            
+            # Extract the key-value pair from the data node
+            key = data_node.key
+            value = data_node.value
+            
+            # Validate constraint against the data node's value (not the data node itself)
+            if not target.validate_constraint(value):
+                from .errors import TypeConstraintError
+                raise TypeConstraintError(
+                    f"Value {value.to_display_string()} violates map<{target.constraint}> constraint",
+                    value.position or position
+                )
+            
+            # Set the unwrapped key-value pair in the map
+            target.set(key, value)
+            return StringValue(f"Pushed data node with key '{key}' and value {value.to_display_string()}", position)
+        
+        elif method_name == "pop":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"pop() takes 1 argument, got {len(args)}", position)
+            
+            key_arg = args[0]
+            if not isinstance(key_arg, StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"Map key must be string, got {key_arg.get_type()}", position)
+            
+            # Get the value before removing it
+            value = target.get(key_arg.value)
+            if value is None:
+                # Return empty string for missing keys (consistent with get())
+                return StringValue("", position)
+            
+            # Remove the key-value pair
+            existed = target.remove(key_arg.value)
+            
+            # Return the value that was removed
+            return value
+        
+        else:
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, "map", position)
+    
     # Additional visitor methods that need to be implemented
     def visit_expression_statement(self, node) -> None:
         """Visit an expression statement."""
@@ -962,20 +1199,35 @@ class ASTExecutor(BaseASTVisitor):
         
         index_value = self.execute(node.target.indices[0])
         
-        if not isinstance(target_value, ListValue):
+        # Handle list index assignment
+        if isinstance(target_value, ListValue):
+            if not isinstance(index_value, NumberValue) or not isinstance(index_value.value, int):
+                raise RuntimeError(
+                    f"List index must be integer, got {index_value.get_type()}",
+                    node.target.indices[0].position
+                )
+            
+            target_value.set_element(index_value.value, value)
+            self.result = f"Set {node.target.target.name}[{index_value.value}] = {value.to_display_string()}"
+        
+        # Handle map index assignment - creates/updates data node
+        elif isinstance(target_value, MapValue):
+            if not isinstance(index_value, StringValue):
+                raise RuntimeError(
+                    f"Map index must be string, got {index_value.get_type()}",
+                    node.target.indices[0].position
+                )
+            
+            key = index_value.value
+            # Set the key-value pair in the map (this creates the data node internally)
+            target_value.set(key, value)
+            self.result = f"Set {node.target.target.name}['{key}'] = {value.to_display_string()}"
+        
+        else:
             raise RuntimeError(
                 f"Cannot index {target_value.get_type()}", 
                 node.target.position
             )
-        
-        if not isinstance(index_value, NumberValue) or not isinstance(index_value.value, int):
-            raise RuntimeError(
-                f"List index must be integer, got {index_value.get_type()}",
-                node.target.indices[0].position
-            )
-        
-        target_value.set_element(index_value.value, value)
-        self.result = f"Set {node.target.target.name}[{index_value.value}] = {value.to_display_string()}"
     
     def visit_slice_assignment(self, node) -> None:
         """Visit a slice assignment (not yet fully implemented)."""

@@ -95,6 +95,14 @@ class LanguageKeywordRegistry:
             syntax_example="data node = { \"key\": \"value\" }"
         ))
         
+        self._register_keyword(KeywordDefinition(
+            keyword="map",
+            category=KeywordCategory.TYPE,
+            parser_method="parse_type_keyword",
+            description="Map type declaration",
+            syntax_example="map<string> config = { \"host\": \"localhost\", \"port\": \"8080\" }"
+        ))
+        
         # Statement keywords
         self._register_keyword(KeywordDefinition(
             keyword="import",

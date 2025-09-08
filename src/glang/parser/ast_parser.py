@@ -505,26 +505,46 @@ class ASTParser:
             self.consume(TokenType.RBRACKET, "Expected ']' after list elements")
             return ListLiteral(elements, SourcePosition(bracket_token.line, bracket_token.column))
         
-        # Data node literals: { "key": value }
+        # Data node literals and Map literals: { "key": value } or { "key1": value1, "key2": value2 }
         if self.match(TokenType.LBRACE):
             brace_token = self.previous()
+            pairs = []
             
-            # Parse the key (must be a string literal)
+            # Handle empty braces (empty map)
+            if self.check(TokenType.RBRACE):
+                self.advance()  # consume closing brace
+                return MapLiteral(pairs, SourcePosition(brace_token.line, brace_token.column))
+            
+            # Parse first key-value pair
             if not self.check(TokenType.STRING_LITERAL):
-                raise ParseError("Data node key must be a string literal", self.peek())
+                raise ParseError("Key must be a string literal", self.peek())
             key_token = self.advance()
             key = self.process_string_literal(key_token.value)
             
-            # Expect colon
-            self.consume(TokenType.COLON, "Expected ':' after data node key")
-            
-            # Parse the value (any expression)
+            self.consume(TokenType.COLON, "Expected ':' after key")
             value = self.parse_expression()
+            pairs.append((key, value))
             
-            # Expect closing brace
-            self.consume(TokenType.RBRACE, "Expected '}' after data node value")
+            # Check if there are more pairs (comma-separated)
+            while self.match(TokenType.COMMA):
+                if not self.check(TokenType.STRING_LITERAL):
+                    raise ParseError("Key must be a string literal", self.peek())
+                key_token = self.advance()
+                key = self.process_string_literal(key_token.value)
+                
+                self.consume(TokenType.COLON, "Expected ':' after key")
+                value = self.parse_expression()
+                pairs.append((key, value))
             
-            return DataNodeLiteral(key, value, SourcePosition(brace_token.line, brace_token.column))
+            self.consume(TokenType.RBRACE, "Expected '}' after pairs")
+            
+            # If there's exactly one pair, return a DataNodeLiteral for backward compatibility
+            if len(pairs) == 1:
+                key, value = pairs[0]
+                return DataNodeLiteral(key, value, SourcePosition(brace_token.line, brace_token.column))
+            else:
+                # Multiple pairs = map literal
+                return MapLiteral(pairs, SourcePosition(brace_token.line, brace_token.column))
         
         # Special print function call
         if self.check(TokenType.IDENTIFIER) and self.peek().value == "print":

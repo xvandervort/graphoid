@@ -1,7 +1,7 @@
 """AST node definitions for glang language."""
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Union, Any, Tuple
 from dataclasses import dataclass
 
 @dataclass
@@ -149,6 +149,15 @@ class DataNodeLiteral(Expression):
     
     def accept(self, visitor):
         return visitor.visit_data_node_literal(self)
+
+@dataclass
+class MapLiteral(Expression):
+    """Map literal: { "key1": value1, "key2": value2, ... }"""
+    pairs: List[Tuple[str, Expression]]  # List of (key, value) pairs
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_map_literal(self)
 
 # =============================================================================
 # Statement Nodes - represent actions and declarations
@@ -342,6 +351,11 @@ class ASTVisitor(ABC):
         """Visit a data node literal."""
         pass
     
+    @abstractmethod
+    def visit_map_literal(self, node: MapLiteral):
+        """Visit a map literal."""
+        pass
+    
     # Statement visitors
     @abstractmethod
     def visit_variable_declaration(self, node: VariableDeclaration): 
@@ -465,6 +479,11 @@ class BaseASTVisitor(ASTVisitor):
     
     def visit_data_node_literal(self, node: DataNodeLiteral):
         node.value.accept(self)
+        return node
+    
+    def visit_map_literal(self, node: MapLiteral):
+        for key, value in node.pairs:
+            value.accept(self)
         return node
     
     def visit_variable_declaration(self, node: VariableDeclaration):

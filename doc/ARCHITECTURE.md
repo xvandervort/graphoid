@@ -191,6 +191,152 @@ node_b = distributed_graph.create_node(ServerNode("192.168.1.2"))
 distributed_graph.add_edge(node_a, node_b, weight=network_latency)
 ```
 
+## Method Dispatch Architecture
+
+### Design Decision: Functional Dispatch vs Object-Oriented Methods
+
+One of Glang's key architectural decisions is **how type-specific methods are implemented**. This deserves documentation because it differs from typical Python patterns.
+
+#### The Problem
+
+When a user writes `list.append(5)` or `string.upper()`, how should the language implement these type-specific operations?
+
+#### Options Considered
+
+**Option 1: Traditional Object-Oriented Methods**
+```python
+class ListValue(GlangValue):
+    def append(self, item):
+        # Implementation here
+        pass
+    
+    def sort(self):
+        # Implementation here  
+        pass
+
+class StringValue(GlangValue):
+    def upper(self):
+        # Implementation here
+        pass
+```
+
+**Option 2: Functional Method Dispatch** ⭐ **(Chosen)**
+```python
+class ASTExecutor:
+    def _dispatch_list_method(self, method_name, target, args):
+        if method_name == "append":
+            # Implementation here
+        elif method_name == "sort":
+            # Implementation here
+    
+    def _dispatch_string_method(self, method_name, target, args):
+        if method_name == "upper":
+            # Implementation here
+```
+
+#### Decision: Functional Dispatch
+
+Glang uses **functional method dispatch** where:
+
+1. **Parser** creates generic `MethodCall` AST nodes for all method calls
+2. **Executor** determines target type at runtime
+3. **Type-specific dispatch functions** handle the actual method implementation
+4. **Universal methods** are handled uniformly across all types
+
+#### Architectural Rationale
+
+**1. Alignment with Functional Programming Principles**
+- Glang leans toward functional programming (immutable transformations, graph operations)
+- Separating data (values) from operations (methods) follows functional philosophy
+- Data and behaviors are distinct concerns
+
+**2. Language Extension Simplicity**
+```python
+# Adding new methods doesn't require class modification
+def _dispatch_list_method(self, method_name, target, args):
+    # ... existing methods ...
+    elif method_name == "new_method":  # Easy to add!
+        return self._handle_new_list_method(target, args)
+```
+
+**3. Consistent Universal Method Handling**
+Universal methods like `type()`, `size()`, `methods()` work uniformly:
+```python
+def _apply_universal_method(self, method_name, target):
+    if method_name == "type":
+        return StringValue(target.get_type())  # Works for ANY GlangValue
+    elif method_name == "size":
+        return NumberValue(target.size())      # Consistent across all types
+```
+
+**4. Simpler Runtime Model**
+- No method lookup overhead or vtable construction
+- No inheritance chains to navigate
+- Direct dispatch based on known type and method name
+- Predictable execution path
+
+**5. Better Error Handling**
+```python
+# Easy to provide specific error messages
+if method_name not in valid_methods[target_type]:
+    available = ", ".join(sorted(valid_methods[target_type]))
+    raise RuntimeError(f"Method '{method_name}' not available on {target_type}. Available: {available}")
+```
+
+#### Implementation Flow
+
+```mermaid
+graph TD
+    A[user writes: list.append 5] --> B[Parser creates MethodCall AST]
+    B --> C[Executor.visit_method_call]
+    C --> D[Determine target type: 'list']
+    D --> E[Call _dispatch_list_method]
+    E --> F[Execute specific method implementation]
+    F --> G[Return GlangValue result]
+```
+
+#### Trade-offs Analysis
+
+**Functional Dispatch ✅ (Chosen)**
+- ✅ Simple, predictable execution model
+- ✅ Easy to add new methods without touching existing classes  
+- ✅ Clean separation between data and operations
+- ✅ Consistent universal method handling
+- ✅ Better alignment with functional programming paradigms
+- ❌ Method implementations spread across executor rather than co-located with types
+- ❌ Some code duplication for similar operations across types
+- ❌ Large dispatch functions can become unwieldy
+
+**Object-Oriented Methods ❌ (Rejected)**
+- ✅ Methods co-located with their types
+- ✅ Natural inheritance for shared behavior  
+- ✅ More familiar to Python developers
+- ✅ Could enable polymorphism
+- ❌ More complex runtime with method resolution
+- ❌ Harder to implement universal methods consistently  
+- ❌ Less aligned with functional language design
+- ❌ Class hierarchy could become complex
+
+#### Why This Choice Aligns with Glang's Philosophy
+
+This decision reflects Glang's broader architectural principles:
+
+1. **Graph-Native Design**: Values are graph nodes with data; operations are external transformations
+2. **Functional Approach**: Data and operations are separate concerns
+3. **Consistent Execution**: Uniform handling across all types supports the "everything is a graph" philosophy
+4. **Language Simplicity**: Users see consistent `value.method()` syntax regardless of implementation complexity
+
+#### Future Considerations
+
+This architecture supports planned features:
+
+- **New data types**: Easy to add dispatch functions for graph types, tree types, etc.
+- **Method aliases**: Can map multiple method names to same implementation
+- **Performance optimization**: Hot methods can be optimized without changing class hierarchies
+- **Debugging support**: Execution flow is explicit and traceable
+
+---
+
 ## Summary
 
 Glang's architecture demonstrates that "everything is a graph" is not just a slogan - it's a practical, implementable approach that:
@@ -199,5 +345,6 @@ Glang's architecture demonstrates that "everything is a graph" is not just a slo
 2. **Enables** powerful introspection and debugging capabilities  
 3. **Simplifies** the mental model for developers
 4. **Provides** a solid foundation for advanced features
+5. **Supports** functional programming principles through architectural decisions like method dispatch
 
 The result is a language where the core abstraction is so fundamental that it changes how we think about programming itself.

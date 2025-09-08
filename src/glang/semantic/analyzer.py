@@ -68,21 +68,21 @@ class SemanticAnalyzer(BaseASTVisitor):
     def visit_variable_declaration(self, node: VariableDeclaration) -> None:
         """Analyze variable declarations."""
         # Validate type
-        valid_types = {'list', 'string', 'num', 'bool', 'data'}
+        valid_types = {'list', 'string', 'num', 'bool', 'data', 'map'}
         if node.var_type not in valid_types:
             self.report_error(InvalidTypeError(node.var_type, node.position))
             return
         
         # Validate constraint if present
         if node.type_constraint:
-            valid_constraints = {'string', 'num', 'bool', 'list', 'data'}
+            valid_constraints = {'string', 'num', 'bool', 'list', 'data', 'map'}
             if node.type_constraint not in valid_constraints:
                 self.report_error(InvalidConstraintError(
                     node.type_constraint, node.var_type, node.position))
                 return
             
-            # Only list and data types support constraints currently
-            if node.var_type not in ['list', 'data']:
+            # Only list, data, and map types support constraints currently
+            if node.var_type not in ['list', 'data', 'map']:
                 self.report_error(InvalidConstraintError(
                     node.type_constraint, node.var_type, node.position))
                 return
@@ -250,7 +250,7 @@ class SemanticAnalyzer(BaseASTVisitor):
         # Check if target is indexable
         if isinstance(node.target, VariableRef):
             symbol = self.symbol_table.lookup_symbol(node.target.name)
-            if symbol and symbol.symbol_type not in {'list', 'string'}:
+            if symbol and symbol.symbol_type not in {'list', 'string', 'map'}:
                 self.report_error(InvalidMethodCallError(
                     "index access", symbol.symbol_type,
                     "Type is not indexable", node.position))
@@ -341,7 +341,10 @@ class SemanticAnalyzer(BaseASTVisitor):
             } | universal_methods,
             'num': {'abs', 'round', 'to'} | universal_methods,
             'bool': {'flip', 'toggle', 'numify', 'toNum'} | universal_methods,
-            'data': {'key', 'value'} | universal_methods
+            'data': {'key', 'value'} | universal_methods,
+            'map': {
+                'get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop'
+            } | universal_methods
         }
         
         if target_type not in valid_methods:
