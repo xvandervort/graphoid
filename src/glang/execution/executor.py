@@ -418,7 +418,7 @@ class ASTExecutor(BaseASTVisitor):
         # Type-specific methods
         type_methods = {
             'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort'],
-            'string': ['length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split', 'reverse', 'unique', 'chars'],
+            'string': ['length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split', 'trim', 'join', 'matches', 'replace', 'findAll', 'reverse', 'unique', 'chars'],
             'num': ['to'],
             'bool': ['flip', 'toggle', 'numify', 'toNum']
         }
@@ -667,6 +667,90 @@ class ASTExecutor(BaseASTVisitor):
             string_values = [StringValue(part, position) for part in parts]
             return ListValue(string_values, "string", position)
         
+        # Trim method (remove leading/trailing whitespace)
+        elif method_name == "trim":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"trim() takes no arguments, got {len(args)}", position)
+            
+            return StringValue(target.value.strip(), position)
+        
+        # Join method (join elements of a list with this string as separator)
+        elif method_name == "join":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"join() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], ListValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"join() argument must be list, got {args[0].get_type()}", position)
+            
+            # Convert all list elements to strings and join with separator
+            list_arg = args[0]
+            string_parts = []
+            for element in list_arg.elements:
+                string_parts.append(element.to_display_string())
+            
+            joined = target.value.join(string_parts)
+            return StringValue(joined, position)
+        
+        # Pattern matching methods
+        elif method_name == "matches":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"matches() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"matches() argument must be string, got {args[0].get_type()}", position)
+            
+            import re
+            pattern = args[0].value
+            try:
+                result = bool(re.search(pattern, target.value))
+                return BooleanValue(result, position)
+            except re.error as e:
+                from .errors import ArgumentError
+                raise ArgumentError(f"Invalid regex pattern: {e}", position)
+        
+        elif method_name == "replace":
+            if len(args) != 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"replace() takes 2 arguments, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue) or not isinstance(args[1], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"replace() arguments must be strings", position)
+            
+            import re
+            pattern = args[0].value
+            replacement = args[1].value
+            try:
+                result = re.sub(pattern, replacement, target.value)
+                return StringValue(result, position)
+            except re.error as e:
+                from .errors import ArgumentError
+                raise ArgumentError(f"Invalid regex pattern: {e}", position)
+        
+        elif method_name == "findAll":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"findAll() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"findAll() argument must be string, got {args[0].get_type()}", position)
+            
+            import re
+            pattern = args[0].value
+            try:
+                matches = re.findall(pattern, target.value)
+                string_matches = [StringValue(match, position) for match in matches]
+                return ListValue(string_matches, "string", position)
+            except re.error as e:
+                from .errors import ArgumentError
+                raise ArgumentError(f"Invalid regex pattern: {e}", position)
+        
         
         # Graph operations that work on character level
         elif method_name == "reverse":
@@ -844,7 +928,7 @@ class ASTExecutor(BaseASTVisitor):
         elif isinstance(target_value, ListValue):
             elements = target_value.elements
             sliced_elements = elements[start_val:stop_val:step_val]
-            self.result = ListValue(sliced_elements, target_value.element_type, node.position)
+            self.result = ListValue(sliced_elements, target_value.constraint, node.position)
         
         else:
             raise RuntimeError(

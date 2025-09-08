@@ -328,7 +328,8 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'types', 'coerce_to_constraint', 'indexOf', 'count', 'min', 'max', 'sum', 'sort'
             } | universal_methods,
             'string': {
-                'size', 'empty', 'upper', 'lower', 'split',
+                'size', 'empty', 'upper', 'lower', 'split', 'trim', 'join',
+                'matches', 'replace', 'findAll',
                 'length', 'contains', 'up', 'toUpper', 'down', 'toLower',
                 'reverse', 'unique', 'chars'
             } | universal_methods,

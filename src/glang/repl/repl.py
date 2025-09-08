@@ -46,6 +46,10 @@ class REPL:
             "ns": self._handle_namespace_command,
             "stats": self._handle_stats_command,
             "clear": self._handle_clear_command,
+            "methods": self._handle_methods_command,
+            "type": self._handle_type_command,
+            "inspect": self._handle_inspect_command,
+            "can": self._handle_can_command,
         }
         
         self.running = True
@@ -159,6 +163,10 @@ class REPL:
         print("  /namespace, /ns             # Show current variables")
         print("  /stats                      # Show session statistics")
         print("  /clear                      # Clear all variables")
+        print("  /methods <var>              # Show methods for variable")
+        print("  /type <var>                 # Show type information")
+        print("  /inspect <var>              # Detailed variable inspection")
+        print("  /can <var> <method>         # Check method availability")
         print("  /exit, /x                   # Exit REPL")
     
     def _handle_version_command(self, args: List[str]) -> None:
@@ -252,6 +260,101 @@ class REPL:
         """Clear all variables from the session."""
         self.execution_session.clear_variables()
         print("All variables cleared.")
+    
+    def _handle_methods_command(self, args: List[str]) -> None:
+        """Show all methods available on a variable."""
+        if len(args) != 1:
+            print("Usage: /methods <variable_name>")
+            return
+        
+        var_name = args[0]
+        variables = self.execution_session.execution_context.variables
+        
+        if var_name not in variables:
+            print(f"Variable '{var_name}' not found.")
+            return
+        
+        value = variables[var_name]
+        
+        # Execute the methods() call on the variable
+        result = self.execution_session.execute_statement(f"{var_name}.methods()")
+        if result.success and hasattr(result.value, 'elements'):
+            methods = [elem.value for elem in result.value.elements]
+            print(f"=== Methods for '{var_name}' ({value.get_type()}) ===")
+            for method in sorted(methods):
+                print(f"  {method}")
+        else:
+            print(f"Could not retrieve methods for '{var_name}'")
+    
+    def _handle_type_command(self, args: List[str]) -> None:
+        """Show detailed type information for a variable."""
+        if len(args) != 1:
+            print("Usage: /type <variable_name>")
+            return
+        
+        var_name = args[0]
+        variables = self.execution_session.execution_context.variables
+        
+        if var_name not in variables:
+            print(f"Variable '{var_name}' not found.")
+            return
+        
+        value = variables[var_name]
+        print(f"=== Type Information for '{var_name}' ===")
+        print(f"Type: {value.get_type()}")
+        print(f"Value: {value.to_display_string()}")
+        
+        # Show constraint for lists
+        if hasattr(value, 'constraint') and value.constraint:
+            print(f"Constraint: {value.constraint}")
+        
+        # Show size
+        result = self.execution_session.execute_statement(f"{var_name}.size()")
+        if result.success:
+            print(f"Size: {result.value.value}")
+    
+    def _handle_inspect_command(self, args: List[str]) -> None:
+        """Show detailed inspection of a variable."""
+        if len(args) != 1:
+            print("Usage: /inspect <variable_name>")
+            return
+        
+        var_name = args[0]
+        variables = self.execution_session.execution_context.variables
+        
+        if var_name not in variables:
+            print(f"Variable '{var_name}' not found.")
+            return
+        
+        # Execute the inspect() call on the variable
+        result = self.execution_session.execute_statement(f"{var_name}.inspect()")
+        if result.success:
+            print(f"=== Inspection of '{var_name}' ===")
+            print(result.value.to_display_string())
+        else:
+            print(f"Could not inspect '{var_name}': {result.error}")
+    
+    def _handle_can_command(self, args: List[str]) -> None:
+        """Check if a variable supports a specific method."""
+        if len(args) != 2:
+            print("Usage: /can <variable_name> <method_name>")
+            return
+        
+        var_name = args[0]
+        method_name = args[1]
+        variables = self.execution_session.execution_context.variables
+        
+        if var_name not in variables:
+            print(f"Variable '{var_name}' not found.")
+            return
+        
+        # Execute the can() call on the variable
+        result = self.execution_session.execute_statement(f"{var_name}.can(\"{method_name}\")")
+        if result.success:
+            can_do = result.value.value
+            print(f"'{var_name}' {'can' if can_do else 'cannot'} use method '{method_name}'")
+        else:
+            print(f"Could not check method availability: {result.error}")
     
     # History and readline support
     
