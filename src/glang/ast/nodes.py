@@ -111,6 +111,15 @@ class MethodCallExpression(Expression):
         return visitor.visit_method_call_expression(self)
 
 @dataclass
+class PrintExpression(Expression):
+    """Print function call expression: print(args) or print args"""
+    arguments: List[Expression]  # The expressions to print
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_print_expression(self)
+
+@dataclass
 class BinaryOperation(Expression):
     """Binary operation: left op right (e.g., 5 + 3, a > b)"""
     left: Expression
@@ -209,6 +218,15 @@ class LoadStatement(Statement):
     
     def accept(self, visitor):
         return visitor.visit_load_statement(self)
+
+@dataclass
+class PrintStatement(Statement):
+    """Print statement: print(expression1, expression2, ...)"""
+    arguments: List[Expression]  # The expressions to print
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_print_statement(self)
 
 @dataclass
 class ImportStatement(Statement):

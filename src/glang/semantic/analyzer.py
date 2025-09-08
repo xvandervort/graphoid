@@ -187,6 +187,22 @@ class SemanticAnalyzer(BaseASTVisitor):
                 node.position
             ))
     
+    def visit_print_statement(self, node: 'PrintStatement') -> None:
+        """Analyze print statements."""
+        from ..ast.nodes import PrintStatement
+        
+        # Analyze all arguments to ensure they're valid expressions
+        for arg in node.arguments:
+            arg.accept(self)
+    
+    def visit_print_expression(self, node: 'PrintExpression') -> None:
+        """Analyze print expressions."""
+        from ..ast.nodes import PrintExpression
+        
+        # Analyze all arguments to ensure they're valid expressions
+        for arg in node.arguments:
+            arg.accept(self)
+    
     
     # Expression visitors
     

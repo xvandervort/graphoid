@@ -280,6 +280,60 @@ class ASTParser:
         
         return LoadStatement(filename=filename, position=pos)
     
+    def parse_print_statement(self) -> 'PrintStatement':
+        """Parse print statement: print(expression1, expression2, ...)"""
+        from ..ast.nodes import PrintStatement
+        
+        # Parse 'print' keyword
+        print_token = self.consume(TokenType.PRINT, "Expected 'print'")
+        pos = SourcePosition(print_token.line, print_token.column)
+        
+        # Parse opening parenthesis
+        self.consume(TokenType.LPAREN, "Expected '(' after 'print'")
+        
+        # Parse arguments (can be empty)
+        arguments = []
+        if not self.check(TokenType.RPAREN):
+            # Parse first argument
+            arguments.append(self.parse_expression())
+            
+            # Parse additional arguments separated by commas
+            while self.match(TokenType.COMMA):
+                arguments.append(self.parse_expression())
+        
+        # Parse closing parenthesis
+        self.consume(TokenType.RPAREN, "Expected ')' after print arguments")
+        
+        return PrintStatement(arguments=arguments, position=pos)
+    
+    def parse_print_function_call(self) -> Expression:
+        """Parse print function call with optional parentheses: print args or print(args)"""
+        from ..ast.nodes import PrintExpression
+        
+        # Consume 'print' token
+        print_token = self.consume(TokenType.IDENTIFIER, "Expected 'print'")
+        pos = SourcePosition(print_token.line, print_token.column)
+        
+        # Check for optional opening parenthesis
+        has_parens = self.match(TokenType.LPAREN)
+        
+        # Parse arguments
+        arguments = []
+        if (has_parens and not self.check(TokenType.RPAREN)) or \
+           (not has_parens and not self.is_at_end() and not self.check(TokenType.NEWLINE) and not self.check(TokenType.EOF)):
+            arguments.append(self.parse_expression())
+            
+            # Arguments can be comma-separated
+            while self.match(TokenType.COMMA):
+                arguments.append(self.parse_expression())
+        
+        # If we had opening paren, consume closing paren
+        if has_parens:
+            self.consume(TokenType.RPAREN, "Expected ')' after print arguments")
+        
+        # Return a special PrintExpression (we'll need to create this)
+        return PrintExpression(arguments=arguments, position=pos)
+    
     def parse_expression(self) -> Expression:
         """Parse an expression."""
         return self.parse_comparison()
@@ -438,7 +492,11 @@ class ASTParser:
             self.consume(TokenType.RBRACKET, "Expected ']' after list elements")
             return ListLiteral(elements, SourcePosition(bracket_token.line, bracket_token.column))
         
-        # Variable references (including keywords used as variables)
+        # Special print function call
+        if self.check(TokenType.IDENTIFIER) and self.peek().value == "print":
+            return self.parse_print_function_call()
+        
+        # Variable references (including keywords used as variables)  
         if self.check(TokenType.IDENTIFIER) or self.check_type_keyword():
             token = self.advance()
             return VariableRef(token.value, SourcePosition(token.line, token.column))

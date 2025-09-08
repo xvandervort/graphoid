@@ -930,6 +930,56 @@ class ASTExecutor(BaseASTVisitor):
         from .errors import LoadRequest
         raise LoadRequest(node.filename, node.position)
     
+    def visit_print_statement(self, node: 'PrintStatement') -> None:
+        """Visit print statement - print values to output."""
+        from ..ast.nodes import PrintStatement
+        
+        # Evaluate all arguments and print them
+        output_parts = []
+        for arg in node.arguments:
+            # Execute the argument expression to get its value
+            value = self.execute(arg)
+            
+            # Convert to display string
+            if value is not None:
+                output_parts.append(value.to_display_string())
+            else:
+                output_parts.append("None")
+        
+        # Print all parts separated by spaces, or just empty line if no arguments
+        if output_parts:
+            print(" ".join(output_parts))
+        else:
+            print()
+        
+        # Print statements don't return values
+        self.result = None
+    
+    def visit_print_expression(self, node: 'PrintExpression') -> None:
+        """Visit print expression - print values and return None."""
+        from ..ast.nodes import PrintExpression
+        
+        # Evaluate all arguments and print them
+        output_parts = []
+        for arg in node.arguments:
+            # Execute the argument expression to get its value
+            value = self.execute(arg)
+            
+            # Convert to display string
+            if value is not None:
+                output_parts.append(value.to_display_string())
+            else:
+                output_parts.append("None")
+        
+        # Print all parts separated by spaces, or just empty line if no arguments
+        if output_parts:
+            print(" ".join(output_parts))
+        else:
+            print()
+        
+        # Print expressions return None 
+        self.result = None
+    
     def visit_import_statement(self, node: ImportStatement) -> None:
         """Visit import statement - load module into namespace."""
         if not self.context.module_manager:
