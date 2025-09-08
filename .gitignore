@@ -49,3 +49,4 @@ dmypy.json
 # Claude
 .claude/
 .coverage
+doc/*

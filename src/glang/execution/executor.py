@@ -187,6 +187,44 @@ class ASTExecutor(BaseASTVisitor):
             target_value.set_element(index_value.value, value)
             self.result = f"Set {node.target.target.name}[{index_value.value}] = {value.to_display_string()}"
         
+        elif isinstance(node.target, (MethodCall, MethodCallExpression)):
+            # Method call assignment - provide specific error messages
+            method_name = node.target.method_name
+            
+            if hasattr(node.target.target, 'name'):
+                var_name = node.target.target.name
+                if method_name == 'key':
+                    # Keys are immutable
+                    raise RuntimeError(
+                        f"Assignment to data node key is not allowed. "
+                        f"Data node keys are immutable.",
+                        node.position
+                    )
+                elif method_name == 'value':
+                    # Handle data node value assignment
+                    target_var = self.context.variables.get(var_name)
+                    if target_var and hasattr(target_var, 'value') and hasattr(target_var, 'set_value'):
+                        # This is a data node - update its value
+                        new_value = self.execute(node.value)
+                        target_var.set_value(new_value)
+                        self.result = f"Updated data node '{var_name}' value"
+                    else:
+                        raise RuntimeError(
+                            f"Variable '{var_name}' is not a data node or does not support value assignment.",
+                            node.position
+                        )
+                else:
+                    raise RuntimeError(
+                        f"Property assignment '{var_name}.{method_name} = ...' is not supported. "
+                        f"Use method calls like '{var_name}.{method_name}()' to access values.",
+                        node.position
+                    )
+            else:
+                raise RuntimeError(
+                    f"Property assignment is not supported in this language. Use method calls instead.",
+                    node.position
+                )
+        
         else:
             raise RuntimeError(f"Invalid assignment target", node.position)
     

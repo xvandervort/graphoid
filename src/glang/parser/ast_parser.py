@@ -102,6 +102,11 @@ class ASTParser:
             value = self.parse_expression()
             return Assignment(expr, value, SourcePosition(self.previous().line, self.previous().column))
         
+        # Method call assignment: obj.method = value (will be validated at semantic/execution phase)
+        if isinstance(expr, (MethodCall, MethodCallExpression)) and self.match(TokenType.ASSIGN):
+            value = self.parse_expression()
+            return Assignment(expr, value, SourcePosition(self.previous().line, self.previous().column))
+        
         # Check for malformed variable declaration (type keyword followed by = without variable name)  
         if isinstance(expr, VariableRef) and self.is_type_keyword_name(expr.name) and self.check(TokenType.ASSIGN):
             raise ParseError(f"Missing variable name after type '{expr.name}'", self.peek())
@@ -404,26 +409,15 @@ class ASTParser:
             method_name = method_token.value
             pos = SourcePosition(method_token.line, method_token.column)
             
-            # Check for property assignment attempt (obj.prop = value)
-            if self.check(TokenType.ASSIGN):
-                # Provide specific error message for property assignment attempts
-                if hasattr(expr, 'name'):  # VariableRef has a name attribute
-                    var_name = expr.name
-                    if method_name in ['key', 'value']:
-                        # Special message for data node properties
-                        raise ParseError(f"Assignment to data node property '{method_name}' is not allowed. Data node keys are immutable and values cannot be assigned directly.", self.peek())
-                    else:
-                        raise ParseError(f"Property assignment '{var_name}.{method_name} = ...' is not supported. Use method calls like '{var_name}.{method_name}()' instead.", self.peek())
-                else:
-                    raise ParseError(f"Property assignment is not supported in this language. Use method calls instead.", self.peek())
-            
             # Optional parentheses for method calls
             self.match(TokenType.LPAREN)
             
             # Parse arguments
             arguments = []
+            # Only parse arguments if we have parentheses or if the next token isn't an assignment operator
             if not self.check(TokenType.RPAREN) and not self.is_at_end() and \
-               not self.check(TokenType.NEWLINE) and not self.check(TokenType.EOF):
+               not self.check(TokenType.NEWLINE) and not self.check(TokenType.EOF) and \
+               not self.check(TokenType.ASSIGN):
                 arguments.append(self.parse_expression())
                 
                 # Arguments can be comma-separated or space-separated
