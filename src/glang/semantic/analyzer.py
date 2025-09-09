@@ -76,7 +76,7 @@ class SemanticAnalyzer(BaseASTVisitor):
         elif isinstance(expr, DataNodeLiteral):
             return 'data'
         elif isinstance(expr, MapLiteral):
-            return 'map'
+            return 'hash'
         elif isinstance(expr, VariableRef):
             # Look up the type of the referenced variable
             if self.symbol_table.symbol_exists(expr.name):
@@ -115,8 +115,8 @@ class SemanticAnalyzer(BaseASTVisitor):
                         return symbol.type_constraint if symbol.type_constraint else None
                     elif symbol.symbol_type == 'string':
                         return 'string'  # String indexing returns string
-                    elif symbol.symbol_type == 'map':
-                        return 'data'  # Map indexing returns data node
+                    elif symbol.symbol_type == 'hash':
+                        return 'data'  # Hash indexing returns data node
         
         return None  # Cannot infer type
     
@@ -125,21 +125,21 @@ class SemanticAnalyzer(BaseASTVisitor):
     def visit_variable_declaration(self, node: VariableDeclaration) -> None:
         """Analyze variable declarations."""
         # Validate type
-        valid_types = {'list', 'string', 'num', 'bool', 'data', 'map'}
+        valid_types = {'list', 'string', 'num', 'bool', 'data', 'hash'}
         if node.var_type not in valid_types:
             self.report_error(InvalidTypeError(node.var_type, node.position))
             return
         
         # Validate constraint if present
         if node.type_constraint:
-            valid_constraints = {'string', 'num', 'bool', 'list', 'data', 'map'}
+            valid_constraints = {'string', 'num', 'bool', 'list', 'data', 'hash'}
             if node.type_constraint not in valid_constraints:
                 self.report_error(InvalidConstraintError(
                     node.type_constraint, node.var_type, node.position))
                 return
             
-            # Only list, data, and map types support constraints currently
-            if node.var_type not in ['list', 'data', 'map']:
+            # Only list, data, and hash types support constraints currently
+            if node.var_type not in ['list', 'data', 'hash']:
                 self.report_error(InvalidConstraintError(
                     node.type_constraint, node.var_type, node.position))
                 return
@@ -316,7 +316,7 @@ class SemanticAnalyzer(BaseASTVisitor):
         # Check if target is indexable
         if isinstance(node.target, VariableRef):
             symbol = self.symbol_table.lookup_symbol(node.target.name)
-            if symbol and symbol.symbol_type not in {'list', 'string', 'map'}:
+            if symbol and symbol.symbol_type not in {'list', 'string', 'hash'}:
                 self.report_error(InvalidMethodCallError(
                     "index access", symbol.symbol_type,
                     "Type is not indexable", node.position))
@@ -408,7 +408,7 @@ class SemanticAnalyzer(BaseASTVisitor):
             'num': {'abs', 'round', 'to'} | universal_methods,
             'bool': {'flip', 'toggle', 'numify', 'toNum'} | universal_methods,
             'data': {'key', 'value'} | universal_methods,
-            'map': {
+            'hash': {
                 'get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop'
             } | universal_methods
         }

@@ -274,7 +274,7 @@ class MapValue(GlangValue):
         return {key: value.to_python() for key, value in self.pairs.items()}
     
     def get_type(self) -> str:
-        return "map"
+        return "hash"
     
     def to_display_string(self) -> str:
         if not self.pairs:
@@ -300,7 +300,7 @@ class MapValue(GlangValue):
         if not self.validate_constraint(value):
             from .errors import TypeConstraintError
             raise TypeConstraintError(
-                f"Cannot assign {value.get_type()} to map<{self.constraint}>",
+                f"Cannot assign {value.get_type()} to hash<{self.constraint}>",
                 value.position
             )
         self.pairs[key] = value
@@ -337,7 +337,7 @@ class MapValue(GlangValue):
     def universal_inspect(self) -> 'StringValue':
         """Map-specific inspection showing constraint and size."""
         constraint_info = f"<{self.constraint}>" if self.constraint else ""
-        info = f'map{constraint_info} ({len(self.pairs)} pairs)'
+        info = f'hash{constraint_info} ({len(self.pairs)} pairs)'
         return StringValue(info, self.position)
 
 

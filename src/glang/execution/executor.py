@@ -123,7 +123,7 @@ class ASTExecutor(BaseASTVisitor):
                     )
         
         # For map declarations, handle both MapValue and DataValue (single pair) initializers
-        elif node.var_type == "map":
+        elif node.var_type == "hash":
             if isinstance(initializer_value, DataValue):
                 # Convert single DataValue to MapValue for map declarations
                 pairs = [(initializer_value.key, initializer_value.value)]
@@ -137,7 +137,7 @@ class ASTExecutor(BaseASTVisitor):
                 for key, value in initializer_value.pairs.items():
                     if not initializer_value.validate_constraint(value):
                         raise TypeConstraintError(
-                            f"Value {value.to_display_string()} for key '{key}' violates map<{node.type_constraint}> constraint",
+                            f"Value {value.to_display_string()} for key '{key}' violates hash<{node.type_constraint}> constraint",
                             value.position or node.position
                         )
         
@@ -460,8 +460,8 @@ class ASTExecutor(BaseASTVisitor):
             return self._dispatch_bool_method(target, method_name, args, position)
         elif target_type == "data":
             return self._dispatch_data_method(target, method_name, args, position)
-        elif target_type == "map":
-            return self._dispatch_map_method(target, method_name, args, position)
+        elif target_type == "hash":
+            return self._dispatch_hash_method(target, method_name, args, position)
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, target_type, position)
@@ -538,7 +538,7 @@ class ASTExecutor(BaseASTVisitor):
             'num': ['to'],
             'bool': ['flip', 'toggle', 'numify', 'toNum'],
             'data': ['key', 'value'],
-            'map': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop']
+            'hash': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop']
         }
         
         specific_methods = type_methods.get(target_type, [])
@@ -995,9 +995,9 @@ class ASTExecutor(BaseASTVisitor):
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "data", position)
     
-    def _dispatch_map_method(self, target: MapValue, method_name: str,
+    def _dispatch_hash_method(self, target: MapValue, method_name: str,
                             args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
-        """Handle map method calls."""
+        """Handle hash method calls."""
         
         if method_name == "get":
             if len(args) != 1:
@@ -1007,7 +1007,7 @@ class ASTExecutor(BaseASTVisitor):
             key_arg = args[0]
             if not isinstance(key_arg, StringValue):
                 from .errors import ArgumentError
-                raise ArgumentError(f"Map key must be string, got {key_arg.get_type()}", position)
+                raise ArgumentError(f"Hash key must be string, got {key_arg.get_type()}", position)
             
             value = target.get(key_arg.value)
             if value is None:
@@ -1026,7 +1026,7 @@ class ASTExecutor(BaseASTVisitor):
             value_arg = args[1]
             if not isinstance(key_arg, StringValue):
                 from .errors import ArgumentError
-                raise ArgumentError(f"Map key must be string, got {key_arg.get_type()}", position)
+                raise ArgumentError(f"Hash key must be string, got {key_arg.get_type()}", position)
             
             target.set(key_arg.value, value_arg)
             return target  # Return the map for chaining
@@ -1039,7 +1039,7 @@ class ASTExecutor(BaseASTVisitor):
             key_arg = args[0]
             if not isinstance(key_arg, StringValue):
                 from .errors import ArgumentError
-                raise ArgumentError(f"Map key must be string, got {key_arg.get_type()}", position)
+                raise ArgumentError(f"Hash key must be string, got {key_arg.get_type()}", position)
             
             return BooleanValue(target.has_key(key_arg.value), position)
         
@@ -1080,7 +1080,7 @@ class ASTExecutor(BaseASTVisitor):
             key_arg = args[0]
             if not isinstance(key_arg, StringValue):
                 from .errors import ArgumentError
-                raise ArgumentError(f"Map key must be string, got {key_arg.get_type()}", position)
+                raise ArgumentError(f"Hash key must be string, got {key_arg.get_type()}", position)
             
             target.remove(key_arg.value)
             return target  # Return the map for chaining
@@ -1100,13 +1100,13 @@ class ASTExecutor(BaseASTVisitor):
             other_map = args[0]
             if not isinstance(other_map, MapValue):
                 from .errors import ArgumentError
-                raise ArgumentError(f"merge() requires a map argument, got {other_map.get_type()}", position)
+                raise ArgumentError(f"merge() requires a hash argument, got {other_map.get_type()}", position)
             
             # Check constraint compatibility
             if target.constraint and other_map.constraint and target.constraint != other_map.constraint:
                 from .errors import TypeConstraintError
                 raise TypeConstraintError(
-                    f"Cannot merge map<{other_map.constraint}> into map<{target.constraint}>",
+                    f"Cannot merge hash<{other_map.constraint}> into hash<{target.constraint}>",
                     position
                 )
             
@@ -1116,7 +1116,7 @@ class ASTExecutor(BaseASTVisitor):
                 if not target.validate_constraint(value):
                     from .errors import TypeConstraintError
                     raise TypeConstraintError(
-                        f"Value {value.to_display_string()} for key '{key}' violates map<{target.constraint}> constraint",
+                        f"Value {value.to_display_string()} for key '{key}' violates hash<{target.constraint}> constraint",
                         value.position or position
                     )
                 target.set(key, value)
@@ -1142,7 +1142,7 @@ class ASTExecutor(BaseASTVisitor):
             if not target.validate_constraint(value):
                 from .errors import TypeConstraintError
                 raise TypeConstraintError(
-                    f"Value {value.to_display_string()} violates map<{target.constraint}> constraint",
+                    f"Value {value.to_display_string()} violates hash<{target.constraint}> constraint",
                     value.position or position
                 )
             
@@ -1158,7 +1158,7 @@ class ASTExecutor(BaseASTVisitor):
             key_arg = args[0]
             if not isinstance(key_arg, StringValue):
                 from .errors import ArgumentError
-                raise ArgumentError(f"Map key must be string, got {key_arg.get_type()}", position)
+                raise ArgumentError(f"Hash key must be string, got {key_arg.get_type()}", position)
             
             # Get the value before removing it
             value = target.get(key_arg.value)
@@ -1174,7 +1174,7 @@ class ASTExecutor(BaseASTVisitor):
         
         else:
             from .errors import MethodNotFoundError
-            raise MethodNotFoundError(method_name, "map", position)
+            raise MethodNotFoundError(method_name, "hash", position)
     
     # Additional visitor methods that need to be implemented
     def visit_expression_statement(self, node) -> None:

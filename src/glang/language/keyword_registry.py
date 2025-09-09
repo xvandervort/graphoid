@@ -96,11 +96,11 @@ class LanguageKeywordRegistry:
         ))
         
         self._register_keyword(KeywordDefinition(
-            keyword="map",
+            keyword="hash",
             category=KeywordCategory.TYPE,
             parser_method="parse_type_keyword",
-            description="Map type declaration",
-            syntax_example="map<string> config = { \"host\": \"localhost\", \"port\": \"8080\" }"
+            description="Hash type declaration",
+            syntax_example="hash<string> config = { \"host\": \"localhost\", \"port\": \"8080\" }"
         ))
         
         # Statement keywords

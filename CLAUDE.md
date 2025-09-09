@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Core Features
 - **Strong type system** with optional type inference
-- **Modern syntax** for variables, lists, and method calls
+- **Modern syntax** for variables, lists, hashes, and method calls
 - **File loading system** for modular programming
 - **Clean AST-based execution** for reliability and extensibility
 
@@ -67,7 +67,7 @@ black src/ test/
 mypy src/
 
 # Demonstrate the language
-echo -e "string greeting = \"Hello World\"\nlist items = [1, 2, 3]\ndata user = { \"name\": \"Alice\" }\nmap config = { \"host\": \"localhost\", \"port\": 8080 }\nitems.append(4)\nconfig[\"debug\"] = true\n/namespace\n/exit" | glang
+echo -e "string greeting = \"Hello World\"\nlist items = [1, 2, 3]\ndata user = { \"name\": \"Alice\" }\nhash config = { \"host\": \"localhost\", \"port\": 8080 }\nitems.append(4)\nconfig[\"debug\"] = true\n/namespace\n/exit" | glang
 ```
 
 ## REPL Commands
@@ -111,9 +111,9 @@ list<bool> flags = [true, false, true]
 user = { "name": "Alice" }           # Infers data type
 data<num> score = { "final": 95 }    # Explicit constraint
 
-# Maps (type inferred from literal)
-config = { "host": "localhost", "port": 8080, "debug": true }  # Infers map type
-map<string> settings = { "theme": "dark", "lang": "en" }       # Explicit constraint
+# Hashes (type inferred from literal)
+config = { "host": "localhost", "port": 8080, "debug": true }  # Infers hash type
+hash<string> settings = { "theme": "dark", "lang": "en" }       # Explicit constraint
 ```
 
 ### Advanced Operations
@@ -186,7 +186,7 @@ Glang uses a clean, modern architecture:
 - ✅ Method calls with type constraint enforcement
 - ✅ Index access and assignment for lists, strings, and maps
 - ✅ Data nodes with key-value semantics and type constraints
-- ✅ Maps as collections of data nodes with Ruby hash-like syntax
+- ✅ Hashes as collections of data nodes with Ruby hash-like syntax
 - ✅ Comprehensive test suite (230+ tests, 39% coverage)
 
 ### Development Guidelines

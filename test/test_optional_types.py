@@ -152,7 +152,7 @@ class TestOptionalTypeDeclarations:
         assert result.success
         assert analyzer.symbol_table.symbol_exists("config")
         symbol = analyzer.symbol_table.lookup_symbol("config")
-        assert symbol.symbol_type == "map"
+        assert symbol.symbol_type == "hash"
         
         # Should execute successfully
         executor.execute(ast)
