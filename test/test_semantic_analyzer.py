@@ -385,7 +385,7 @@ class TestTypeInferenceSemanticAnalysis:
         assert result.symbol_table.symbol_exists("name")
         symbol = result.symbol_table.lookup_symbol("name")
         assert symbol is not None
-        assert symbol.symbol_type == "inferred"
+        assert symbol.symbol_type == "string"  # Type is now inferred as string
         assert symbol.name == "name"
     
     def test_multiple_type_inference_assignments(self):
@@ -409,8 +409,8 @@ class TestTypeInferenceSemanticAnalysis:
         
         age_symbol = symbol_table.lookup_symbol("age")
         name_symbol = symbol_table.lookup_symbol("name")
-        assert age_symbol.symbol_type == "inferred"
-        assert name_symbol.symbol_type == "inferred"
+        assert age_symbol.symbol_type == "num"  # Type is now inferred as num
+        assert name_symbol.symbol_type == "string"  # Type is now inferred as string
     
     def test_type_inference_vs_explicit_declaration(self):
         """Test that explicit declarations still work alongside type inference."""
@@ -432,7 +432,7 @@ class TestTypeInferenceSemanticAnalysis:
         age_symbol = symbol_table.lookup_symbol("age")
         
         assert title_symbol.symbol_type == "string"  # Explicit
-        assert age_symbol.symbol_type == "inferred"  # Inferred
+        assert age_symbol.symbol_type == "num"  # Type is now inferred as num
     
     def test_assignment_to_existing_variable(self):
         """Test that assignment to existing variable works normally."""

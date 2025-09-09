@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Design Principles:
 - **Intuitive syntax** - Natural programming constructs that feel familiar
-- **Type safety** - Comprehensive type checking with helpful error messages  
+- **Minimal boilerplate** - Optional type declarations where types are obvious from context
 - **Extensibility** - Clean AST architecture for future language features
 - **Developer experience** - Excellent error messages and REPL environment
 
@@ -91,29 +91,29 @@ echo -e "string greeting = \"Hello World\"\nlist items = [1, 2, 3]\ndata user = 
 
 ### Variable Declarations
 ```glang
-# Explicit type declarations
-string name = "Alice"
-num age = 25
-bool active = true
-list items = [1, 2, 3]
+# Optional type declarations (types can be omitted when obvious)
+name = "Alice"         # Infers string type from string literal
+age = 25               # Infers num type from numeric literal
+active = true          # Infers bool type from boolean literal
+items = [1, 2, 3]      # Infers list type from list literal
 
-# Type-constrained lists
+# Explicit types when needed (for clarity or constraints)
+string username = "Bob"
+num max_age = 100
+bool is_valid = false
+
+# Type-constrained lists (explicit type required for constraints)
 list<num> scores = [95, 87, 92]
 list<string> names = ["alice", "bob", "charlie"]
 list<bool> flags = [true, false, true]
 
-# Data nodes (key-value pairs)
-data user = { "name": "Alice" }
-data<num> score = { "final": 95 }
+# Data nodes (type inferred from literal)
+user = { "name": "Alice" }           # Infers data type
+data<num> score = { "final": 95 }    # Explicit constraint
 
-# Maps (collections of data nodes)
-map config = { "host": "localhost", "port": 8080, "debug": true }
-map<string> settings = { "theme": "dark", "lang": "en" }
-
-# Type inference (new!)
-name = "Bob"           # Infers string type
-count = 42             # Infers num type  
-data = [1, 2, 3]       # Infers list type
+# Maps (type inferred from literal)
+config = { "host": "localhost", "port": 8080, "debug": true }  # Infers map type
+map<string> settings = { "theme": "dark", "lang": "en" }       # Explicit constraint
 ```
 
 ### Advanced Operations
@@ -172,7 +172,7 @@ Glang uses a clean, modern architecture:
 5. **File System**: Modular loading system with .gr file format
 
 ### Development Philosophy
-- **Type Safety First**: Every operation is type-checked at parse time
+- **Minimal Boilerplate**: Type declarations optional when obvious from context
 - **Clear Error Messages**: Comprehensive error reporting with source positions
 - **Extensible Design**: Clean visitor pattern allows easy language extensions
 - **Testing Focus**: 194 tests with 71% coverage ensure reliability
@@ -191,6 +191,6 @@ Glang uses a clean, modern architecture:
 
 ### Development Guidelines
 - **AST-first development** - All new features should extend the AST system
-- **Type safety everywhere** - Every operation must be type-checked
+- **Smart type inference** - Infer types from context to reduce boilerplate
 - **Comprehensive testing** - New features require full test coverage  
 - **Clean error messages** - Users should understand exactly what went wrong

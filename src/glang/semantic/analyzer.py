@@ -63,6 +63,63 @@ class SemanticAnalyzer(BaseASTVisitor):
         """Report a semantic error."""
         self.errors.append(error)
     
+    def infer_type_from_expression(self, expr: Expression) -> Optional[str]:
+        """Infer the type of an expression for implicit variable declarations."""
+        if isinstance(expr, StringLiteral):
+            return 'string'
+        elif isinstance(expr, NumberLiteral):
+            return 'num'
+        elif isinstance(expr, BooleanLiteral):
+            return 'bool'
+        elif isinstance(expr, ListLiteral):
+            return 'list'
+        elif isinstance(expr, DataNodeLiteral):
+            return 'data'
+        elif isinstance(expr, MapLiteral):
+            return 'map'
+        elif isinstance(expr, VariableRef):
+            # Look up the type of the referenced variable
+            if self.symbol_table.symbol_exists(expr.name):
+                symbol = self.symbol_table.lookup_symbol(expr.name)
+                return symbol.symbol_type
+        elif isinstance(expr, MethodCallExpression):
+            # Some methods have known return types
+            if expr.method == 'len':
+                return 'num'
+            # For other methods, we'd need more context
+        elif isinstance(expr, BinaryOperation):
+            # Arithmetic operations return numbers
+            if expr.operator in ['+', '-', '*', '/', '%', '//', '**']:
+                return 'num'
+            # Dot operators (element-wise operations) return lists
+            elif expr.operator in ['+.', '-.', '*.', '/.', '%.', '//.', '**.']:
+                return 'list'
+            # Comparison operations return booleans
+            elif expr.operator in ['<', '>', '<=', '>=', '==', '!=']:
+                return 'bool'
+            # Logical operations return booleans
+            elif expr.operator in ['and', 'or']:
+                return 'bool'
+        elif isinstance(expr, UnaryOperation):
+            if expr.operator == 'not':
+                return 'bool'
+            elif expr.operator == '-':
+                return 'num'
+        elif isinstance(expr, IndexAccess):
+            # Need to check the type of the indexed object
+            if isinstance(expr.target, VariableRef):
+                if self.symbol_table.symbol_exists(expr.target.name):
+                    symbol = self.symbol_table.lookup_symbol(expr.target.name)
+                    if symbol.symbol_type == 'list':
+                        # Could be constrained type or any type
+                        return symbol.type_constraint if symbol.type_constraint else None
+                    elif symbol.symbol_type == 'string':
+                        return 'string'  # String indexing returns string
+                    elif symbol.symbol_type == 'map':
+                        return 'data'  # Map indexing returns data node
+        
+        return None  # Cannot infer type
+    
     # Statement visitors
     
     def visit_variable_declaration(self, node: VariableDeclaration) -> None:
@@ -138,12 +195,21 @@ class SemanticAnalyzer(BaseASTVisitor):
             
             if not symbol:
                 # NEW: Type inference - treat as implicit variable declaration
-                # Analyze the value to ensure it's valid
-                node.value.accept(self)
+                # Infer type from the value expression
+                inferred_type = self.infer_type_from_expression(node.value)
                 
-                # Create a symbol for the new variable (type will be inferred at runtime)
-                inferred_symbol = Symbol(var_name, "inferred", None, node.target.position)
+                if inferred_type is None:
+                    # If we can't infer the type, report an error
+                    self.report_error(SemanticError(
+                        f"Cannot infer type for variable '{var_name}'", node.target.position))
+                    return
+                
+                # Create a symbol for the new variable with inferred type
+                inferred_symbol = Symbol(var_name, inferred_type, None, node.target.position)
                 self.symbol_table.declare_symbol(inferred_symbol)
+                
+                # Now analyze the value
+                node.value.accept(self)
             else:
                 # Variable exists - analyze normally
                 node.target.accept(self)

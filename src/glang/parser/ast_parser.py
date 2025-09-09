@@ -81,7 +81,7 @@ class ASTParser:
             if next_token and next_token.type == TokenType.IMPORT:
                 return self.parse_import_statement()
         
-        # Variable declaration: type name = expr
+        # Explicit variable declaration: type name = expr
         if self.check_variable_declaration():
             return self.parse_variable_declaration()
         
