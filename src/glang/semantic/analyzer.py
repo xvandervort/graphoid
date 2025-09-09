@@ -84,8 +84,41 @@ class SemanticAnalyzer(BaseASTVisitor):
                 return symbol.symbol_type
         elif isinstance(expr, MethodCallExpression):
             # Some methods have known return types
-            if expr.method == 'len':
+            if expr.method_name == 'len':
                 return 'num'
+            elif expr.method_name in ['map', 'filter', 'select', 'reject']:
+                # These methods return lists - try to infer from target type
+                if isinstance(expr.target, VariableRef):
+                    if self.symbol_table.symbol_exists(expr.target.name):
+                        symbol = self.symbol_table.lookup_symbol(expr.target.name)
+                        if symbol.symbol_type == 'list':
+                            return 'list'
+                return 'list'  # Default to list type
+            elif expr.method_name == 'each':
+                # each() returns the original target (for chaining)
+                if isinstance(expr.target, VariableRef):
+                    if self.symbol_table.symbol_exists(expr.target.name):
+                        symbol = self.symbol_table.lookup_symbol(expr.target.name)
+                        return symbol.symbol_type
+                return None  # Cannot determine
+            elif expr.method_name in ['get', 'pop']:
+                # Hash methods that return data nodes
+                return 'data'
+            elif expr.method_name in ['keys', 'values']:
+                # Hash methods that return lists
+                return 'list'
+            elif expr.method_name in ['has_key', 'empty']:
+                # Methods that return booleans
+                return 'bool'
+            elif expr.method_name in ['size', 'count', 'indexOf', 'count_values', 'min', 'max', 'sum']:
+                # Methods that return numbers
+                return 'num'
+            elif expr.method_name in ['up', 'down', 'toUpper', 'toLower', 'trim', 'reverse', 'replace', 'join', 'chars', 'split', 'findAll']:
+                # String methods that return strings or lists
+                if expr.method_name in ['chars', 'split', 'findAll']:
+                    return 'list'
+                else:
+                    return 'string'
             # For other methods, we'd need more context
         elif isinstance(expr, BinaryOperation):
             # Arithmetic operations return numbers
@@ -397,7 +430,8 @@ class SemanticAnalyzer(BaseASTVisitor):
             'list': {
                 'append', 'prepend', 'insert', 'remove', 'pop', 'clear', 'reverse',
                 'size', 'empty', 'constraint', 'validate_constraint', 'type_summary',
-                'types', 'coerce_to_constraint', 'indexOf', 'count', 'min', 'max', 'sum', 'sort'
+                'types', 'coerce_to_constraint', 'indexOf', 'count', 'min', 'max', 'sum', 'sort',
+                'map', 'filter', 'each', 'select', 'reject'
             } | universal_methods,
             'string': {
                 'size', 'empty', 'upper', 'lower', 'split', 'trim', 'join',

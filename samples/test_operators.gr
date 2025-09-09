@@ -1,0 +1,4 @@
+data a = { 'name': 5 }
+data b = { 'age': 10 }
+a.value < b.value
+a.value > b.value

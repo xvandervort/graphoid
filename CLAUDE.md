@@ -121,12 +121,12 @@ hash<string> settings = { "theme": "dark", "lang": "en" }       # Explicit const
 # Index access
 items[0]           # Get first element from list
 items[-1]          # Get last element (if supported)
-config["host"]     # Get data node from map: { "host": "localhost" }
+config["host"]     # Get data node from hash: { "host": "localhost" }
 
 # Index assignment  
 items[0] = 99      # Set first element in list
 scores[1] = 100    # Update element
-config["port"] = 9000  # Create/update data node in map
+config["port"] = 9000  # Create/update data node in hash
 
 # Method calls
 items.append(4)    # Add element to list
@@ -138,7 +138,41 @@ config.count_values("localhost")  # Count occurrences: 1
 # Data node operations
 user.key()         # Get key: "name"
 user.value()       # Get value: "Alice"
+
+# Functional programming operations (new!)
+numbers = [1, 2, 3, 4, 5]
+numbers.map("double")        # [2, 4, 6, 8, 10]
+numbers.filter("even")       # [2, 4]
+numbers.filter("positive")   # [1, 2, 3, 4, 5]
+numbers.select("odd")        # [1, 3, 5] (alias for filter)
+numbers.reject("even")       # [1, 3, 5] (opposite of filter)
+
+# String transformations
+names = ["alice", "bob"]
+names.map("upper")           # ["ALICE", "BOB"]
+names.map("lower")           # ["alice", "bob"]
+
+# Type conversions
+nums = [1, 2, 3]
+nums.map("to_string")        # ["1", "2", "3"]
+strings = ["1", "2", "3"]
+strings.map("to_num")        # [1, 2, 3]
+
+# Chaining operations
+numbers.filter("positive").map("double").filter("even")
+names.map("upper").each("print")  # Print each uppercase name
 ```
+
+#### Available Transformations for map()
+**Numeric:** `double`, `square`, `negate`, `increment`/`inc`, `decrement`/`dec`  
+**String:** `upper`/`up`, `lower`/`down`, `trim`, `reverse`  
+**Type Conversion:** `to_string`/`str`, `to_num`/`num`, `to_bool`/`bool`
+
+#### Available Predicates for filter()
+**Numeric:** `positive`/`pos`, `negative`/`neg`, `zero`, `even`, `odd`  
+**String/Collection:** `empty`, `non_empty`, `uppercase`, `lowercase`, `alphabetic`/`alpha`, `numeric`/`digit`  
+**Type Checks:** `is_string`/`string`, `is_number`/`number`, `is_bool`/`boolean`, `is_list`/`list`  
+**General:** `truthy`, `falsy`
 
 ### File Loading
 ```glang
@@ -187,7 +221,8 @@ Glang uses a clean, modern architecture:
 - ✅ Index access and assignment for lists, strings, and maps
 - ✅ Data nodes with key-value semantics and type constraints
 - ✅ Hashes as collections of data nodes with Ruby hash-like syntax
-- ✅ Comprehensive test suite (230+ tests, 39% coverage)
+- ✅ Functional programming operations: map, filter, each with built-in transformations
+- ✅ Comprehensive test suite (490+ tests, 35% coverage)
 
 ### Development Guidelines
 - **AST-first development** - All new features should extend the AST system

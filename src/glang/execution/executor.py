@@ -719,8 +719,162 @@ class ASTExecutor(BaseASTVisitor):
             # Return new sorted list
             return ListValue(sorted_elements, target.constraint, position)
         
-        # Note: map, filter, reduce will be implemented when lambda functions are available
-        # For now, we skip these advanced functional programming methods
+        # Functional programming methods using built-in transformations
+        elif method_name == "map":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"map() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"map() argument must be a string naming a transformation", position)
+            
+            transform_name = args[0].value
+            
+            # Import transformation registry
+            from .transformations import transformation_registry
+            transform_func = transformation_registry.get_transformation(transform_name)
+            
+            if not transform_func:
+                from .errors import ArgumentError
+                available = ", ".join(sorted(transformation_registry.transformations.keys()))
+                raise ArgumentError(
+                    f"Unknown transformation '{transform_name}'. Available: {available}", 
+                    position
+                )
+            
+            # Apply transformation to each element
+            result_elements = []
+            for element in target.elements:
+                try:
+                    transformed = transform_func(element)
+                    result_elements.append(transformed)
+                except ValueError as e:
+                    from .errors import RuntimeError
+                    raise RuntimeError(
+                        f"Transformation '{transform_name}' failed: {e}", 
+                        position
+                    )
+            
+            # Infer constraint from first result element if any
+            new_constraint = None
+            if result_elements:
+                first_type = result_elements[0].get_type()
+                # Check all elements are same type
+                if all(elem.get_type() == first_type for elem in result_elements):
+                    new_constraint = first_type
+            
+            return ListValue(result_elements, new_constraint, position)
+        
+        elif method_name == "filter":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"filter() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"filter() argument must be a string naming a predicate", position)
+            
+            predicate_name = args[0].value
+            
+            # Import transformation registry
+            from .transformations import transformation_registry
+            predicate_func = transformation_registry.get_predicate(predicate_name)
+            
+            if not predicate_func:
+                from .errors import ArgumentError
+                available = ", ".join(sorted(transformation_registry.predicates.keys()))
+                raise ArgumentError(
+                    f"Unknown predicate '{predicate_name}'. Available: {available}", 
+                    position
+                )
+            
+            # Filter elements using predicate
+            result_elements = []
+            for element in target.elements:
+                try:
+                    if predicate_func(element):
+                        result_elements.append(element)
+                except Exception as e:
+                    from .errors import RuntimeError
+                    raise RuntimeError(
+                        f"Predicate '{predicate_name}' failed: {e}", 
+                        position
+                    )
+            
+            # Maintain original constraint
+            return ListValue(result_elements, target.constraint, position)
+        
+        elif method_name == "each":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"each() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"each() argument must be a string naming an action", position)
+            
+            action_name = args[0].value
+            
+            # Special built-in actions
+            if action_name == "print":
+                # Print each element
+                for element in target.elements:
+                    print(element.to_display_string())
+            else:
+                from .errors import ArgumentError
+                raise ArgumentError(
+                    f"Unknown action '{action_name}'. Available: print", 
+                    position
+                )
+            
+            # Return original list for chaining
+            return target
+        
+        # Aliases for functional methods
+        elif method_name == "select":
+            # Alias for filter (Ruby-style)
+            return self._dispatch_list_method(target, "filter", args, position)
+        
+        elif method_name == "reject":
+            # Opposite of filter - keep elements that fail predicate
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"reject() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"reject() argument must be a string naming a predicate", position)
+            
+            predicate_name = args[0].value
+            
+            # Import transformation registry
+            from .transformations import transformation_registry
+            predicate_func = transformation_registry.get_predicate(predicate_name)
+            
+            if not predicate_func:
+                from .errors import ArgumentError
+                available = ", ".join(sorted(transformation_registry.predicates.keys()))
+                raise ArgumentError(
+                    f"Unknown predicate '{predicate_name}'. Available: {available}", 
+                    position
+                )
+            
+            # Filter elements using inverted predicate
+            result_elements = []
+            for element in target.elements:
+                try:
+                    if not predicate_func(element):  # Note the NOT
+                        result_elements.append(element)
+                except Exception as e:
+                    from .errors import RuntimeError
+                    raise RuntimeError(
+                        f"Predicate '{predicate_name}' failed: {e}", 
+                        position
+                    )
+            
+            # Maintain original constraint
+            return ListValue(result_elements, target.constraint, position)
         
         else:
             from .errors import MethodNotFoundError
