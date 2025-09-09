@@ -19,6 +19,16 @@ from .values import *
 from .errors import RuntimeError, VariableNotFoundError, TypeConstraintError
 
 
+class BreakException(Exception):
+    """Exception raised by break statement to exit loops."""
+    pass
+
+
+class ContinueException(Exception):
+    """Exception raised by continue statement to continue loops."""
+    pass
+
+
 class ExecutionContext:
     """Context for AST execution with variable storage."""
     
@@ -1947,3 +1957,105 @@ class ASTExecutor(BaseASTVisitor):
                 return BooleanValue(left.value != right.value)
         
         raise RuntimeError(f"Cannot compare {left.get_type()} and {right.get_type()} with {operation}")
+    
+    # Control flow visit methods
+    
+    def visit_if_statement(self, node: IfStatement) -> None:
+        """Execute if statement."""
+        # Evaluate condition
+        condition_value = self.execute(node.condition)
+        
+        # Convert to boolean
+        if isinstance(condition_value, BooleanValue):
+            condition_bool = condition_value.value
+        elif isinstance(condition_value, NumberValue):
+            condition_bool = condition_value.value != 0
+        elif isinstance(condition_value, StringValue):
+            condition_bool = len(condition_value.value) > 0
+        elif isinstance(condition_value, ListValue):
+            condition_bool = len(condition_value.elements) > 0
+        else:
+            condition_bool = True  # Default truthy
+        
+        # Debug output
+        #print(f"DEBUG: Condition value: {condition_value}, bool: {condition_bool}")
+        
+        # Execute appropriate block
+        if condition_bool:
+            self.execute(node.then_block)
+        elif node.else_block:
+            self.execute(node.else_block)
+    
+    def visit_while_statement(self, node: WhileStatement) -> None:
+        """Execute while loop."""
+        while True:
+            # Evaluate condition
+            condition_value = self.execute(node.condition)
+            
+            # Convert to boolean
+            if isinstance(condition_value, BooleanValue):
+                condition_bool = condition_value.value
+            elif isinstance(condition_value, NumberValue):
+                condition_bool = condition_value.value != 0
+            elif isinstance(condition_value, StringValue):
+                condition_bool = len(condition_value.value) > 0
+            elif isinstance(condition_value, ListValue):
+                condition_bool = len(condition_value.elements) > 0
+            else:
+                condition_bool = True  # Default truthy
+            
+            # Exit if condition is false
+            if not condition_bool:
+                break
+            
+            # Execute body, handling break/continue
+            try:
+                self.execute(node.body)
+            except BreakException:
+                break
+            except ContinueException:
+                continue
+    
+    def visit_for_in_statement(self, node: ForInStatement) -> None:
+        """Execute for-in loop."""
+        # Evaluate iterable
+        iterable_value = self.execute(node.iterable)
+        
+        # Ensure it's iterable
+        if isinstance(iterable_value, ListValue):
+            elements = iterable_value.elements
+        elif isinstance(iterable_value, StringValue):
+            # String is iterable by character
+            elements = [StringValue(char, iterable_value.position) for char in iterable_value.value]
+        elif isinstance(iterable_value, HashValue):
+            # Hash is iterable by keys (as data nodes)
+            elements = [DataNodeValue(key, value, iterable_value.position) 
+                       for key, value in iterable_value.pairs.items()]
+        else:
+            raise RuntimeError(f"Cannot iterate over {iterable_value.get_type()}")
+        
+        # Execute body for each element
+        for element in elements:
+            # Set loop variable
+            self.context.set_variable(node.variable, element)
+            
+            # Execute body, handling break/continue
+            try:
+                self.execute(node.body)
+            except BreakException:
+                break
+            except ContinueException:
+                continue
+    
+    def visit_break_statement(self, node: BreakStatement) -> None:
+        """Execute break statement."""
+        raise BreakException()
+    
+    def visit_continue_statement(self, node: ContinueStatement) -> None:
+        """Execute continue statement."""
+        raise ContinueException()
+    
+    def visit_block(self, node: Block) -> None:
+        """Execute block of statements."""
+        for statement in node.statements:
+            self.execute(statement)

@@ -49,6 +49,7 @@ def _create_dynamic_token_type():
         "RBRACE": "RBRACE",              # }
         "COLON": "COLON",                # :
         "SLASH": "SLASH",                # /
+        "SEMICOLON": "SEMICOLON",        # ;
         
         # Element-wise arithmetic operators
         "PLUS_DOT": "PLUS_DOT",          # +.
@@ -157,6 +158,7 @@ class Tokenizer:
             (r'\}', TokenType.RBRACE),
             (r':', TokenType.COLON),
             (r'/', TokenType.SLASH),
+            (r';', TokenType.SEMICOLON),
             
             # Whitespace (skip)
             (r'[ \t]+', None),

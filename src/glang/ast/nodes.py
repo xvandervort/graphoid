@@ -284,6 +284,67 @@ class NoOp(Statement):
         return visitor.visit_noop(self)
 
 # =============================================================================
+# Control Flow Statements
+# =============================================================================
+
+@dataclass
+class Block(ASTNode):
+    """Block of statements: { stmt1; stmt2; ... }"""
+    statements: List[Statement]
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_block(self)
+
+@dataclass 
+class IfStatement(Statement):
+    """If statement: if condition { then_block } else { else_block }"""
+    condition: Expression
+    then_block: Block
+    else_block: Optional[Block] = None
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_if_statement(self)
+
+@dataclass
+class WhileStatement(Statement):
+    """While loop: while condition { body }"""
+    condition: Expression
+    body: Block
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_while_statement(self)
+
+@dataclass
+class ForInStatement(Statement):
+    """For-in loop: for variable in iterable { body }"""
+    variable: str  # Loop variable name
+    iterable: Expression  # Expression that evaluates to an iterable
+    body: Block
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_for_in_statement(self)
+
+@dataclass
+class BreakStatement(Statement):
+    """Break statement: break"""
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_break_statement(self)
+
+@dataclass  
+class ContinueStatement(Statement):
+    """Continue statement: continue"""
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_continue_statement(self)
+
+# =============================================================================
 # Visitor Pattern for AST Traversal
 # =============================================================================
 
@@ -416,6 +477,37 @@ class ASTVisitor(ABC):
     def visit_noop(self, node: NoOp):
         """Visit a no-op statement."""
         pass
+    
+    # Control flow visitors
+    @abstractmethod
+    def visit_block(self, node: Block):
+        """Visit a block of statements."""
+        pass
+    
+    @abstractmethod
+    def visit_if_statement(self, node: IfStatement):
+        """Visit an if statement."""
+        pass
+    
+    @abstractmethod
+    def visit_while_statement(self, node: WhileStatement):
+        """Visit a while statement."""
+        pass
+    
+    @abstractmethod
+    def visit_for_in_statement(self, node: ForInStatement):
+        """Visit a for-in statement."""
+        pass
+    
+    @abstractmethod
+    def visit_break_statement(self, node: BreakStatement):
+        """Visit a break statement."""
+        pass
+    
+    @abstractmethod
+    def visit_continue_statement(self, node: ContinueStatement):
+        """Visit a continue statement."""
+        pass
 
 # =============================================================================
 # Utility Classes  
@@ -533,4 +625,33 @@ class BaseASTVisitor(ASTVisitor):
         return node
     
     def visit_noop(self, node: NoOp):
+        return node
+    
+    # Control flow visitor implementations
+    def visit_block(self, node: Block):
+        for stmt in node.statements:
+            stmt.accept(self)
+        return node
+    
+    def visit_if_statement(self, node: IfStatement):
+        node.condition.accept(self)
+        node.then_block.accept(self)
+        if node.else_block:
+            node.else_block.accept(self)
+        return node
+    
+    def visit_while_statement(self, node: WhileStatement):
+        node.condition.accept(self)
+        node.body.accept(self)
+        return node
+    
+    def visit_for_in_statement(self, node: ForInStatement):
+        node.iterable.accept(self)
+        node.body.accept(self)
+        return node
+    
+    def visit_break_statement(self, node: BreakStatement):
+        return node
+    
+    def visit_continue_statement(self, node: ContinueStatement):
         return node

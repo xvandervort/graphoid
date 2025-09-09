@@ -457,3 +457,61 @@ class SemanticAnalyzer(BaseASTVisitor):
             reason = f"Available methods: {available}" if available else "No methods available"
             self.report_error(InvalidMethodCallError(
                 method_name, target_type, reason, position))
+    
+    # Control flow visit methods
+    
+    def visit_if_statement(self, node: IfStatement) -> None:
+        """Visit if statement node."""
+        # Check condition expression
+        node.condition.accept(self)
+        
+        # Visit then block
+        node.then_block.accept(self)
+        
+        # Visit else block if present
+        if node.else_block:
+            node.else_block.accept(self)
+    
+    def visit_while_statement(self, node: WhileStatement) -> None:
+        """Visit while statement node."""
+        # Check condition expression
+        node.condition.accept(self)
+        
+        # Visit body block
+        node.body.accept(self)
+    
+    def visit_for_in_statement(self, node: ForInStatement) -> None:
+        """Visit for-in statement node."""
+        # Check iterable expression
+        node.iterable.accept(self)
+        
+        # TODO: Add loop variable to symbol table in a new scope
+        # For now, we'll add it to current scope
+        # Create a symbol for the loop variable (infer type from iterable if possible)
+        loop_var_symbol = Symbol(node.variable, "any", position=node.position)
+        try:
+            self.symbol_table.declare_symbol(loop_var_symbol)
+        except ValueError:
+            # Variable already exists, that's fine for loop variables
+            pass
+        
+        # Visit body block
+        node.body.accept(self)
+    
+    def visit_break_statement(self, node: BreakStatement) -> None:
+        """Visit break statement node."""
+        # TODO: Validate that break is inside a loop
+        # For now, just pass - the executor will handle loop context
+        pass
+    
+    def visit_continue_statement(self, node: ContinueStatement) -> None:
+        """Visit continue statement node."""
+        # TODO: Validate that continue is inside a loop
+        # For now, just pass - the executor will handle loop context
+        pass
+    
+    def visit_block(self, node: Block) -> None:
+        """Visit block node."""
+        # Visit all statements in the block
+        for statement in node.statements:
+            statement.accept(self)

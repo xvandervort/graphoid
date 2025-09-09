@@ -137,6 +137,63 @@ class LanguageKeywordRegistry:
             syntax_example="load \"config.gr\""
         ))
         
+        # Control flow keywords
+        self._register_keyword(KeywordDefinition(
+            keyword="if",
+            category=KeywordCategory.STATEMENT,
+            parser_method="parse_if_statement",
+            description="Conditional statement",
+            syntax_example="if condition { statements }"
+        ))
+        
+        self._register_keyword(KeywordDefinition(
+            keyword="else",
+            category=KeywordCategory.STATEMENT,
+            parser_method="parse_else_clause",
+            description="Else clause for if statements",
+            syntax_example="else { statements }"
+        ))
+        
+        self._register_keyword(KeywordDefinition(
+            keyword="while",
+            category=KeywordCategory.STATEMENT,
+            parser_method="parse_while_statement",
+            description="While loop statement",
+            syntax_example="while condition { statements }"
+        ))
+        
+        self._register_keyword(KeywordDefinition(
+            keyword="for",
+            category=KeywordCategory.STATEMENT,
+            parser_method="parse_for_statement",
+            description="For-in loop statement",
+            syntax_example="for item in items { statements }"
+        ))
+        
+        self._register_keyword(KeywordDefinition(
+            keyword="in",
+            category=KeywordCategory.STATEMENT,
+            parser_method="parse_in_keyword",
+            description="In keyword for for-loops",
+            syntax_example="for item in items"
+        ))
+        
+        self._register_keyword(KeywordDefinition(
+            keyword="break",
+            category=KeywordCategory.STATEMENT,
+            parser_method="parse_break_statement",
+            description="Break out of loop",
+            syntax_example="break"
+        ))
+        
+        self._register_keyword(KeywordDefinition(
+            keyword="continue",
+            category=KeywordCategory.STATEMENT,
+            parser_method="parse_continue_statement",
+            description="Continue to next loop iteration",
+            syntax_example="continue"
+        ))
+        
         # Boolean literal keywords
         self._register_keyword(KeywordDefinition(
             keyword="true",

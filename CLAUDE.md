@@ -174,6 +174,59 @@ names.map("upper").each("print")  # Print each uppercase name
 **Type Checks:** `is_string`/`string`, `is_number`/`number`, `is_bool`/`boolean`, `is_list`/`list`  
 **General:** `truthy`, `falsy`
 
+### Control Flow
+
+```glang
+# If statements
+if condition {
+    # execute when true
+}
+
+# If-else statements  
+if condition {
+    # execute when true
+} else {
+    # execute when false  
+}
+
+# While loops
+while condition {
+    # loop body
+}
+
+# For-in loops
+for item in items {
+    # process each item
+}
+
+# Break and continue
+for item in items {
+    if item == 5 {
+        break      # exit loop
+    }
+    if item % 2 == 0 {
+        continue   # skip to next iteration
+    }
+    print(item)
+}
+
+# Nested control structures
+for row in matrix {
+    for item in row {
+        if item > threshold {
+            result.append(item)
+        }
+    }
+}
+
+# Control flow with functional operations
+if numbers.filter("even").size() > 0 {
+    processed = numbers.map("double")
+} else {
+    processed = numbers.map("negate")
+}
+```
+
 ### File Loading
 ```glang
 # Load another .gr file (language-level)
@@ -222,7 +275,8 @@ Glang uses a clean, modern architecture:
 - ✅ Data nodes with key-value semantics and type constraints
 - ✅ Hashes as collections of data nodes with Ruby hash-like syntax
 - ✅ Functional programming operations: map, filter, each with built-in transformations
-- ✅ Comprehensive test suite (490+ tests, 35% coverage)
+- ✅ Control flow structures: if/else, while, for-in, break/continue with proper nesting
+- ✅ Comprehensive test suite (527+ tests, 68% coverage)
 
 ### Development Guidelines
 - **AST-first development** - All new features should extend the AST system

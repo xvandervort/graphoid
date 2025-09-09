@@ -70,15 +70,16 @@ class REPL:
         try:
             while self.running:
                 try:
-                    user_input = input(self.prompt).strip()
+                    # Handle multiline input
+                    complete_input = self._read_complete_statement()
                     
-                    if not user_input:
+                    if not complete_input:
                         continue
                     
                     # Add to history
-                    self.command_history.append(user_input)
+                    self.command_history.append(complete_input)
                     
-                    self._process_input(user_input)
+                    self._process_input(complete_input)
                     
                 except KeyboardInterrupt:
                     print("\\n(Use /exit to quit)")
@@ -89,6 +90,104 @@ class REPL:
         finally:
             # Save history when exiting
             self._save_history()
+    
+    def _read_complete_statement(self) -> str:
+        """Read a complete statement, handling multiline input for control flow."""
+        lines = []
+        current_prompt = self.prompt
+        
+        while True:
+            try:
+                line = input(current_prompt).strip()
+                
+                # Empty line handling
+                if not line:
+                    if not lines:  # Empty input at start
+                        return ""
+                    # Empty line in middle - treat as continuation
+                    lines.append("")
+                    current_prompt = "...> "
+                    continue
+                
+                lines.append(line)
+                
+                # Check if this is a complete statement
+                combined = " ".join(lines)
+                
+                # Slash commands are always complete
+                if combined.startswith('/'):
+                    return combined
+                
+                # Check for balanced braces to determine if statement is complete
+                if self._is_statement_complete(combined):
+                    return combined
+                
+                # Continue reading with continuation prompt
+                current_prompt = "...> "
+                
+            except KeyboardInterrupt:
+                # Reset on Ctrl+C
+                if lines:
+                    print("\\n(Statement cancelled)")
+                    return ""
+                else:
+                    raise
+            except EOFError:
+                # If we have partial input, treat as complete
+                if lines:
+                    return " ".join(lines)
+                else:
+                    raise
+    
+    def _is_statement_complete(self, statement: str) -> bool:
+        """Check if a statement appears to be complete by counting braces."""
+        brace_count = 0
+        paren_count = 0
+        bracket_count = 0
+        in_string = False
+        escape_next = False
+        
+        i = 0
+        while i < len(statement):
+            char = statement[i]
+            
+            if escape_next:
+                escape_next = False
+                i += 1
+                continue
+            
+            if char == '\\':
+                escape_next = True
+                i += 1
+                continue
+            
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                i += 1
+                continue
+            
+            if in_string:
+                i += 1
+                continue
+            
+            # Count delimiters outside of strings
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+            elif char == '(':
+                paren_count += 1
+            elif char == ')':
+                paren_count -= 1
+            elif char == '[':
+                bracket_count += 1
+            elif char == ']':
+                bracket_count -= 1
+            
+            i += 1
+        
+        # Statement is complete if all delimiters are balanced
+        return brace_count == 0 and paren_count == 0 and bracket_count == 0
     
     def _process_input(self, user_input: str) -> None:
         """Process user input and execute appropriate command."""

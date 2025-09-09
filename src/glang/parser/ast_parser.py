@@ -288,6 +288,102 @@ class ASTParser:
         
         return LoadStatement(filename=filename, position=pos)
     
+    def parse_if_statement(self) -> IfStatement:
+        """Parse if statement: if condition { statements } [else { statements }]"""
+        # Parse 'if' keyword
+        if_token = self.consume(TokenType.IF, "Expected 'if'")
+        pos = SourcePosition(if_token.line, if_token.column)
+        
+        # Parse condition expression
+        condition = self.parse_expression()
+        
+        # Parse then block
+        then_block = self.parse_block()
+        
+        # Optional else block
+        else_block = None
+        if self.check(TokenType.ELSE):
+            self.advance()  # consume 'else'
+            else_block = self.parse_block()
+        
+        return IfStatement(condition=condition, then_block=then_block, else_block=else_block, position=pos)
+    
+    def parse_while_statement(self) -> WhileStatement:
+        """Parse while statement: while condition { statements }"""
+        # Parse 'while' keyword
+        while_token = self.consume(TokenType.WHILE, "Expected 'while'")
+        pos = SourcePosition(while_token.line, while_token.column)
+        
+        # Parse condition expression
+        condition = self.parse_expression()
+        
+        # Parse body block
+        body = self.parse_block()
+        
+        return WhileStatement(condition=condition, body=body, position=pos)
+    
+    def parse_for_statement(self) -> ForInStatement:
+        """Parse for-in statement: for variable in iterable { statements }"""
+        # Parse 'for' keyword
+        for_token = self.consume(TokenType.FOR, "Expected 'for'")
+        pos = SourcePosition(for_token.line, for_token.column)
+        
+        # Parse variable name
+        variable_token = self.consume(TokenType.IDENTIFIER, "Expected variable name after 'for'")
+        variable = variable_token.value
+        
+        # Parse 'in' keyword
+        self.consume(TokenType.IN, "Expected 'in' after variable name")
+        
+        # Parse iterable expression
+        iterable = self.parse_expression()
+        
+        # Parse body block
+        body = self.parse_block()
+        
+        return ForInStatement(variable=variable, iterable=iterable, body=body, position=pos)
+    
+    def parse_break_statement(self) -> BreakStatement:
+        """Parse break statement: break"""
+        break_token = self.consume(TokenType.BREAK, "Expected 'break'")
+        pos = SourcePosition(break_token.line, break_token.column)
+        
+        return BreakStatement(position=pos)
+    
+    def parse_continue_statement(self) -> ContinueStatement:
+        """Parse continue statement: continue"""
+        continue_token = self.consume(TokenType.CONTINUE, "Expected 'continue'")
+        pos = SourcePosition(continue_token.line, continue_token.column)
+        
+        return ContinueStatement(position=pos)
+    
+    def parse_block(self) -> Block:
+        """Parse a block of statements: { statement1; statement2; ... }"""
+        # Parse opening brace
+        brace_token = self.consume(TokenType.LBRACE, "Expected '{'")
+        pos = SourcePosition(brace_token.line, brace_token.column)
+        
+        # Parse statements
+        statements = []
+        
+        # Skip leading newlines
+        while self.match(TokenType.NEWLINE):
+            pass
+        
+        while not self.check(TokenType.RBRACE) and not self.is_at_end():
+            # Parse statement
+            stmt = self.parse_statement()
+            statements.append(stmt)
+            
+            # Skip trailing newlines and semicolons
+            while self.match(TokenType.NEWLINE, TokenType.SEMICOLON):
+                pass
+        
+        # Parse closing brace
+        self.consume(TokenType.RBRACE, "Expected '}'")
+        
+        return Block(statements=statements, position=pos)
+    
     def parse_print_statement(self) -> 'PrintStatement':
         """Parse print statement: print(expression1, expression2, ...)"""
         from ..ast.nodes import PrintStatement

@@ -52,6 +52,13 @@ class TestASTNodes:
             def visit_module_declaration(self, node): pass
             def visit_alias_declaration(self, node): pass
             def visit_noop(self, node): pass
+            # Control flow visitor methods
+            def visit_if_statement(self, node): pass
+            def visit_while_statement(self, node): pass
+            def visit_for_in_statement(self, node): pass
+            def visit_break_statement(self, node): pass
+            def visit_continue_statement(self, node): pass
+            def visit_block(self, node): pass
             
         visitor = TestVisitor()
         result = node.accept(visitor)
