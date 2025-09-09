@@ -414,10 +414,14 @@ class ASTParser:
             
             # Parse arguments
             arguments = []
-            # Only parse arguments if we have parentheses or if the next token isn't an assignment operator
+            # Only parse arguments if we have parentheses or if the next token isn't an assignment or comparison operator
             if not self.check(TokenType.RPAREN) and not self.is_at_end() and \
                not self.check(TokenType.NEWLINE) and not self.check(TokenType.EOF) and \
-               not self.check(TokenType.ASSIGN):
+               not self.check(TokenType.ASSIGN) and \
+               not self.check(TokenType.EQUAL) and not self.check(TokenType.NOT_EQUAL) and \
+               not self.check(TokenType.GREATER) and not self.check(TokenType.LESS) and \
+               not self.check(TokenType.GREATER_EQUAL) and not self.check(TokenType.LESS_EQUAL) and \
+               not self.check(TokenType.NOT_GREATER) and not self.check(TokenType.NOT_LESS):
                 arguments.append(self.parse_expression())
                 
                 # Arguments can be comma-separated or space-separated
