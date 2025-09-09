@@ -251,7 +251,8 @@ class TestMapMethods:
         # Remove existing key
         result = session.execute_statement('config.remove("debug")')
         assert result.success
-        assert result.value.value is True  # Should return true for existing key
+        # Now returns the map itself for chaining
+        assert hasattr(result.value, 'pairs')  # Should return the map
         
         # Verify it was removed
         result = session.execute_statement('config.has_key("debug")')
@@ -261,7 +262,8 @@ class TestMapMethods:
         # Remove non-existing key
         result = session.execute_statement('config.remove("missing")')
         assert result.success
-        assert result.value.value is False  # Should return false for missing key
+        # Now returns the map itself for chaining (regardless of key existence)
+        assert hasattr(result.value, 'pairs')  # Should return the map
     
     def test_map_empty_method(self):
         """Test map.empty() method."""

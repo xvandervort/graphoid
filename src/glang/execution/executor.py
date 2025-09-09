@@ -555,7 +555,7 @@ class ASTExecutor(BaseASTVisitor):
             
             # Use ListValue's append method (includes constraint validation)
             target.append(args[0])
-            return f"Appended {args[0].to_display_string()} to list"
+            return target  # Return the list for chaining
         
         elif method_name == "prepend":
             if len(args) != 1:
@@ -570,7 +570,7 @@ class ASTExecutor(BaseASTVisitor):
                 )
             
             target.elements.insert(0, args[0])
-            return f"Prepended {args[0].to_display_string()} to list"
+            return target  # Return the list for chaining
         
         elif method_name == "insert":
             if len(args) != 2:
@@ -595,7 +595,7 @@ class ASTExecutor(BaseASTVisitor):
                 raise IndexError(f"Insert index {index} out of range", position)
             
             target.elements.insert(index, value_arg)
-            return f"Inserted {value_arg.to_display_string()} at index {index}"
+            return target  # Return the list for chaining
         
         elif method_name == "reverse":
             if len(args) != 0:
@@ -1029,7 +1029,7 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"Map key must be string, got {key_arg.get_type()}", position)
             
             target.set(key_arg.value, value_arg)
-            return StringValue(f"Set {key_arg.value}", position)
+            return target  # Return the map for chaining
         
         elif method_name == "has_key":
             if len(args) != 1:
@@ -1082,8 +1082,8 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"Map key must be string, got {key_arg.get_type()}", position)
             
-            existed = target.remove(key_arg.value)
-            return BooleanValue(existed, position)
+            target.remove(key_arg.value)
+            return target  # Return the map for chaining
         
         elif method_name == "empty":
             if len(args) != 0:
