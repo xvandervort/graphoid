@@ -17,6 +17,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Minimal boilerplate** - Optional type declarations where types are obvious from context
 - **Extensibility** - Clean AST architecture for future language features
 - **Developer experience** - Excellent error messages and REPL environment
+- **Self-hosting philosophy** - Write as much of Glang as possible in Glang itself
+- **Standard library in Glang** - Core libraries implemented in the language, not the host implementation
 
 ## Repository Structure
 
@@ -29,8 +31,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `files/` - File loading/saving system for .gr programs
   - `repl/` - Modern REPL implementation
   - `cli.py` - Command-line interface
-- `test/` - Comprehensive test suite (194 tests, 71% coverage)
-- `doc/` - Documentation files
+- `test/` - Comprehensive test suite (230+ tests with growing coverage)
+- `stdlib/` - Standard library modules written in Glang
+- `samples/` - Example programs and demonstrations
+- `docs/` - Documentation files including language cheat sheet
 
 ## Development Setup
 
@@ -262,7 +266,10 @@ Glang uses a clean, modern architecture:
 - **Minimal Boilerplate**: Type declarations optional when obvious from context
 - **Clear Error Messages**: Comprehensive error reporting with source positions
 - **Extensible Design**: Clean visitor pattern allows easy language extensions
-- **Testing Focus**: 194 tests with 71% coverage ensure reliability
+- **Testing Focus**: 230+ tests with comprehensive coverage ensure reliability
+- **Self-Hosting Vision**: Write as much of Glang as possible in Glang itself
+- **Standard Library in Glang**: Core functionality implemented in the language, not the host runtime
+- **Dogfooding**: Use Glang extensively to validate its expressiveness and identify missing features
 
 ### Current Implementation Status  
 - ✅ Modern lexer and AST parser
@@ -276,6 +283,10 @@ Glang uses a clean, modern architecture:
 - ✅ Hashes as collections of data nodes with Ruby hash-like syntax
 - ✅ Functional programming operations: map, filter, each with built-in transformations
 - ✅ Control flow structures: if/else, while, for-in, break/continue with proper nesting
+- ✅ CLI program execution with shebang support and command-line arguments
+- ✅ Mathematical methods (abs, sqrt, log, pow, rounding) for numbers
+- ✅ Type casting system (to_string, to_num, to_bool) for all basic types
+- ✅ Standard library foundation with math constants module (stdlib/math.gr)
 - ✅ Comprehensive test suite (527+ tests, 68% coverage)
 
 ### Development Guidelines
