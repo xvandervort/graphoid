@@ -621,6 +621,254 @@ for file in files {
 }
 ```
 
+## 🔗 JSON Operations
+
+### Importing JSON Module
+```glang
+import "json"               # Import JSON module
+import "io"                 # Often needed for file operations
+```
+
+### Quick JSON Reference
+```glang
+# Essential JSON operations:
+json.encode(data)           # Convert to JSON string
+json.encode_pretty(data)    # Convert to formatted JSON  
+json.decode(json_string)    # Parse JSON to Glang values
+json.is_valid(json_string)  # Check if valid JSON
+
+# Complete file workflow:
+# 1. Create data → 2. Encode to JSON → 3. Write to file
+# 4. Read file → 5. Validate → 6. Decode JSON → 7. Use data
+```
+
+### Encoding to JSON
+```glang
+# Encode Glang values to JSON strings
+data = { "name": "Alice", "age": 25, "active": true }
+json_string = json.encode(data)
+io.print(json_string)      # {"name":"Alice","age":25,"active":true}
+
+# Pretty formatting with indentation
+pretty_json = json.encode_pretty(data)
+io.print(pretty_json)
+# {
+#   "name": "Alice", 
+#   "age": 25,
+#   "active": true
+# }
+
+# Encode different data types
+numbers = [1, 2, 3, 4, 5]
+json.encode(numbers)       # [1,2,3,4,5]
+
+name = "Hello World"
+json.encode(name)          # "Hello World"
+
+flag = true
+json.encode(flag)          # true
+```
+
+### Decoding from JSON
+```glang
+# Decode JSON strings to Glang values
+json_data = '{"name": "Bob", "score": 95}'
+parsed = json.decode(json_data)
+
+# Access decoded data
+name_data = parsed["name"]
+io.print(name_data.value())  # "Bob"
+
+score_data = parsed["score"] 
+io.print(score_data.value()) # 95
+
+# Decode arrays
+json_array = "[1, 2, 3, 4]"
+numbers = json.decode(json_array)
+io.print(numbers[0])       # 1
+
+# Decode simple values
+json.decode("42")          # 42
+json.decode("true")        # true
+json.decode('"hello"')     # "hello"
+```
+
+### JSON Validation
+```glang
+# Check if string is valid JSON
+valid_json = '{"key": "value"}'
+is_valid = json.is_valid(valid_json)
+io.print(is_valid)         # true
+
+invalid_json = "not json"
+is_valid = json.is_valid(invalid_json)
+io.print(is_valid)         # false
+
+# Use before parsing
+json_text = io.input("Enter JSON: ")
+if json.is_valid(json_text) {
+    data = json.decode(json_text)
+    io.print("Parsed successfully!")
+} else {
+    io.print("Invalid JSON format")
+}
+```
+
+### Creating and Writing JSON Files
+```glang
+import "json"
+import "io"
+
+# Create data structure (build nested objects first)
+preferences = { "theme": "dark", "notifications": true }
+scores = [95, 87, 92]
+
+user_data = {
+    "name": "Alice Johnson",
+    "age": 28,
+    "email": "alice@example.com",
+    "preferences": preferences,
+    "scores": scores
+}
+
+# Convert to JSON and write to file
+json_string = json.encode_pretty(user_data)
+io.write_file("user.json", json_string)
+io.print("User data saved to user.json")
+
+# For compact JSON (no formatting):
+compact_json = json.encode(user_data)
+io.write_file("user_compact.json", compact_json)
+```
+
+### Reading and Parsing JSON Files
+```glang
+import "json"
+import "io"
+
+# Read JSON file and parse it
+if io.exists("user.json") {
+    file_content = io.read_file("user.json")
+    
+    # Validate before parsing
+    if json.is_valid(file_content) {
+        user = json.decode(file_content)
+        
+        # Access data (use explicit types for JSON decoded values)
+        string name = user["name"].value()
+        num age = user["age"].value()
+        string theme = user["preferences"]["theme"].value()
+        
+        io.print("User: " + name + ", Age: " + age.to_string())
+        io.print("Theme: " + theme)
+        
+        # Process array data
+        scores = user["scores"].value()
+        io.print("Scores: " + scores.to_string())
+    } else {
+        io.print("Invalid JSON in file")
+    }
+} else {
+    io.print("File not found")
+}
+```
+
+### Complete JSON File Workflow
+```glang
+import "json"
+import "io"
+
+# Step 1: Create configuration data
+database_config = { "host": "localhost", "port": 5432, "name": "myapp" }
+features = ["auth", "logging", "cache"]
+
+config = {
+    "database": database_config,
+    "features": features,
+    "debug": true,
+    "version": "1.0.0"
+}
+
+# Step 2: Save to JSON file
+io.print("Saving configuration...")
+config_json = json.encode_pretty(config)
+io.write_file("config.json", config_json)
+io.print("Configuration saved to config.json")
+
+# Step 3: Later, load and use the configuration
+io.print("Loading configuration...")
+if io.exists("config.json") {
+    content = io.read_file("config.json")
+    if json.is_valid(content) {
+        loaded_config = json.decode(content)
+        
+        # Extract configuration values (explicit types recommended)
+        string db_host = loaded_config["database"]["host"].value()
+        num db_port = loaded_config["database"]["port"].value()
+        bool debug_mode = loaded_config["debug"].value()
+        
+        io.print("Database: " + db_host + ":" + db_port.to_string())
+        io.print("Debug mode: " + debug_mode.to_string())
+        
+        # Process features array
+        features = loaded_config["features"].value()
+        io.print("Enabled features:")
+        for feature in features.elements {
+            io.print("  - " + feature)
+        }
+    }
+}
+
+```
+
+### API Data Processing with JSON
+```glang
+import "json"
+import "io"
+
+# Simulate API response
+api_response = '{"users": [{"name": "Alice", "id": 1}, {"name": "Bob", "id": 2}]}'
+data = json.decode(api_response)
+users = data["users"].value()  # Get the array
+
+for user in users.elements {
+    string user_name = user["name"].value()
+    num user_id = user["id"].value()
+    io.print("User: " + user_name + " (ID: " + user_id.to_string() + ")")
+}
+
+# Save processed data to file
+processed_users = []
+for user in users.elements {
+    string name = user["name"].value()
+    num id = user["id"].value()
+    user_info = {
+        "display_name": name.up(),
+        "user_id": id
+    }
+    processed_users.append(user_info)
+}
+
+output_data = { "processed_users": processed_users }
+output_json = json.encode_pretty(output_data)
+io.write_file("processed_users.json", output_json)
+```
+
+### JSON Type Conversions
+```glang
+# Round-trip conversion (Glang -> JSON -> Glang)
+original = { "items": [1, 2, 3], "text": "hello", "flag": true }
+
+# Convert to JSON and back
+json_str = json.encode(original)
+decoded = json.decode(json_str)
+
+# Data preserves structure and types (use explicit types for clarity)
+list items = decoded["items"].value()   # List with [1, 2, 3]
+string text = decoded["text"].value()   # String "hello"  
+bool flag = decoded["flag"].value()     # Boolean true
+```
+
 ## 🛠️ REPL Commands
 
 ### Essential Commands

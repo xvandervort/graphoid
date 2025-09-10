@@ -24,6 +24,10 @@ class BuiltinModuleRegistry:
         from .io_module import create_io_module_namespace
         cls._builtin_modules['io'] = create_io_module_namespace()
         
+        # Register JSON module
+        from .json_module import create_json_module_namespace
+        cls._builtin_modules['json'] = create_json_module_namespace()
+        
         cls._initialized = True
     
     @classmethod

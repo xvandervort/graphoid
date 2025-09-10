@@ -337,7 +337,8 @@ Glang uses a clean, modern architecture:
 - ✅ Mathematical methods (abs, sqrt, log, pow, rounding) for numbers
 - ✅ Type casting system (to_string, to_num, to_bool) for all basic types
 - ✅ Standard library foundation with math constants module (stdlib/math.gr)
-- ✅ **Comprehensive test suite** (563+ tests, 63% coverage)
+- ✅ **JSON module** with encode, decode, pretty printing, and validation (json.encode, json.decode, json.is_valid)
+- ✅ **Comprehensive test suite** (597+ tests, 64% coverage)
 
 ### Development Guidelines
 - **AST-first development** - All new features should extend the AST system
@@ -349,10 +350,10 @@ Glang uses a clean, modern architecture:
 
 ### Near-Term Priorities (Q2 2025)
 **Make Glang Practical** - Standard libraries for real-world use:
-- **I/O Library**: File operations, user input, directory management
-- **Network Library**: HTTP client, JSON support, email notifications
-- **Database Connectivity**: SQLite, PostgreSQL, MySQL support
-- **System Library**: OS interaction, processes, date/time
+- **✅ I/O Library**: File operations, user input, directory management
+- **⏳ Network Library**: ✅ JSON support, HTTP client, email notifications 
+- **⏳ Database Connectivity**: SQLite, PostgreSQL, MySQL support
+- **⏳ System Library**: OS interaction, processes, date/time
 
 ### Medium-Term Goals (Q3 2025)
 **Build True Graph Foundation** - Transform containers into real graphs:

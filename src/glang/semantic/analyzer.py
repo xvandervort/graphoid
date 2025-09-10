@@ -121,26 +121,43 @@ class SemanticAnalyzer(BaseASTVisitor):
             elif (isinstance(expr.target, VariableRef) and 
                   self.symbol_table.symbol_exists(expr.target.name) and
                   self.symbol_table.lookup_symbol(expr.target.name).symbol_type == 'module'):
-                # Map I/O module methods to their return types
-                io_method_types = {
-                    'print': 'void',        # New unified print function
-                    'read_file': 'string',
-                    'read_lines': 'list',
-                    'write_file': 'bool',
-                    'write_lines': 'bool', 
-                    'append_file': 'bool',
-                    'exists': 'bool',
-                    'is_file': 'bool',
-                    'is_dir': 'bool',
-                    'make_dir': 'bool',
-                    'remove_file': 'bool',
-                    'remove_dir': 'bool',
-                    'set_cwd': 'bool',
-                    'get_cwd': 'string',
-                    'file_size': 'num',
-                    'list_dir': 'list',
-                    'input': 'string'
-                }
+                # Get the module symbol to determine which module it is
+                symbol = self.symbol_table.lookup_symbol(expr.target.name)
+                module_name = symbol.name if symbol else 'unknown'
+                
+                # Map module methods to their return types
+                if module_name == 'io':
+                    method_types = {
+                        'print': 'void',
+                        'read_file': 'string',
+                        'read_lines': 'list',
+                        'write_file': 'bool',
+                        'write_lines': 'bool', 
+                        'append_file': 'bool',
+                        'exists': 'bool',
+                        'is_file': 'bool',
+                        'is_dir': 'bool',
+                        'make_dir': 'bool',
+                        'remove_file': 'bool',
+                        'remove_dir': 'bool',
+                        'set_cwd': 'bool',
+                        'get_cwd': 'string',
+                        'file_size': 'num',
+                        'list_dir': 'list',
+                        'input': 'string'
+                    }
+                elif module_name == 'json':
+                    method_types = {
+                        'encode': 'string',
+                        'encode_pretty': 'string',
+                        'decode': 'any',  # JSON can decode to any type
+                        'is_valid': 'bool'
+                    }
+                else:
+                    method_types = {}
+                
+                # Legacy support for old io_method_types variable name
+                io_method_types = method_types
                 if expr.method_name in io_method_types:
                     return io_method_types[expr.method_name]
             elif expr.method_name in ['keys', 'values']:
@@ -443,7 +460,7 @@ class SemanticAnalyzer(BaseASTVisitor):
         # Check if target is indexable
         if isinstance(node.target, VariableRef):
             symbol = self.symbol_table.lookup_symbol(node.target.name)
-            if symbol and symbol.symbol_type not in {'list', 'string', 'hash'}:
+            if symbol and symbol.symbol_type not in {'list', 'string', 'hash', 'any'}:
                 self.report_error(InvalidMethodCallError(
                     "index access", symbol.symbol_type,
                     "Type is not indexable", node.position))
