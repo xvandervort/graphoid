@@ -1,0 +1,50 @@
+# Demonstrate I/O operations in Glang
+
+import "io"
+
+# Write a file
+io.write_file("hello.txt", "Hello from Glang!")
+print("Created hello.txt")
+
+# Read the file
+content = io.read_file("hello.txt")
+print("Content: " + content)
+
+# Check if file exists
+if io.exists("hello.txt") {
+    print("File exists!")
+}
+
+# Get file size
+size = io.file_size("hello.txt")
+print("File size: " + size.to_string() + " bytes")
+
+# List current directory
+files = io.list_dir(".")
+print("Files in current directory:")
+for file in files {
+    if io.is_file(file) {
+        print("  [file] " + file)
+    } else if io.is_dir(file) {
+        print("  [dir]  " + file)
+    }
+}
+
+# Create a directory
+io.make_dir("test_dir")
+print("Created test_dir/")
+
+# Write multiple lines
+lines = ["Line 1", "Line 2", "Line 3"]
+io.write_lines("multi.txt", lines)
+print("Created multi.txt with multiple lines")
+
+# Read lines
+read_lines = io.read_lines("multi.txt")
+print("Read " + read_lines.size().to_string() + " lines")
+
+# Clean up
+io.remove_file("hello.txt")
+io.remove_file("multi.txt")
+io.remove_dir("test_dir")
+print("Cleaned up test files")

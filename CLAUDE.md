@@ -4,21 +4,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Glang** is a modern programming language with powerful type inference, built on a clean AST-based architecture. The language provides:
+**Glang** is a general-purpose programming language with revolutionary graph-theoretic features, designed to be both practically useful and conceptually powerful.
 
-### Core Features
-- **Strong type system** with optional type inference
-- **Modern syntax** for variables, lists, hashes, and method calls
-- **File loading system** for modular programming
-- **Clean AST-based execution** for reliability and extensibility
+### Current Vision (Updated January 2025)
+Glang aims to be:
+1. **A Practical Language First** - Complete with I/O, networking, databases, and standard library
+2. **Then a Graph Language** - With true graph structures including nodes, edges, and traversal
+3. **Finally a Revolutionary Platform** - Enabling self-aware, self-mutating, distributed graph systems
+
+### Core Features (Implemented)
+- **Complete Function System** - Functions, lambdas, closures, and recursion
+- **Strong Type System** - With optional type inference and type constraints
+- **Modern Collections** - Lists, hashes, and data nodes (currently container-based, not true graphs yet)
+- **Method-Based Design** - Everything uses methods: `list.append()`, `string.upper()`, `num.abs()`
+- **File Loading System** - Modular programming with `.gr` files
+- **Clean AST Architecture** - Reliable execution with excellent error messages
 
 ### Design Principles:
-- **Intuitive syntax** - Natural programming constructs that feel familiar
-- **Minimal boilerplate** - Optional type declarations where types are obvious from context
-- **Extensibility** - Clean AST architecture for future language features
-- **Developer experience** - Excellent error messages and REPL environment
-- **Self-hosting philosophy** - Write as much of Glang as possible in Glang itself
-- **Standard library in Glang** - Core libraries implemented in the language, not the host implementation
+- **Practical First** - Must be useful for real-world applications before adding advanced features
+- **Graph-Theoretic Foundation** - All data will eventually be conceptualized as graphs with nodes and edges
+- **Self-Aware Data Structures** - Future: Collections that understand their own structure and relationships
+- **Intuitive Syntax** - Natural programming constructs that feel familiar
+- **Developer Experience** - Excellent error messages, REPL environment, and reflection capabilities
+
+### Architectural Discovery (January 2025)
+**Critical Realization**: Current "graph" types (lists, hashes) are actually just containers. True graph features require:
+- **Edges**: Explicit relationships between nodes with metadata
+- **Node Awareness**: Nodes knowing their container and neighbors
+- **Graph Traversal**: Real pathfinding and connectivity analysis
+
+This represents a major architectural challenge but is essential for Glang's unique vision.
 
 ## Repository Structure
 
@@ -178,6 +193,39 @@ names.map("upper").each("print")  # Print each uppercase name
 **Type Checks:** `is_string`/`string`, `is_number`/`number`, `is_bool`/`boolean`, `is_list`/`list`  
 **General:** `truthy`, `falsy`
 
+### Functions and Lambdas
+
+```glang
+# Function declarations
+func greet(name) {
+    return "Hello, " + name + "!"
+}
+
+func add(x, y) {
+    return x + y
+}
+
+# Function calls
+message = greet("World")      # "Hello, World!"
+result = add(15, 27)          # 42
+
+# Lambda expressions
+double = x => x * 2
+multiply = (x, y) => x * y
+
+# Using lambdas
+result = double(5)            # 10
+product = multiply(7, 8)      # 56
+
+# Recursive functions
+func fibonacci(n) {
+    if n <= 1 {
+        return n
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2)
+}
+```
+
 ### Control Flow
 
 ```glang
@@ -275,6 +323,8 @@ Glang uses a clean, modern architecture:
 - ✅ Modern lexer and AST parser
 - ✅ Complete semantic analysis with symbol tables
 - ✅ Type-safe execution engine
+- ✅ **Complete function system** with declarations, calls, and returns
+- ✅ **Lambda expressions** with `x => x * 2` syntax
 - ✅ File loading system with .gr format
 - ✅ Type inference for variable declarations
 - ✅ Method calls with type constraint enforcement
@@ -287,10 +337,88 @@ Glang uses a clean, modern architecture:
 - ✅ Mathematical methods (abs, sqrt, log, pow, rounding) for numbers
 - ✅ Type casting system (to_string, to_num, to_bool) for all basic types
 - ✅ Standard library foundation with math constants module (stdlib/math.gr)
-- ✅ Comprehensive test suite (527+ tests, 68% coverage)
+- ✅ **Comprehensive test suite** (563+ tests, 63% coverage)
 
 ### Development Guidelines
 - **AST-first development** - All new features should extend the AST system
 - **Smart type inference** - Infer types from context to reduce boilerplate
 - **Comprehensive testing** - New features require full test coverage  
 - **Clean error messages** - Users should understand exactly what went wrong
+
+## Future Vision: The Path to Revolutionary Graph Computing
+
+### Near-Term Priorities (Q2 2025)
+**Make Glang Practical** - Standard libraries for real-world use:
+- **I/O Library**: File operations, user input, directory management
+- **Network Library**: HTTP client, JSON support, email notifications
+- **Database Connectivity**: SQLite, PostgreSQL, MySQL support
+- **System Library**: OS interaction, processes, date/time
+
+### Medium-Term Goals (Q3 2025)
+**Build True Graph Foundation** - Transform containers into real graphs:
+- **Graph Architecture**: Nodes + edges with metadata, not just containers
+- **Node Awareness**: Nodes know their container and can access siblings
+- **Graph Traversal**: Real pathfinding, connectivity analysis
+- **Anonymous Functions**: Function references with `.call()` method
+
+### Long-Term Vision (Q4 2025 and Beyond)
+**Revolutionary Graph Features** - What makes Glang unique:
+
+#### Self-Aware Data Structures
+```glang
+# Future: Hashes that act like classes
+statistics = {
+    'data': [85.4, 67.3, 92.1],
+    'calc_average': func() {
+        # This function can access sibling 'data'
+        total = sum(this.sibling('data'))
+        return total / this.sibling('data').length()
+    }
+}
+average = statistics['calc_average'].call()
+```
+
+#### Self-Mutating Graphs with Governance
+```glang
+# Future: Graphs that safely modify their own structure
+ecosystem = {
+    __control__: {
+        'max_nodes': 10000,
+        'mutation_rate': 100,  # nodes per second
+        'enforce_limits': func(operation) { ... }
+    },
+    methods: {
+        'evolve': func() {
+            # Add/remove species based on survival
+            # All mutations go through __control__
+        }
+    },
+    species: { ... }  # Mutable data region
+}
+```
+
+#### Distributed Graph Systems
+```glang
+# Future: Graphs spanning multiple machines
+distributed_system = {
+    __control__: {
+        'node_id': 'server_1',
+        'peers': ['server_2', 'server_3'],
+        'consensus': func(operation) { ... }
+    },
+    # Graph operations work transparently across network
+}
+```
+
+### Ultimate Goal
+Transform Glang from a programming language into a **platform for living, self-aware computational systems** that can:
+- Understand their own structure
+- Safely modify themselves
+- Distribute across networks
+- Govern their own evolution
+
+This vision positions Glang as uniquely powerful for:
+- Artificial Intelligence systems
+- Smart contracts and blockchain
+- Complex adaptive simulations
+- Self-organizing distributed systems

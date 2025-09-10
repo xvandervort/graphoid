@@ -1,0 +1,81 @@
+# Demonstrate the unified I/O print function in Glang
+
+import "io"
+
+# Basic printing with newlines (default behavior)
+io.print("=== I/O Print Function Demo ===")
+io.print("Hello, World!")
+io.print("This is line 2")
+io.print("This is line 3")
+
+# Printing without newlines
+io.print("")  # Empty line
+io.print("Printing without newlines: ")
+io.print("A", false)
+io.print("B", false) 
+io.print("C", false)
+io.print("D")  # This one gets the newline
+
+# Explicit newline control
+io.print("")  # Empty line
+io.print("Explicit newline control:")
+io.print("Processing", false)
+io.print(".", false)
+io.print(".", false) 
+io.print(".", false)
+io.print(" Done!", true)  # Explicit newline
+
+# Printing different data types
+io.print("")  # Empty line
+io.print("=== Different Data Types ===")
+io.print(42)
+io.print(3.14159)
+io.print(true)
+io.print(false)
+
+# Printing complex data structures
+numbers = [1, 2, 3, 4, 5]
+io.print("List: " + numbers.to_string())
+
+config = {"host": "localhost", "port": 8080}
+io.print("Hash keys: " + config.keys().to_string())
+
+# Interactive example
+io.print("")  # Empty line
+io.print("=== Interactive Input ===")
+io.print("Enter your name: ", false)
+name = io.input()
+io.print("Hello, " + name + "!")
+
+io.print("Enter your age: ", false)
+age_str = io.input()
+age = age_str.to_num()
+io.print("You are " + age.to_string() + " years old")
+
+# File operations with print output
+io.print("")  # Empty line
+io.print("=== File Operations Demo ===")
+filename = "demo_output.txt"
+
+# Write data to file
+data = "Hello from Glang I/O demo!"
+io.write_file(filename, data)
+io.print("Wrote data to " + filename)
+
+# Check if file exists and read it
+if io.exists(filename) {
+    content = io.read_file(filename)
+    io.print("File content: " + content)
+    
+    size = io.file_size(filename)
+    io.print("File size: " + size.to_string() + " bytes")
+} else {
+    io.print("File not found!")
+}
+
+# Clean up
+io.remove_file(filename)
+io.print("Cleaned up " + filename)
+
+io.print("")  # Empty line
+io.print("=== Demo Complete ===")

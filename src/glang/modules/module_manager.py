@@ -86,7 +86,7 @@ class ModuleManager:
         """Import a module and return its namespace.
         
         Args:
-            filename: Path to the module file
+            filename: Path to the module file or built-in module name
             alias: Optional alias for the module
             position: Source position for error reporting
             
@@ -97,6 +97,41 @@ class ModuleManager:
             ModuleNotFoundError: If the module file doesn't exist
             CircularImportError: If circular import detected
         """
+        # Check if this is a built-in module first
+        from .builtin_modules import BuiltinModuleRegistry
+        
+        # Try without .gr extension first for built-in modules
+        module_name = filename.replace('.gr', '') if filename.endswith('.gr') else filename
+        
+        if BuiltinModuleRegistry.is_builtin_module(module_name):
+            # Check if already loaded with this name
+            if module_name in self.loaded_modules:
+                module = self.loaded_modules[module_name]
+                # If importing with a different alias, update the alias mapping
+                if alias and alias != module.import_alias:
+                    self.module_aliases[alias] = module
+                return module
+            
+            # Create a new Module instance for the built-in
+            namespace = BuiltinModuleRegistry.get_builtin_module(module_name)
+            module = Module(
+                filename=module_name,  # Use module name as filename for built-ins
+                import_alias=alias,
+                namespace=namespace,
+                declared_name=module_name  # Built-in modules have their name declared
+            )
+            
+            # Cache the module
+            self.loaded_modules[module_name] = module
+            
+            # Add to aliases
+            effective_name = module.name
+            if effective_name:
+                self.module_aliases[effective_name] = module
+            
+            return module
+        
+        # Not a built-in, proceed with file-based module loading
         # Normalize the filename
         filename = self._normalize_path(filename)
         

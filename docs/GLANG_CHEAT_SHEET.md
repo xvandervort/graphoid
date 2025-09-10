@@ -317,6 +317,69 @@ result = x.to_string().to_bool()  # true
 b = true.to_num().to_string()     # "1"
 ```
 
+## 🔤 String Operations
+
+### Text Manipulation
+```glang
+text = "Hello, World!"
+
+# Case conversion
+text.up()                  # "HELLO, WORLD!"
+text.down()                # "hello, world!"
+
+# Whitespace handling
+spaced = "  hello  "
+spaced.trim()              # "hello"
+
+# String analysis
+text.chars()               # ["H", "e", "l", "l", "o", ",", " ", "W", "o", "r", "l", "d", "!"]
+text.length()              # 13
+text.contains("World")     # true
+```
+
+### String Splitting
+```glang
+# Split by spaces (default)
+sentence = "hello world test"
+words = sentence.split()   # ["hello", "world", "test"]
+
+# Split by custom delimiter
+csv = "apple,banana,cherry"
+fruits = csv.split(",")    # ["apple", "banana", "cherry"]
+
+# Split by newlines (great for file processing!)
+content = "line1\nline2\nline3"
+lines = content.split("\n")  # ["line1", "line2", "line3"]
+
+# Split by any character
+path = "folder/subfolder/file.txt"
+parts = path.split("/")    # ["folder", "subfolder", "file.txt"]
+```
+
+### Practical String Processing
+```glang
+# Process file content line by line
+content = io.read_file("data.txt")
+lines = content.split("\n")
+for line in lines {
+    if line.trim() != "" {
+        processed = line.trim().up()
+        io.print("Processed: " + processed)
+    }
+}
+
+# Parse CSV-like data
+data = "John,25,Engineer\nJane,30,Designer"
+lines = data.split("\n")
+for line in lines {
+    fields = line.split(",")
+    name = fields[0]
+    age = fields[1].to_num()
+    job = fields[2]
+    io.print(name + " is " + age.to_string() + " years old")
+}
+```
+
 ## 🔒 Data Immutability System
 
 ### Freezing Data
@@ -442,14 +505,120 @@ a <= b    # Less or equal
 
 ## 📁 File Operations
 
+### Loading Glang Files
 ```glang
-# Load another .gr file
-load "config.gr"         # Variables become available
+# Load another .gr file into current scope
+load "config.gr"         # Variables become available directly
 
 # REPL file commands  
 /load config.gr          # Load file in REPL
 /save myprogram.gr       # Save current session
 /run example.gr          # Run file in fresh session
+```
+
+## 📦 Module System
+
+### Importing Modules
+```glang
+# Import built-in modules
+import "io"               # Import I/O module as 'io'
+import "math" as calc     # Import with custom alias
+
+# Import .gr modules (with module declaration)
+import "my_library.gr"    # Uses alias from module file
+import "utils.gr" as tools # Override with custom alias
+```
+
+### Creating Modules
+```glang
+# In a .gr file (e.g., math_utils.gr):
+module mathematical_utilities  # Full module name
+alias math                    # Default import alias
+
+# Module variables and functions
+pi = 3.14159
+e = 2.71828
+
+func circle_area(radius) {
+    return pi * radius * radius
+}
+
+# Usage after import:
+import "math_utils.gr"
+area = math.circle_area(5.0)
+```
+
+## 📤 Input/Output Operations
+
+### Console Output
+```glang
+import "io"
+
+# Print with newline (default)
+io.print("Hello, World!")       # Prints with newline
+io.print(42)                    # Prints with newline
+io.print([1, 2, 3])             # Prints with newline
+
+# Print without newline (pass false)
+io.print("Enter name: ", false) # No newline
+io.print("Value: " + value.to_string(), false)
+
+# Explicit newline control
+io.print("Name: " + name + ", Age: " + age.to_string(), true)  # With newline
+io.print("Processing...", false)  # Continue on same line
+io.print(" Done!")               # Finish the line
+```
+
+### File Operations
+```glang
+import "io"
+
+# Read entire file
+content = io.read_file("data.txt")
+print("File content: " + content)
+
+# Write to file (overwrites existing)
+data = "Hello, World!\nLine 2\nLine 3"
+io.write_file("output.txt", data)
+
+# Append to file
+io.append_file("log.txt", "New log entry\n")
+```
+
+### User Input
+```glang
+import "io"
+
+# Get user input
+name = io.input("Enter your name: ")
+io.print("Hello, " + name + "!")
+
+# Input with type conversion
+age_str = io.input("Enter your age: ")
+age = age_str.to_num()
+io.print("You are " + age.to_string() + " years old")
+```
+
+### File System Operations
+```glang
+import "io"
+
+# Check if file exists
+if io.exists("config.txt") {
+    config = io.read_file("config.txt")
+} else {
+    io.print("Config file not found!")
+}
+
+# Get file size
+size = io.file_size("data.csv")
+io.print("File size: " + size.to_string() + " bytes")
+
+# List directory contents
+files = io.list_dir(".")
+for file in files {
+    io.print("Found: " + file)
+}
 ```
 
 ## 🛠️ REPL Commands
@@ -573,6 +742,75 @@ processed = numbers.filter("even")
 print("Processed: " + processed.to_string())
 ```
 
+### File I/O with Error Handling
+```glang
+import "io"
+
+# Read and process a data file
+filename = "scores.txt"
+if io.exists(filename) {
+    content = io.read_file(filename)
+    lines = content.split("\n")
+    
+    total = 0
+    count = 0
+    
+    for line in lines {
+        if line != "" {
+            score = line.to_num()
+            total = total + score
+            count = count + 1
+        }
+    }
+    
+    if count > 0 {
+        average = total / count
+        io.print("Average score: " + average.rnd(2).to_string())
+        
+        # Write result to new file
+        result = "Total scores: " + count.to_string() + "\n"
+        result = result + "Average: " + average.rnd(2).to_string()
+        io.write_file("result.txt", result)
+    }
+} else {
+    io.print("File not found: " + filename)
+}
+```
+
+### Module-Based Calculator
+```glang
+# calculator.gr module file:
+module advanced_calculator
+alias calc
+
+func add(a, b) {
+    return a + b
+}
+
+func multiply(a, b) {
+    return a * b
+}
+
+func power(base, exponent) {
+    return base.pow(exponent)
+}
+
+# Main program:
+import "calculator.gr"
+import "io"
+
+a = io.input("Enter first number: ").to_num()
+b = io.input("Enter second number: ").to_num()
+
+sum = calc.add(a, b)
+product = calc.multiply(a, b)
+power_result = calc.power(a, 2)
+
+io.print("Sum: " + sum.to_string())
+io.print("Product: " + product.to_string())
+io.print(a.to_string() + " squared: " + power_result.to_string())
+```
+
 ---
 
 ## 🎓 Pro Tips
@@ -590,6 +828,14 @@ print("Processed: " + processed.to_string())
 6. **Immutability**: Use `freeze()` to prevent accidental data modifications, especially for configuration and shared data structures
 
 7. **Contamination Checking**: Use `can_accept()` to check if frozen and unfrozen data can be safely mixed before operations
+
+8. **Module Organization**: Use modules to organize related functions - create focused modules like `math_utils.gr` or `string_helpers.gr`
+
+9. **Built-in Modules**: Always import `"io"` for file operations and user interaction - it's essential for most programs
+
+10. **Module vs Load**: Use `import` for reusable code with namespacing, `load` for configuration and simple scripts
+
+11. **String Processing**: Use `string.split()` for parsing - `split()` for spaces, `split(",")` for CSV, `split("\n")` for lines
 
 ---
 

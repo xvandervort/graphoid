@@ -82,14 +82,19 @@ class SemanticAnalyzer(BaseASTVisitor):
             if self.symbol_table.symbol_exists(expr.name):
                 symbol = self.symbol_table.lookup_symbol(expr.name)
                 return symbol.symbol_type
-        elif isinstance(expr, MethodCallExpression):
-            # For chained method calls, recursively infer the type of the target first
+        elif isinstance(expr, MethodCallExpression) or isinstance(expr, MethodCall):
+            # Get the target type
+            target_type = None
             if isinstance(expr.target, MethodCallExpression):
                 # Recursively infer the type of the chained target
                 target_type = self.infer_type_from_expression(expr.target)
                 if target_type is None:
                     return None  # Can't determine
-                # Now we know the type of the target, we can infer the return type
+            elif isinstance(expr.target, VariableRef):
+                # Look up the type of the target variable
+                if self.symbol_table.symbol_exists(expr.target.name):
+                    symbol = self.symbol_table.lookup_symbol(expr.target.name)
+                    target_type = symbol.symbol_type
             
             # Some methods have known return types
             if expr.method_name == 'len':
@@ -112,6 +117,32 @@ class SemanticAnalyzer(BaseASTVisitor):
             elif expr.method_name in ['get', 'pop']:
                 # Hash methods that return data nodes
                 return 'data'
+            # Handle I/O module method return types
+            elif (isinstance(expr.target, VariableRef) and 
+                  self.symbol_table.symbol_exists(expr.target.name) and
+                  self.symbol_table.lookup_symbol(expr.target.name).symbol_type == 'module'):
+                # Map I/O module methods to their return types
+                io_method_types = {
+                    'print': 'void',        # New unified print function
+                    'read_file': 'string',
+                    'read_lines': 'list',
+                    'write_file': 'bool',
+                    'write_lines': 'bool', 
+                    'append_file': 'bool',
+                    'exists': 'bool',
+                    'is_file': 'bool',
+                    'is_dir': 'bool',
+                    'make_dir': 'bool',
+                    'remove_file': 'bool',
+                    'remove_dir': 'bool',
+                    'set_cwd': 'bool',
+                    'get_cwd': 'string',
+                    'file_size': 'num',
+                    'list_dir': 'list',
+                    'input': 'string'
+                }
+                if expr.method_name in io_method_types:
+                    return io_method_types[expr.method_name]
             elif expr.method_name in ['keys', 'values']:
                 # Hash methods that return lists
                 return 'list'
@@ -303,6 +334,42 @@ class SemanticAnalyzer(BaseASTVisitor):
         """Analyze expression statements."""
         node.expression.accept(self)
     
+    def visit_import_statement(self, node: ImportStatement) -> None:
+        """Analyze import statements."""
+        # For import statements, register the module as a variable
+        # The actual importing is handled at execution time
+        if not isinstance(node.filename, str):
+            self.errors.append(SemanticError(
+                f"Import statement filename must be a string, got {type(node.filename).__name__}",
+                node.position
+            ))
+            return
+        
+        # Determine the module name (use alias if provided, otherwise extract from filename)
+        if node.alias:
+            module_name = node.alias
+        else:
+            # Extract module name from filename (e.g., "io" from "io" or "io.gr")
+            module_name = node.filename.replace('.gr', '') if node.filename.endswith('.gr') else node.filename
+        
+        # Register the module as a variable with type 'module'
+        symbol = Symbol(module_name, 'module', position=node.position)
+        # Use declare_symbol but check if it already exists first
+        if not self.symbol_table.symbol_exists(module_name):
+            self.symbol_table.declare_symbol(symbol)
+    
+    def visit_module_declaration(self, node: ModuleDeclaration) -> None:
+        """Analyze module declarations."""
+        # Module declarations just declare the module name
+        # No symbols to add to the table
+        pass
+    
+    def visit_alias_declaration(self, node: AliasDeclaration) -> None:
+        """Analyze alias declarations."""
+        # Alias declarations just declare the module alias
+        # No symbols to add to the table
+        pass
+    
     def visit_load_statement(self, node: LoadStatement) -> None:
         """Analyze load statements."""
         # For load statements, we just need to validate the filename is a string
@@ -473,12 +540,17 @@ class SemanticAnalyzer(BaseASTVisitor):
             'data': {'key', 'value'} | universal_methods,
             'hash': {
                 'get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop'
-            } | universal_methods
+            } | universal_methods,
+            'module': universal_methods.copy()  # Modules can have any method - validated at runtime
         }
         
         if target_type not in valid_methods:
             self.report_error(InvalidMethodCallError(
                 method_name, target_type, f"Unknown type '{target_type}'", position))
+            return
+        
+        # Skip method validation for modules - they have dynamic methods
+        if target_type == 'module':
             return
         
         if method_name not in valid_methods[target_type]:

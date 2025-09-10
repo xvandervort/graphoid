@@ -266,23 +266,79 @@ class ASTExecutor(BaseASTVisitor):
     
     def visit_method_call(self, node: MethodCall) -> None:
         """Execute method call."""
-        # Check if this might be a module-qualified variable access (e.g., math.pi)
-        # Use string comparison instead of isinstance to avoid import issues
-        is_variable_ref = type(node.target).__name__ == 'VariableRef'
-        if (is_variable_ref and 
-            len(node.arguments) == 0 and  # No arguments means it's likely a property access
-            self.context.module_manager):
-            
-            # Try to resolve as module.symbol first
-            module_name = node.target.name
-            symbol_name = node.method_name
-            module = self.context.module_manager.get_module(module_name)
-            
-            if module:
+        # Check if this might be a module-qualified access (e.g., math.pi or io.read_file)
+        # Check if target is a VariableRef (not a method call chain)
+        # Check if target is a VariableRef by class name to avoid import path issues
+        is_variable_ref = node.target.__class__.__name__ == 'VariableRef'
+        if is_variable_ref:
+            # Check if the target is a module value
+            from .module_value import ModuleValue
+            target_value = self.context.get_variable(node.target.name)
+            if isinstance(target_value, ModuleValue):
+                # Access symbol from the module
+                module = target_value.module
+                symbol_name = node.method_name
                 symbol_value = module.namespace.get_symbol(symbol_name)
+                
                 if symbol_value is not None:
-                    self.result = symbol_value
-                    return
+                    # Check if it's a built-in function that needs to be called
+                    from ..execution.function_value import BuiltinFunctionValue
+                    if isinstance(symbol_value, BuiltinFunctionValue):
+                        # Execute arguments
+                        arg_values = []
+                        for arg in node.arguments:
+                            arg_value = self.execute(arg)
+                            if not isinstance(arg_value, GlangValue):
+                                arg_value = python_to_glang_value(arg_value, arg.position if hasattr(arg, 'position') else node.position)
+                            arg_values.append(arg_value)
+                        
+                        # Call the built-in function
+                        self.result = symbol_value.call(arg_values, node.position)
+                        return
+                    elif len(node.arguments) == 0:
+                        # It's a property/constant access (like math.pi)
+                        self.result = symbol_value
+                        return
+                    else:
+                        # It's a symbol but not a BuiltinFunction and has arguments
+                        # This shouldn't happen with our current module system
+                        from ..modules.errors import ModuleSymbolError
+                        raise ModuleSymbolError(node.target.name, symbol_name, node.position)
+                else:
+                    # Symbol not found in module
+                    from ..modules.errors import ModuleSymbolError
+                    raise ModuleSymbolError(node.target.name, symbol_name, node.position)
+                # Return here to prevent falling through to regular method dispatch
+                return
+            
+            # Fall back to old module manager approach for compatibility
+            elif self.context.module_manager:
+                # Try to resolve as module.symbol first
+                module_name = node.target.name
+                symbol_name = node.method_name
+                module = self.context.module_manager.get_module(module_name)
+                
+                if module:
+                    symbol_value = module.namespace.get_symbol(symbol_name)
+                    if symbol_value is not None:
+                        # Check if it's a built-in function that needs to be called
+                        from ..execution.function_value import BuiltinFunctionValue
+                        if isinstance(symbol_value, BuiltinFunctionValue):
+                            # Execute arguments
+                            arg_values = []
+                            for arg in node.arguments:
+                                arg_value = self.execute(arg)
+                                if not isinstance(arg_value, GlangValue):
+                                    arg_value = python_to_glang_value(arg_value, arg.position if hasattr(arg, 'position') else node.position)
+                                arg_values.append(arg_value)
+                            
+                            # Call the built-in function
+                            self.result = symbol_value.call(arg_values, node.position)
+                            return
+                        elif len(node.arguments) == 0:
+                            # It's a property/constant access (like math.pi)
+                            self.result = symbol_value
+                            return
         
         # Fall back to regular method call execution
         try:

@@ -187,6 +187,35 @@ class ExecutionSession:
                     import_req.position
                 )
                 
+                # Check if this is a built-in module
+                from ..modules.builtin_modules import BuiltinModuleRegistry
+                module_name_check = module.filename.replace('.gr', '') if module.filename.endswith('.gr') else module.filename
+                
+                if BuiltinModuleRegistry.is_builtin_module(module_name_check):
+                    # Built-in module - no need to load a file
+                    # The module namespace is already populated
+                    module_name = module.name
+                    
+                    # Add the module itself as a variable so it can be accessed
+                    from .module_value import ModuleValue
+                    module_value = ModuleValue(module, import_req.position)
+                    self.execution_context.set_variable(module_name, module_value)
+                    
+                    # Also add to symbol table for semantic analysis
+                    from ..semantic.symbol_table import Symbol
+                    symbol = Symbol(module_name, "module", import_req.position)
+                    try:
+                        self.semantic_session.persistent_symbol_table.declare_symbol(symbol)
+                    except Exception as e:
+                        # Handle symbol already declared error gracefully
+                        if "already declared" in str(e):
+                            # Symbol already exists, skip redeclaration
+                            pass
+                        else:
+                            raise
+                    
+                    return ExecutionResult(f"Imported built-in module {import_req.filename} as {module_name}", self.execution_context, True)
+                
                 # Capture variables before loading module
                 vars_before = set(self.execution_context.variables.keys())
                 
@@ -224,6 +253,26 @@ class ExecutionSession:
                         del self.execution_context.variables[var_name]
                 
                 module_name = module.name
+                
+                # Add the module itself as a variable so it can be accessed
+                from .module_value import ModuleValue
+                module_value = ModuleValue(module, import_req.position)
+                self.execution_context.set_variable(module_name, module_value)
+                
+                # Also add to symbol table for semantic analysis
+                from ..semantic.symbol_table import Symbol
+                symbol = Symbol(module_name, "module", import_req.position)
+                try:
+                    self.semantic_session.persistent_symbol_table.declare_symbol(symbol)
+                except Exception as e:
+                    # Handle symbol already declared error gracefully
+                    if "already declared" in str(e):
+                        # Symbol already exists, skip redeclaration
+                        pass
+                    else:
+                        raise
+                
+                
                 return ExecutionResult(f"Imported {import_req.filename} as {module_name}", self.execution_context, True)
                 
             except Exception as e:
