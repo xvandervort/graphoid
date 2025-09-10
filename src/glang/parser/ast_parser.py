@@ -510,14 +510,21 @@ class ASTParser:
             
             # Parse arguments
             arguments = []
-            # Only parse arguments if we have parentheses or if the next token isn't an assignment or comparison operator
+            # Only parse arguments if we have parentheses or if the next token isn't an operator that should end the method call
             if not self.check(TokenType.RPAREN) and not self.is_at_end() and \
                not self.check(TokenType.NEWLINE) and not self.check(TokenType.EOF) and \
+               not self.check(TokenType.DOT) and \
                not self.check(TokenType.ASSIGN) and \
                not self.check(TokenType.EQUAL) and not self.check(TokenType.NOT_EQUAL) and \
                not self.check(TokenType.GREATER) and not self.check(TokenType.LESS) and \
                not self.check(TokenType.GREATER_EQUAL) and not self.check(TokenType.LESS_EQUAL) and \
-               not self.check(TokenType.NOT_GREATER) and not self.check(TokenType.NOT_LESS):
+               not self.check(TokenType.NOT_GREATER) and not self.check(TokenType.NOT_LESS) and \
+               not self.check(TokenType.PLUS) and not self.check(TokenType.MINUS) and \
+               not self.check(TokenType.MULTIPLY) and not self.check(TokenType.SLASH) and \
+               not self.check(TokenType.MODULO) and \
+               not self.check(TokenType.PLUS_DOT) and not self.check(TokenType.MINUS_DOT) and \
+               not self.check(TokenType.MULTIPLY_DOT) and not self.check(TokenType.DIVIDE_DOT) and \
+               not self.check(TokenType.MODULO_DOT):
                 arguments.append(self.parse_expression())
                 
                 # Arguments can be comma-separated or space-separated
@@ -661,11 +668,60 @@ class ASTParser:
             self.consume(TokenType.RPAREN, "Expected ')' after expression")
             return expr
         
-        # Error case
+        # Error case - provide helpful context-specific error messages
         current_token = self.peek()
-        raise ParseError(f"Unexpected token: {current_token.value}", current_token)
+        error_msg = self.get_helpful_error_message(current_token)
+        raise ParseError(error_msg, current_token)
     
     
+    def get_helpful_error_message(self, token: Token) -> str:
+        """Generate a helpful error message based on the current token and context."""
+        if token.type == TokenType.PLUS:
+            # Check if this might be a method call issue
+            if self.current > 0:
+                prev_token = self.tokens[self.current - 1]
+                if prev_token.type == TokenType.IDENTIFIER:
+                    return f"'{prev_token.value}' looks like a method call. Did you mean '{prev_token.value}()' or forget an operator before '+'?"
+            return f"Unexpected '+' operator. Are you missing a left operand or trying to use '+' in an invalid context?"
+        
+        elif token.type == TokenType.IDENTIFIER:
+            # Common mistakes with identifiers
+            return f"Unexpected identifier '{token.value}'. Are you missing an operator, assignment (=), or trying to call a method?"
+        
+        elif token.type == TokenType.DOT:
+            return "Unexpected '.'. Method calls need an object before the dot (e.g., 'object.method()')"
+        
+        elif token.type == TokenType.COLON:
+            return "Unexpected ':'. Colons are used in data structures like { \"key\": value } or control flow like if/while statements"
+        
+        elif token.type == TokenType.RBRACE:
+            return "Unexpected '}'. Check if you have a matching '{' or are missing content in a data structure"
+        
+        elif token.type == TokenType.RBRACKET:
+            return "Unexpected ']'. Check if you have a matching '[' or are missing content in a list"
+        
+        elif token.type == TokenType.RPAREN:
+            return "Unexpected ')'. Check if you have a matching '(' or are missing content in parentheses"
+        
+        elif token.type == TokenType.COMMA:
+            return "Unexpected ','. Commas separate elements in lists, function arguments, or data structures"
+        
+        elif token.type == TokenType.ASSIGN:
+            return "Unexpected '=' assignment operator. Are you trying to assign to an invalid target?"
+        
+        elif token.type in [TokenType.EQUAL, TokenType.NOT_EQUAL, TokenType.GREATER, TokenType.LESS]:
+            return f"Unexpected comparison operator '{token.value}'. Comparisons need expressions on both sides"
+        
+        elif token.type == TokenType.EOF:
+            return "Unexpected end of input. Are you missing a closing bracket, brace, or parenthesis?"
+        
+        elif token.type == TokenType.NEWLINE:
+            return "Unexpected newline. Are you missing a semicolon or have an incomplete statement?"
+        
+        else:
+            # Generic fallback with more context
+            return f"Unexpected token '{token.value}' of type {token.type.name}. Expected a value, variable name, or expression"
+
     def process_string_literal(self, literal: str) -> str:
         """Process string literal, removing quotes and handling escapes."""
         # Remove surrounding quotes
@@ -719,7 +775,72 @@ class ASTParser:
             return self.advance()
         
         current_token = self.peek()
-        raise ParseError(f"{message}. Got '{current_token.value}'", current_token)
+        enhanced_message = self.enhance_expected_token_message(token_type, current_token, message)
+        raise ParseError(enhanced_message, current_token)
+    
+    def enhance_expected_token_message(self, expected_type: TokenType, actual_token: Token, base_message: str) -> str:
+        """Enhance error messages for expected token mismatches."""
+        # More helpful messages for common expected token scenarios
+        if expected_type == TokenType.RPAREN:
+            if actual_token.type == TokenType.EOF:
+                return f"{base_message}. Reached end of input - are you missing a closing parenthesis ')' somewhere?"
+            elif actual_token.type == TokenType.NEWLINE:
+                return f"{base_message}. Found newline instead - missing closing parenthesis ')' on this line?"
+            else:
+                return f"{base_message}. Got '{actual_token.value}' instead of ')'"
+        
+        elif expected_type == TokenType.RBRACKET:
+            if actual_token.type == TokenType.EOF:
+                return f"{base_message}. Reached end of input - are you missing a closing bracket ']' somewhere?"
+            else:
+                return f"{base_message}. Got '{actual_token.value}' instead of ']'"
+        
+        elif expected_type == TokenType.RBRACE:
+            if actual_token.type == TokenType.EOF:
+                return f"{base_message}. Reached end of input - are you missing a closing brace '}}' somewhere?"
+            else:
+                return f"{base_message}. Got '{actual_token.value}' instead of '}}'"
+        
+        elif expected_type == TokenType.COLON:
+            return f"{base_message}. Data structures need colons between keys and values (e.g., {{ \"key\": value }}). Got '{actual_token.value}'"
+        
+        elif expected_type == TokenType.IDENTIFIER:
+            if actual_token.type == TokenType.STRING_LITERAL:
+                return f"{base_message}. Got string '{actual_token.value}' - did you forget to remove quotes from a variable name?"
+            elif actual_token.type == TokenType.NUMBER_LITERAL:
+                return f"{base_message}. Got number '{actual_token.value}' - variable names must start with a letter"
+            else:
+                return f"{base_message}. Got '{actual_token.value}' - expected a variable or method name"
+        
+        else:
+            # Fallback with better context
+            expected_symbol = self.token_type_to_symbol(expected_type)
+            return f"{base_message}. Expected '{expected_symbol}' but got '{actual_token.value}'"
+    
+    def token_type_to_symbol(self, token_type: TokenType) -> str:
+        """Convert token type to human-readable symbol."""
+        symbol_map = {
+            TokenType.LPAREN: '(',
+            TokenType.RPAREN: ')',
+            TokenType.LBRACKET: '[',
+            TokenType.RBRACKET: ']',
+            TokenType.LBRACE: '{',
+            TokenType.RBRACE: '}',
+            TokenType.COLON: ':',
+            TokenType.COMMA: ',',
+            TokenType.DOT: '.',
+            TokenType.ASSIGN: '=',
+            TokenType.PLUS: '+',
+            TokenType.MINUS: '-',
+            TokenType.MULTIPLY: '*',
+            TokenType.SLASH: '/',
+            TokenType.MODULO: '%',
+            TokenType.SEMICOLON: ';',
+            TokenType.IDENTIFIER: 'identifier',
+            TokenType.STRING_LITERAL: 'string',
+            TokenType.NUMBER_LITERAL: 'number'
+        }
+        return symbol_map.get(token_type, token_type.name.lower())
     
     def check_type_keyword(self) -> bool:
         """Check if current token is a type keyword."""

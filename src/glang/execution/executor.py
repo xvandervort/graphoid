@@ -498,6 +498,24 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"inspect() takes no arguments, got {len(args)}", position)
             return target.universal_inspect()
         
+        elif method_name == "freeze":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"freeze() takes no arguments, got {len(args)}", position)
+            return target.freeze()
+        
+        elif method_name == "is_frozen":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"is_frozen() takes no arguments, got {len(args)}", position)
+            return BooleanValue(target.is_frozen_value(), position)
+        
+        elif method_name == "contains_frozen":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"contains_frozen() takes no arguments, got {len(args)}", position)
+            return BooleanValue(target.contains_frozen_data(), position)
+        
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, target.get_type(), position)
@@ -539,16 +557,16 @@ class ASTExecutor(BaseASTVisitor):
     def _get_available_methods(self, target_type: str) -> List[str]:
         """Get list of available methods for a given type."""
         # Universal methods available on all types
-        universal_methods = ['type', 'methods', 'can', 'inspect', 'size']
+        universal_methods = ['type', 'methods', 'can', 'inspect', 'size', 'freeze', 'is_frozen', 'contains_frozen']
         
         # Type-specific methods
         type_methods = {
-            'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort', 'to_string', 'to_bool'],
+            'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort', 'to_string', 'to_bool', 'can_accept'],
             'string': ['length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split', 'trim', 'join', 'matches', 'replace', 'findAll', 'reverse', 'unique', 'chars', 'to_string', 'to_num', 'to_bool'],
             'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool'],
             'bool': ['flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'],
-            'data': ['key', 'value'],
-            'hash': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop']
+            'data': ['key', 'value', 'can_accept'],
+            'hash': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept']
         }
         
         specific_methods = type_methods.get(target_type, [])
@@ -902,6 +920,22 @@ class ASTExecutor(BaseASTVisitor):
             # Maintain original constraint
             return ListValue(result_elements, target.constraint, position)
         
+        elif method_name == "can_accept":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"can_accept() takes exactly one argument, got {len(args)}", position)
+            
+            # Check if the list can accept the given element
+            can_accept, message = target.can_accept_element(args[0])
+            if can_accept:
+                return BooleanValue(True, position)
+            else:
+                return StringValue(message, position)
+        
+        # Check if it's a universal method
+        elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
+            return self._dispatch_universal_method(target, method_name, args, position)
+        
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "list", position)
@@ -1114,6 +1148,10 @@ class ASTExecutor(BaseASTVisitor):
             char_strings = [StringValue(node.value, position) for node in char_nodes]
             return ListValue(char_strings, "string", position)
         
+        # Check if it's a universal method
+        elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
+            return self._dispatch_universal_method(target, method_name, args, position)
+        
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "string", position)
@@ -1286,6 +1324,10 @@ class ASTExecutor(BaseASTVisitor):
                 multiplier = 10 ** places
                 return NumberValue(math.floor(target.value * multiplier) / multiplier, position)
         
+        # Check if it's a universal method
+        elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
+            return self._dispatch_universal_method(target, method_name, args, position)
+        
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "num", position)
@@ -1329,6 +1371,9 @@ class ASTExecutor(BaseASTVisitor):
             
             return NumberValue(1 if target.value else 0, position)
         
+        # Check if it's a universal method
+        elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
+            return self._dispatch_universal_method(target, method_name, args, position)
         
         else:
             from .errors import MethodNotFoundError
@@ -1353,6 +1398,18 @@ class ASTExecutor(BaseASTVisitor):
             
             # Return the value
             return target.get_value()
+        
+        elif method_name == "can_accept":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"can_accept() takes exactly one argument, got {len(args)}", position)
+            
+            # Check if the data node can accept the given value
+            can_accept, message = target.can_accept_value(args[0])
+            if can_accept:
+                return BooleanValue(True, position)
+            else:
+                return StringValue(message, position)
         
         else:
             from .errors import MethodNotFoundError
@@ -1534,6 +1591,18 @@ class ASTExecutor(BaseASTVisitor):
             
             # Return the value that was removed
             return value
+        
+        elif method_name == "can_accept":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"can_accept() takes exactly one argument, got {len(args)}", position)
+            
+            # Check if the map can accept the given value
+            can_accept, message = target.can_accept_value(args[0])
+            if can_accept:
+                return BooleanValue(True, position)
+            else:
+                return StringValue(message, position)
         
         else:
             from .errors import MethodNotFoundError

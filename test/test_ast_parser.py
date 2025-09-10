@@ -118,6 +118,87 @@ class TestASTParser:
         assert isinstance(ast.arguments[0], VariableRef)
         assert ast.arguments[0].name == "value"
     
+    def test_parse_zero_argument_method_syntax(self):
+        """Test parsing zero-argument methods without parentheses."""
+        # Single zero-argument method with operator
+        ast = self.parser.parse('obj.to_string + "suffix"')
+        
+        assert isinstance(ast, ExpressionStatement)
+        assert isinstance(ast.expression, BinaryOperation)
+        assert isinstance(ast.expression.left, MethodCallExpression)
+        assert ast.expression.left.method_name == "to_string"
+        assert len(ast.expression.left.arguments) == 0
+        assert ast.expression.operator == "+"
+        assert isinstance(ast.expression.right, StringLiteral)
+        assert ast.expression.right.value == "suffix"
+        
+        # Zero-argument method chaining (parsed as statement when no operator follows)
+        ast = self.parser.parse('obj.freeze.is_frozen')
+        
+        assert isinstance(ast, MethodCall)
+        # First method call: obj.freeze
+        assert isinstance(ast.target, MethodCallExpression)
+        assert ast.target.method_name == "freeze"
+        assert len(ast.target.arguments) == 0
+        # Second method call: .is_frozen
+        assert ast.method_name == "is_frozen"
+        assert len(ast.arguments) == 0
+        
+        # Triple method chaining with operator
+        ast = self.parser.parse('text.trim.reverse.up + "end"')
+        
+        assert isinstance(ast, ExpressionStatement)
+        assert isinstance(ast.expression, BinaryOperation)
+        # Left side is a method call chain
+        left_expr = ast.expression.left
+        assert isinstance(left_expr, MethodCallExpression)
+        assert left_expr.method_name == "up"
+        assert len(left_expr.arguments) == 0
+        
+        # The target of "up" should be "text.trim.reverse"
+        assert isinstance(left_expr.target, MethodCallExpression)
+        assert left_expr.target.method_name == "reverse"
+        assert len(left_expr.target.arguments) == 0
+        
+        # The target of "reverse" should be "text.trim"
+        assert isinstance(left_expr.target.target, MethodCallExpression)
+        assert left_expr.target.target.method_name == "trim"
+        assert len(left_expr.target.target.arguments) == 0
+        
+        # Original issue case - simplified method test
+        ast = self.parser.parse('i.to_string + " is a number"')
+        
+        assert isinstance(ast, ExpressionStatement)
+        assert isinstance(ast.expression, BinaryOperation)
+        assert isinstance(ast.expression.left, MethodCallExpression)
+        assert ast.expression.left.method_name == "to_string"
+        assert len(ast.expression.left.arguments) == 0
+        assert ast.expression.operator == "+"
+        assert isinstance(ast.expression.right, StringLiteral)
+        
+        # Test various zero-argument methods work
+        test_methods = [
+            ('x.freeze + 1', 'freeze'),
+            ('x.is_frozen + true', 'is_frozen'),
+            ('x.contains_frozen + false', 'contains_frozen'),
+            ('items.size + 5', 'size'),
+            ('name.up + "test"', 'up'),
+            ('name.down + "test"', 'down'),
+            ('value.flip + 1', 'flip'),
+            ('num.abs + 2', 'abs'),
+            ('num.sqrt + 3', 'sqrt'),
+            ('text.trim + "end"', 'trim'),
+            ('text.reverse + "end"', 'reverse'),
+        ]
+        
+        for code, method_name in test_methods:
+            ast = self.parser.parse(code)
+            assert isinstance(ast, ExpressionStatement)
+            assert isinstance(ast.expression, BinaryOperation)
+            assert isinstance(ast.expression.left, MethodCallExpression)
+            assert ast.expression.left.method_name == method_name
+            assert len(ast.expression.left.arguments) == 0, f"Method {method_name} should have 0 arguments"
+    
     def test_parse_index_access(self):
         """Test parsing index access expressions."""
         # Simple index

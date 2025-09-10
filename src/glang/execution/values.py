@@ -22,6 +22,8 @@ class GlangValue(ABC):
     
     def __init__(self, position: Optional[SourcePosition] = None):
         self.position = position
+        self.is_frozen = False
+        self.contains_frozen = False
     
     @abstractmethod
     def to_python(self) -> Any:
@@ -83,6 +85,54 @@ class GlangValue(ABC):
         except NotImplementedError:
             # Fallback if methods() not available
             return BooleanValue(False, self.position)
+    
+    # Immutability methods
+    def freeze(self) -> 'GlangValue':
+        """Freeze this value, making it immutable.
+        Returns self for method chaining.
+        """
+        self.is_frozen = True
+        self.contains_frozen = True
+        self._deep_freeze()
+        return self
+    
+    def _deep_freeze(self):
+        """Override in collection types to freeze contained elements."""
+        pass
+    
+    def is_frozen_value(self) -> bool:
+        """Check if this value is frozen."""
+        return self.is_frozen
+    
+    def contains_frozen_data(self) -> bool:
+        """Check if this value contains any frozen data."""
+        return self.contains_frozen
+    
+    def can_accept_element(self, element: 'GlangValue') -> Tuple[bool, str]:
+        """Check if this collection can accept the given element.
+        Returns (can_accept, reason_if_not).
+        Override in collection types for actual checking.
+        """
+        return True, ""
+    
+    def _check_not_frozen(self, operation: str):
+        """Raise error if this value is frozen and operation would mutate it."""
+        if self.is_frozen:
+            raise RuntimeError(f"Cannot {operation}: value is frozen (immutable)")
+    
+    def _check_contamination_compatibility(self, element: 'GlangValue', operation: str):
+        """Check if adding element would violate contamination rules."""
+        if self.is_frozen:
+            # Frozen collections cannot be modified anyway
+            raise RuntimeError(f"Cannot {operation}: collection is frozen")
+        
+        if element.is_frozen_value() and not self.contains_frozen:
+            # Adding frozen element to unfrozen collection
+            raise RuntimeError(f"Cannot {operation}: cannot mix frozen and unfrozen data in same collection")
+        
+        if not element.is_frozen_value() and self.contains_frozen:
+            # Adding unfrozen element to collection with frozen data
+            raise RuntimeError(f"Cannot {operation}: cannot mix frozen and unfrozen data in same collection")
 
 
 class CharNode(GlangValue):
@@ -208,6 +258,8 @@ class DataValue(GlangValue):
         self.key = key  # Immutable string key
         self.value = value  # Mutable value
         self.constraint = constraint  # Optional type constraint for value
+        # Check if value is frozen
+        self._update_frozen_flag()
     
     def to_python(self) -> dict:
         return {self.key: self.value.to_python()}
@@ -226,13 +278,19 @@ class DataValue(GlangValue):
     
     def set_value(self, new_value: GlangValue) -> None:
         """Set the value (with constraint validation)."""
+        self._check_not_frozen("set value")
+        self._check_contamination_compatibility(new_value, "set value")
+        
         if not self.validate_constraint(new_value):
             from .errors import TypeConstraintError
             raise TypeConstraintError(
                 f"Cannot assign {new_value.get_type()} to data<{self.constraint}>",
                 new_value.position
             )
+        
+        old_value = self.value
         self.value = new_value
+        self._update_frozen_flag()
     
     def get_key(self) -> StringValue:
         """Get the key as a StringValue."""
@@ -258,6 +316,33 @@ class DataValue(GlangValue):
         constraint_info = f"<{self.constraint}>" if self.constraint else ""
         info = f'data{constraint_info} {{ "{self.key}": {self.value.get_type()} }}'
         return StringValue(info, self.position)
+    
+    # Immutability-specific methods
+    def _update_frozen_flag(self):
+        """Update the contains_frozen flag based on value."""
+        self.contains_frozen = self.value.is_frozen_value() or self.value.contains_frozen_data()
+    
+    def _deep_freeze(self):
+        """Freeze the contained value."""
+        self.value.freeze()
+    
+    def can_accept_value(self, new_value: GlangValue) -> Tuple[bool, str]:
+        """Check if this data node can accept the given value."""
+        # Check constraint first
+        if not self.validate_constraint(new_value):
+            return False, f"Value type {new_value.get_type()} does not match constraint {self.constraint}"
+        
+        # Check contamination rules
+        if self.is_frozen:
+            return False, "Cannot modify frozen data node"
+        
+        if new_value.is_frozen_value() and not self.contains_frozen:
+            return False, "Cannot mix frozen and unfrozen data in same collection"
+        
+        if not new_value.is_frozen_value() and self.contains_frozen:
+            return False, "Cannot mix frozen and unfrozen data in same collection"
+        
+        return True, ""
 
 
 class MapValue(GlangValue):
@@ -269,6 +354,8 @@ class MapValue(GlangValue):
         # Store as ordered dictionary to maintain insertion order
         self.pairs = dict(pairs)  # Convert to dict for efficient key lookup
         self.constraint = constraint  # Optional type constraint for all values
+        # Check if any values are frozen
+        self._update_frozen_flag()
     
     def to_python(self) -> dict:
         return {key: value.to_python() for key, value in self.pairs.items()}
@@ -297,13 +384,18 @@ class MapValue(GlangValue):
     
     def set(self, key: str, value: GlangValue) -> None:
         """Set value for key (with constraint validation)."""
+        self._check_not_frozen("set key")
+        self._check_contamination_compatibility(value, "set key")
+        
         if not self.validate_constraint(value):
             from .errors import TypeConstraintError
             raise TypeConstraintError(
                 f"Cannot assign {value.get_type()} to hash<{self.constraint}>",
                 value.position
             )
+        
         self.pairs[key] = value
+        self._update_frozen_flag()
     
     def has_key(self, key: str) -> bool:
         """Check if key exists in map."""
@@ -319,8 +411,11 @@ class MapValue(GlangValue):
     
     def remove(self, key: str) -> bool:
         """Remove key-value pair. Returns True if key existed."""
+        self._check_not_frozen("remove key")
+        
         if key in self.pairs:
             del self.pairs[key]
+            self._update_frozen_flag()
             return True
         return False
     
@@ -339,6 +434,35 @@ class MapValue(GlangValue):
         constraint_info = f"<{self.constraint}>" if self.constraint else ""
         info = f'hash{constraint_info} ({len(self.pairs)} pairs)'
         return StringValue(info, self.position)
+    
+    # Immutability-specific methods
+    def _update_frozen_flag(self):
+        """Update the contains_frozen flag based on values."""
+        self.contains_frozen = any(value.is_frozen_value() or value.contains_frozen_data() 
+                                 for value in self.pairs.values())
+    
+    def _deep_freeze(self):
+        """Freeze all contained values."""
+        for value in self.pairs.values():
+            value.freeze()
+    
+    def can_accept_value(self, value: GlangValue) -> Tuple[bool, str]:
+        """Check if this map can accept the given value."""
+        # Check constraint first
+        if not self.validate_constraint(value):
+            return False, f"Value type {value.get_type()} does not match constraint {self.constraint}"
+        
+        # Check contamination rules
+        if self.is_frozen:
+            return False, "Cannot modify frozen map"
+        
+        if value.is_frozen_value() and not self.contains_frozen:
+            return False, "Cannot mix frozen and unfrozen data in same collection"
+        
+        if not value.is_frozen_value() and self.contains_frozen:
+            return False, "Cannot mix frozen and unfrozen data in same collection"
+        
+        return True, ""
 
 
 class ListValue(GlangValue):
@@ -349,6 +473,8 @@ class ListValue(GlangValue):
         super().__init__(position)
         self.elements = elements
         self.constraint = constraint
+        # Check if any elements are frozen
+        self._update_frozen_flag()
     
     def to_python(self) -> List[Any]:
         return [elem.to_python() for elem in self.elements]
@@ -368,13 +494,18 @@ class ListValue(GlangValue):
     
     def append(self, value: GlangValue) -> None:
         """Append value to list (with constraint validation)."""
+        self._check_not_frozen("append")
+        self._check_contamination_compatibility(value, "append")
+        
         if not self.validate_constraint(value):
             from .errors import TypeConstraintError
             raise TypeConstraintError(
                 f"Cannot append {value.get_type()} to list<{self.constraint}>",
                 value.position
             )
+        
         self.elements.append(value)
+        self._update_frozen_flag()
     
     def get_element(self, index: int) -> GlangValue:
         """Get element at index (with bounds checking)."""
@@ -389,6 +520,9 @@ class ListValue(GlangValue):
             from .errors import RuntimeError
             raise RuntimeError(f"List index {index} out of range", value.position)
         
+        self._check_not_frozen("set element")
+        self._check_contamination_compatibility(value, "set element")
+        
         if not self.validate_constraint(value):
             from .errors import TypeConstraintError
             raise TypeConstraintError(
@@ -397,6 +531,7 @@ class ListValue(GlangValue):
             )
         
         self.elements[index] = value
+        self._update_frozen_flag()
     
     def __len__(self) -> int:
         return len(self.elements)
@@ -405,6 +540,35 @@ class ListValue(GlangValue):
         return (isinstance(other, ListValue) and 
                 self.elements == other.elements and
                 self.constraint == other.constraint)
+    
+    # Immutability-specific methods
+    def _update_frozen_flag(self):
+        """Update the contains_frozen flag based on elements."""
+        self.contains_frozen = any(elem.is_frozen_value() or elem.contains_frozen_data() 
+                                 for elem in self.elements)
+    
+    def _deep_freeze(self):
+        """Freeze all contained elements."""
+        for element in self.elements:
+            element.freeze()
+    
+    def can_accept_element(self, element: GlangValue) -> Tuple[bool, str]:
+        """Check if this list can accept the given element."""
+        # Check constraint first
+        if not self.validate_constraint(element):
+            return False, f"Element type {element.get_type()} does not match constraint {self.constraint}"
+        
+        # Check contamination rules
+        if self.is_frozen:
+            return False, "Cannot add to frozen list"
+        
+        if element.is_frozen_value() and not self.contains_frozen:
+            return False, "Cannot mix frozen and unfrozen data in same collection"
+        
+        if not element.is_frozen_value() and self.contains_frozen:
+            return False, "Cannot mix frozen and unfrozen data in same collection"
+        
+        return True, ""
     
     # Override universal methods for list-specific behavior
     def universal_size(self) -> 'NumberValue':

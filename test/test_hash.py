@@ -659,16 +659,16 @@ class TestMapEdgeCases:
         methods_list = result.value
         assert methods_list.get_type() == "list"
         
-        # Should have 16 methods total (5 universal + 11 hash-specific)
-        assert len(methods_list.elements) == 16  # Updated count with count_values()
+        # Should have 20 methods total (8 universal + 12 hash-specific)
+        assert len(methods_list.elements) == 20  # Updated count with immutability methods
         
         # Check that all expected methods are present
         method_names = [elem.value for elem in methods_list.elements]
         
         # Universal methods
-        for method in ['type', 'methods', 'can', 'inspect', 'size']:
+        for method in ['type', 'methods', 'can', 'inspect', 'size', 'freeze', 'is_frozen', 'contains_frozen']:
             assert method in method_names, f"Missing universal method: {method}"
             
         # Map-specific methods  
-        for method in ['get', 'set', 'has_key', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop']:
+        for method in ['get', 'set', 'has_key', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'count_values', 'can_accept']:
             assert method in method_names, f"Missing hash method: {method}"

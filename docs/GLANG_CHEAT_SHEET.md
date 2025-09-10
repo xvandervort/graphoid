@@ -231,6 +231,101 @@ result = x.to_string().to_bool()  # true
 b = true.to_num().to_string()     # "1"
 ```
 
+## 🔒 Data Immutability System
+
+### Freezing Data
+```glang
+# Make any value immutable
+name = "Alice"
+name.freeze()              # Returns self for chaining
+print(name.is_frozen())    # true
+
+# Chaining example
+config = { "host": "localhost", "port": 8080 }
+config.freeze().inspect()  # Freeze and inspect in one line
+```
+
+### Deep Freezing Collections
+```glang
+# Freezing collections also freezes their contents
+items = [1, 2, 3]
+items.freeze()             # All elements become frozen too
+print(items.contains_frozen())  # true
+
+# Same for hashes and data nodes
+user = { "name": "Alice", "age": 25 }
+user.freeze()              # All values become frozen
+```
+
+### Contamination Rules (Strict Separation)
+```glang
+# Frozen and unfrozen data cannot mix
+list1 = [1, 2, 3]         # Unfrozen list
+item = "hello"
+item.freeze()              # Frozen string
+
+# This will throw an error:
+# list1.append(item)       # Cannot mix frozen/unfrozen data
+
+# Check compatibility before operations
+if list1.can_accept(item) {
+    list1.append(item)
+} else {
+    print("Cannot add frozen item to unfrozen list")
+}
+```
+
+### Mutation Prevention
+```glang
+config = { "debug": true }
+config.freeze()
+
+# These will throw runtime errors:
+# config["debug"] = false  # Cannot modify frozen hash
+# config.set("port", 8080) # Cannot add to frozen hash
+
+# Use is_frozen() to check before mutations
+if !config.is_frozen() {
+    config["new_key"] = "value"
+}
+```
+
+### Immutability Methods (Available on All Types)
+```glang
+# Universal methods
+value.freeze()             # Make immutable (returns self)
+value.is_frozen()          # Check if frozen: true/false
+value.contains_frozen()    # Check if contains frozen data
+
+# Collection-specific methods  
+list.can_accept(item)      # Check if item can be added
+hash.can_accept(value)     # Check if value can be stored
+data.can_accept(value)     # Check if value can be set
+```
+
+### Practical Use Cases
+```glang
+# Configuration that shouldn't change
+config = { "api_key": "secret", "endpoint": "api.com" }
+config.freeze()            # Prevent accidental modifications
+
+# Immutable data structures
+numbers = [1, 2, 3, 4, 5]
+frozen_numbers = numbers.freeze()  # Prevent mutations
+# Can still read, but not modify
+
+# Safe data sharing
+def process_data(data) {
+    if data.is_frozen() {
+        # Safe to use without worrying about modifications
+        return data.map("double")
+    } else {
+        # Make a frozen copy to prevent side effects  
+        return data.freeze().map("double")
+    }
+}
+```
+
 ## 🔢 Operators & Comparisons
 
 ### Arithmetic
@@ -392,6 +487,10 @@ print("Processed: " + processed.to_string())
 4. **Property vs Method**: Both `list.size` and `list.size()` work - use what feels natural
 
 5. **Functional Style**: Use `filter()` and `map()` for data transformations instead of explicit loops when possible
+
+6. **Immutability**: Use `freeze()` to prevent accidental data modifications, especially for configuration and shared data structures
+
+7. **Contamination Checking**: Use `can_accept()` to check if frozen and unfrozen data can be safely mixed before operations
 
 ---
 
