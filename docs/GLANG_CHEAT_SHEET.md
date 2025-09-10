@@ -154,6 +154,83 @@ numbers.reject("odd")     # Opposite of filter
 numbers.filter("positive").map("double").each("print")
 ```
 
+## 🧮 Mathematical Methods
+
+### Number Methods
+```glang
+x = 16
+x.abs()                   # Absolute value: 16
+x.sqrt()                  # Square root: 4.0
+x.log()                   # Natural logarithm: 2.77...
+x.log(10)                # Log base 10: 1.20...
+x.pow(2)                  # Power: 256
+x.to(2)                   # Truncate to 2 decimals
+
+# Rounding methods
+y = 3.14159
+y.rnd()                   # Round to nearest: 3
+y.rnd(2)                  # Round to 2 places: 3.14
+y.rnd_up()               # Round up (ceiling): 4
+y.rnd_up(2)              # Round up to 2 places: 3.15
+y.rnd_dwn()              # Round down (floor): 3
+y.rnd_dwn(2)             # Round down to 2 places: 3.14
+```
+
+### Boolean Methods
+```glang
+flag = true
+flag.flip()               # Toggle: false
+flag.toggle()             # Alias for flip: false
+flag.numify()             # Convert to number: 1
+flag.toNum()              # Alias for numify: 1
+```
+
+### Mathematical Constants
+```glang
+load "stdlib/math.gr"     # Load mathematical constants
+print(pi)                 # 3.141592653589793
+print(e)                  # 2.718281828459045
+
+# Example: Calculate circle area
+radius = 5
+area = pi * radius.pow(2)
+print("Area: " + area.to_string())
+```
+
+## 🔄 Type Casting
+
+### Convert Any Type to String
+```glang
+(42).to_string()          # "42"
+true.to_string()          # "true"
+[1, 2, 3].to_string()     # "[1, 2, 3]"
+```
+
+### Convert to Numbers
+```glang
+"123".to_num()            # 123
+"3.14".to_num()           # 3.14
+true.to_num()             # 1
+false.to_num()            # 0
+```
+
+### Convert to Booleans
+```glang
+(42).to_bool()            # true (non-zero)
+(0).to_bool()             # false (zero)
+"hello".to_bool()         # true (non-empty)
+"".to_bool()              # false (empty)
+[1, 2].to_bool()          # true (non-empty)
+[].to_bool()              # false (empty)
+```
+
+### Chained Conversions
+```glang
+x = 42
+result = x.to_string().to_bool()  # true
+b = true.to_num().to_string()     # "1"
+```
+
 ## 🔢 Operators & Comparisons
 
 ### Arithmetic
@@ -253,16 +330,53 @@ for row in matrix {
 print(result)  # [1, 3, 5, 7, 9]
 ```
 
+### Mathematical Calculations
+```glang
+# Load mathematical constants
+load "stdlib/math.gr"
+
+# Calculate various formulas
+radius = 7.5
+area = pi * radius.pow(2)
+circumference = 2 * pi * radius
+
+print("Circle with radius " + radius.to_string())
+print("Area: " + area.rnd(2).to_string())
+print("Circumference: " + circumference.rnd(2).to_string())
+
+# Temperature conversion
+celsius = 25
+fahrenheit = celsius * 9 / 5 + 32
+print(celsius.to_string() + "°C = " + fahrenheit.to_string() + "°F")
+```
+
+### Type Conversion Pipeline
+```glang
+# Data processing with type conversion
+scores = ["95", "87", "92", "76", "88"]
+
+# Convert to numbers, filter, and format
+high_scores = scores.map("to_num")
+                   .filter("positive")
+                   .filter(s => s > 90)
+                   .map("to_string")
+
+for score in high_scores {
+    print("High score: " + score)
+}
+```
+
 ### Nested Functional Operations
 ```glang
 numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-# Complex pipeline
-if numbers.filter("even").map("square").filter("positive").size() > 3 {
-    processed = numbers.map("double")
-} else {
-    processed = numbers.filter("odd")
-}
+# Complex pipeline with mathematical operations
+processed = numbers.filter("even")
+                  .map(x => x.pow(2))
+                  .filter(x => x > 10)
+                  .map(x => x.sqrt().rnd(2))
+
+print("Processed: " + processed.to_string())
 ```
 
 ---

@@ -543,10 +543,10 @@ class ASTExecutor(BaseASTVisitor):
         
         # Type-specific methods
         type_methods = {
-            'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort'],
-            'string': ['length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split', 'trim', 'join', 'matches', 'replace', 'findAll', 'reverse', 'unique', 'chars'],
-            'num': ['to'],
-            'bool': ['flip', 'toggle', 'numify', 'toNum'],
+            'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort', 'to_string', 'to_bool'],
+            'string': ['length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split', 'trim', 'join', 'matches', 'replace', 'findAll', 'reverse', 'unique', 'chars', 'to_string', 'to_num', 'to_bool'],
+            'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool'],
+            'bool': ['flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'],
             'data': ['key', 'value'],
             'hash': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop']
         }
@@ -558,7 +558,23 @@ class ASTExecutor(BaseASTVisitor):
                              args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle list method calls."""
         
-        if method_name == "append":
+        # Type conversion methods
+        if method_name == "to_string":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_string() takes no arguments, got {len(args)}", position)
+            # Convert list to string representation
+            element_strs = [elem.to_display_string() for elem in target.elements]
+            return StringValue(f"[{', '.join(element_strs)}]", position)
+        
+        elif method_name == "to_bool":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_bool() takes no arguments, got {len(args)}", position)
+            # Non-empty list is true, empty is false
+            return BooleanValue(len(target.elements) > 0, position)
+        
+        elif method_name == "append":
             if len(args) != 1:
                 from .errors import ArgumentError
                 raise ArgumentError(f"append() takes 1 argument, got {len(args)}", position)
@@ -894,8 +910,36 @@ class ASTExecutor(BaseASTVisitor):
                                args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle string method calls."""
         
+        # Type conversion methods
+        if method_name == "to_string":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_string() takes no arguments, got {len(args)}", position)
+            return target  # Already a string
+        
+        elif method_name == "to_num":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_num() takes no arguments, got {len(args)}", position)
+            try:
+                # Try int first, then float
+                if '.' in target.value:
+                    return NumberValue(float(target.value), position)
+                else:
+                    return NumberValue(int(target.value), position)
+            except ValueError:
+                from .errors import RuntimeError
+                raise RuntimeError(f"Cannot convert '{target.value}' to number", position)
+        
+        elif method_name == "to_bool":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_bool() takes no arguments, got {len(args)}", position)
+            # Empty string is false, non-empty is true
+            return BooleanValue(len(target.value) > 0, position)
+        
         # Length method
-        if method_name == "length":
+        elif method_name == "length":
             if len(args) != 0:
                 from .errors import ArgumentError
                 raise ArgumentError(f"length() takes no arguments, got {len(args)}", position)
@@ -1077,9 +1121,29 @@ class ASTExecutor(BaseASTVisitor):
     def _dispatch_num_method(self, target: NumberValue, method_name: str,
                             args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle number method calls."""
+        import math
+        
+        # Type conversion methods
+        if method_name == "to_string":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_string() takes no arguments, got {len(args)}", position)
+            return StringValue(str(target.value), position)
+        
+        elif method_name == "to_bool":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_bool() takes no arguments, got {len(args)}", position)
+            return BooleanValue(target.value != 0, position)
+        
+        elif method_name == "to_num":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_num() takes no arguments, got {len(args)}", position)
+            return target  # Already a number
         
         # to() method for precision truncation
-        if method_name == "to":
+        elif method_name == "to":
             if len(args) != 1:
                 from .errors import ArgumentError
                 raise ArgumentError(f"to() takes 1 argument, got {len(args)}", position)
@@ -1105,6 +1169,122 @@ class ASTExecutor(BaseASTVisitor):
             
             return NumberValue(truncated, position)
         
+        # Mathematical methods - basic functions
+        elif method_name == "abs":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"abs() takes no arguments, got {len(args)}", position)
+            return NumberValue(abs(target.value), position)
+        
+        elif method_name == "sqrt":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"sqrt() takes no arguments, got {len(args)}", position)
+            if target.value < 0:
+                from .errors import RuntimeError
+                raise RuntimeError("Cannot take square root of negative number", position)
+            return NumberValue(math.sqrt(target.value), position)
+        
+        elif method_name == "log":
+            if len(args) > 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"log() takes 0 or 1 arguments, got {len(args)}", position)
+            if target.value <= 0:
+                from .errors import RuntimeError
+                raise RuntimeError("Cannot take logarithm of non-positive number", position)
+            
+            if len(args) == 0:
+                # Natural log (base e)
+                return NumberValue(math.log(target.value), position)
+            else:
+                # Log with specified base
+                if not isinstance(args[0], NumberValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"log() base must be number, got {args[0].get_type()}", position)
+                base = args[0].value
+                if base <= 0 or base == 1:
+                    from .errors import RuntimeError
+                    raise RuntimeError("Logarithm base must be positive and not equal to 1", position)
+                return NumberValue(math.log(target.value, base), position)
+        
+        elif method_name == "pow":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"pow() takes 1 argument, got {len(args)}", position)
+            if not isinstance(args[0], NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"pow() exponent must be number, got {args[0].get_type()}", position)
+            
+            exponent = args[0].value
+            try:
+                result = pow(target.value, exponent)
+                return NumberValue(result, position)
+            except (ValueError, ZeroDivisionError) as e:
+                from .errors import RuntimeError
+                raise RuntimeError(f"Power operation failed: {e}", position)
+        
+        # Rounding methods
+        elif method_name == "rnd":
+            # Round to nearest integer or specified decimal places
+            if len(args) > 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"rnd() takes 0 or 1 arguments, got {len(args)}", position)
+            
+            if len(args) == 0:
+                # Round to nearest integer
+                return NumberValue(round(target.value), position)
+            else:
+                # Round to specified decimal places
+                if not isinstance(args[0], NumberValue) or not isinstance(args[0].value, int):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"rnd() places must be integer, got {args[0].get_type()}", position)
+                places = args[0].value
+                if places < 0:
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"rnd() places must be non-negative, got {places}", position)
+                return NumberValue(round(target.value, places), position)
+        
+        elif method_name == "rnd_up":
+            # Always round up (ceiling)
+            if len(args) > 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"rnd_up() takes 0 or 1 arguments, got {len(args)}", position)
+            
+            if len(args) == 0:
+                # Ceiling to integer
+                return NumberValue(math.ceil(target.value), position)
+            else:
+                # Ceiling to specified decimal places
+                if not isinstance(args[0], NumberValue) or not isinstance(args[0].value, int):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"rnd_up() places must be integer, got {args[0].get_type()}", position)
+                places = args[0].value
+                if places < 0:
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"rnd_up() places must be non-negative, got {places}", position)
+                multiplier = 10 ** places
+                return NumberValue(math.ceil(target.value * multiplier) / multiplier, position)
+        
+        elif method_name == "rnd_dwn":
+            # Always round down (floor)
+            if len(args) > 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"rnd_dwn() takes 0 or 1 arguments, got {len(args)}", position)
+            
+            if len(args) == 0:
+                # Floor to integer
+                return NumberValue(math.floor(target.value), position)
+            else:
+                # Floor to specified decimal places
+                if not isinstance(args[0], NumberValue) or not isinstance(args[0].value, int):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"rnd_dwn() places must be integer, got {args[0].get_type()}", position)
+                places = args[0].value
+                if places < 0:
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"rnd_dwn() places must be non-negative, got {places}", position)
+                multiplier = 10 ** places
+                return NumberValue(math.floor(target.value * multiplier) / multiplier, position)
         
         else:
             from .errors import MethodNotFoundError
@@ -1114,8 +1294,27 @@ class ASTExecutor(BaseASTVisitor):
                              args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle boolean method calls."""
         
+        # Type conversion methods
+        if method_name == "to_string":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_string() takes no arguments, got {len(args)}", position)
+            return StringValue(str(target.value).lower(), position)  # "true" or "false"
+        
+        elif method_name == "to_num":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_num() takes no arguments, got {len(args)}", position)
+            return NumberValue(1 if target.value else 0, position)
+        
+        elif method_name == "to_bool":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_bool() takes no arguments, got {len(args)}", position)
+            return target  # Already a boolean
+        
         # flip() and toggle() methods (aliases)
-        if method_name in ["flip", "toggle"]:
+        elif method_name in ["flip", "toggle"]:
             if len(args) != 0:
                 from .errors import ArgumentError
                 raise ArgumentError(f"{method_name}() takes no arguments, got {len(args)}", position)

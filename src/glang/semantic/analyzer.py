@@ -83,6 +83,14 @@ class SemanticAnalyzer(BaseASTVisitor):
                 symbol = self.symbol_table.lookup_symbol(expr.name)
                 return symbol.symbol_type
         elif isinstance(expr, MethodCallExpression):
+            # For chained method calls, recursively infer the type of the target first
+            if isinstance(expr.target, MethodCallExpression):
+                # Recursively infer the type of the chained target
+                target_type = self.infer_type_from_expression(expr.target)
+                if target_type is None:
+                    return None  # Can't determine
+                # Now we know the type of the target, we can infer the return type
+            
             # Some methods have known return types
             if expr.method_name == 'len':
                 return 'num'
@@ -119,6 +127,18 @@ class SemanticAnalyzer(BaseASTVisitor):
                     return 'list'
                 else:
                     return 'string'
+            elif expr.method_name == 'to_string':
+                # Type casting to string
+                return 'string'
+            elif expr.method_name in ['to_num', 'numify', 'toNum']:
+                # Type casting to number
+                return 'num'
+            elif expr.method_name in ['to_bool', 'flip', 'toggle']:
+                # Type casting to boolean or boolean operations
+                return 'bool'
+            elif expr.method_name in ['abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to']:
+                # Mathematical methods that return numbers
+                return 'num'
             # For other methods, we'd need more context
         elif isinstance(expr, BinaryOperation):
             # Arithmetic operations return numbers
@@ -431,16 +451,18 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'append', 'prepend', 'insert', 'remove', 'pop', 'clear', 'reverse',
                 'size', 'empty', 'constraint', 'validate_constraint', 'type_summary',
                 'types', 'coerce_to_constraint', 'indexOf', 'count', 'min', 'max', 'sum', 'sort',
-                'map', 'filter', 'each', 'select', 'reject'
+                'map', 'filter', 'each', 'select', 'reject',
+                'to_string', 'to_bool'
             } | universal_methods,
             'string': {
                 'size', 'empty', 'upper', 'lower', 'split', 'trim', 'join',
                 'matches', 'replace', 'findAll',
                 'length', 'contains', 'up', 'toUpper', 'down', 'toLower',
-                'reverse', 'unique', 'chars'
+                'reverse', 'unique', 'chars',
+                'to_string', 'to_num', 'to_bool'
             } | universal_methods,
-            'num': {'abs', 'round', 'to'} | universal_methods,
-            'bool': {'flip', 'toggle', 'numify', 'toNum'} | universal_methods,
+            'num': {'abs', 'round', 'to', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool'} | universal_methods,
+            'bool': {'flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'} | universal_methods,
             'data': {'key', 'value'} | universal_methods,
             'hash': {
                 'get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop'

@@ -1,22 +1,36 @@
-# Test glang program file
-# This demonstrates the .gr file format
+#!/usr/bin/env glang
+# Test Glang program with control flow and functional operations
 
-# String variables
-string greeting = "Hello, World!"
-name = "Alice"
+# Create some data
+numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+print("Original numbers:")
+print(numbers)
 
-# Numeric variables
-num age = 25
-count = 10
+# Filter even numbers
+evens = numbers.filter("even")
+print("Even numbers:")
+print(evens)
 
-# Boolean variables
-bool is_active = true
-flag = false
+# Double the evens
+doubled = evens.map("double")
+print("Doubled evens:")
+print(doubled)
 
-# List variables
-list fruits = ["apple", "banana", "cherry"]
-list<num> scores = [95, 87, 92]
+# Control flow example
+total = 0
+count = 0
+for number in doubled {
+    if number > 10 {
+        total = total + number
+        count = count + 1
+    }
+}
 
-# Method calls
-fruits.append("orange")
-scores.append(100)
+print("Found large numbers, total:")
+print(total)
+print("Count:")
+print(count)
+
+# Note: args variable is only available when command line arguments are provided
+
+print("Program completed successfully!")
