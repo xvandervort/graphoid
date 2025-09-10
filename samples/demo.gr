@@ -1,7 +1,62 @@
-# Glang program file
-# Generated on 2025-09-04 21:21:18
+#!/usr/bin/env glang
+# Comprehensive Glang demonstration program
 
-# Variable declarations
-string project = "Glang Demo"
-num version = 1.0
-list features = ["file-import", "type-inference", "ast-execution"]
+print "=== Glang Demo Program ==="
+print "Command line arguments: " + args.size().to_string()
+
+# Show arguments if provided
+if args.size() > 0 {
+    print "Arguments: " + args.to_string()
+} else {
+    print "No arguments provided"
+}
+
+# Variables and type inference
+name = "Glang"
+version = 1.0
+ready = true
+
+print "\nLanguage: " + name
+print "Version: " + version.to_string()
+print "Ready: " + ready.to_string()
+
+# Lists and functional programming
+numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+print "\nOriginal numbers: " + numbers.to_string()
+
+evens = numbers.filter("even")
+print "Even numbers: " + evens.to_string()
+
+doubled = evens.map("double")  
+print "Evens doubled: " + doubled.to_string()
+
+total = numbers.sum()
+print "Sum of all: " + total.to_string()
+
+# Data structures
+config = { "host": "localhost", "port": 8080, "debug": true }
+print "\nConfiguration:"
+print "Host: " + config["host"].value().to_string()
+print "Port: " + config["port"].value().to_string()
+print "Debug: " + config["debug"].value().to_string()
+
+# Control flow with loops
+print "\nCountdown:"
+counter = 5
+while counter > 0 {
+    print counter.to_string() + "..."
+    counter = counter - 1
+}
+print "Blast off! 🚀"
+
+# Mathematical operations
+print "\nMath demonstration:"
+radius = 7
+area = 3.14159 * radius * radius
+circumference = 2 * 3.14159 * radius
+
+print "Circle with radius " + radius.to_string()
+print "Area: " + area.to_string()  
+print "Circumference: " + circumference.to_string()
+
+print "\n=== Demo Complete ==="

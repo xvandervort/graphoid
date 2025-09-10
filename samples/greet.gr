@@ -1,0 +1,20 @@
+#!/usr/bin/env glang
+# Greet program that accepts command line arguments
+
+# Check if arguments were provided
+name = "World"
+if args.size > 0 {
+    name = args[0].value
+}
+
+print "Hello, " + name + "!"
+
+# Show usage info if no args
+if args.size == 0 {
+    print "Usage: glang greet.gr --args YourName"
+}
+
+# Show all arguments if more than one
+if args.size > 1 {
+    print "All arguments: " + args.to_string
+}

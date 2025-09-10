@@ -102,10 +102,15 @@ def execute_file(file_path: str, program_args: list, verbose: bool, check_syntax
         session = ExecutionSession(file_manager)
         
         # Set up program arguments (make them available as 'args' variable)
-        if program_args:
-            from glang.execution.values import ListValue, StringValue
-            args_list = ListValue([StringValue(arg, None) for arg in program_args], None, None)
-            session.execution_context.set_variable('args', args_list)
+        from glang.execution.values import ListValue, StringValue
+        args_list = ListValue([StringValue(arg, None) for arg in program_args], None, None)
+        session.execution_context.set_variable('args', args_list)
+        
+        # Also add to symbol table so semantic analysis knows about it
+        from glang.semantic.symbol_table import Symbol
+        symbol_table = session.execution_context.symbol_table
+        args_symbol = Symbol('args', 'list', None, None)
+        symbol_table.declare_symbol(args_symbol)
         
         if check_syntax:
             # Only parse and analyze, don't execute

@@ -1,0 +1,26 @@
+#!/usr/bin/env glang
+# Fibonacci sequence generator in Glang
+
+n = 10
+print "Generating first " + n.to_string() + " Fibonacci numbers:"
+
+# Initialize the sequence
+fib = [0, 1]
+
+# Generate fibonacci numbers
+counter = 2
+while counter < n {
+    next_fib = fib[counter - 1] + fib[counter - 2]
+    fib.append(next_fib)
+    counter = counter + 1
+}
+
+print fib.to_string()
+
+# Find even fibonacci numbers
+evens = fib.filter("even")
+print "Even fibonacci numbers: " + evens.to_string()
+
+# Calculate sum
+total = fib.sum()
+print "Sum of all: " + total.to_string()

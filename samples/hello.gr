@@ -1,0 +1,21 @@
+#!/usr/bin/env glang
+# Hello World program in Glang
+
+name = "World"
+message = "Hello " + name + "!"
+print message
+
+# Demonstrate lists and functional programming
+numbers = [1, 2, 3, 4, 5]
+evens = numbers.filter("even")
+doubled = evens.map("double")
+print "Even numbers doubled: " + doubled.to_string
+
+# Demonstrate data structures
+config = { "version": "1.0", "debug": true }
+print "Version: " + config["version"].value
+
+# Math operations
+radius = 5
+area = 3.14159 * radius * radius
+print "Circle area: " + area.to_string
