@@ -344,6 +344,50 @@ class ContinueStatement(Statement):
     def accept(self, visitor):
         return visitor.visit_continue_statement(self)
 
+
+@dataclass
+class FunctionDeclaration(Statement):
+    """Function declaration: func name(param1, param2) { body }"""
+    name: str
+    parameters: List[str]  # Parameter names
+    body: 'Block'
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_function_declaration(self)
+
+
+@dataclass
+class ReturnStatement(Statement):
+    """Return statement: return expression"""
+    value: Optional[Expression] = None  # None for bare 'return'
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_return_statement(self)
+
+
+@dataclass  
+class FunctionCall(Expression):
+    """Function call expression: func_name(arg1, arg2)"""
+    name: str
+    arguments: List[Expression]
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_function_call(self)
+
+
+@dataclass
+class LambdaExpression(Expression):
+    """Lambda expression: param => expression or (param1, param2) => expression"""
+    parameters: List[str]  # Parameter names
+    body: Expression  # Single expression (not a block)
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_lambda_expression(self)
+
 # =============================================================================
 # Visitor Pattern for AST Traversal
 # =============================================================================
@@ -508,6 +552,26 @@ class ASTVisitor(ABC):
     def visit_continue_statement(self, node: ContinueStatement):
         """Visit a continue statement."""
         pass
+    
+    @abstractmethod
+    def visit_function_declaration(self, node: FunctionDeclaration):
+        """Visit a function declaration."""
+        pass
+    
+    @abstractmethod
+    def visit_return_statement(self, node: ReturnStatement):
+        """Visit a return statement."""
+        pass
+    
+    @abstractmethod
+    def visit_function_call(self, node: FunctionCall):
+        """Visit a function call."""
+        pass
+    
+    @abstractmethod
+    def visit_lambda_expression(self, node: LambdaExpression):
+        """Visit a lambda expression."""
+        pass
 
 # =============================================================================
 # Utility Classes  
@@ -654,4 +718,22 @@ class BaseASTVisitor(ASTVisitor):
         return node
     
     def visit_continue_statement(self, node: ContinueStatement):
+        return node
+    
+    def visit_function_declaration(self, node: FunctionDeclaration):
+        node.body.accept(self)
+        return node
+    
+    def visit_return_statement(self, node: ReturnStatement):
+        if node.value:
+            node.value.accept(self)
+        return node
+    
+    def visit_function_call(self, node: FunctionCall):
+        for arg in node.arguments:
+            arg.accept(self)
+        return node
+    
+    def visit_lambda_expression(self, node: LambdaExpression):
+        node.body.accept(self)
         return node

@@ -194,6 +194,23 @@ class LanguageKeywordRegistry:
             syntax_example="continue"
         ))
         
+        # Function keywords
+        self._register_keyword(KeywordDefinition(
+            keyword="func",
+            category=KeywordCategory.STATEMENT,
+            parser_method="parse_function_declaration",
+            description="Declare a function",
+            syntax_example="func greet(name) { return \"Hello, \" + name }"
+        ))
+        
+        self._register_keyword(KeywordDefinition(
+            keyword="return",
+            category=KeywordCategory.STATEMENT,
+            parser_method="parse_return_statement",
+            description="Return a value from function",
+            syntax_example="return value"
+        ))
+        
         # Boolean literal keywords
         self._register_keyword(KeywordDefinition(
             keyword="true",

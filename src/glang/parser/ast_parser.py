@@ -357,6 +357,111 @@ class ASTParser:
         
         return ContinueStatement(position=pos)
     
+    def parse_function_declaration(self) -> FunctionDeclaration:
+        """Parse function declaration: func name(param1, param2) { body }"""
+        from ..ast.nodes import FunctionDeclaration
+        
+        func_token = self.consume(TokenType.FUNC, "Expected 'func'")
+        pos = SourcePosition(func_token.line, func_token.column)
+        
+        # Parse function name
+        name_token = self.consume(TokenType.IDENTIFIER, "Expected function name")
+        name = name_token.value
+        
+        # Parse parameters: (param1, param2, ...)
+        self.consume(TokenType.LPAREN, "Expected '(' after function name")
+        
+        parameters = []
+        if not self.check(TokenType.RPAREN):
+            # Parse first parameter
+            param_token = self.consume(TokenType.IDENTIFIER, "Expected parameter name")
+            parameters.append(param_token.value)
+            
+            # Parse additional parameters
+            while self.match(TokenType.COMMA):
+                param_token = self.consume(TokenType.IDENTIFIER, "Expected parameter name")
+                parameters.append(param_token.value)
+        
+        self.consume(TokenType.RPAREN, "Expected ')' after parameters")
+        
+        # Parse function body
+        body = self.parse_block()
+        
+        return FunctionDeclaration(name=name, parameters=parameters, body=body, position=pos)
+    
+    def parse_return_statement(self) -> ReturnStatement:
+        """Parse return statement: return [expression]"""
+        from ..ast.nodes import ReturnStatement
+        
+        return_token = self.consume(TokenType.RETURN, "Expected 'return'")
+        pos = SourcePosition(return_token.line, return_token.column)
+        
+        # Check if there's a return value
+        value = None
+        if not self.check(TokenType.NEWLINE) and not self.check(TokenType.SEMICOLON) and not self.check(TokenType.RBRACE) and not self.is_at_end():
+            value = self.parse_expression()
+        
+        return ReturnStatement(value=value, position=pos)
+    
+    def parse_function_call_from_name(self, name: str, pos: SourcePosition) -> FunctionCall:
+        """Parse function call starting from name: name(arg1, arg2, ...)"""
+        from ..ast.nodes import FunctionCall
+        
+        # Consume opening parenthesis
+        self.consume(TokenType.LPAREN, "Expected '(' for function call")
+        
+        # Parse arguments
+        arguments = []
+        if not self.check(TokenType.RPAREN):
+            arguments.append(self.parse_expression())
+            
+            while self.match(TokenType.COMMA):
+                arguments.append(self.parse_expression())
+        
+        # Consume closing parenthesis
+        self.consume(TokenType.RPAREN, "Expected ')' after function arguments")
+        
+        return FunctionCall(name=name, arguments=arguments, position=pos)
+    
+    def parse_lambda_expression(self) -> LambdaExpression:
+        """Parse lambda expression: param => expression or (param1, param2) => expression"""
+        from ..ast.nodes import LambdaExpression
+        
+        parameters = []
+        pos = None
+        
+        if self.check(TokenType.LPAREN):
+            # Multiple parameters: (param1, param2) => expression
+            lparen_token = self.advance()
+            pos = SourcePosition(lparen_token.line, lparen_token.column)
+            
+            if not self.check(TokenType.RPAREN):
+                param_token = self.consume(TokenType.IDENTIFIER, "Expected parameter name")
+                parameters.append(param_token.value)
+                
+                while self.match(TokenType.COMMA):
+                    param_token = self.consume(TokenType.IDENTIFIER, "Expected parameter name")
+                    parameters.append(param_token.value)
+            
+            self.consume(TokenType.RPAREN, "Expected ')' after lambda parameters")
+        
+        elif self.check(TokenType.IDENTIFIER):
+            # Single parameter: param => expression  
+            param_token = self.advance()
+            pos = SourcePosition(param_token.line, param_token.column)
+            parameters.append(param_token.value)
+        
+        else:
+            raise ParseError("Expected parameter name or parameter list for lambda", self.peek())
+        
+        # Consume arrow
+        self.consume(TokenType.ARROW, "Expected '=>' in lambda expression")
+        
+        # Parse body expression
+        body = self.parse_expression()
+        
+        return LambdaExpression(parameters=parameters, body=body, position=pos)
+    
     def parse_block(self) -> Block:
         """Parse a block of statements: { statement1; statement2; ... }"""
         # Parse opening brace
@@ -657,13 +762,49 @@ class ASTParser:
         if self.check(TokenType.IDENTIFIER) and self.peek().value == "print":
             return self.parse_print_function_call()
         
-        # Variable references (including keywords used as variables)  
+        # Function calls, lambda expressions, and variable references (including keywords used as variables)  
         if self.check(TokenType.IDENTIFIER) or self.check_type_keyword():
             token = self.advance()
-            return VariableRef(token.value, SourcePosition(token.line, token.column))
+            name = token.value
+            pos = SourcePosition(token.line, token.column)
+            
+            # Check if this is a lambda expression (identifier followed by arrow)
+            if self.check(TokenType.ARROW):
+                # Restore position and parse as lambda
+                self.current -= 1
+                return self.parse_lambda_expression()
+            # Check if this is a function call (identifier followed by parentheses)
+            elif self.check(TokenType.LPAREN):
+                return self.parse_function_call_from_name(name, pos)
+            else:
+                # Regular variable reference
+                return VariableRef(name, pos)
         
-        # Parenthesized expressions
-        if self.match(TokenType.LPAREN):
+        # Lambda expressions: param => expression or (param1, param2) => expression
+        if self.check(TokenType.LPAREN):
+            # Look ahead to see if this might be a lambda with multiple parameters
+            saved_pos = self.current
+            try:
+                self.advance()  # consume (
+                # Check for parameter list pattern
+                if self.check(TokenType.IDENTIFIER):
+                    self.advance()  # consume parameter
+                    while self.match(TokenType.COMMA):
+                        if self.check(TokenType.IDENTIFIER):
+                            self.advance()
+                        else:
+                            break
+                    if self.match(TokenType.RPAREN) and self.check(TokenType.ARROW):
+                        # This is a lambda with multiple parameters
+                        self.current = saved_pos  # restore position
+                        return self.parse_lambda_expression()
+            except:
+                pass
+            # Restore position and parse as parenthesized expression
+            self.current = saved_pos
+            
+            # Regular parenthesized expressions
+            self.advance()  # consume (
             expr = self.parse_expression()
             self.consume(TokenType.RPAREN, "Expected ')' after expression")
             return expr

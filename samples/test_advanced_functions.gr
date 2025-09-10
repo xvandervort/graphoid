@@ -1,0 +1,40 @@
+# Test advanced function features
+
+# Function with multiple parameters
+func calculate(x, y, operation) {
+    if operation == "add" {
+        return x + y
+    }
+    if operation == "multiply" {
+        return x * y
+    }
+    return 0
+}
+
+# Test function calls
+sum_result = calculate(10, 5, "add")
+product_result = calculate(10, 5, "multiply")
+
+print "Sum: " + sum_result.to_string()
+print "Product: " + product_result.to_string()
+
+# Nested function calls
+func double(n) {
+    return n * 2
+}
+
+func add_one(n) {
+    return n + 1
+}
+
+# Compose functions
+composed = double(add_one(5))
+print "double(add_one(5)) = " + composed.to_string()
+
+# Function returning functions (simulation)
+func make_multiplier(factor) {
+    return factor
+}
+
+multiplier = make_multiplier(3)
+print "Multiplier factor: " + multiplier.to_string()

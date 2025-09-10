@@ -615,3 +615,71 @@ def glang_value_to_python(glang_value: GlangValue) -> Any:
 def infer_type_from_value(value: GlangValue) -> str:
     """Infer glang type name from GlangValue for display purposes."""
     return value.get_type()
+
+
+class FunctionValue(GlangValue):
+    """Runtime function value representing a user-defined function."""
+    
+    def __init__(self, name: str, parameters: List[str], body: 'Block', closure_context: Optional['ExecutionContext'] = None, position: Optional[SourcePosition] = None):
+        super().__init__(position)
+        self.name = name
+        self.parameters = parameters
+        self.body = body
+        self.closure_context = closure_context  # For closures (later enhancement)
+        
+    def to_python(self) -> str:
+        return f"<function {self.name}>"
+    
+    def get_type(self) -> str:
+        return "function"
+    
+    def to_display_string(self) -> str:
+        param_list = ", ".join(self.parameters)
+        return f"func {self.name}({param_list}) {{ ... }}"
+    
+    def arity(self) -> int:
+        """Return number of parameters this function expects."""
+        return len(self.parameters)
+
+
+class LambdaValue(GlangValue):
+    """Runtime lambda value representing an anonymous function."""
+    
+    def __init__(self, parameters: List[str], body: 'Expression', closure_context: Optional['ExecutionContext'] = None, position: Optional[SourcePosition] = None):
+        super().__init__(position)
+        self.parameters = parameters
+        self.body = body
+        self.closure_context = closure_context  # For closures (later enhancement)
+        
+    def to_python(self) -> str:
+        return f"<lambda>"
+    
+    def get_type(self) -> str:
+        return "lambda"
+    
+    def to_display_string(self) -> str:
+        param_list = ", ".join(self.parameters)
+        if len(self.parameters) == 1:
+            return f"{param_list} => ..."
+        else:
+            return f"({param_list}) => ..."
+    
+    def arity(self) -> int:
+        """Return number of parameters this lambda expects."""
+        return len(self.parameters)
+
+
+class NoneValue(GlangValue):
+    """Runtime value representing absence of value (like null/None)."""
+    
+    def __init__(self, position: Optional[SourcePosition] = None):
+        super().__init__(position)
+        
+    def to_python(self) -> None:
+        return None
+    
+    def get_type(self) -> str:
+        return "none"
+    
+    def to_display_string(self) -> str:
+        return "none"

@@ -58,6 +58,9 @@ def _create_dynamic_token_type():
         "DIVIDE_DOT": "DIVIDE_DOT",      # /.
         "MODULO_DOT": "MODULO_DOT",      # %.
         
+        # Function-related operators
+        "ARROW": "ARROW",                # => (lambda arrow)
+        
         # Special
         "NEWLINE": "NEWLINE",            # \n
         "EOF": "EOF",                    # End of input
@@ -124,6 +127,7 @@ class Tokenizer:
             (r'[a-zA-Z_][a-zA-Z0-9_]*', TokenType.IDENTIFIER),
             
             # Multi-character operators (before single character ones)
+            (r'=>', TokenType.ARROW),         # Lambda arrow (must be before >= check)
             (r'>=', TokenType.GREATER_EQUAL),
             (r'<=', TokenType.LESS_EQUAL),
             (r'==', TokenType.EQUAL),

@@ -59,6 +59,11 @@ class TestASTNodes:
             def visit_break_statement(self, node): pass
             def visit_continue_statement(self, node): pass
             def visit_block(self, node): pass
+            # Function-related visitor methods
+            def visit_function_declaration(self, node): pass
+            def visit_return_statement(self, node): pass
+            def visit_function_call(self, node): pass
+            def visit_lambda_expression(self, node): pass
             
         visitor = TestVisitor()
         result = node.accept(visitor)

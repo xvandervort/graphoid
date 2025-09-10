@@ -158,6 +158,13 @@ class SemanticAnalyzer(BaseASTVisitor):
                 return 'bool'
             elif expr.operator == '-':
                 return 'num'
+        elif isinstance(expr, FunctionCall):
+            # Function calls - for now, we can't infer return type without analyzing function body
+            # Return generic type for successful inference
+            return 'any'
+        elif isinstance(expr, LambdaExpression):
+            # Lambda expressions - treat as function type
+            return 'function'
         elif isinstance(expr, IndexAccess):
             # Need to check the type of the indexed object
             if isinstance(expr.target, VariableRef):
@@ -178,7 +185,7 @@ class SemanticAnalyzer(BaseASTVisitor):
     def visit_variable_declaration(self, node: VariableDeclaration) -> None:
         """Analyze variable declarations."""
         # Validate type
-        valid_types = {'list', 'string', 'num', 'bool', 'data', 'hash'}
+        valid_types = {'list', 'string', 'num', 'bool', 'data', 'hash', 'function', 'any'}
         if node.var_type not in valid_types:
             self.report_error(InvalidTypeError(node.var_type, node.position))
             return
@@ -537,3 +544,63 @@ class SemanticAnalyzer(BaseASTVisitor):
         # Visit all statements in the block
         for statement in node.statements:
             statement.accept(self)
+    
+    # Function-related visitor methods
+    
+    def visit_function_declaration(self, node: FunctionDeclaration) -> None:
+        """Analyze function declarations."""
+        # Check if function name already exists
+        if self.symbol_table.symbol_exists(node.name):
+            existing = self.symbol_table.lookup_symbol(node.name)
+            self.report_error(RedeclarationError(
+                node.name, existing.position, node.position))
+            return
+        
+        # Create function symbol
+        symbol = Symbol(
+            name=node.name,
+            symbol_type='function',
+            type_constraint=None,
+            position=node.position
+        )
+        
+        try:
+            self.symbol_table.declare_symbol(symbol)
+        except ValueError as e:
+            self.report_error(SemanticError(str(e), node.position))
+        
+        # TODO: Function body analysis should be deferred until function is called
+        # or we implement proper scoping with parameter declarations
+        # For now, skip analyzing the function body during declaration
+        # The parameters are only valid within the function's execution context
+        pass
+    
+    def visit_function_call(self, node: FunctionCall) -> None:
+        """Analyze function calls."""
+        # Check that function exists
+        symbol = self.symbol_table.lookup_symbol(node.name)
+        if not symbol:
+            self.report_error(UndefinedVariableError(node.name, node.position))
+        elif symbol.symbol_type != 'function':
+            self.report_error(SemanticError(
+                f"'{node.name}' is not a function (it's a {symbol.symbol_type})",
+                node.position))
+        
+        # Analyze arguments
+        for arg in node.arguments:
+            arg.accept(self)
+    
+    def visit_return_statement(self, node: ReturnStatement) -> None:
+        """Analyze return statements."""
+        # TODO: Check that return is inside a function
+        # For now, just analyze the value if present
+        if node.value:
+            node.value.accept(self)
+    
+    def visit_lambda_expression(self, node: LambdaExpression) -> None:
+        """Analyze lambda expressions."""
+        # TODO: Lambda body analysis should be deferred until lambda is called
+        # or we implement proper scoping with parameter declarations
+        # For now, skip analyzing the lambda body during declaration
+        # The parameters are only valid within the lambda's execution context
+        pass

@@ -29,6 +29,13 @@ class ContinueException(Exception):
     pass
 
 
+class ReturnException(Exception):
+    """Exception raised by return statement to return from functions."""
+    def __init__(self, value: Optional['GlangValue'] = None):
+        self.value = value
+        super().__init__()
+
+
 class ExecutionContext:
     """Context for AST execution with variable storage."""
     
@@ -2322,6 +2329,122 @@ class ASTExecutor(BaseASTVisitor):
     def visit_continue_statement(self, node: ContinueStatement) -> None:
         """Execute continue statement."""
         raise ContinueException()
+    
+    def visit_function_declaration(self, node: FunctionDeclaration) -> None:
+        """Execute function declaration - creates and stores function value."""
+        from .values import FunctionValue
+        
+        # Create function value
+        func_value = FunctionValue(
+            name=node.name,
+            parameters=node.parameters,
+            body=node.body,
+            position=node.position
+        )
+        
+        # Store function in context
+        self.context.set_variable(node.name, func_value)
+        
+        # Store result
+        self.result = func_value
+    
+    def visit_return_statement(self, node: ReturnStatement) -> None:
+        """Execute return statement."""
+        if node.value is not None:
+            value = self.execute(node.value)
+            raise ReturnException(value)
+        else:
+            raise ReturnException()
+    
+    def visit_function_call(self, node: FunctionCall) -> Any:
+        """Execute function call."""
+        from .values import FunctionValue, LambdaValue
+        
+        # Look up function
+        func_value = self.context.get_variable(node.name)
+        if func_value is None:
+            from .errors import VariableNotFoundError
+            raise VariableNotFoundError(f"Function '{node.name}' not found", node.position)
+        
+        if not isinstance(func_value, (FunctionValue, LambdaValue)):
+            from .errors import RuntimeError
+            raise RuntimeError(f"'{node.name}' is not a function", node.position)
+        
+        # Check arity
+        if len(node.arguments) != func_value.arity():
+            from .errors import RuntimeError
+            raise RuntimeError(
+                f"Function '{node.name}' expects {func_value.arity()} arguments but got {len(node.arguments)}", 
+                node.position
+            )
+        
+        # Evaluate arguments
+        arg_values = [self.execute(arg) for arg in node.arguments]
+        
+        # Call the function
+        result = self.call_function(func_value, arg_values, node.position)
+        
+        self.result = result
+        return result
+    
+    def visit_lambda_expression(self, node: LambdaExpression) -> Any:
+        """Execute lambda expression - creates lambda value."""
+        from .values import LambdaValue
+        
+        # Create lambda value
+        lambda_value = LambdaValue(
+            parameters=node.parameters,
+            body=node.body,
+            position=node.position
+        )
+        
+        self.result = lambda_value
+        return lambda_value
+    
+    def call_function(self, func_value: 'GlangValue', arguments: List['GlangValue'], position: Optional[SourcePosition] = None) -> Any:
+        """Call a function or lambda with given arguments."""
+        from .values import FunctionValue, LambdaValue
+        
+        if isinstance(func_value, FunctionValue):
+            # Create new execution context for function scope
+            # For now, we'll use a simple approach without proper scoping
+            # Save current variable state
+            old_vars = self.context.variables.copy()
+            
+            try:
+                # Bind parameters to arguments
+                for param_name, arg_value in zip(func_value.parameters, arguments):
+                    self.context.set_variable(param_name, arg_value)
+                
+                # Execute function body
+                try:
+                    self.execute(func_value.body)
+                    # If no return statement, return None equivalent
+                    from .values import NoneValue
+                    return NoneValue()
+                except ReturnException as ret:
+                    return ret.value if ret.value is not None else NoneValue()
+                
+            finally:
+                # Restore variable state
+                self.context.variables = old_vars
+        
+        elif isinstance(func_value, LambdaValue):
+            # Similar to function but execute expression instead of block
+            old_vars = self.context.variables.copy()
+            
+            try:
+                # Bind parameters to arguments
+                for param_name, arg_value in zip(func_value.parameters, arguments):
+                    self.context.set_variable(param_name, arg_value)
+                
+                # Execute lambda body (expression)
+                result = self.execute(func_value.body)
+                return result
+                
+            finally:
+                # Restore variable state
+                self.context.variables = old_vars
     
     def visit_block(self, node: Block) -> None:
         """Execute block of statements."""

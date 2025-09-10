@@ -115,6 +115,92 @@ for item in items {
 }
 ```
 
+## ⚡ Functions & Lambda Expressions
+
+### Function Declarations
+```glang
+# Basic function
+func greet(name) {
+    return "Hello, " + name + "!"
+}
+
+# Function with multiple parameters
+func add(x, y) {
+    return x + y
+}
+
+# Function without return (returns none)
+func say_hello() {
+    print("Hello from function!")
+}
+
+# Function with early returns
+func find_max(a, b) {
+    if a >= b {
+        return a
+    }
+    return b
+}
+```
+
+### Function Calls
+```glang
+# Calling functions
+message = greet("World")      # "Hello, World!"
+result = add(15, 27)          # 42
+say_hello()                   # Prints and returns none
+
+# Recursive functions
+func fibonacci(n) {
+    if n <= 1 {
+        return n
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+fib_result = fibonacci(6)     # 8
+```
+
+### Lambda Expressions
+```glang
+# Single parameter lambda
+double = x => x * 2
+result = double(5)            # 10
+
+# Multiple parameter lambda
+multiply = (x, y) => x * y
+product = multiply(7, 8)      # 56
+
+# Lambda with complex expressions
+square_and_add = x => x * x + 1
+value = square_and_add(4)     # 17
+
+# Using lambdas directly
+numbers = [1, 2, 3, 4, 5]
+squared = numbers.map(x => x * x)  # [1, 4, 9, 16, 25]
+```
+
+### Function Integration
+```glang
+# Functions work with all language features
+func process_list(items, threshold) {
+    result = []
+    for item in items {
+        if item > threshold {
+            result.append(item * 2)
+        }
+    }
+    return result
+}
+
+data = [1, 2, 3, 4, 5]
+processed = process_list(data, 2)  # [6, 8, 10]
+
+# Functions can be assigned to variables
+operation = add
+sum_result = operation(10, 20)     # 30
+```
+
 ## 🎯 Functional Programming
 
 ### Map (Transform Elements)
@@ -445,20 +531,33 @@ fahrenheit = celsius * 9 / 5 + 32
 print(celsius.to_string() + "°C = " + fahrenheit.to_string() + "°F")
 ```
 
-### Type Conversion Pipeline
+### Type Conversion Pipeline with Lambdas
 ```glang
-# Data processing with type conversion
+# Data processing with type conversion and custom functions
 scores = ["95", "87", "92", "76", "88"]
 
-# Convert to numbers, filter, and format
-high_scores = scores.map("to_num")
-                   .filter("positive")
+# Convert to numbers, filter, and format using lambdas
+high_scores = scores.map(s => s.to_num())
                    .filter(s => s > 90)
-                   .map("to_string")
+                   .map(s => s.to_string())
 
 for score in high_scores {
     print("High score: " + score)
 }
+
+# Custom function for grading
+func calculate_grade(score) {
+    if score >= 90 {
+        return "A"
+    } else if score >= 80 {
+        return "B" 
+    } else {
+        return "C"
+    }
+}
+
+grades = scores.map(s => calculate_grade(s.to_num()))
+print("Grades: " + grades.to_string())
 ```
 
 ### Nested Functional Operations
