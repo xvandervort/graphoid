@@ -1085,6 +1085,113 @@ io.print(a.to_string() + " squared: " + power_result.to_string())
 
 11. **String Processing**: Use `string.split()` for parsing - `split()` for spaces, `split(",")` for CSV, `split("\n")` for lines
 
+## Crypto Module
+
+The crypto module provides secure cryptographic operations for data protection and integrity verification.
+
+### Import and Basic Usage
+```glang
+import "crypto"
+
+# Convert string to bytes for crypto operations
+message = "Hello World"
+# Manual conversion (until we have string.to_bytes())
+data = [72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100]
+```
+
+### Hashing Operations
+```glang
+# Hash data with different algorithms
+md5_hash = crypto.hash_md5(data)        # 16 bytes
+sha1_hash = crypto.hash_sha1(data)      # 20 bytes  
+sha256_hash = crypto.hash_sha256(data)  # 32 bytes
+sha512_hash = crypto.hash_sha512(data)  # 64 bytes
+
+# Convert hash to readable hex string
+hex_hash = crypto.to_hex(sha256_hash)
+print(hex_hash)  # "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e"
+```
+
+### Symmetric Encryption (AES-256)
+```glang
+# Generate cryptographic key
+key = crypto.random_bytes(32)  # 32 bytes for AES-256
+
+# Encrypt data
+encrypted = crypto.aes_encrypt(data, key)  # Returns IV + ciphertext
+
+# Decrypt data  
+decrypted = crypto.aes_decrypt(encrypted, key)  # Returns original data
+
+# Verify roundtrip
+if decrypted == data {
+    print("Encryption successful!")
+}
+```
+
+### Random Number Generation
+```glang
+# Generate cryptographically secure random bytes
+salt = crypto.random_bytes(16)      # 16 random bytes
+nonce = crypto.random_bytes(12)     # 12 bytes for GCM mode
+session_key = crypto.random_bytes(32)  # 32 bytes for keys
+```
+
+### Format Conversion (Solves Hex Literal Gap)
+```glang
+# Convert bytes to/from hexadecimal
+packet_data = [18, 52, 86, 120]        # Instead of [0x12, 0x34, 0x56, 0x78]
+hex_string = crypto.to_hex(packet_data) # "12345678"
+restored = crypto.from_hex("FFABCD")    # [255, 171, 205]
+
+# Convert bytes to/from base64
+encoded = crypto.to_base64(data)        # "SGVsbG8gV29ybGQ="
+decoded = crypto.from_base64(encoded)   # Original data back
+```
+
+### Complete Example: File Encryption
+```glang
+import "io"
+import "crypto"
+
+# Read file as binary data
+data = io.read_binary("secret.txt")
+
+# Generate encryption key (save this securely!)
+key = crypto.random_bytes(32)
+key_hex = crypto.to_hex(key)
+print("Save this key: " + key_hex)
+
+# Encrypt the file
+encrypted = crypto.aes_encrypt(data, key)
+
+# Save encrypted file
+io.write_binary("secret.txt.encrypted", encrypted)
+
+# Later: decrypt the file
+saved_key = crypto.from_hex(key_hex)
+encrypted_data = io.read_binary("secret.txt.encrypted")
+decrypted = crypto.aes_decrypt(encrypted_data, saved_key)
+
+# Save decrypted file
+io.write_binary("secret_restored.txt", decrypted)
+```
+
+### Security Best Practices
+```glang
+# Always use proper key sizes
+aes_key = crypto.random_bytes(32)      # ✅ 256-bit AES key
+weak_key = crypto.random_bytes(8)      # ❌ Too short
+
+# Use SHA-256 or SHA-512 for new applications  
+secure_hash = crypto.hash_sha256(data) # ✅ Cryptographically secure
+legacy_hash = crypto.hash_md5(data)    # ⚠️ Use only for compatibility
+
+# Store keys securely (never in source code)
+config_key = crypto.from_hex(io.read_file("key.txt"))  # ✅ Read from secure file
+hardcoded = [1, 2, 3, 4]              # ❌ Never hardcode keys
+```
+
 ---
 
 *Happy coding with Glang! 🚀*

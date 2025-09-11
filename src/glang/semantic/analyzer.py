@@ -161,6 +161,45 @@ class SemanticAnalyzer(BaseASTVisitor):
                         'decode': 'any',  # JSON can decode to any type
                         'is_valid': 'bool'
                     }
+                elif module_name == 'crypto':
+                    method_types = {
+                        # Hashing functions
+                        'hash_md5': 'list',      # Returns list of bytes (16 bytes for MD5)
+                        'hash_sha1': 'list',     # Returns list of bytes (20 bytes for SHA1)
+                        'hash_sha256': 'list',   # Returns list of bytes (32 bytes for SHA256)
+                        'hash_sha512': 'list',   # Returns list of bytes (64 bytes for SHA512)
+                        
+                        # Random generation
+                        'random_bytes': 'list',  # Returns list of random bytes
+                        
+                        # Symmetric encryption (AES)
+                        'aes_encrypt': 'list',   # Returns list of encrypted bytes (IV + ciphertext)
+                        'aes_decrypt': 'list',   # Returns list of decrypted bytes
+                        'aes_gcm_encrypt': 'list',   # Returns list of encrypted bytes (nonce + ciphertext + tag)
+                        'aes_gcm_decrypt': 'list',   # Returns list of decrypted bytes
+                        
+                        # Message authentication
+                        'hmac_sha256': 'list',   # Returns list of HMAC bytes (32 bytes)
+                        
+                        # Key derivation
+                        'hkdf_expand': 'list',   # Returns list of derived key bytes
+                        
+                        # Asymmetric encryption (RSA)
+                        'rsa_generate_keypair': 'hash',  # Returns hash with private/public keys
+                        'rsa_encrypt': 'list',   # Returns list of encrypted bytes
+                        'rsa_decrypt': 'list',   # Returns list of decrypted bytes
+                        
+                        # Elliptic Curve Diffie-Hellman (ECDH)
+                        'ecdh_generate_keypair': 'hash',  # Returns hash with private/public/curve
+                        'ecdh_compute_shared_secret': 'list',  # Returns list of shared secret bytes
+                        'ecdh_public_key_from_private': 'list',  # Returns list of public key bytes
+                        
+                        # Format conversion
+                        'to_hex': 'string',      # Converts bytes to hex string
+                        'from_hex': 'list',      # Converts hex string to bytes
+                        'to_base64': 'string',   # Converts bytes to base64 string
+                        'from_base64': 'list'    # Converts base64 string to bytes
+                    }
                 else:
                     method_types = {}
                 

@@ -28,6 +28,10 @@ class BuiltinModuleRegistry:
         from .json_module import create_json_module_namespace
         cls._builtin_modules['json'] = create_json_module_namespace()
         
+        # Register Crypto module
+        from .crypto_module import create_crypto_module_namespace
+        cls._builtin_modules['crypto'] = create_crypto_module_namespace()
+        
         cls._initialized = True
     
     @classmethod
