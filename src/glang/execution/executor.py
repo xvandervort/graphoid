@@ -1273,10 +1273,11 @@ class ASTExecutor(BaseASTVisitor):
             if len(args) != 0:
                 from .errors import ArgumentError
                 raise ArgumentError(f"sqrt() takes no arguments, got {len(args)}", position)
-            if target.value < 0:
+            try:
+                return target.sqrt()
+            except ValueError as e:
                 from .errors import RuntimeError
-                raise RuntimeError("Cannot take square root of negative number", position)
-            return NumberValue(math.sqrt(target.value), position)
+                raise RuntimeError(str(e), position)
         
         elif method_name == "log":
             if len(args) > 1:
@@ -1345,7 +1346,7 @@ class ASTExecutor(BaseASTVisitor):
             
             if len(args) == 0:
                 # Ceiling to integer
-                return NumberValue(math.ceil(target.value), position)
+                return target.ceil()
             else:
                 # Ceiling to specified decimal places
                 if not isinstance(args[0], NumberValue) or not isinstance(args[0].value, int):
@@ -2030,7 +2031,7 @@ class ASTExecutor(BaseASTVisitor):
                 left_elem = left.elements[i]
                 right_elem = right.elements[i]
                 if isinstance(left_elem, NumberValue) and isinstance(right_elem, NumberValue):
-                    result_elements.append(NumberValue(left_elem.value + right_elem.value, left_elem.position))
+                    result_elements.append(left_elem.add(right_elem))
                 else:
                     raise RuntimeError("Element-wise addition requires all elements to be numbers")
             return ListValue(result_elements, "num", left.position)
@@ -2042,7 +2043,7 @@ class ASTExecutor(BaseASTVisitor):
             result_elements = []
             for element in left.elements:
                 if isinstance(element, NumberValue):
-                    result_elements.append(NumberValue(element.value + right.value, element.position))
+                    result_elements.append(element.add(right))
                 else:
                     raise RuntimeError("Cannot add number to non-numeric list element")
             return ListValue(result_elements, "num", left.position)
@@ -2054,7 +2055,7 @@ class ASTExecutor(BaseASTVisitor):
             result_elements = []
             for element in right.elements:
                 if isinstance(element, NumberValue):
-                    result_elements.append(NumberValue(left.value + element.value, element.position))
+                    result_elements.append(left.add(element))
                 else:
                     raise RuntimeError("Cannot add number to non-numeric list element")
             return ListValue(result_elements, "num", right.position)
@@ -2074,7 +2075,7 @@ class ASTExecutor(BaseASTVisitor):
                 left_elem = left.elements[i]
                 right_elem = right.elements[i]
                 if isinstance(left_elem, NumberValue) and isinstance(right_elem, NumberValue):
-                    result_elements.append(NumberValue(left_elem.value - right_elem.value, left_elem.position))
+                    result_elements.append(left_elem.subtract(right_elem))
                 else:
                     raise RuntimeError("Element-wise subtraction requires all elements to be numbers")
             return ListValue(result_elements, "num", left.position)
@@ -2086,7 +2087,7 @@ class ASTExecutor(BaseASTVisitor):
             result_elements = []
             for element in left.elements:
                 if isinstance(element, NumberValue):
-                    result_elements.append(NumberValue(element.value - right.value, element.position))
+                    result_elements.append(element.subtract(right))
                 else:
                     raise RuntimeError("Cannot subtract number from non-numeric list element")
             return ListValue(result_elements, "num", left.position)
@@ -2098,7 +2099,7 @@ class ASTExecutor(BaseASTVisitor):
             result_elements = []
             for element in right.elements:
                 if isinstance(element, NumberValue):
-                    result_elements.append(NumberValue(left.value - element.value, element.position))
+                    result_elements.append(left.subtract(element))
                 else:
                     raise RuntimeError("Cannot subtract non-numeric list element from number")
             return ListValue(result_elements, "num", right.position)
@@ -2118,7 +2119,7 @@ class ASTExecutor(BaseASTVisitor):
                 left_elem = left.elements[i]
                 right_elem = right.elements[i]
                 if isinstance(left_elem, NumberValue) and isinstance(right_elem, NumberValue):
-                    result_elements.append(NumberValue(left_elem.value * right_elem.value, left_elem.position))
+                    result_elements.append(left_elem.multiply(right_elem))
                 else:
                     raise RuntimeError("Element-wise multiplication requires all elements to be numbers")
             return ListValue(result_elements, "num", left.position)
@@ -2130,7 +2131,7 @@ class ASTExecutor(BaseASTVisitor):
             result_elements = []
             for element in left.elements:
                 if isinstance(element, NumberValue):
-                    result_elements.append(NumberValue(element.value * right.value, element.position))
+                    result_elements.append(element.multiply(right))
                 else:
                     raise RuntimeError("Cannot multiply non-numeric list element with number")
             return ListValue(result_elements, "num", left.position)
@@ -2142,7 +2143,7 @@ class ASTExecutor(BaseASTVisitor):
             result_elements = []
             for element in right.elements:
                 if isinstance(element, NumberValue):
-                    result_elements.append(NumberValue(left.value * element.value, element.position))
+                    result_elements.append(left.multiply(element))
                 else:
                     raise RuntimeError("Cannot multiply number with non-numeric list element")
             return ListValue(result_elements, "num", right.position)
@@ -2164,7 +2165,7 @@ class ASTExecutor(BaseASTVisitor):
                 if isinstance(left_elem, NumberValue) and isinstance(right_elem, NumberValue):
                     if right_elem.value == 0:
                         raise RuntimeError("Division by zero in element-wise division")
-                    result_elements.append(NumberValue(left_elem.value / right_elem.value, left_elem.position))
+                    result_elements.append(left_elem.divide(right_elem))
                 else:
                     raise RuntimeError("Element-wise division requires all elements to be numbers")
             return ListValue(result_elements, "num", left.position)
@@ -2178,7 +2179,7 @@ class ASTExecutor(BaseASTVisitor):
             result_elements = []
             for element in left.elements:
                 if isinstance(element, NumberValue):
-                    result_elements.append(NumberValue(element.value / right.value, element.position))
+                    result_elements.append(element.divide(right))
                 else:
                     raise RuntimeError("Cannot divide non-numeric list element by number")
             return ListValue(result_elements, "num", left.position)
@@ -2192,7 +2193,7 @@ class ASTExecutor(BaseASTVisitor):
                 if isinstance(element, NumberValue):
                     if element.value == 0:
                         raise RuntimeError("Division by zero in element-wise division")
-                    result_elements.append(NumberValue(left.value / element.value, element.position))
+                    result_elements.append(left.divide(element))
                 else:
                     raise RuntimeError("Cannot divide number by non-numeric list element")
             return ListValue(result_elements, "num", right.position)
@@ -2214,7 +2215,7 @@ class ASTExecutor(BaseASTVisitor):
                 if isinstance(left_elem, NumberValue) and isinstance(right_elem, NumberValue):
                     if right_elem.value == 0:
                         raise RuntimeError("Modulo by zero in element-wise modulo")
-                    result_elements.append(NumberValue(left_elem.value % right_elem.value, left_elem.position))
+                    result_elements.append(left_elem.modulo(right_elem))
                 else:
                     raise RuntimeError("Element-wise modulo requires all elements to be numbers")
             return ListValue(result_elements, "num", left.position)
@@ -2228,7 +2229,7 @@ class ASTExecutor(BaseASTVisitor):
             result_elements = []
             for element in left.elements:
                 if isinstance(element, NumberValue):
-                    result_elements.append(NumberValue(element.value % right.value, element.position))
+                    result_elements.append(element.modulo(right))
                 else:
                     raise RuntimeError("Cannot perform modulo on non-numeric list element with number")
             return ListValue(result_elements, "num", left.position)
@@ -2242,7 +2243,7 @@ class ASTExecutor(BaseASTVisitor):
                 if isinstance(element, NumberValue):
                     if element.value == 0:
                         raise RuntimeError("Modulo by zero in element-wise modulo")
-                    result_elements.append(NumberValue(left.value % element.value, element.position))
+                    result_elements.append(left.modulo(element))
                 else:
                     raise RuntimeError("Cannot perform modulo on number with non-numeric list element")
             return ListValue(result_elements, "num", right.position)

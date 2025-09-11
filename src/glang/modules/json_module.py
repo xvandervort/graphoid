@@ -119,10 +119,11 @@ class JSONModule:
         """Convert Python object from JSON to Glang value."""
         if isinstance(data, str):
             return StringValue(data, position)
+        elif isinstance(data, bool):
+            # Check bool before int/float since bool is subclass of int in Python
+            return BooleanValue(data, position)
         elif isinstance(data, (int, float)):
             return NumberValue(data, position)
-        elif isinstance(data, bool):
-            return BooleanValue(data, position)
         elif data is None:
             return NoneValue(position)
         elif isinstance(data, list):

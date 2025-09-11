@@ -22,27 +22,31 @@ class TransformationRegistry:
         # Numeric transformations
         def double(value: GlangValue) -> GlangValue:
             if isinstance(value, NumberValue):
-                return NumberValue(value.value * 2, value.position)
+                two = NumberValue(2, value.position)
+                return value.multiply(two)
             raise ValueError(f"Cannot double {value.get_type()}")
         
         def square(value: GlangValue) -> GlangValue:
             if isinstance(value, NumberValue):
-                return NumberValue(value.value ** 2, value.position)
+                two = NumberValue(2, value.position)
+                return value.power(two)
             raise ValueError(f"Cannot square {value.get_type()}")
         
         def negate(value: GlangValue) -> GlangValue:
             if isinstance(value, NumberValue):
-                return NumberValue(-value.value, value.position)
+                return value.negate()
             raise ValueError(f"Cannot negate {value.get_type()}")
         
         def increment(value: GlangValue) -> GlangValue:
             if isinstance(value, NumberValue):
-                return NumberValue(value.value + 1, value.position)
+                one = NumberValue(1, value.position)
+                return value.add(one)
             raise ValueError(f"Cannot increment {value.get_type()}")
         
         def decrement(value: GlangValue) -> GlangValue:
             if isinstance(value, NumberValue):
-                return NumberValue(value.value - 1, value.position)
+                one = NumberValue(1, value.position)
+                return value.subtract(one)
             raise ValueError(f"Cannot decrement {value.get_type()}")
         
         # String transformations

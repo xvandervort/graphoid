@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from typing import Any, List, Optional, Union, Tuple
 import sys
 import os
+from .glang_number import GlangNumber, create_glang_number
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
@@ -398,11 +399,23 @@ class StringValue(GlangValue):
 
 
 class NumberValue(GlangValue):
-    """Runtime number value (int or float)."""
+    """Runtime number value using Glang's custom number system."""
     
-    def __init__(self, value: Union[int, float], position: Optional[SourcePosition] = None):
+    def __init__(self, value: Union[int, float, str, bool, GlangNumber], position: Optional[SourcePosition] = None):
         super().__init__(position)
-        self.value = value
+        if isinstance(value, GlangNumber):
+            self.glang_number = value
+        else:
+            self.glang_number = create_glang_number(value)
+    
+    @property
+    def value(self) -> Union[int, float]:
+        """Compatibility property for existing code that accesses .value directly."""
+        # Return Python equivalent for backwards compatibility
+        if self.glang_number.is_integer():
+            return self.glang_number.to_python_int()
+        else:
+            return self.glang_number.to_python_float()
     
     def to_python(self) -> Union[int, float]:
         return self.value
@@ -411,70 +424,123 @@ class NumberValue(GlangValue):
         return "num"
     
     def to_display_string(self) -> str:
-        return str(self.value)
+        return self.glang_number.to_string()
     
     def __eq__(self, other) -> bool:
-        return isinstance(other, NumberValue) and self.value == other.value
+        return isinstance(other, NumberValue) and self.glang_number == other.glang_number
     
     # Arithmetic operations using Glang semantics
     def add(self, other: 'NumberValue') -> 'NumberValue':
         """Add two numbers using Glang arithmetic semantics."""
         if not isinstance(other, NumberValue):
             raise ValueError(f"Cannot add {other.get_type()} to number")
-        return NumberValue(self.value + other.value)
+        result = self.glang_number.add(other.glang_number)
+        return NumberValue(result, self.position)
     
     def subtract(self, other: 'NumberValue') -> 'NumberValue':
         """Subtract two numbers using Glang arithmetic semantics."""
         if not isinstance(other, NumberValue):
             raise ValueError(f"Cannot subtract {other.get_type()} from number")
-        return NumberValue(self.value - other.value)
+        result = self.glang_number.subtract(other.glang_number)
+        return NumberValue(result, self.position)
     
     def multiply(self, other: 'NumberValue') -> 'NumberValue':
         """Multiply two numbers using Glang arithmetic semantics."""
         if not isinstance(other, NumberValue):
             raise ValueError(f"Cannot multiply number by {other.get_type()}")
-        return NumberValue(self.value * other.value)
+        result = self.glang_number.multiply(other.glang_number)
+        return NumberValue(result, self.position)
     
     def divide(self, other: 'NumberValue') -> 'NumberValue':
         """Divide two numbers using Glang arithmetic semantics."""
         if not isinstance(other, NumberValue):
             raise ValueError(f"Cannot divide number by {other.get_type()}")
-        if other.value == 0:
+        try:
+            result = self.glang_number.divide(other.glang_number)
+            return NumberValue(result, self.position)
+        except ZeroDivisionError:
             raise ValueError("Division by zero")
-        return NumberValue(self.value / other.value)
     
     def modulo(self, other: 'NumberValue') -> 'NumberValue':
         """Perform modulo operation using Glang arithmetic semantics."""
         if not isinstance(other, NumberValue):
             raise ValueError(f"Cannot perform modulo on number with {other.get_type()}")
-        if other.value == 0:
+        try:
+            result = self.glang_number.modulo(other.glang_number)
+            return NumberValue(result, self.position)
+        except ZeroDivisionError:
             raise ValueError("Modulo by zero")
-        return NumberValue(self.value % other.value)
     
     # Comparison operations using Glang semantics
     def greater_than(self, other: 'NumberValue') -> 'BooleanValue':
         """Compare if this number is greater than another using Glang semantics."""
         if not isinstance(other, NumberValue):
             raise ValueError(f"Cannot compare number with {other.get_type()}")
-        return BooleanValue(self.value > other.value)
+        comparison = self.glang_number.compare_to(other.glang_number)
+        return BooleanValue(comparison > 0, self.position)
     
     def less_than(self, other: 'NumberValue') -> 'BooleanValue':
         """Compare if this number is less than another using Glang semantics."""
         if not isinstance(other, NumberValue):
             raise ValueError(f"Cannot compare number with {other.get_type()}")
-        return BooleanValue(self.value < other.value)
+        comparison = self.glang_number.compare_to(other.glang_number)
+        return BooleanValue(comparison < 0, self.position)
     
     def greater_equal(self, other: 'NumberValue') -> 'BooleanValue':
         """Compare if this number is greater than or equal to another using Glang semantics."""
         if not isinstance(other, NumberValue):
             raise ValueError(f"Cannot compare number with {other.get_type()}")
-        return BooleanValue(self.value >= other.value)
+        comparison = self.glang_number.compare_to(other.glang_number)
+        return BooleanValue(comparison >= 0, self.position)
     
     def less_equal(self, other: 'NumberValue') -> 'BooleanValue':
         """Compare if this number is less than or equal to another using Glang semantics."""
         if not isinstance(other, NumberValue):
             raise ValueError(f"Cannot compare number with {other.get_type()}")
-        return BooleanValue(self.value <= other.value)
+        comparison = self.glang_number.compare_to(other.glang_number)
+        return BooleanValue(comparison <= 0, self.position)
+    
+    # Convenience methods for common operations
+    def negate(self) -> 'NumberValue':
+        """Return the negative of this number."""
+        result = self.glang_number.negate()
+        return NumberValue(result, self.position)
+    
+    def absolute(self) -> 'NumberValue':
+        """Return the absolute value of this number."""
+        result = self.glang_number.absolute()
+        return NumberValue(result, self.position)
+    
+    def power(self, other: 'NumberValue') -> 'NumberValue':
+        """Raise this number to the power of other."""
+        if not isinstance(other, NumberValue):
+            raise ValueError(f"Cannot raise number to power of {other.get_type()}")
+        try:
+            result = self.glang_number.power(other.glang_number)
+            return NumberValue(result, self.position)
+        except Exception as e:
+            raise ValueError(str(e))
+    
+    # Mathematical methods that delegate to GlangNumber
+    def sqrt(self) -> 'NumberValue':
+        """Calculate square root using Glang number system."""
+        result = self.glang_number.sqrt()
+        return NumberValue(result, self.position)
+    
+    def ceil(self) -> 'NumberValue':
+        """Return ceiling using Glang number system."""
+        result = self.glang_number.ceil()
+        return NumberValue(result, self.position)
+    
+    def floor(self) -> 'NumberValue':
+        """Return floor using Glang number system."""
+        result = self.glang_number.floor()
+        return NumberValue(result, self.position)
+    
+    def round_to_precision(self, precision: int) -> 'NumberValue':
+        """Round to specified decimal places using Glang rounding rules."""
+        result = self.glang_number.round_to_precision(precision)
+        return NumberValue(result, self.position)
 
 
 class BooleanValue(GlangValue):
@@ -983,12 +1049,7 @@ class ListValue(GlangValue):
         
         # Use type-specific comparison
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
-            if left.value < right.value:
-                return -1
-            elif left.value > right.value:
-                return 1
-            else:
-                return 0
+            return left.glang_number.compare_to(right.glang_number)
         elif isinstance(left, StringValue) and isinstance(right, StringValue):
             if left.value < right.value:
                 return -1
