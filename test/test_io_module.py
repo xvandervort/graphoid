@@ -498,9 +498,9 @@ class TestIONetworkModule:
         download_code = f'io.download_file("not-a-valid-url", "{temp_file}")'
         result = self.session.execute_statement(download_code)
         assert not result.success
-        # Should contain error about invalid URL
+        # Should contain error about failed download
         error_str = str(result.error)
-        assert ("unknown url type" in error_str or "URL error" in error_str)
+        assert ("Failed to download" in error_str and "not-a-valid-url" in error_str)
         
         # File should not be created
         assert not os.path.exists(temp_file)
@@ -515,7 +515,7 @@ class TestIONetworkModule:
         download_code = f'io.download_file("https://httpbin.org/status/404", "{temp_file}")'
         result = self.session.execute_statement(download_code)
         assert not result.success
-        assert "HTTP error 404" in str(result.error)
+        assert "Failed to download" in str(result.error)
         
     def test_send_email_placeholder(self):
         """Test that send_email properly indicates it's not implemented."""

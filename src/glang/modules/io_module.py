@@ -6,10 +6,8 @@ Uses the Glang file system interface for language independence.
 """
 
 import sys
-import urllib.request
-import urllib.parse
-import urllib.error
 from typing import Optional, List
+from .network_interface import get_network_provider
 
 from ..execution.values import (
     GlangValue, StringValue, BooleanValue, NumberValue, 
@@ -708,7 +706,7 @@ class IOModule:
     
     @staticmethod
     def http_get(url: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
-        """Make an HTTP GET request and return the response body.
+        """Make an HTTP GET request using Glang's network interface.
         
         Usage in Glang:
             response = io.http_get("https://api.example.com/data")
@@ -719,22 +717,24 @@ class IOModule:
                 position
             )
         
-        url_str = url.value
+        provider = get_network_provider()
+        if not provider.is_available():
+            raise RuntimeError("Network functionality not available", position)
         
-        try:
-            with urllib.request.urlopen(url_str) as response:
-                content = response.read().decode('utf-8')
-            return StringValue(content, position)
-        except urllib.error.HTTPError as e:
-            raise RuntimeError(f"HTTP error {e.code}: {e.reason}", position)
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"URL error: {e.reason}", position)
-        except Exception as e:
-            raise RuntimeError(f"Error making HTTP request to {url_str}: {str(e)}", position)
+        response = provider.http_request("GET", url.value)
+        
+        # Handle errors at the Glang level rather than letting Python exceptions bubble up
+        if response.status_code == 0:  # Network/URL error
+            raise RuntimeError(f"Network error: {response.body}", position)
+        
+        if response.status_code >= 400:  # HTTP error
+            raise RuntimeError(f"HTTP error {response.status_code}: {response.body}", position)
+        
+        return StringValue(response.body, position)
     
     @staticmethod
     def http_post(url: GlangValue, data: GlangValue = None, position: Optional[SourcePosition] = None) -> GlangValue:
-        """Make an HTTP POST request with optional data.
+        """Make an HTTP POST request using Glang's network interface.
         
         Usage in Glang:
             response = io.http_post("https://api.example.com/submit", "key=value")
@@ -746,34 +746,33 @@ class IOModule:
                 position
             )
         
-        url_str = url.value
-        
-        # Prepare data
+        # Process data using Glang's type system
         post_data = None
         if data is not None:
             if isinstance(data, StringValue):
-                post_data = data.value.encode('utf-8')
+                post_data = data.value
             else:
-                post_data = data.to_display_string().encode('utf-8')
+                # Use Glang's own to_display_string() method
+                post_data = data.to_display_string()
         
-        try:
-            req = urllib.request.Request(url_str, data=post_data, method='POST')
-            if post_data:
-                req.add_header('Content-Type', 'application/x-www-form-urlencoded')
-            
-            with urllib.request.urlopen(req) as response:
-                content = response.read().decode('utf-8')
-            return StringValue(content, position)
-        except urllib.error.HTTPError as e:
-            raise RuntimeError(f"HTTP error {e.code}: {e.reason}", position)
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"URL error: {e.reason}", position)
-        except Exception as e:
-            raise RuntimeError(f"Error making HTTP POST to {url_str}: {str(e)}", position)
+        provider = get_network_provider()
+        if not provider.is_available():
+            raise RuntimeError("Network functionality not available", position)
+        
+        response = provider.http_request("POST", url.value, post_data)
+        
+        # Handle errors at Glang level
+        if response.status_code == 0:
+            raise RuntimeError(f"Network error: {response.body}", position)
+        
+        if response.status_code >= 400:
+            raise RuntimeError(f"HTTP error {response.status_code}: {response.body}", position)
+        
+        return StringValue(response.body, position)
     
     @staticmethod
     def download_file(url: GlangValue, filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
-        """Download a file from a URL and save it locally.
+        """Download a file from a URL using Glang's filesystem interface.
         
         Usage in Glang:
             io.download_file("https://example.com/file.txt", "local_file.txt")
@@ -790,25 +789,25 @@ class IOModule:
                 position
             )
         
-        url_str = url.value
+        # Use Glang's filesystem interface for path operations
+        filesystem = get_filesystem()
         path = filepath.value
         
-        try:
-            # Create parent directories if they don't exist
-            filesystem = get_filesystem()
-            parent_dir = filesystem.get_dirname(path)
-            if parent_dir and not filesystem.file_exists(parent_dir):
-                filesystem.create_directory(parent_dir, parents=True)
-            
-            # Download the file
-            urllib.request.urlretrieve(url_str, path)
-            return BooleanValue(True, position)
-        except urllib.error.HTTPError as e:
-            raise RuntimeError(f"HTTP error {e.code}: {e.reason}", position)
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"URL error: {e.reason}", position)
-        except Exception as e:
-            raise RuntimeError(f"Error downloading {url_str} to {path}: {str(e)}", position)
+        # Create parent directories using Glang's filesystem interface
+        parent_dir = filesystem.get_dirname(path)
+        if parent_dir and not filesystem.file_exists(parent_dir):
+            filesystem.create_directory(parent_dir, parents=True)
+        
+        # Download using Glang's network provider
+        provider = get_network_provider()
+        if not provider.is_available():
+            raise RuntimeError("Network functionality not available", position)
+        
+        success = provider.download_to_file(url.value, path)
+        if not success:
+            raise RuntimeError(f"Failed to download {url.value} to {path}", position)
+        
+        return BooleanValue(success, position)
     
     @staticmethod
     def send_email(to_addr: GlangValue, subject: GlangValue, body: GlangValue, 
