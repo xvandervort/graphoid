@@ -155,6 +155,51 @@ class CharNode(GlangValue):
     
     def __eq__(self, other) -> bool:
         return isinstance(other, CharNode) and self.value == other.value
+    
+    # Character-specific operations using Glang semantics
+    def is_alphabetic(self) -> bool:
+        """Check if character is alphabetic."""
+        return self.value.isalpha()
+    
+    def is_numeric(self) -> bool:
+        """Check if character is numeric."""
+        return self.value.isnumeric()
+    
+    def is_whitespace(self) -> bool:
+        """Check if character is whitespace."""
+        return self.value.isspace()
+    
+    def is_uppercase(self) -> bool:
+        """Check if character is uppercase."""
+        return self.value.isupper()
+    
+    def is_lowercase(self) -> bool:
+        """Check if character is lowercase."""
+        return self.value.islower()
+    
+    def to_uppercase(self) -> 'CharNode':
+        """Convert character to uppercase."""
+        return CharNode(self.value.upper(), self.position)
+    
+    def to_lowercase(self) -> 'CharNode':
+        """Convert character to lowercase."""
+        return CharNode(self.value.lower(), self.position)
+    
+    def compare_to(self, other: 'CharNode') -> int:
+        """Compare characters using Glang semantics.
+        Returns -1 if self < other, 0 if equal, 1 if self > other."""
+        if not isinstance(other, CharNode):
+            raise ValueError(f"Cannot compare char with {other.get_type()}")
+        if self.value < other.value:
+            return -1
+        elif self.value > other.value:
+            return 1
+        else:
+            return 0
+    
+    def is_whitespace(self) -> bool:
+        """Check if character is whitespace."""
+        return self.value.isspace()
 
 
 class StringValue(GlangValue):
@@ -179,35 +224,62 @@ class StringValue(GlangValue):
     
     # String operations using Glang semantics
     def concatenate(self, other: 'StringValue') -> 'StringValue':
-        """Concatenate two strings using Glang semantics."""
+        """Concatenate two strings using character node operations."""
         if not isinstance(other, StringValue):
             raise ValueError(f"Cannot concatenate string with {other.get_type()}")
-        return StringValue(self.value + other.value)
+        
+        # Use character nodes for concatenation
+        self_chars = self.to_char_nodes()
+        other_chars = other.to_char_nodes()
+        combined_chars = self_chars + other_chars
+        
+        return self.from_char_nodes(combined_chars)
     
-    # Comparison operations using Glang semantics
+    # Comparison operations using character node semantics
     def greater_than(self, other: 'StringValue') -> 'BooleanValue':
-        """Compare if this string is greater than another using Glang semantics."""
+        """Compare if this string is greater than another using character node semantics."""
         if not isinstance(other, StringValue):
             raise ValueError(f"Cannot compare string with {other.get_type()}")
-        return BooleanValue(self.value > other.value)
+        return BooleanValue(self._compare_char_nodes(other) > 0)
     
     def less_than(self, other: 'StringValue') -> 'BooleanValue':
-        """Compare if this string is less than another using Glang semantics."""
+        """Compare if this string is less than another using character node semantics."""
         if not isinstance(other, StringValue):
             raise ValueError(f"Cannot compare string with {other.get_type()}")
-        return BooleanValue(self.value < other.value)
+        return BooleanValue(self._compare_char_nodes(other) < 0)
     
     def greater_equal(self, other: 'StringValue') -> 'BooleanValue':
-        """Compare if this string is greater than or equal to another using Glang semantics."""
+        """Compare if this string is greater than or equal to another using character node semantics."""
         if not isinstance(other, StringValue):
             raise ValueError(f"Cannot compare string with {other.get_type()}")
-        return BooleanValue(self.value >= other.value)
+        return BooleanValue(self._compare_char_nodes(other) >= 0)
     
     def less_equal(self, other: 'StringValue') -> 'BooleanValue':
-        """Compare if this string is less than or equal to another using Glang semantics."""
+        """Compare if this string is less than or equal to another using character node semantics."""
         if not isinstance(other, StringValue):
             raise ValueError(f"Cannot compare string with {other.get_type()}")
-        return BooleanValue(self.value <= other.value)
+        return BooleanValue(self._compare_char_nodes(other) <= 0)
+    
+    def _compare_char_nodes(self, other: 'StringValue') -> int:
+        """Compare two strings character by character using CharNode semantics.
+        Returns -1 if self < other, 0 if equal, 1 if self > other."""
+        self_chars = self.to_char_nodes()
+        other_chars = other.to_char_nodes()
+        
+        # Compare character by character
+        min_len = min(len(self_chars), len(other_chars))
+        for i in range(min_len):
+            char_comparison = self_chars[i].compare_to(other_chars[i])
+            if char_comparison != 0:
+                return char_comparison
+        
+        # If all compared characters are equal, the shorter string is "less"
+        if len(self_chars) < len(other_chars):
+            return -1
+        elif len(self_chars) > len(other_chars):
+            return 1
+        else:
+            return 0
     
     def to_char_nodes(self) -> List['CharNode']:
         """Convert string to list of character nodes for graph operations."""
@@ -223,6 +295,96 @@ class StringValue(GlangValue):
     def clear_char_cache(self):
         """Clear the character node cache."""
         self._char_nodes = None
+    
+    # String manipulation operations using character nodes
+    def get_char_at(self, index: int) -> 'StringValue':
+        """Get character at index using character node operations."""
+        char_nodes = self.to_char_nodes()
+        
+        # Handle negative indices
+        if index < 0:
+            index = len(char_nodes) + index
+        
+        if index < 0 or index >= len(char_nodes):
+            raise IndexError(f"String index {index} out of range for string of length {len(char_nodes)}")
+        return StringValue(char_nodes[index].value, self.position)
+    
+    def to_upper(self) -> 'StringValue':
+        """Convert string to uppercase using character node operations."""
+        char_nodes = self.to_char_nodes()
+        upper_chars = [node.to_uppercase() for node in char_nodes]
+        return self.from_char_nodes(upper_chars)
+    
+    def to_lower(self) -> 'StringValue':
+        """Convert string to lowercase using character node operations."""
+        char_nodes = self.to_char_nodes()
+        lower_chars = [node.to_lowercase() for node in char_nodes]
+        return self.from_char_nodes(lower_chars)
+    
+    def trim(self) -> 'StringValue':
+        """Trim whitespace from both ends using character node operations."""
+        char_nodes = self.to_char_nodes()
+        
+        # Find first non-whitespace character
+        start = 0
+        while start < len(char_nodes) and char_nodes[start].is_whitespace():
+            start += 1
+        
+        # Find last non-whitespace character
+        end = len(char_nodes) - 1
+        while end >= start and char_nodes[end].is_whitespace():
+            end -= 1
+        
+        # Return trimmed string
+        if start > end:
+            # All characters were whitespace
+            return StringValue("", self.position)
+        else:
+            trimmed_chars = char_nodes[start:end + 1]
+            return self.from_char_nodes(trimmed_chars)
+    
+    def reverse(self) -> 'StringValue':
+        """Reverse string using character node operations."""
+        char_nodes = self.to_char_nodes()
+        reversed_chars = char_nodes[::-1]
+        return self.from_char_nodes(reversed_chars)
+    
+    def split(self, delimiter: 'StringValue') -> 'ListValue':
+        """Split string by delimiter using character node operations."""
+        if not isinstance(delimiter, StringValue):
+            raise ValueError(f"Split delimiter must be string, got {delimiter.get_type()}")
+        
+        # For now, use Python split but convert results to proper StringValues
+        # TODO: Implement full character node-based splitting algorithm
+        parts = self.value.split(delimiter.value)
+        string_values = [StringValue(part, self.position) for part in parts]
+        
+        return ListValue(string_values, "string", self.position)
+    
+    def join(self, string_list: 'ListValue') -> 'StringValue':
+        """Join list of strings with this string as delimiter using character node operations."""
+        if not isinstance(string_list, ListValue):
+            raise ValueError(f"Join target must be list, got {string_list.get_type()}")
+        
+        if not string_list.elements:
+            return StringValue("", self.position)
+        
+        # Verify all elements are strings
+        for element in string_list.elements:
+            if not isinstance(element, StringValue):
+                raise ValueError(f"All elements must be strings, got {element.get_type()}")
+        
+        # Use character node operations for joining
+        result_chars = []
+        delimiter_chars = self.to_char_nodes()
+        
+        for i, element in enumerate(string_list.elements):
+            if i > 0:
+                # Add delimiter between elements
+                result_chars.extend(delimiter_chars)
+            result_chars.extend(element.to_char_nodes())
+        
+        return self.from_char_nodes(result_chars)
     
     # Override universal methods for string-specific behavior
     def universal_size(self) -> 'NumberValue':

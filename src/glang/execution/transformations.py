@@ -48,22 +48,22 @@ class TransformationRegistry:
         # String transformations
         def upper(value: GlangValue) -> GlangValue:
             if isinstance(value, StringValue):
-                return StringValue(value.value.upper(), value.position)
+                return value.to_upper()
             raise ValueError(f"Cannot uppercase {value.get_type()}")
         
         def lower(value: GlangValue) -> GlangValue:
             if isinstance(value, StringValue):
-                return StringValue(value.value.lower(), value.position)
+                return value.to_lower()
             raise ValueError(f"Cannot lowercase {value.get_type()}")
         
         def trim(value: GlangValue) -> GlangValue:
             if isinstance(value, StringValue):
-                return StringValue(value.value.strip(), value.position)
+                return value.trim()
             raise ValueError(f"Cannot trim {value.get_type()}")
         
         def reverse(value: GlangValue) -> GlangValue:
             if isinstance(value, StringValue):
-                return StringValue(value.value[::-1], value.position)
+                return value.reverse()
             raise ValueError(f"Cannot reverse {value.get_type()}")
         
         # Type conversions

@@ -461,21 +461,11 @@ class ASTExecutor(BaseASTVisitor):
                 )
             
             idx = index_value.value
-            string_val = target_value.value
-            
-            # Handle negative indices
-            if idx < 0:
-                idx = len(string_val) + idx
-            
-            # Check bounds
-            if idx < 0 or idx >= len(string_val):
-                raise RuntimeError(
-                    f"String index {index_value.value} out of range for string of length {len(string_val)}",
-                    node.indices[0].position
-                )
-            
-            # Return character as a string
-            self.result = StringValue(string_val[idx], node.position)
+            # Use character node-based indexing with automatic negative index handling
+            try:
+                self.result = target_value.get_char_at(idx)
+            except IndexError as e:
+                raise RuntimeError(str(e), node.indices[0].position)
         
         # Handle hash indexing - returns data node, not raw value
         elif isinstance(target_value, HashValue):
@@ -1060,7 +1050,7 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"{method_name}() takes no arguments, got {len(args)}", position)
             
-            return StringValue(target.value.upper(), position)
+            return target.to_upper()
         
         # Lower case methods (down and toLower as alias)
         elif method_name in ["down", "toLower"]:
@@ -1068,7 +1058,7 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"{method_name}() takes no arguments, got {len(args)}", position)
             
-            return StringValue(target.value.lower(), position)
+            return target.to_lower()
         
         # Split method
         elif method_name == "split":
@@ -1077,17 +1067,15 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"split() takes 0 or 1 argument, got {len(args)}", position)
             
             # Default delimiter is space
-            delimiter = " "
+            delimiter = StringValue(" ")
             if len(args) == 1:
                 if not isinstance(args[0], StringValue):
                     from .errors import ArgumentError
                     raise ArgumentError(f"split() argument must be string, got {args[0].get_type()}", position)
-                delimiter = args[0].value
+                delimiter = args[0]
             
-            # Split the string and convert to list of StringValues
-            parts = target.value.split(delimiter)
-            string_values = [StringValue(part, position) for part in parts]
-            return ListValue(string_values, "string", position)
+            # Use character node-based split
+            return target.split(delimiter)
         
         # Trim method (remove leading/trailing whitespace)
         elif method_name == "trim":
@@ -1095,7 +1083,7 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"trim() takes no arguments, got {len(args)}", position)
             
-            return StringValue(target.value.strip(), position)
+            return target.trim()
         
         # Join method (join elements of a list with this string as separator)
         elif method_name == "join":
@@ -1107,14 +1095,19 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"join() argument must be list, got {args[0].get_type()}", position)
             
-            # Convert all list elements to strings and join with separator
+            # Convert all list elements to StringValues for character node-based joining
             list_arg = args[0]
-            string_parts = []
+            string_values = []
             for element in list_arg.elements:
-                string_parts.append(element.to_display_string())
+                # Convert element to string if it's not already
+                if isinstance(element, StringValue):
+                    string_values.append(element)
+                else:
+                    string_values.append(StringValue(element.to_display_string(), element.position))
             
-            joined = target.value.join(string_parts)
-            return StringValue(joined, position)
+            # Create temporary ListValue and use character node-based join
+            string_list = ListValue(string_values, "string", position)
+            return target.join(string_list)
         
         # Pattern matching methods
         elif method_name == "matches":
