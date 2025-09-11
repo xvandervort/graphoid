@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption, PublicFormat
 from cryptography.hazmat.backends import default_backend
 
-from glang.execution.values import GlangValue, StringValue, ListValue, NumberValue, MapValue, DataValue
+from glang.execution.values import GlangValue, StringValue, ListValue, NumberValue, HashValue, DataValue
 from glang.ast.nodes import SourcePosition
 from glang.modules.errors import ModuleError
 
@@ -506,7 +506,7 @@ class CryptoModule:
         result_hash["private"] = ListValue(private_list, 'num', position)
         result_hash["public"] = ListValue(public_list, 'num', position)
         
-        return MapValue(result_hash, position)
+        return HashValue(result_hash, position)
     
     @staticmethod
     def rsa_encrypt(data: GlangValue, public_key: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
@@ -514,7 +514,7 @@ class CryptoModule:
         if not isinstance(data, ListValue):
             raise ModuleError("rsa_encrypt expects list of bytes for data", position)
         
-        # Handle DataValue wrapper for public key (MapValue automatically wraps in DataValue)
+        # Handle DataValue wrapper for public key (HashValue automatically wraps in DataValue)
         key_value = public_key
         if isinstance(public_key, DataValue):
             key_value = public_key.value
@@ -653,7 +653,7 @@ class CryptoModule:
         result_hash["public"] = ListValue(public_list, 'num', position)
         result_hash["curve"] = StringValue(curve_str, position)
         
-        return MapValue(result_hash, position)
+        return HashValue(result_hash, position)
     
     @staticmethod
     def ecdh_compute_shared_secret(private_key: GlangValue, peer_public_key: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:

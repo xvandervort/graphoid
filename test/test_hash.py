@@ -4,7 +4,7 @@ import pytest
 from glang.parser.ast_parser import ASTParser
 from glang.execution.pipeline import ExecutionSession
 from glang.ast.nodes import MapLiteral, VariableDeclaration, Assignment
-from glang.execution.values import MapValue, StringValue, NumberValue, BooleanValue
+from glang.execution.values import HashValue, StringValue, NumberValue, BooleanValue
 from glang.semantic.analyzer import SemanticAnalyzer
 from glang.execution.executor import ASTExecutor, ExecutionContext
 from glang.semantic.symbol_table import SymbolTable
@@ -72,7 +72,7 @@ class TestMapExecution:
         result = session.execute_statement('{}')
         
         assert result.success
-        assert isinstance(result.value, MapValue)
+        assert isinstance(result.value, HashValue)
         assert len(result.value.pairs) == 0
         assert str(result.value) == "{}"
     
@@ -82,7 +82,7 @@ class TestMapExecution:
         result = session.execute_statement('{ "host": "localhost", "port": 8080 }')
         
         assert result.success
-        assert isinstance(result.value, MapValue)
+        assert isinstance(result.value, HashValue)
         assert len(result.value.pairs) == 2
         assert result.value.get("host").value == "localhost"
         assert result.value.get("port").value == 8080
@@ -99,7 +99,7 @@ class TestMapExecution:
         # Verify the variable exists
         result = session.execute_statement('config')
         assert result.success
-        assert isinstance(result.value, MapValue)
+        assert isinstance(result.value, HashValue)
         assert result.value.get("debug").value is True
         assert result.value.get("port").value == 3000
     

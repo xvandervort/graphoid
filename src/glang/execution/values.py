@@ -177,6 +177,38 @@ class StringValue(GlangValue):
     def __eq__(self, other) -> bool:
         return isinstance(other, StringValue) and self.value == other.value
     
+    # String operations using Glang semantics
+    def concatenate(self, other: 'StringValue') -> 'StringValue':
+        """Concatenate two strings using Glang semantics."""
+        if not isinstance(other, StringValue):
+            raise ValueError(f"Cannot concatenate string with {other.get_type()}")
+        return StringValue(self.value + other.value)
+    
+    # Comparison operations using Glang semantics
+    def greater_than(self, other: 'StringValue') -> 'BooleanValue':
+        """Compare if this string is greater than another using Glang semantics."""
+        if not isinstance(other, StringValue):
+            raise ValueError(f"Cannot compare string with {other.get_type()}")
+        return BooleanValue(self.value > other.value)
+    
+    def less_than(self, other: 'StringValue') -> 'BooleanValue':
+        """Compare if this string is less than another using Glang semantics."""
+        if not isinstance(other, StringValue):
+            raise ValueError(f"Cannot compare string with {other.get_type()}")
+        return BooleanValue(self.value < other.value)
+    
+    def greater_equal(self, other: 'StringValue') -> 'BooleanValue':
+        """Compare if this string is greater than or equal to another using Glang semantics."""
+        if not isinstance(other, StringValue):
+            raise ValueError(f"Cannot compare string with {other.get_type()}")
+        return BooleanValue(self.value >= other.value)
+    
+    def less_equal(self, other: 'StringValue') -> 'BooleanValue':
+        """Compare if this string is less than or equal to another using Glang semantics."""
+        if not isinstance(other, StringValue):
+            raise ValueError(f"Cannot compare string with {other.get_type()}")
+        return BooleanValue(self.value <= other.value)
+    
     def to_char_nodes(self) -> List['CharNode']:
         """Convert string to list of character nodes for graph operations."""
         if self._char_nodes is None:
@@ -221,6 +253,66 @@ class NumberValue(GlangValue):
     
     def __eq__(self, other) -> bool:
         return isinstance(other, NumberValue) and self.value == other.value
+    
+    # Arithmetic operations using Glang semantics
+    def add(self, other: 'NumberValue') -> 'NumberValue':
+        """Add two numbers using Glang arithmetic semantics."""
+        if not isinstance(other, NumberValue):
+            raise ValueError(f"Cannot add {other.get_type()} to number")
+        return NumberValue(self.value + other.value)
+    
+    def subtract(self, other: 'NumberValue') -> 'NumberValue':
+        """Subtract two numbers using Glang arithmetic semantics."""
+        if not isinstance(other, NumberValue):
+            raise ValueError(f"Cannot subtract {other.get_type()} from number")
+        return NumberValue(self.value - other.value)
+    
+    def multiply(self, other: 'NumberValue') -> 'NumberValue':
+        """Multiply two numbers using Glang arithmetic semantics."""
+        if not isinstance(other, NumberValue):
+            raise ValueError(f"Cannot multiply number by {other.get_type()}")
+        return NumberValue(self.value * other.value)
+    
+    def divide(self, other: 'NumberValue') -> 'NumberValue':
+        """Divide two numbers using Glang arithmetic semantics."""
+        if not isinstance(other, NumberValue):
+            raise ValueError(f"Cannot divide number by {other.get_type()}")
+        if other.value == 0:
+            raise ValueError("Division by zero")
+        return NumberValue(self.value / other.value)
+    
+    def modulo(self, other: 'NumberValue') -> 'NumberValue':
+        """Perform modulo operation using Glang arithmetic semantics."""
+        if not isinstance(other, NumberValue):
+            raise ValueError(f"Cannot perform modulo on number with {other.get_type()}")
+        if other.value == 0:
+            raise ValueError("Modulo by zero")
+        return NumberValue(self.value % other.value)
+    
+    # Comparison operations using Glang semantics
+    def greater_than(self, other: 'NumberValue') -> 'BooleanValue':
+        """Compare if this number is greater than another using Glang semantics."""
+        if not isinstance(other, NumberValue):
+            raise ValueError(f"Cannot compare number with {other.get_type()}")
+        return BooleanValue(self.value > other.value)
+    
+    def less_than(self, other: 'NumberValue') -> 'BooleanValue':
+        """Compare if this number is less than another using Glang semantics."""
+        if not isinstance(other, NumberValue):
+            raise ValueError(f"Cannot compare number with {other.get_type()}")
+        return BooleanValue(self.value < other.value)
+    
+    def greater_equal(self, other: 'NumberValue') -> 'BooleanValue':
+        """Compare if this number is greater than or equal to another using Glang semantics."""
+        if not isinstance(other, NumberValue):
+            raise ValueError(f"Cannot compare number with {other.get_type()}")
+        return BooleanValue(self.value >= other.value)
+    
+    def less_equal(self, other: 'NumberValue') -> 'BooleanValue':
+        """Compare if this number is less than or equal to another using Glang semantics."""
+        if not isinstance(other, NumberValue):
+            raise ValueError(f"Cannot compare number with {other.get_type()}")
+        return BooleanValue(self.value <= other.value)
 
 
 class BooleanValue(GlangValue):
@@ -345,14 +437,119 @@ class DataValue(GlangValue):
         return True, ""
 
 
-class MapValue(GlangValue):
-    """Runtime map value - collection of data nodes (key-value pairs)."""
+class GlangHashTable:
+    """A simple hash table implementation using Glang semantics."""
+    
+    def __init__(self):
+        self.buckets = [[] for _ in range(16)]  # Start with 16 buckets
+        self.size = 0
+    
+    def _hash(self, key: str) -> int:
+        """Simple hash function for strings using Glang semantics."""
+        # Use Python's built-in hash but modulo our bucket count
+        # In the future, this could be replaced with a custom hash function
+        return hash(key) % len(self.buckets)
+    
+    def get(self, key: str) -> Optional[GlangValue]:
+        """Get value by key using Glang semantics."""
+        bucket_idx = self._hash(key)
+        bucket = self.buckets[bucket_idx]
+        
+        for stored_key, value in bucket:
+            if stored_key == key:  # String equality is straightforward
+                return value
+        return None
+    
+    def set(self, key: str, value: GlangValue) -> None:
+        """Set value for key using Glang semantics."""
+        bucket_idx = self._hash(key)
+        bucket = self.buckets[bucket_idx]
+        
+        # Check if key already exists
+        for i, (stored_key, stored_value) in enumerate(bucket):
+            if stored_key == key:
+                bucket[i] = (key, value)  # Replace existing
+                return
+        
+        # Key doesn't exist, add new entry
+        bucket.append((key, value))
+        self.size += 1
+        
+        # Resize if load factor gets too high
+        if self.size > len(self.buckets) * 2:
+            self._resize()
+    
+    def has_key(self, key: str) -> bool:
+        """Check if key exists using Glang semantics."""
+        return self.get(key) is not None
+    
+    def keys(self) -> List[str]:
+        """Get all keys in insertion order (approximately)."""
+        result = []
+        for bucket in self.buckets:
+            for key, _ in bucket:
+                result.append(key)
+        return result
+    
+    def values(self) -> List[GlangValue]:
+        """Get all values in insertion order (approximately)."""
+        result = []
+        for bucket in self.buckets:
+            for _, value in bucket:
+                result.append(value)
+        return result
+    
+    def items(self) -> List[Tuple[str, GlangValue]]:
+        """Get all key-value pairs."""
+        result = []
+        for bucket in self.buckets:
+            for key, value in bucket:
+                result.append((key, value))
+        return result
+    
+    def remove(self, key: str) -> bool:
+        """Remove key-value pair. Returns True if key existed."""
+        bucket_idx = self._hash(key)
+        bucket = self.buckets[bucket_idx]
+        
+        for i, (stored_key, stored_value) in enumerate(bucket):
+            if stored_key == key:
+                del bucket[i]
+                self.size -= 1
+                return True
+        return False
+    
+    def __len__(self) -> int:
+        """Get number of key-value pairs."""
+        return self.size
+    
+    def __contains__(self, key: str) -> bool:
+        """Support Python's 'in' operator for backward compatibility."""
+        return self.has_key(key)
+    
+    def _resize(self) -> None:
+        """Resize hash table when load factor gets too high."""
+        old_buckets = self.buckets
+        self.buckets = [[] for _ in range(len(old_buckets) * 2)]
+        old_size = self.size
+        self.size = 0
+        
+        # Rehash all existing entries
+        for bucket in old_buckets:
+            for key, value in bucket:
+                self.set(key, value)
+
+
+class HashValue(GlangValue):
+    """Runtime hash value - collection of data nodes (key-value pairs)."""
     
     def __init__(self, pairs: List[Tuple[str, GlangValue]], constraint: Optional[str] = None,
                  position: Optional[SourcePosition] = None):
         super().__init__(position)
-        # Store as ordered dictionary to maintain insertion order
-        self.pairs = dict(pairs)  # Convert to dict for efficient key lookup
+        # Use Glang hash table instead of Python dict
+        self.pairs = GlangHashTable()
+        for key, value in pairs:
+            self.pairs.set(key, value)
         self.constraint = constraint  # Optional type constraint for all values
         # Check if any values are frozen
         self._update_frozen_flag()
@@ -394,39 +591,36 @@ class MapValue(GlangValue):
                 value.position
             )
         
-        self.pairs[key] = value
+        self.pairs.set(key, value)
         self._update_frozen_flag()
     
     def has_key(self, key: str) -> bool:
         """Check if key exists in map."""
-        return key in self.pairs
+        return self.pairs.has_key(key)
     
     def keys(self) -> List[str]:
         """Get all keys."""
-        return list(self.pairs.keys())
+        return self.pairs.keys()
     
     def values(self) -> List[GlangValue]:
         """Get all values."""
-        return list(self.pairs.values())
+        return self.pairs.values()
     
     def remove(self, key: str) -> bool:
         """Remove key-value pair. Returns True if key existed."""
         self._check_not_frozen("remove key")
         
-        if key in self.pairs:
-            del self.pairs[key]
+        if self.pairs.remove(key):
             self._update_frozen_flag()
             return True
         return False
     
     def __eq__(self, other) -> bool:
-        return (isinstance(other, MapValue) and 
-                self.pairs == other.pairs and
-                self.constraint == other.constraint)
+        return self.equals(other) if isinstance(other, HashValue) else False
     
-    def equals(self, other: 'MapValue') -> bool:
-        """Compare two maps using Glang equality semantics."""
-        if not isinstance(other, MapValue):
+    def equals(self, other: 'HashValue') -> bool:
+        """Compare two hashes using Glang equality semantics."""
+        if not isinstance(other, HashValue):
             return False
         
         if len(self.pairs) != len(other.pairs):
@@ -559,9 +753,7 @@ class ListValue(GlangValue):
         return len(self.elements)
     
     def __eq__(self, other) -> bool:
-        return (isinstance(other, ListValue) and 
-                self.elements == other.elements and
-                self.constraint == other.constraint)
+        return self.equals(other) if isinstance(other, ListValue) else False
     
     def contains(self, value: GlangValue) -> bool:
         """Check if this list contains the given value using Glang equality semantics."""
@@ -605,7 +797,7 @@ class ListValue(GlangValue):
             return left.equals(right)
         elif isinstance(left, DataValue) and isinstance(right, DataValue):
             return left.key == right.key and ListValue._glang_equals(left.value, right.value)
-        elif isinstance(left, MapValue) and isinstance(right, MapValue):
+        elif isinstance(left, HashValue) and isinstance(right, HashValue):
             return left.equals(right)
         elif isinstance(left, NoneValue) and isinstance(right, NoneValue):
             return True
@@ -613,6 +805,45 @@ class ListValue(GlangValue):
             # For any unknown types, fall back to Python equality
             # This should not happen in practice
             return left == right
+    
+    @staticmethod
+    def _glang_compare(left: GlangValue, right: GlangValue) -> int:
+        """Compare two Glang values using Glang's comparison semantics.
+        
+        Returns:
+            -1 if left < right
+             0 if left == right
+             1 if left > right
+        """
+        # Different types cannot be compared (except for special cases)
+        if left.get_type() != right.get_type():
+            raise ValueError(f"Cannot compare {left.get_type()} with {right.get_type()}")
+        
+        # Use type-specific comparison
+        if isinstance(left, NumberValue) and isinstance(right, NumberValue):
+            if left.value < right.value:
+                return -1
+            elif left.value > right.value:
+                return 1
+            else:
+                return 0
+        elif isinstance(left, StringValue) and isinstance(right, StringValue):
+            if left.value < right.value:
+                return -1
+            elif left.value > right.value:
+                return 1
+            else:
+                return 0
+        elif isinstance(left, BooleanValue) and isinstance(right, BooleanValue):
+            # False < True in Glang
+            if left.value < right.value:
+                return -1
+            elif left.value > right.value:
+                return 1
+            else:
+                return 0
+        else:
+            raise ValueError(f"Comparison not supported for {left.get_type()}")
     
     # Immutability-specific methods
     def _update_frozen_flag(self):

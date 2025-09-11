@@ -158,7 +158,7 @@ class TestOptionalTypeDeclarations:
         executor.execute(ast)
         assert "config" in executor.context.variables
         # Map should contain data nodes
-        # MapValue uses 'pairs' to store its key-value pairs
+        # HashValue uses 'pairs' to store its key-value pairs
         assert len(executor.context.variables["config"].pairs) == 2
     
     def test_explicit_type_still_works(self):

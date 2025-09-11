@@ -11,7 +11,7 @@ from pathlib import Path
 
 from ..execution.values import (
     GlangValue, StringValue, BooleanValue, NumberValue, 
-    ListValue, DataValue, MapValue
+    ListValue, DataValue, HashValue
 )
 from ..execution.errors import RuntimeError
 from ..ast.nodes import SourcePosition

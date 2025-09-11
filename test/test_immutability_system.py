@@ -7,7 +7,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../src'))
 
 from glang.execution.values import (
-    StringValue, NumberValue, BooleanValue, ListValue, DataValue, MapValue
+    StringValue, NumberValue, BooleanValue, ListValue, DataValue, HashValue
 )
 from glang.execution.executor import ASTExecutor, ExecutionContext
 from glang.semantic.analyzer import SemanticAnalyzer
@@ -192,7 +192,7 @@ class TestMapFreezingAndContamination:
     def test_map_freezing(self):
         """Test that maps can be frozen."""
         pairs = [("name", StringValue("Alice")), ("age", NumberValue(25))]
-        map_val = MapValue(pairs)
+        map_val = HashValue(pairs)
         assert not map_val.is_frozen_value()
         assert not map_val.contains_frozen_data()
         
@@ -210,13 +210,13 @@ class TestMapFreezingAndContamination:
         frozen_value.freeze()
         
         pairs = [("key1", StringValue("normal")), ("key2", frozen_value)]
-        map_val = MapValue(pairs)
+        map_val = HashValue(pairs)
         assert map_val.contains_frozen_data()
     
     def test_frozen_map_rejects_mutations(self):
         """Test that frozen maps reject mutations."""
         pairs = [("name", StringValue("Alice"))]
-        map_val = MapValue(pairs)
+        map_val = HashValue(pairs)
         map_val.freeze()
         
         with pytest.raises(RuntimeError, match="Cannot set key: value is frozen"):
@@ -229,7 +229,7 @@ class TestMapFreezingAndContamination:
         """Test that maps prevent mixing frozen and unfrozen values."""
         # Start with unfrozen map
         pairs = [("name", StringValue("Alice"))]
-        map_val = MapValue(pairs)
+        map_val = HashValue(pairs)
         assert not map_val.contains_frozen_data()
         
         # Try to add a frozen value
@@ -242,7 +242,7 @@ class TestMapFreezingAndContamination:
     def test_can_accept_value_method_for_maps(self):
         """Test the can_accept_value method for maps."""
         pairs = [("name", StringValue("Alice"))]
-        map_val = MapValue(pairs)
+        map_val = HashValue(pairs)
         
         # Should accept unfrozen value
         can_accept, msg = map_val.can_accept_value(StringValue("Bob"))

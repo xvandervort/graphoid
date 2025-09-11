@@ -10,7 +10,7 @@ from pathlib import Path
 
 from ..execution.values import (
     GlangValue, StringValue, BooleanValue, NumberValue, 
-    ListValue, DataValue, MapValue, NoneValue
+    ListValue, DataValue, HashValue, NoneValue
 )
 from ..execution.errors import RuntimeError
 from ..ast.nodes import SourcePosition
@@ -98,7 +98,7 @@ class JSONModule:
             return None
         elif isinstance(value, ListValue):
             return [JSONModule._glang_to_python(item, position) for item in value.elements]
-        elif isinstance(value, MapValue):
+        elif isinstance(value, HashValue):
             # Convert hash/map to dictionary
             result = {}
             for key, glang_value in value.pairs.items():
@@ -156,7 +156,7 @@ class JSONModule:
                 else:
                     value_type = 'any'  # Mixed types
             
-            return MapValue(pairs, value_type, position)
+            return HashValue(pairs, value_type, position)
         else:
             # Unknown type - convert to string
             return StringValue(str(data), position)

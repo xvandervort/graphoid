@@ -139,18 +139,18 @@ class ASTExecutor(BaseASTVisitor):
                         initializer_value.value.position or node.position
                     )
         
-        # For map declarations, handle both MapValue and DataValue (single pair) initializers
+        # For hash declarations, handle both HashValue and DataValue (single pair) initializers
         elif node.var_type == "hash":
             if isinstance(initializer_value, DataValue):
-                # Convert single DataValue to MapValue for map declarations
+                # Convert single DataValue to HashValue for hash declarations
                 pairs = [(initializer_value.key, initializer_value.value)]
-                initializer_value = MapValue(pairs, node.type_constraint, initializer_value.position)
-            elif isinstance(initializer_value, MapValue):
+                initializer_value = HashValue(pairs, node.type_constraint, initializer_value.position)
+            elif isinstance(initializer_value, HashValue):
                 if node.type_constraint:
                     initializer_value.constraint = node.type_constraint
             
             # Validate constraint if specified
-            if node.type_constraint and isinstance(initializer_value, MapValue):
+            if node.type_constraint and isinstance(initializer_value, HashValue):
                 for key, value in initializer_value.pairs.items():
                     if not initializer_value.validate_constraint(value):
                         raise TypeConstraintError(
@@ -427,8 +427,8 @@ class ASTExecutor(BaseASTVisitor):
                 value = python_to_glang_value(value, value_expr.position)
             evaluated_pairs.append((key, value))
         
-        # Create MapValue with the evaluated pairs
-        self.result = MapValue(evaluated_pairs, None, node.position)
+        # Create HashValue with the evaluated pairs
+        self.result = HashValue(evaluated_pairs, None, node.position)
     
     def visit_index_access(self, node: IndexAccess) -> None:
         """Evaluate index access."""
@@ -477,11 +477,11 @@ class ASTExecutor(BaseASTVisitor):
             # Return character as a string
             self.result = StringValue(string_val[idx], node.position)
         
-        # Handle map indexing - returns data node, not raw value
-        elif isinstance(target_value, MapValue):
+        # Handle hash indexing - returns data node, not raw value
+        elif isinstance(target_value, HashValue):
             if not isinstance(index_value, StringValue):
                 raise RuntimeError(
-                    f"Map index must be string, got {index_value.get_type()}",
+                    f"Hash index must be string, got {index_value.get_type()}",
                     node.indices[0].position
                 )
             
@@ -812,16 +812,15 @@ class ASTExecutor(BaseASTVisitor):
             # Create a copy of elements for sorting (immutable operation)
             sorted_elements = target.elements.copy()
             
-            # Sort based on element type
-            if isinstance(first_element, NumberValue):
-                sorted_elements.sort(key=lambda x: x.value)
-            elif isinstance(first_element, StringValue):
-                sorted_elements.sort(key=lambda x: x.value)
-            elif isinstance(first_element, BooleanValue):
-                sorted_elements.sort(key=lambda x: x.value)  # False < True
-            else:
+            # Sort using Glang comparison semantics
+            try:
+                import functools
+                sorted_elements.sort(key=functools.cmp_to_key(
+                    lambda x, y: ListValue._glang_compare(x, y)
+                ))
+            except ValueError as e:
                 from .errors import ArgumentError
-                raise ArgumentError(f"sort() does not support {first_element.get_type()} elements", position)
+                raise ArgumentError(f"sort() failed: {str(e)}", position)
             
             # Return new sorted list
             return ListValue(sorted_elements, target.constraint, position)
@@ -1478,7 +1477,7 @@ class ASTExecutor(BaseASTVisitor):
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "data", position)
     
-    def _dispatch_hash_method(self, target: MapValue, method_name: str,
+    def _dispatch_hash_method(self, target: HashValue, method_name: str,
                             args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle hash method calls."""
         
@@ -1581,7 +1580,7 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"merge() takes 1 argument, got {len(args)}", position)
             
             other_map = args[0]
-            if not isinstance(other_map, MapValue):
+            if not isinstance(other_map, HashValue):
                 from .errors import ArgumentError
                 raise ArgumentError(f"merge() requires a hash argument, got {other_map.get_type()}", position)
             
@@ -1705,11 +1704,11 @@ class ASTExecutor(BaseASTVisitor):
             target_value.set_element(index_value.value, value)
             self.result = f"Set {node.target.target.name}[{index_value.value}] = {value.to_display_string()}"
         
-        # Handle map index assignment - creates/updates data node
-        elif isinstance(target_value, MapValue):
+        # Handle hash index assignment - creates/updates data node
+        elif isinstance(target_value, HashValue):
             if not isinstance(index_value, StringValue):
                 raise RuntimeError(
-                    f"Map index must be string, got {index_value.get_type()}",
+                    f"Hash index must be string, got {index_value.get_type()}",
                     node.target.indices[0].position
                 )
             
@@ -1951,9 +1950,9 @@ class ASTExecutor(BaseASTVisitor):
     def perform_addition(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform addition operation."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
-            return NumberValue(left.value + right.value)
+            return left.add(right)
         elif isinstance(left, StringValue) and isinstance(right, StringValue):
-            return StringValue(left.value + right.value)
+            return left.concatenate(right)
         elif isinstance(left, ListValue) and isinstance(right, ListValue):
             # List concatenation/union - combine all elements
             combined_elements = left.elements + right.elements
@@ -1967,7 +1966,7 @@ class ASTExecutor(BaseASTVisitor):
     def perform_subtraction(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform subtraction operation."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
-            return NumberValue(left.value - right.value)
+            return left.subtract(right)
         elif isinstance(left, ListValue) and isinstance(right, ListValue):
             # List set difference - remove elements from left that are in right
             result_elements = []
@@ -1982,25 +1981,27 @@ class ASTExecutor(BaseASTVisitor):
     def perform_multiplication(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform multiplication operation (numbers only - use *. for element-wise)."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
-            return NumberValue(left.value * right.value)
+            return left.multiply(right)
         else:
             raise RuntimeError(f"Cannot multiply {left.get_type()} and {right.get_type()} - use *. for element-wise operations")
     
     def perform_division(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform division operation (numbers only - use /. for element-wise)."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
-            if right.value == 0:
-                raise RuntimeError("Division by zero")
-            return NumberValue(left.value / right.value)
+            try:
+                return left.divide(right)
+            except ValueError as e:
+                raise RuntimeError(str(e))
         else:
             raise RuntimeError(f"Cannot divide {left.get_type()} by {right.get_type()} - use /. for element-wise operations")
     
     def perform_modulo(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform modulo operation (numbers only - use %. for element-wise)."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
-            if right.value == 0:
-                raise RuntimeError("Modulo by zero")
-            return NumberValue(left.value % right.value)
+            try:
+                return left.modulo(right)
+            except ValueError as e:
+                raise RuntimeError(str(e))
         else:
             raise RuntimeError(f"Cannot perform modulo on {left.get_type()} and {right.get_type()} - use %. for element-wise operations")
     
@@ -2268,23 +2269,23 @@ class ASTExecutor(BaseASTVisitor):
         # For ordering operations, only support compatible types
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
             if operation == "greater":
-                return BooleanValue(left.value > right.value)
+                return left.greater_than(right)
             elif operation == "less":
-                return BooleanValue(left.value < right.value)
+                return left.less_than(right)
             elif operation == "greater_equal":
-                return BooleanValue(left.value >= right.value)
+                return left.greater_equal(right)
             elif operation == "less_equal":
-                return BooleanValue(left.value <= right.value)
+                return left.less_equal(right)
         elif isinstance(left, StringValue) and isinstance(right, StringValue):
             # String comparisons (lexicographic)
             if operation == "greater":
-                return BooleanValue(left.value > right.value)
+                return left.greater_than(right)
             elif operation == "less":
-                return BooleanValue(left.value < right.value)
+                return left.less_than(right)
             elif operation == "greater_equal":
-                return BooleanValue(left.value >= right.value)
+                return left.greater_equal(right)
             elif operation == "less_equal":
-                return BooleanValue(left.value <= right.value)
+                return left.less_equal(right)
         
         raise RuntimeError(f"Cannot compare {left.get_type()} and {right.get_type()} with {operation}")
     
