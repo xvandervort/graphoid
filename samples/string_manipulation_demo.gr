@@ -1,0 +1,64 @@
+# Comprehensive String Manipulation Demo
+
+print("🔤 String Manipulation Demo")
+print("===========================")
+
+# Basic string operations
+string original = "  Hello, World! 123  "
+print("Original: '" + original + "'")
+
+# Case transformations
+print("\n📝 Case Transformations:")
+print("Upper: " + original.up())
+print("Lower: " + original.down())
+
+# Trimming whitespace
+print("\n✂️  Trimming:")
+string trimmed = original.trim()
+print("Trimmed: '" + trimmed + "'")
+
+# Length and character operations
+print("\n📏 Length and Characters:")
+print("Length: " + trimmed.length().to_string())
+print("Characters: " + trimmed.chars().to_string())
+
+# String splitting and joining
+print("\n🔀 Split and Join:")
+list<string> words = trimmed.split(" ")
+print("Split by space: " + words.to_string())
+string rejoined = "-".join(words)
+print("Joined with dash: " + rejoined)
+
+# Regular expressions
+print("\n🔍 Pattern Matching:")
+string text = "Hello World 123 Test"
+bool has_numbers = text.matches("[0-9]+")
+print("Has numbers: " + has_numbers.to_string())
+
+string no_numbers = text.replace("[0-9]+", "XXX")
+print("Replace numbers: " + no_numbers)
+
+list<string> found_words = text.findAll("[A-Za-z]+")
+print("Find all words: " + found_words.to_string())
+
+# Containment checks
+print("\n🔎 Containment:")
+bool contains_world = text.contains("World")
+print("Contains 'World': " + contains_world.to_string())
+
+# String reverse
+print("\n🔄 Reverse:")
+string reversed_text = text.reverse()
+print("Reversed: " + reversed_text)
+
+# Type conversions
+print("\n🔄 Type Conversions:")
+string number_str = "42"
+num converted = number_str.to_num()
+print("String '42' to number: " + converted.to_string())
+
+string bool_str = "true"
+bool converted_bool = bool_str.to_bool()
+print("String 'true' to bool: " + converted_bool.to_string())
+
+print("\n✨ String manipulation demo completed!")

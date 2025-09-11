@@ -1,11 +1,14 @@
 """
 Built-in I/O module for Glang
 
-Provides file operations, user input, and directory management.
+Provides file operations, user input, directory management, and network operations.
 Uses the Glang file system interface for language independence.
 """
 
 import sys
+import urllib.request
+import urllib.parse
+import urllib.error
 from typing import Optional, List
 
 from ..execution.values import (
@@ -702,6 +705,144 @@ class IOModule:
             return StringValue(resolved, position)
         except Exception as e:
             raise RuntimeError(f"Error resolving path: {str(e)}", position)
+    
+    @staticmethod
+    def http_get(url: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Make an HTTP GET request and return the response body.
+        
+        Usage in Glang:
+            response = io.http_get("https://api.example.com/data")
+        """
+        if not isinstance(url, StringValue):
+            raise RuntimeError(
+                f"io.http_get expects string URL, got {url.get_type()}",
+                position
+            )
+        
+        url_str = url.value
+        
+        try:
+            with urllib.request.urlopen(url_str) as response:
+                content = response.read().decode('utf-8')
+            return StringValue(content, position)
+        except urllib.error.HTTPError as e:
+            raise RuntimeError(f"HTTP error {e.code}: {e.reason}", position)
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"URL error: {e.reason}", position)
+        except Exception as e:
+            raise RuntimeError(f"Error making HTTP request to {url_str}: {str(e)}", position)
+    
+    @staticmethod
+    def http_post(url: GlangValue, data: GlangValue = None, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Make an HTTP POST request with optional data.
+        
+        Usage in Glang:
+            response = io.http_post("https://api.example.com/submit", "key=value")
+            response = io.http_post("https://api.example.com/submit")  # No data
+        """
+        if not isinstance(url, StringValue):
+            raise RuntimeError(
+                f"io.http_post expects string URL, got {url.get_type()}",
+                position
+            )
+        
+        url_str = url.value
+        
+        # Prepare data
+        post_data = None
+        if data is not None:
+            if isinstance(data, StringValue):
+                post_data = data.value.encode('utf-8')
+            else:
+                post_data = data.to_display_string().encode('utf-8')
+        
+        try:
+            req = urllib.request.Request(url_str, data=post_data, method='POST')
+            if post_data:
+                req.add_header('Content-Type', 'application/x-www-form-urlencoded')
+            
+            with urllib.request.urlopen(req) as response:
+                content = response.read().decode('utf-8')
+            return StringValue(content, position)
+        except urllib.error.HTTPError as e:
+            raise RuntimeError(f"HTTP error {e.code}: {e.reason}", position)
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"URL error: {e.reason}", position)
+        except Exception as e:
+            raise RuntimeError(f"Error making HTTP POST to {url_str}: {str(e)}", position)
+    
+    @staticmethod
+    def download_file(url: GlangValue, filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Download a file from a URL and save it locally.
+        
+        Usage in Glang:
+            io.download_file("https://example.com/file.txt", "local_file.txt")
+        """
+        if not isinstance(url, StringValue):
+            raise RuntimeError(
+                f"io.download_file expects string URL, got {url.get_type()}",
+                position
+            )
+        
+        if not isinstance(filepath, StringValue):
+            raise RuntimeError(
+                f"io.download_file expects string filepath, got {filepath.get_type()}",
+                position
+            )
+        
+        url_str = url.value
+        path = filepath.value
+        
+        try:
+            # Create parent directories if they don't exist
+            filesystem = get_filesystem()
+            parent_dir = filesystem.get_dirname(path)
+            if parent_dir and not filesystem.file_exists(parent_dir):
+                filesystem.create_directory(parent_dir, parents=True)
+            
+            # Download the file
+            urllib.request.urlretrieve(url_str, path)
+            return BooleanValue(True, position)
+        except urllib.error.HTTPError as e:
+            raise RuntimeError(f"HTTP error {e.code}: {e.reason}", position)
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"URL error: {e.reason}", position)
+        except Exception as e:
+            raise RuntimeError(f"Error downloading {url_str} to {path}: {str(e)}", position)
+    
+    @staticmethod
+    def send_email(to_addr: GlangValue, subject: GlangValue, body: GlangValue, 
+                   smtp_server: GlangValue = None, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Send an email notification (requires SMTP configuration).
+        
+        Usage in Glang:
+            io.send_email("user@example.com", "Alert", "System alert message")
+            io.send_email("user@example.com", "Alert", "Message", "smtp.gmail.com:587")
+        """
+        if not isinstance(to_addr, StringValue):
+            raise RuntimeError(
+                f"io.send_email expects string to_addr, got {to_addr.get_type()}",
+                position
+            )
+        
+        if not isinstance(subject, StringValue):
+            raise RuntimeError(
+                f"io.send_email expects string subject, got {subject.get_type()}",
+                position
+            )
+        
+        if not isinstance(body, StringValue):
+            raise RuntimeError(
+                f"io.send_email expects string body, got {body.get_type()}",
+                position
+            )
+        
+        # For now, return a placeholder since email requires SMTP configuration
+        # In a real implementation, this would use smtplib
+        raise RuntimeError(
+            "Email functionality requires SMTP server configuration (not yet implemented)",
+            position
+        )
 
 
 def create_io_module_namespace():
@@ -712,12 +853,20 @@ def create_io_module_namespace():
     
     # Register all IO functions
     io_functions = {
+        # Console operations
         'print': IOModule.print_output,  # Use 'print' as the public name
+        'input': IOModule.input,
+        
+        # File operations
         'read_file': IOModule.read_file,
         'write_file': IOModule.write_file,
         'append_file': IOModule.append_file,
         'read_binary': IOModule.read_binary,
         'write_binary': IOModule.write_binary,
+        'read_lines': IOModule.read_lines,
+        'write_lines': IOModule.write_lines,
+        
+        # File system operations
         'exists': IOModule.exists,
         'is_file': IOModule.is_file,
         'is_dir': IOModule.is_dir,
@@ -728,15 +877,20 @@ def create_io_module_namespace():
         'get_cwd': IOModule.get_cwd,
         'set_cwd': IOModule.set_cwd,
         'file_size': IOModule.file_size,
-        'read_lines': IOModule.read_lines,
-        'write_lines': IOModule.write_lines,
+        
+        # Path operations
         'join_path': IOModule.join_path,
         'split_path': IOModule.split_path,
         'get_basename': IOModule.get_basename,
         'get_dirname': IOModule.get_dirname,
         'get_extension': IOModule.get_extension,
         'resolve_path': IOModule.resolve_path,
-        'input': IOModule.input,
+        
+        # Network operations
+        'http_get': IOModule.http_get,
+        'http_post': IOModule.http_post,
+        'download_file': IOModule.download_file,
+        'send_email': IOModule.send_email,
     }
     
     # Wrap functions as callable values

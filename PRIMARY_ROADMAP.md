@@ -28,8 +28,8 @@ Transform Glang from a practical programming language into a revolutionary platf
 #### 1.1 Standard Library Completion
 - [x] Math module with constants
 - [x] JSON encoding/decoding
-- [ ] Complete I/O operations (file, network, console)
-- [ ] String manipulation utilities
+- [x] Complete I/O operations (file, network, console)
+- [x] String manipulation utilities
 - [ ] Date/time handling
 - [ ] Regular expressions
 - [ ] Random number generation
@@ -166,10 +166,13 @@ The following documents have been superseded by this roadmap:
 ## Next Actions
 
 ### Immediate (This Month)
-1. Complete I/O module implementation
-2. Add string manipulation functions
-3. Write v0.9 release notes
-4. Update README with roadmap reference
+1. ✅ ~~Complete I/O module implementation~~
+2. ✅ ~~Add string manipulation functions~~
+3. ✅ ~~Write v0.9 release notes~~
+4. ✅ ~~Update README with roadmap reference~~
+5. Add date/time handling module
+6. Implement regular expression enhancements
+7. Create random number generation module
 
 ### Q1 2025
 1. Finish standard library modules

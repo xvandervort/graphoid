@@ -1,6 +1,6 @@
 # IO Module
 
-The IO module provides input/output operations for file system interaction, console I/O, and path manipulation.
+The IO module provides input/output operations for file system interaction, console I/O, path manipulation, and network operations.
 
 ## Importing
 
@@ -377,6 +377,93 @@ current = io.resolve_path(".")
 print("Current absolute: " + current)
 ```
 
+## Network Operations *(Added in v0.5)*
+
+### http_get(url)
+Makes an HTTP GET request to the specified URL and returns the response body as a string.
+
+```glang
+# Simple GET request
+response = io.http_get("https://api.example.com/data")
+print("Response: " + response)
+
+# Get JSON data
+json_response = io.http_get("https://jsonplaceholder.typicode.com/users/1")
+user_data = json.decode(json_response)
+print("User name: " + user_data.get("name").value())
+
+# Check API status
+try {
+    status = io.http_get("https://api.service.com/health")
+    print("Service is up: " + status)
+} catch (error) {
+    print("Service unavailable: " + error.to_string())
+}
+```
+
+### http_post(url, data)
+Makes an HTTP POST request with optional data and returns the response body as a string.
+
+```glang
+# POST with form data
+response = io.http_post("https://httpbin.org/post", "key=value&name=test")
+print("Response: " + response)
+
+# POST without data
+response = io.http_post("https://api.example.com/trigger")
+print("Triggered successfully")
+
+# Submit form data
+form_data = "username=alice&password=secret123"
+login_response = io.http_post("https://example.com/login", form_data)
+print("Login response: " + login_response)
+
+# API data submission
+api_data = "action=update&id=123&status=active"
+result = io.http_post("https://api.service.com/update", api_data)
+```
+
+### download_file(url, filepath)
+Downloads a file from a URL and saves it to the local filesystem. Returns true on success.
+
+```glang
+# Download a file
+success = io.download_file("https://example.com/data.txt", "downloaded_data.txt")
+if success {
+    print("File downloaded successfully")
+    content = io.read_file("downloaded_data.txt")
+    print("Content: " + content)
+}
+
+# Download to specific directory
+io.make_dir("downloads")
+url = "https://github.com/user/repo/archive/main.zip"
+io.download_file(url, "downloads/repo.zip")
+
+# Download with error handling
+try {
+    success = io.download_file("https://api.service.com/export", "export.csv")
+    if success {
+        lines = io.read_lines("export.csv")
+        print("Downloaded " + lines.size().to_string() + " lines")
+    }
+} catch (error) {
+    print("Download failed: " + error.to_string())
+}
+```
+
+### send_email(to_addr, subject, body, smtp_server)
+Sends an email notification. Currently returns an error indicating this feature is not yet implemented.
+
+```glang
+# This will currently fail with "not yet implemented" error
+try {
+    io.send_email("user@example.com", "Alert", "System status update")
+} catch (error) {
+    print("Email not available: " + error.to_string())
+}
+```
+
 ## Examples
 
 ### File Processing Pipeline
@@ -524,4 +611,102 @@ for i in [0, 1, 2, 3] {
 
 # Write modified data
 io.write_binary("modified.bin", bytes)
+```
+
+### Web Service Integration
+```glang
+import "io"
+import "json"
+
+func fetch_user_data(user_id) {
+    # Fetch user data from API
+    url = "https://jsonplaceholder.typicode.com/users/" + user_id.to_string()
+    
+    try {
+        response = io.http_get(url)
+        user_data = json.decode(response)
+        return user_data
+    } catch (error) {
+        print("Failed to fetch user: " + error.to_string())
+        return {}
+    }
+}
+
+func save_user_report(user_data) {
+    # Create user report
+    name = user_data.get("name").value()
+    email = user_data.get("email").value()
+    
+    report_lines = [
+        "User Report",
+        "===========",
+        "Name: " + name,
+        "Email: " + email,
+        "Generated: " + "2025-01-11"  # Would use real timestamp
+    ]
+    
+    filename = name.replace(" ", "_").lower() + "_report.txt"
+    return io.write_lines(filename, report_lines)
+}
+
+# Process multiple users
+user_ids = [1, 2, 3, 4, 5]
+for user_id in user_ids {
+    user_data = fetch_user_data(user_id)
+    if user_data.size() > 0 {
+        success = save_user_report(user_data)
+        if success {
+            print("Report saved for user " + user_id.to_string())
+        }
+    }
+}
+```
+
+### File Backup System
+```glang
+import "io"
+
+func backup_to_remote(local_file, backup_url) {
+    # Read local file
+    if not io.exists(local_file) {
+        print("Local file not found: " + local_file)
+        return false
+    }
+    
+    content = io.read_file(local_file)
+    
+    # Upload to backup service (simplified example)
+    try {
+        response = io.http_post(backup_url, content)
+        print("Backup successful: " + response)
+        return true
+    } catch (error) {
+        print("Backup failed: " + error.to_string())
+        return false
+    }
+}
+
+func download_backup(backup_url, local_file) {
+    # Download backup file
+    try {
+        success = io.download_file(backup_url, local_file)
+        if success {
+            print("Backup downloaded to: " + local_file)
+            return true
+        } else {
+            print("Download failed")
+            return false
+        }
+    } catch (error) {
+        print("Download error: " + error.to_string())
+        return false
+    }
+}
+
+# Example usage
+files_to_backup = ["config.txt", "data.csv", "app.log"]
+for file in files_to_backup {
+    backup_url = "https://backup.service.com/upload/" + file
+    backup_to_remote(file, backup_url)
+}
 ```

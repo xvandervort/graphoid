@@ -1,0 +1,31 @@
+# Demonstrate network I/O operations in Glang
+
+import "io"
+
+print("🌐 Network I/O Demo")
+print("==================")
+
+# Test HTTP GET (using a simple service that echoes back)
+print("Testing HTTP GET...")
+string response = io.http_get("https://httpbin.org/get")
+print("✅ HTTP GET successful")
+print("Response length: " + response.length().to_string() + " chars")
+
+# Test file download  
+print("\nTesting file download...")
+io.download_file("https://httpbin.org/robots.txt", "downloaded_robots.txt")
+if io.exists("downloaded_robots.txt") {
+    string content = io.read_file("downloaded_robots.txt")
+    print("✅ File downloaded successfully")
+    print("Content preview: " + content)
+    io.remove_file("downloaded_robots.txt")
+    print("✅ Cleanup completed")
+}
+
+# Test HTTP POST (with simple data)
+print("\nTesting HTTP POST...")
+string post_response = io.http_post("https://httpbin.org/post", "test_data=hello_from_glang")
+print("✅ HTTP POST successful")
+print("Response length: " + post_response.length().to_string() + " chars")
+
+print("\n✨ Network I/O demo completed!")

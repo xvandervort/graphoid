@@ -367,3 +367,183 @@ class TestIOModule:
         result = self.session.execute_statement(remove_dir_code)
         assert not result.success
         assert "Directory not empty" in str(result.error)
+
+
+class TestIONetworkModule:
+    """Test I/O module network operations."""
+    
+    def setup_method(self):
+        """Set up test environment."""
+        self.session = ExecutionSession()
+        # Import io module
+        result = self.session.execute_statement('import "io"')
+        assert result.success
+        
+    def test_http_get_success(self):
+        """Test successful HTTP GET request."""
+        # Using httpbin.org for reliable testing
+        get_code = 'string response = io.http_get("https://httpbin.org/get")'
+        result = self.session.execute_statement(get_code)
+        assert result.success
+        
+        # Check that we got a response
+        result = self.session.execute_statement('response.length() > 0')
+        assert result.success
+        assert result.value.value == True
+        
+        # Response should contain JSON-like content
+        result = self.session.execute_statement('response.contains("{")')
+        assert result.success
+        assert result.value.value == True
+        
+    def test_http_get_invalid_url(self):
+        """Test HTTP GET with invalid URL."""
+        get_code = 'string response = io.http_get("not-a-valid-url")'
+        result = self.session.execute_statement(get_code)
+        assert not result.success
+        # Should contain error about invalid URL
+        error_str = str(result.error)
+        assert ("unknown url type" in error_str or "URL error" in error_str)
+        
+    def test_http_get_nonexistent_domain(self):
+        """Test HTTP GET with nonexistent domain."""
+        get_code = 'string response = io.http_get("https://nonexistent-domain-12345.com")'
+        result = self.session.execute_statement(get_code)
+        assert not result.success
+        # Should contain either "URL error" or "HTTP error"
+        error_str = str(result.error)
+        assert "error" in error_str.lower()
+        
+    def test_http_post_success(self):
+        """Test successful HTTP POST request."""
+        post_code = 'string response = io.http_post("https://httpbin.org/post", "test_key=test_value")'
+        result = self.session.execute_statement(post_code)
+        assert result.success
+        
+        # Check that we got a response
+        result = self.session.execute_statement('response.length() > 0')
+        assert result.success
+        assert result.value.value == True
+        
+        # Response should contain our posted data
+        result = self.session.execute_statement('response.contains("test_key")')
+        assert result.success
+        assert result.value.value == True
+        
+    def test_http_post_no_data(self):
+        """Test HTTP POST with no data."""
+        post_code = 'string response = io.http_post("https://httpbin.org/post")'
+        result = self.session.execute_statement(post_code)
+        
+        # Handle both success and temporary service errors (502, 503, etc.)
+        if result.success:
+            # Should get a response
+            result = self.session.execute_statement('response.length() > 0')
+            assert result.success
+            assert result.value.value == True
+        else:
+            # Accept temporary service errors as valid (not our code's fault)
+            error_str = str(result.error)
+            assert any(code in error_str for code in ["502", "503", "504", "timeout"]), \
+                f"Unexpected error (not a service issue): {error_str}"
+        
+    def test_http_post_invalid_url(self):
+        """Test HTTP POST with invalid URL."""
+        post_code = 'string response = io.http_post("not-a-valid-url", "data")'
+        result = self.session.execute_statement(post_code)
+        assert not result.success
+        # Should contain error about invalid URL
+        error_str = str(result.error)
+        assert ("unknown url type" in error_str or "URL error" in error_str)
+        
+    def test_download_file_success(self):
+        """Test successful file download."""
+        import tempfile
+        import os
+        
+        # Create temporary file path
+        temp_file = os.path.join(tempfile.gettempdir(), "glang_test_download.txt")
+        
+        # Clean up any existing file
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+            
+        try:
+            download_code = f'io.download_file("https://httpbin.org/robots.txt", "{temp_file}")'
+            result = self.session.execute_statement(download_code)
+            assert result.success
+            assert result.value.value == True
+            
+            # Check that file was created
+            assert os.path.exists(temp_file)
+            
+            # Check file contents
+            with open(temp_file, 'r') as f:
+                content = f.read()
+                assert len(content) > 0
+                assert "User-agent" in content
+                
+        finally:
+            # Clean up
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+                
+    def test_download_file_invalid_url(self):
+        """Test file download with invalid URL."""
+        import tempfile
+        import os
+        
+        temp_file = os.path.join(tempfile.gettempdir(), "glang_test_download_fail.txt")
+        
+        download_code = f'io.download_file("not-a-valid-url", "{temp_file}")'
+        result = self.session.execute_statement(download_code)
+        assert not result.success
+        # Should contain error about invalid URL
+        error_str = str(result.error)
+        assert ("unknown url type" in error_str or "URL error" in error_str)
+        
+        # File should not be created
+        assert not os.path.exists(temp_file)
+        
+    def test_download_file_404(self):
+        """Test file download with 404 error."""
+        import tempfile
+        import os
+        
+        temp_file = os.path.join(tempfile.gettempdir(), "glang_test_download_404.txt")
+        
+        download_code = f'io.download_file("https://httpbin.org/status/404", "{temp_file}")'
+        result = self.session.execute_statement(download_code)
+        assert not result.success
+        assert "HTTP error 404" in str(result.error)
+        
+    def test_send_email_placeholder(self):
+        """Test that send_email properly indicates it's not implemented."""
+        email_code = 'io.send_email("test@example.com", "Test", "Message")'
+        result = self.session.execute_statement(email_code)
+        assert not result.success
+        assert "not yet implemented" in str(result.error)
+        
+    def test_network_with_type_validation(self):
+        """Test network functions with type validation."""
+        # Test http_get with non-string URL
+        result = self.session.execute_statement('num invalid_url = 123')
+        assert result.success
+        
+        result = self.session.execute_statement('io.http_get(invalid_url)')
+        assert not result.success
+        assert "expects string URL" in str(result.error)
+        
+        # Test http_post with non-string URL
+        result = self.session.execute_statement('io.http_post(invalid_url, "data")')
+        assert not result.success
+        assert "expects string URL" in str(result.error)
+        
+        # Test download_file with non-string parameters
+        result = self.session.execute_statement('io.download_file(invalid_url, "file.txt")')
+        assert not result.success
+        assert "expects string URL" in str(result.error)
+        
+        result = self.session.execute_statement('io.download_file("https://example.com", invalid_url)')
+        assert not result.success
+        assert "expects string filepath" in str(result.error)

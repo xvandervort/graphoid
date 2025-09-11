@@ -621,6 +621,25 @@ for file in files {
 }
 ```
 
+### Network Operations (v0.5+)
+```glang
+import "io"
+
+# HTTP GET request
+response = io.http_get("https://api.example.com/data")
+
+# HTTP POST request
+result = io.http_post("https://api.service.com/submit", "key=value")
+
+# Download files
+success = io.download_file("https://example.com/file.txt", "local_file.txt")
+
+# Web API integration
+api_response = io.http_get("https://jsonplaceholder.typicode.com/users/1") 
+user_data = json.decode(api_response)
+name = user_data.get("name").value()
+```
+
 ## 🔗 JSON Operations
 
 ### Importing JSON Module
