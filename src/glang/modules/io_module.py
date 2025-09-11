@@ -480,6 +480,219 @@ class IOModule:
             return StringValue("", position)
         except Exception as e:
             raise RuntimeError(f"Error reading input: {str(e)}", position)
+    
+    @staticmethod
+    def read_binary(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Read binary contents of a file as a list of numbers (bytes).
+        
+        Usage in Glang:
+            bytes = io.read_binary("image.png")
+        """
+        if not isinstance(filepath, StringValue):
+            raise RuntimeError(
+                f"io.read_binary expects string filepath, got {filepath.get_type()}",
+                position
+            )
+        
+        path = filepath.value
+        
+        try:
+            with open(path, 'rb') as f:
+                binary_data = f.read()
+            
+            # Convert bytes to list of numbers (0-255)
+            byte_list = [NumberValue(byte, position) for byte in binary_data]
+            return ListValue(byte_list, 'num', position)
+            
+        except FileNotFoundError:
+            raise RuntimeError(f"File not found: {path}", position)
+        except PermissionError:
+            raise RuntimeError(f"Permission denied: {path}", position)
+        except Exception as e:
+            raise RuntimeError(f"Error reading binary file {path}: {str(e)}", position)
+    
+    @staticmethod
+    def write_binary(filepath: GlangValue, data: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Write binary data to a file from a list of numbers (bytes).
+        
+        Usage in Glang:
+            bytes = [72, 101, 108, 108, 111]  # "Hello" in ASCII
+            io.write_binary("output.bin", bytes)
+        """
+        if not isinstance(filepath, StringValue):
+            raise RuntimeError(
+                f"io.write_binary expects string filepath, got {filepath.get_type()}",
+                position
+            )
+        
+        if not isinstance(data, ListValue):
+            raise RuntimeError(
+                f"io.write_binary expects list of bytes, got {data.get_type()}",
+                position
+            )
+        
+        path = filepath.value
+        
+        try:
+            # Convert list of numbers to bytes
+            byte_data = bytearray()
+            for item in data.elements:
+                if not isinstance(item, NumberValue):
+                    raise RuntimeError(
+                        f"Binary data must be list of numbers, found {item.get_type()}",
+                        position
+                    )
+                
+                byte_value = int(item.value)
+                if not (0 <= byte_value <= 255):
+                    raise RuntimeError(
+                        f"Byte values must be 0-255, got {byte_value}",
+                        position
+                    )
+                
+                byte_data.append(byte_value)
+            
+            with open(path, 'wb') as f:
+                f.write(byte_data)
+            
+            return BooleanValue(True, position)  # Success indicator
+            
+        except FileNotFoundError:
+            raise RuntimeError(f"Directory not found for file: {path}", position)
+        except PermissionError:
+            raise RuntimeError(f"Permission denied: {path}", position)
+        except Exception as e:
+            raise RuntimeError(f"Error writing binary file {path}: {str(e)}", position)
+    
+    @staticmethod
+    def join_path(path_list: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Join multiple path components into a single path.
+        
+        Usage in Glang:
+            paths = ["home", "user", "documents", "file.txt"]
+            full_path = io.join_path(paths)
+        """
+        if not isinstance(path_list, ListValue):
+            raise RuntimeError(
+                f"io.join_path expects list of paths, got {path_list.get_type()}",
+                position
+            )
+        
+        path_parts = []
+        for path_value in path_list.elements:
+            if not isinstance(path_value, StringValue):
+                raise RuntimeError(
+                    f"io.join_path expects list of strings, found {path_value.get_type()}",
+                    position
+                )
+            path_parts.append(path_value.value)
+        
+        try:
+            if not path_parts:
+                # Handle empty list case
+                joined_path = ""
+            else:
+                joined_path = os.path.join(*path_parts)
+            return StringValue(joined_path, position)
+        except Exception as e:
+            raise RuntimeError(f"Error joining paths: {str(e)}", position)
+    
+    @staticmethod
+    def split_path(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Split a path into directory and filename components.
+        
+        Usage in Glang:
+            parts = io.split_path("/home/user/document.txt")
+            # Returns list: ["/home/user", "document.txt"]
+        """
+        if not isinstance(filepath, StringValue):
+            raise RuntimeError(
+                f"io.split_path expects string filepath, got {filepath.get_type()}",
+                position
+            )
+        
+        try:
+            directory, filename = os.path.split(filepath.value)
+            parts = [StringValue(directory, position), StringValue(filename, position)]
+            return ListValue(parts, 'string', position)
+        except Exception as e:
+            raise RuntimeError(f"Error splitting path: {str(e)}", position)
+    
+    @staticmethod
+    def get_basename(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Get the filename component of a path (without directory).
+        
+        Usage in Glang:
+            filename = io.get_basename("/home/user/document.txt")  # "document.txt"
+        """
+        if not isinstance(filepath, StringValue):
+            raise RuntimeError(
+                f"io.get_basename expects string filepath, got {filepath.get_type()}",
+                position
+            )
+        
+        try:
+            basename = os.path.basename(filepath.value)
+            return StringValue(basename, position)
+        except Exception as e:
+            raise RuntimeError(f"Error getting basename: {str(e)}", position)
+    
+    @staticmethod
+    def get_dirname(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Get the directory component of a path (without filename).
+        
+        Usage in Glang:
+            dirname = io.get_dirname("/home/user/document.txt")  # "/home/user"
+        """
+        if not isinstance(filepath, StringValue):
+            raise RuntimeError(
+                f"io.get_dirname expects string filepath, got {filepath.get_type()}",
+                position
+            )
+        
+        try:
+            dirname = os.path.dirname(filepath.value)
+            return StringValue(dirname, position)
+        except Exception as e:
+            raise RuntimeError(f"Error getting dirname: {str(e)}", position)
+    
+    @staticmethod
+    def get_extension(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Get the file extension from a path.
+        
+        Usage in Glang:
+            ext = io.get_extension("document.txt")  # ".txt"
+        """
+        if not isinstance(filepath, StringValue):
+            raise RuntimeError(
+                f"io.get_extension expects string filepath, got {filepath.get_type()}",
+                position
+            )
+        
+        try:
+            _, ext = os.path.splitext(filepath.value)
+            return StringValue(ext, position)
+        except Exception as e:
+            raise RuntimeError(f"Error getting extension: {str(e)}", position)
+    
+    @staticmethod
+    def resolve_path(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Resolve a path to its absolute form, resolving any relative components.
+        
+        Usage in Glang:
+            abs_path = io.resolve_path("../documents/file.txt")
+        """
+        if not isinstance(filepath, StringValue):
+            raise RuntimeError(
+                f"io.resolve_path expects string filepath, got {filepath.get_type()}",
+                position
+            )
+        
+        try:
+            resolved = os.path.abspath(filepath.value)
+            return StringValue(resolved, position)
+        except Exception as e:
+            raise RuntimeError(f"Error resolving path: {str(e)}", position)
 
 
 def create_io_module_namespace():
@@ -494,6 +707,8 @@ def create_io_module_namespace():
         'read_file': IOModule.read_file,
         'write_file': IOModule.write_file,
         'append_file': IOModule.append_file,
+        'read_binary': IOModule.read_binary,
+        'write_binary': IOModule.write_binary,
         'exists': IOModule.exists,
         'is_file': IOModule.is_file,
         'is_dir': IOModule.is_dir,
@@ -506,6 +721,12 @@ def create_io_module_namespace():
         'file_size': IOModule.file_size,
         'read_lines': IOModule.read_lines,
         'write_lines': IOModule.write_lines,
+        'join_path': IOModule.join_path,
+        'split_path': IOModule.split_path,
+        'get_basename': IOModule.get_basename,
+        'get_dirname': IOModule.get_dirname,
+        'get_extension': IOModule.get_extension,
+        'resolve_path': IOModule.resolve_path,
         'input': IOModule.input,
     }
     

@@ -357,6 +357,7 @@ Glang uses a clean, modern architecture:
 
 ### Medium-Term Goals (Q3 2025)
 **Build True Graph Foundation** - Transform containers into real graphs:
+- **Enhanced Binary Data Processing**: Hexadecimal literals, fixed-size lists, format detection, image processing
 - **Graph Architecture**: Nodes + edges with metadata, not just containers
 - **Node Awareness**: Nodes know their container and can access siblings
 - **Graph Traversal**: Real pathfinding, connectivity analysis

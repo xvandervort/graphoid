@@ -131,8 +131,10 @@ class SemanticAnalyzer(BaseASTVisitor):
                         'print': 'void',
                         'read_file': 'string',
                         'read_lines': 'list',
+                        'read_binary': 'list',  # Returns list of numbers (bytes)
                         'write_file': 'bool',
                         'write_lines': 'bool', 
+                        'write_binary': 'bool', # Returns boolean success indicator
                         'append_file': 'bool',
                         'exists': 'bool',
                         'is_file': 'bool',
@@ -144,6 +146,12 @@ class SemanticAnalyzer(BaseASTVisitor):
                         'get_cwd': 'string',
                         'file_size': 'num',
                         'list_dir': 'list',
+                        'join_path': 'string',     # Joins paths into single string
+                        'split_path': 'list',      # Splits path into [dir, filename]
+                        'get_basename': 'string',  # Gets filename component
+                        'get_dirname': 'string',   # Gets directory component
+                        'get_extension': 'string', # Gets file extension
+                        'resolve_path': 'string',  # Resolves to absolute path
                         'input': 'string'
                     }
                 elif module_name == 'json':

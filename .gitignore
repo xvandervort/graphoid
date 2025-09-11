@@ -50,3 +50,4 @@ dmypy.json
 .claude/
 .coverage
 doc/*
+tmp/*
