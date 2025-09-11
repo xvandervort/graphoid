@@ -28,8 +28,8 @@ This prototype is implemented in Python for rapid development and testing.
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd grang
+git clone <repository-url> (There isn't one yet)
+cd glang
 
 # Create and activate virtual environment
 python -m venv .venv

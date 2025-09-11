@@ -1972,7 +1972,7 @@ class ASTExecutor(BaseASTVisitor):
             # List set difference - remove elements from left that are in right
             result_elements = []
             for element in left.elements:
-                if element not in right.elements:
+                if not right.contains(element):
                     result_elements.append(element)
             return ListValue(result_elements, left.constraint, left.position)
         # Note: List-scalar arithmetic moved to -. operator
@@ -2009,9 +2009,12 @@ class ASTExecutor(BaseASTVisitor):
         if isinstance(left, ListValue) and isinstance(right, ListValue):
             # List intersection - keep elements that appear in both lists
             result_elements = []
+            # Create a temporary ListValue to check for duplicates in result
+            result_list = ListValue([], left.constraint, left.position)
             for element in left.elements:
-                if element in right.elements and element not in result_elements:
+                if right.contains(element) and not result_list.contains(element):
                     result_elements.append(element)
+                    result_list.elements.append(element)
             return ListValue(result_elements, left.constraint, left.position)
         else:
             raise RuntimeError(f"Cannot perform intersection on {left.get_type()} and {right.get_type()}")
@@ -2254,6 +2257,15 @@ class ASTExecutor(BaseASTVisitor):
     
     def perform_comparison(self, left: GlangValue, right: GlangValue, operation: str) -> BooleanValue:
         """Perform comparison operations."""
+        # For equality operations, use Glang's equality semantics
+        if operation == "equal":
+            from .values import ListValue
+            return BooleanValue(ListValue._glang_equals(left, right))
+        elif operation == "not_equal":
+            from .values import ListValue
+            return BooleanValue(not ListValue._glang_equals(left, right))
+        
+        # For ordering operations, only support compatible types
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
             if operation == "greater":
                 return BooleanValue(left.value > right.value)
@@ -2263,17 +2275,9 @@ class ASTExecutor(BaseASTVisitor):
                 return BooleanValue(left.value >= right.value)
             elif operation == "less_equal":
                 return BooleanValue(left.value <= right.value)
-            elif operation == "equal":
-                return BooleanValue(left.value == right.value)
-            elif operation == "not_equal":
-                return BooleanValue(left.value != right.value)
         elif isinstance(left, StringValue) and isinstance(right, StringValue):
-            if operation == "equal":
-                return BooleanValue(left.value == right.value)
-            elif operation == "not_equal":
-                return BooleanValue(left.value != right.value)
             # String comparisons (lexicographic)
-            elif operation == "greater":
+            if operation == "greater":
                 return BooleanValue(left.value > right.value)
             elif operation == "less":
                 return BooleanValue(left.value < right.value)
@@ -2281,11 +2285,6 @@ class ASTExecutor(BaseASTVisitor):
                 return BooleanValue(left.value >= right.value)
             elif operation == "less_equal":
                 return BooleanValue(left.value <= right.value)
-        elif isinstance(left, BooleanValue) and isinstance(right, BooleanValue):
-            if operation == "equal":
-                return BooleanValue(left.value == right.value)
-            elif operation == "not_equal":
-                return BooleanValue(left.value != right.value)
         
         raise RuntimeError(f"Cannot compare {left.get_type()} and {right.get_type()} with {operation}")
     

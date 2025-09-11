@@ -424,6 +424,28 @@ class MapValue(GlangValue):
                 self.pairs == other.pairs and
                 self.constraint == other.constraint)
     
+    def equals(self, other: 'MapValue') -> bool:
+        """Compare two maps using Glang equality semantics."""
+        if not isinstance(other, MapValue):
+            return False
+        
+        if len(self.pairs) != len(other.pairs):
+            return False
+        
+        if self.constraint != other.constraint:
+            return False
+        
+        # Check that all keys exist and values are equal
+        for key, value in self.pairs.items():
+            if key not in other.pairs:
+                return False
+            # Import ListValue's _glang_equals for comparison
+            from .values import ListValue
+            if not ListValue._glang_equals(value, other.pairs[key]):
+                return False
+        
+        return True
+    
     # Override universal methods for map-specific behavior
     def universal_size(self) -> 'NumberValue':
         """For maps: size is the number of key-value pairs."""
@@ -540,6 +562,57 @@ class ListValue(GlangValue):
         return (isinstance(other, ListValue) and 
                 self.elements == other.elements and
                 self.constraint == other.constraint)
+    
+    def contains(self, value: GlangValue) -> bool:
+        """Check if this list contains the given value using Glang equality semantics."""
+        for element in self.elements:
+            if self._glang_equals(element, value):
+                return True
+        return False
+    
+    def equals(self, other: 'ListValue') -> bool:
+        """Compare two lists element-by-element using Glang equality semantics."""
+        if not isinstance(other, ListValue):
+            return False
+        
+        if len(self.elements) != len(other.elements):
+            return False
+        
+        if self.constraint != other.constraint:
+            return False
+        
+        for i in range(len(self.elements)):
+            if not self._glang_equals(self.elements[i], other.elements[i]):
+                return False
+        
+        return True
+    
+    @staticmethod
+    def _glang_equals(left: GlangValue, right: GlangValue) -> bool:
+        """Compare two Glang values using Glang's equality semantics."""
+        # Different types are never equal
+        if left.get_type() != right.get_type():
+            return False
+        
+        # Use type-specific comparison
+        if isinstance(left, NumberValue) and isinstance(right, NumberValue):
+            return left.value == right.value
+        elif isinstance(left, StringValue) and isinstance(right, StringValue):
+            return left.value == right.value
+        elif isinstance(left, BooleanValue) and isinstance(right, BooleanValue):
+            return left.value == right.value
+        elif isinstance(left, ListValue) and isinstance(right, ListValue):
+            return left.equals(right)
+        elif isinstance(left, DataValue) and isinstance(right, DataValue):
+            return left.key == right.key and ListValue._glang_equals(left.value, right.value)
+        elif isinstance(left, MapValue) and isinstance(right, MapValue):
+            return left.equals(right)
+        elif isinstance(left, NoneValue) and isinstance(right, NoneValue):
+            return True
+        else:
+            # For any unknown types, fall back to Python equality
+            # This should not happen in practice
+            return left == right
     
     # Immutability-specific methods
     def _update_frozen_flag(self):
