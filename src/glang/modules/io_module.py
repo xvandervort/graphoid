@@ -2,12 +2,11 @@
 Built-in I/O module for Glang
 
 Provides file operations, user input, and directory management.
+Uses the Glang file system interface for language independence.
 """
 
-import os
 import sys
 from typing import Optional, List
-from pathlib import Path
 
 from ..execution.values import (
     GlangValue, StringValue, BooleanValue, NumberValue, 
@@ -15,6 +14,7 @@ from ..execution.values import (
 )
 from ..execution.errors import RuntimeError
 from ..ast.nodes import SourcePosition
+from .filesystem_interface import get_filesystem
 
 
 class IOModule:
@@ -34,10 +34,10 @@ class IOModule:
             )
         
         path = filepath.value
+        filesystem = get_filesystem()
         
         try:
-            with open(path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            content = filesystem.read_text_file(path)
             return StringValue(content, position)
         except FileNotFoundError:
             raise RuntimeError(f"File not found: {path}", position)
@@ -66,16 +66,15 @@ class IOModule:
             content_str = content.value
         
         path = filepath.value
+        filesystem = get_filesystem()
         
         try:
             # Create parent directories if they don't exist
-            parent_dir = os.path.dirname(path)
-            if parent_dir and not os.path.exists(parent_dir):
-                os.makedirs(parent_dir, exist_ok=True)
+            parent_dir = filesystem.get_dirname(path)
+            if parent_dir and not filesystem.file_exists(parent_dir):
+                filesystem.create_directory(parent_dir, parents=True)
             
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(content_str)
-            
+            filesystem.write_text_file(path, content_str)
             return BooleanValue(True, position)
         except PermissionError:
             raise RuntimeError(f"Permission denied: {path}", position)
@@ -128,7 +127,8 @@ class IOModule:
                 position
             )
         
-        return BooleanValue(os.path.exists(path.value), position)
+        filesystem = get_filesystem()
+        return BooleanValue(filesystem.file_exists(path.value), position)
     
     @staticmethod
     def is_file(path: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
@@ -145,7 +145,8 @@ class IOModule:
                 position
             )
         
-        return BooleanValue(os.path.isfile(path.value), position)
+        filesystem = get_filesystem()
+        return BooleanValue(filesystem.is_file(path.value), position)
     
     @staticmethod
     def is_dir(path: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
@@ -162,7 +163,8 @@ class IOModule:
                 position
             )
         
-        return BooleanValue(os.path.isdir(path.value), position)
+        filesystem = get_filesystem()
+        return BooleanValue(filesystem.is_directory(path.value), position)
     
     @staticmethod
     def list_dir(path: GlangValue = None, position: Optional[SourcePosition] = None) -> GlangValue:
@@ -183,7 +185,8 @@ class IOModule:
             )
         
         try:
-            entries = os.listdir(dir_path)
+            filesystem = get_filesystem()
+            entries = filesystem.list_directory(dir_path)
             # Convert to list of StringValues
             glang_entries = [StringValue(entry, position) for entry in sorted(entries)]
             return ListValue(glang_entries, position)
@@ -211,7 +214,8 @@ class IOModule:
         dir_path = path.value
         
         try:
-            os.makedirs(dir_path, exist_ok=True)
+            filesystem = get_filesystem()
+            filesystem.create_directory(dir_path, parents=True)
             return BooleanValue(True, position)
         except PermissionError:
             raise RuntimeError(f"Permission denied: {dir_path}", position)
@@ -234,7 +238,8 @@ class IOModule:
         file_path = path.value
         
         try:
-            os.remove(file_path)
+            filesystem = get_filesystem()
+            filesystem.remove_file(file_path)
             return BooleanValue(True, position)
         except FileNotFoundError:
             raise RuntimeError(f"File not found: {file_path}", position)
@@ -261,7 +266,8 @@ class IOModule:
         dir_path = path.value
         
         try:
-            os.rmdir(dir_path)
+            filesystem = get_filesystem()
+            filesystem.remove_directory(dir_path)
             return BooleanValue(True, position)
         except FileNotFoundError:
             raise RuntimeError(f"Directory not found: {dir_path}", position)
@@ -281,7 +287,8 @@ class IOModule:
             cwd = io.get_cwd()
         """
         try:
-            cwd = os.getcwd()
+            filesystem = get_filesystem()
+            cwd = filesystem.get_current_directory()
             return StringValue(cwd, position)
         except Exception as e:
             raise RuntimeError(f"Error getting current directory: {str(e)}", position)
@@ -302,7 +309,8 @@ class IOModule:
         dir_path = path.value
         
         try:
-            os.chdir(dir_path)
+            filesystem = get_filesystem()
+            filesystem.set_current_directory(dir_path)
             return BooleanValue(True, position)
         except FileNotFoundError:
             raise RuntimeError(f"Directory not found: {dir_path}", position)
@@ -327,7 +335,8 @@ class IOModule:
         file_path = path.value
         
         try:
-            size = os.path.getsize(file_path)
+            filesystem = get_filesystem()
+            size = filesystem.get_file_size(file_path)
             return NumberValue(size, position)
         except FileNotFoundError:
             raise RuntimeError(f"File not found: {file_path}", position)
@@ -392,24 +401,18 @@ class IOModule:
         path = filepath.value
         
         try:
+            filesystem = get_filesystem()
+            
             # Create parent directories if they don't exist
-            parent_dir = os.path.dirname(path)
-            if parent_dir and not os.path.exists(parent_dir):
-                os.makedirs(parent_dir, exist_ok=True)
+            parent_dir = filesystem.get_dirname(path)
+            if parent_dir and not filesystem.file_exists(parent_dir):
+                filesystem.create_directory(parent_dir, parents=True)
             
-            with open(path, 'w', encoding='utf-8') as f:
-                for i, line_val in enumerate(lines.elements):
-                    if isinstance(line_val, StringValue):
-                        line_str = line_val.value
-                    else:
-                        line_str = line_val.to_display_string()
-                    
-                    # Add newline except for last line
-                    if i < len(lines.elements) - 1:
-                        f.write(line_str + '\n')
-                    else:
-                        f.write(line_str)
+            # Convert lines to text content
+            line_strings = [line.to_display_string() for line in lines.elements]
+            content = '\n'.join(line_strings)
             
+            filesystem.write_text_file(path, content)
             return BooleanValue(True, position)
         except PermissionError:
             raise RuntimeError(f"Permission denied: {path}", position)
@@ -592,7 +595,8 @@ class IOModule:
                 # Handle empty list case
                 joined_path = ""
             else:
-                joined_path = os.path.join(*path_parts)
+                filesystem = get_filesystem()
+                joined_path = filesystem.join_path(*path_parts)
             return StringValue(joined_path, position)
         except Exception as e:
             raise RuntimeError(f"Error joining paths: {str(e)}", position)
@@ -612,7 +616,8 @@ class IOModule:
             )
         
         try:
-            directory, filename = os.path.split(filepath.value)
+            filesystem = get_filesystem()
+            directory, filename = filesystem.split_path(filepath.value)
             parts = [StringValue(directory, position), StringValue(filename, position)]
             return ListValue(parts, 'string', position)
         except Exception as e:
@@ -632,7 +637,8 @@ class IOModule:
             )
         
         try:
-            basename = os.path.basename(filepath.value)
+            filesystem = get_filesystem()
+            basename = filesystem.get_basename(filepath.value)
             return StringValue(basename, position)
         except Exception as e:
             raise RuntimeError(f"Error getting basename: {str(e)}", position)
@@ -651,7 +657,8 @@ class IOModule:
             )
         
         try:
-            dirname = os.path.dirname(filepath.value)
+            filesystem = get_filesystem()
+            dirname = filesystem.get_dirname(filepath.value)
             return StringValue(dirname, position)
         except Exception as e:
             raise RuntimeError(f"Error getting dirname: {str(e)}", position)
@@ -670,7 +677,8 @@ class IOModule:
             )
         
         try:
-            _, ext = os.path.splitext(filepath.value)
+            filesystem = get_filesystem()
+            ext = filesystem.get_extension(filepath.value)
             return StringValue(ext, position)
         except Exception as e:
             raise RuntimeError(f"Error getting extension: {str(e)}", position)
@@ -689,7 +697,8 @@ class IOModule:
             )
         
         try:
-            resolved = os.path.abspath(filepath.value)
+            filesystem = get_filesystem()
+            resolved = filesystem.resolve_path(filepath.value)
             return StringValue(resolved, position)
         except Exception as e:
             raise RuntimeError(f"Error resolving path: {str(e)}", position)
