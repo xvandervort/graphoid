@@ -49,7 +49,14 @@ This represents a major architectural challenge but is essential for Glang's uni
 - `test/` - Comprehensive test suite (230+ tests with growing coverage)
 - `stdlib/` - Standard library modules written in Glang
 - `samples/` - Example programs and demonstrations
-- `docs/` - Documentation files including language cheat sheet
+- `docs/` - **User-facing documentation ONLY** (language cheat sheet, module references)
+- `dev_docs/` - Internal development documents: design, planning, architecture (NOT for users)
+
+### Documentation Organization Rules
+**IMPORTANT**: NEVER place documentation files (.md) in the root directory!
+- Root directory: Only README.md and CLAUDE.md belong here
+- User documentation: Always goes in `docs/`
+- Development/design docs: Always goes in `dev_docs/`
 
 ## Development Setup
 

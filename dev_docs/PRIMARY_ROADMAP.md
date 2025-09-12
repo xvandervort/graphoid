@@ -148,7 +148,7 @@ Transform Glang from a practical programming language into a revolutionary platf
 
 ### Design Documents
 - [ABSTRACTION_LAYER_ROADMAP.md](./ABSTRACTION_LAYER_ROADMAP.md) - Detailed system abstraction plans
-- [CLAUDE.md](./CLAUDE.md) - Development guidelines and project overview
+- [CLAUDE.md](../CLAUDE.md) - Development guidelines and project overview
 
 ### Historical Documents (Archived)
 The following documents have been superseded by this roadmap:
@@ -159,7 +159,7 @@ The following documents have been superseded by this roadmap:
 - CLAUDE_SESSION_NOTES.md → Historical reference only
 
 ### Reference Documents (Keep)
-- [README.md](./README.md) - User-facing project description
+- [README.md](../README.md) - User-facing project description
 - [MODULE_SYSTEM_LESSONS.md](./MODULE_SYSTEM_LESSONS.md) - Lessons learned from module implementation
 - [OPERATOR_SEPARATION_SUMMARY.md](./OPERATOR_SEPARATION_SUMMARY.md) - Design decision documentation
 - [GLANG_LANGUAGE_COMPARISON.md](./GLANG_LANGUAGE_COMPARISON.md) - Language feature comparison
