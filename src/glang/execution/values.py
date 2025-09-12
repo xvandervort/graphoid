@@ -1210,3 +1210,32 @@ class NoneValue(GlangValue):
     
     def to_display_string(self) -> str:
         return "none"
+
+
+class TimeValue(GlangValue):
+    """A Glang Time value representing a point in time (internally UTC timestamp)."""
+    
+    def __init__(self, timestamp: Union[int, float, GlangNumber], position: Optional[SourcePosition] = None):
+        super().__init__(position)
+        if isinstance(timestamp, (int, float)):
+            self.timestamp = create_glang_number(timestamp)
+        elif hasattr(timestamp, 'to_python_float'):  # GlangNumber
+            self.timestamp = timestamp
+        else:
+            self.timestamp = create_glang_number(float(timestamp))
+    
+    def get_type(self) -> str:
+        return "time"
+    
+    def to_python(self) -> float:
+        """Return the timestamp as a float."""
+        return self.timestamp.to_python_float()
+    
+    def to_string(self) -> str:
+        """Default string representation as ISO datetime."""
+        import datetime as python_datetime
+        dt = python_datetime.datetime.fromtimestamp(self.to_python(), tz=python_datetime.timezone.utc)
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    
+    def to_display_string(self) -> str:
+        return self.to_string()

@@ -103,45 +103,53 @@ hash<num> temperatures = { "morning": 72.5 }    # Values must be numbers
 - **JavaScript**: No built-in precision control beyond floating-point
 - **Java**: BigDecimal requires verbose method calls for every operation
 
-**Glang's Innovation**: **Language-Level Precision Contexts**
+**Glang's Innovation**: **Language-Level Decimal Places Precision**
 
 ```glang
 # Standard precision for general calculations
-pi = 3.14159265358979323846
-circle_area = pi * 10 * 10  # Uses default 28-digit precision
+pi = 3.14159265358979323846    # Full precision
+circle_area = pi * 10 * 10     # Uses default precision
 
-# High-precision context for scientific calculations
-precision 50 {
-    pi = 3.14159265358979323846
-    # All arithmetic in this block uses 50-digit precision
-    precise_area = pi * 10 * 10
+# Integer arithmetic with precision 0
+precision 0 {
+    pi = 3.14159265358979323846  # Result: 3 (integer, no decimal point)
+    area = pi * 10 * 10          # Result: 300 (integer arithmetic)
 }
 
-# Low-precision for performance-critical loops
-precision 4 {
-    for i in range(1000000) {
-        quick_calc = i / 3.0  # Only 4 digits needed
-    }
+# Financial calculations with 2 decimal places
+precision 2 {
+    price = 19.99
+    tax = price * 0.085          # Result: 1.70 (exactly 2 decimal places)
+    total = price + tax          # Result: 21.69 (exactly 2 decimal places)
+}
+
+# Scientific calculations with 5 decimal places
+precision 5 {
+    pi = 3.14159265358979323846  # Result: 3.14159 (5 decimal places)
+    circumference = 2 * pi * 5   # Result: 31.41590 (5 decimal places)
 }
 
 # Nested precision contexts
-precision 10 {
-    outer = 1.0 / 3.0  # 0.3333333333
+precision 3 {
+    outer = 22.0 / 7.0           # Result: 3.143 (3 decimal places)
     
-    precision 3 {
-        inner = 1.0 / 3.0  # 0.333
+    precision 1 {
+        inner = 22.0 / 7.0       # Result: 3.1 (1 decimal place)
     }
     
-    back = 1.0 / 3.0  # 0.3333333333 again
+    back = 22.0 / 7.0            # Result: 3.143 (3 decimal places again)
 }
 ```
 
 **Why This is Revolutionary**:
+- **Decimal places precision**: Intuitive "N digits after decimal point" semantics
+- **Integer mode**: `precision 0` gives true integers with no decimal point
 - **Scoped semantics**: Precision changes are localized, not global
 - **Language construct**: Not a method call or library function
 - **Composable**: Nest different precision requirements naturally
 - **Automatic restoration**: Previous precision restored on block exit
-- **Performance control**: Use lower precision where speed matters
+- **Memory efficient**: Uses only precision + 2 internally for accurate rounding
+- **Financial-friendly**: Perfect for currency calculations requiring exact decimal places
 
 ### **5. Functional Programming Without the Complexity** ⚡
 

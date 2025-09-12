@@ -87,33 +87,35 @@ if numbers.filter("even").size() > 0 {
 
 ### Precision Context Blocks
 ```glang
-# Control numeric precision for calculations
+# Control numeric precision for calculations (decimal places)
 precision 5 {
-    # All arithmetic uses 5-digit precision  
-    pi = 3.14159265358979323846  # Stored with 5 digits
-    area = pi * radius * radius
+    # All arithmetic uses 5 decimal places precision  
+    pi = 3.14159265358979323846  # Result: 3.14159 (5 decimal places)
+    area = pi * radius * radius  # All calculations use 5 decimal places
 }
 
-# High precision for scientific calculations
-precision 50 {
-    precise_pi = 3.14159265358979323846
-    very_precise = precise_pi.sqrt()
+# Integer arithmetic with precision 0
+precision 0 {
+    pi = 3.14159265358979323846  # Result: 3 (integer, no decimal point)
+    area = pi * 10 * 10          # Result: 300 (integer arithmetic)
 }
 
-# Performance-optimized low precision
-precision 3 {
-    for i in range(100000) {
-        quick_calc = i / 7.0  # Fast, low-precision math
-    }
+# Financial calculations with 2 decimal places
+precision 2 {
+    price = 19.99
+    tax = price * 0.085          # Result: 1.70 (exactly 2 decimal places)
+    total = price + tax          # Result: 21.69 (exactly 2 decimal places)
 }
 
 # Nested precision contexts
-precision 10 {
-    outer = 1.0 / 3.0      # 0.3333333333
+precision 3 {
+    outer = 22.0 / 7.0           # Result: 3.143 (3 decimal places)
     
-    precision 4 {
-        inner = 1.0 / 3.0  # 0.3333 
+    precision 1 {
+        inner = 22.0 / 7.0       # Result: 3.1 (1 decimal place)
     }
+    
+    back = 22.0 / 7.0            # Result: 3.143 (3 decimal places restored)
 }
 ```
 
@@ -342,11 +344,35 @@ false.to_num()            # 0
 [].to_bool()              # false (empty)
 ```
 
+### Convert to Time (and back)
+```glang
+# Number (Unix timestamp) to Time
+timestamp = 1735689600
+time_value = timestamp.to_time()  # 2025-01-01T00:00:00Z
+
+# String (ISO format) to Time  
+iso_string = "2025-01-15T14:30:00"
+parsed_time = iso_string.to_time() # 2025-01-15T14:30:00Z
+
+# Time to Number (timestamp)
+import "time" as Time
+current = Time.now()
+timestamp = current.to_num()      # Unix timestamp
+
+# Time to String (ISO format) 
+iso_format = current.to_string()  # "2025-01-15T14:30:00Z"
+```
+
 ### Chained Conversions
 ```glang
 x = 42
 result = x.to_string().to_bool()  # true
 b = true.to_num().to_string()     # "1"
+
+# Time casting chains
+import "time" as Time
+now = Time.now()
+round_trip = now.to_num().to_time().to_string()  # Perfect consistency
 ```
 
 ## 🔤 String Operations
@@ -690,6 +716,37 @@ json.is_valid(json_string)  # Check if valid JSON
 
 # Complete file workflow:
 # 1. Create data → 2. Encode to JSON → 3. Write to file
+```
+
+## ⏰ Time Operations
+
+### Importing Time Module
+```glang
+import "time" as Time       # Import Time module
+```
+
+### Working with Time Values
+```glang
+# Creating times
+current = Time.now()                              # Current time
+today = Time.today()                             # Start of today (UTC)
+birthday = Time.from_components(1990, 12, 25)   # Date only
+meeting = Time.from_components(2025, 1, 15, 14, 30, 0) # Full datetime
+parsed = Time.from_string("2025-01-15T14:30:00") # From ISO string
+
+# Using time values
+print(current.to_string())   # "2025-01-15T14:30:00Z" (ISO format)
+print(current.get_type())    # "time"
+
+# Type casting (bidirectional)
+timestamp = current.to_num()               # Time → Number (Unix timestamp)
+time_from_num = timestamp.to_time()        # Number → Time
+time_from_str = "2025-01-15T14:30:00".to_time() # String → Time
+
+# Round-trip consistency guaranteed
+original = Time.now()
+round_trip = original.to_num().to_time()
+print(original.to_string() == round_trip.to_string()) # true
 # 4. Read file → 5. Validate → 6. Decode JSON → 7. Use data
 ```
 

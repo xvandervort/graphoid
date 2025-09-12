@@ -1,0 +1,89 @@
+# DATETIME MODULE DEMONSTRATION
+# Showcases Glang's native datetime functionality with data node consistency,
+# precision context integration, and Glang-specific semantics
+
+import "datetime" as dt
+
+print("=== Glang DateTime Module Demonstration ===")
+
+# 1. Current date/time functions - showing data node structure
+print("1. Current Date/Time (Data Node Structure):")
+data today = dt.today()
+print("  Today: " + today.value() + " (key: '" + today.key() + "')")
+
+data current_time = dt.current_time()
+print("  Current time: " + current_time.value() + " (key: '" + current_time.key() + "')")
+
+# 2. Precision context integration - Glang's unique feature
+print("2. Precision Context Integration:")
+
+precision 0 {
+    num timestamp_int = dt.now()
+    print("  Integer timestamp (precision 0): " + timestamp_int.to_string())
+}
+
+precision 3 {
+    num timestamp_ms = dt.now()
+    print("  Millisecond timestamp (precision 3): " + timestamp_ms.to_string())
+}
+
+# 3. Date creation as data nodes
+print("3. Date Creation (Glang Data Nodes):")
+data birthday = dt.date(1990, 12, 25)
+data meeting_time = dt.time(14, 30, 15)
+data appointment = dt.datetime(2025, 1, 15, 14, 30, 0)
+
+print("  Birthday: " + birthday.value() + " (type: " + birthday.key() + ")")
+print("  Meeting: " + meeting_time.value() + " (type: " + meeting_time.key() + ")")
+print("  Appointment: " + appointment.value() + " (type: " + appointment.key() + ")")
+
+# 4. Date parsing and validation
+print("4. Date Parsing & Validation:")
+data parsed = dt.parse("2025-06-15")
+print("  Parsed '2025-06-15': " + parsed.value())
+
+bool valid_date = dt.is_valid_date(2025, 2, 29)
+bool invalid_date = dt.is_valid_date(2024, 2, 29)
+print("  Is 2025-02-29 valid? " + valid_date.to_string())
+print("  Is 2024-02-29 valid? " + invalid_date.to_string())
+
+# 5. Utility functions
+print("5. Date Utilities:")
+bool leap_2024 = dt.is_leap_year(2024)
+bool leap_2025 = dt.is_leap_year(2025)
+print("  2024 leap year? " + leap_2024.to_string())
+print("  2025 leap year? " + leap_2025.to_string())
+
+num days_feb_2024 = dt.days_in_month(2024, 2)
+num days_feb_2025 = dt.days_in_month(2025, 2)
+print("  Days in Feb 2024: " + days_feb_2024.to_string())
+print("  Days in Feb 2025: " + days_feb_2025.to_string())
+
+# 6. Constants and data structures
+print("6. Built-in Constants:")
+list months = dt.MONTHS
+list weekdays = dt.WEEKDAYS_SHORT
+
+print("  First 3 months: " + months[0] + ", " + months[1] + ", " + months[2])
+print("  First 3 weekdays: " + weekdays[0] + ", " + weekdays[1] + ", " + weekdays[2])
+
+# 7. Timestamp conversion
+print("7. Timestamp Operations:")
+precision 0 {
+    num simple_timestamp = 1704067200  # 2024-01-01 00:00:00 UTC
+    data dt_from_timestamp = dt.from_timestamp(simple_timestamp)
+    print("  DateTime from timestamp " + simple_timestamp.to_string() + ": " + dt_from_timestamp.value())
+}
+
+# 8. Error handling demonstration
+print("8. Error Handling:")
+bool valid_check = dt.is_valid_date(2025, 13, 1)  # Invalid month
+print("  Is 2025-13-01 valid? " + valid_check.to_string())
+
+print("=== Demonstration Complete ===")
+print("")
+print("Key Glang Features Demonstrated:")
+print("- Data node consistency (dates as {\"date\": \"2025-01-15\"})")
+print("- Precision context integration (integer vs millisecond timestamps)")
+print("- Type-safe date operations with helpful error messages")
+print("- Native Glang semantics rather than Python datetime wrappers")

@@ -352,9 +352,9 @@ e_to_x = e.pow(x)
 print("e^" + x.to_string() + " = " + e_to_x.to_string())
 ```
 
-### Precision Control
+### Method-Based Precision Control
 ```glang
-# Working with different precision levels
+# Working with different precision levels using number methods
 pi = 3.141592653589793
 
 print("Default: " + pi.to_string())
@@ -365,3 +365,23 @@ print("Truncate to 3: " + pi.to(3).to_string())
 print("Round up to 3: " + pi.rnd_up(3).to_string())
 print("Round down to 3: " + pi.rnd_dwn(3).to_string())
 ```
+
+### Language-Level Precision Control
+
+For controlling precision across multiple calculations, Glang provides **precision context blocks**:
+
+```glang
+# All calculations within the block use the specified decimal places
+precision 3 {
+    num pi = 3.14159265358979323846  # Result: 3.142 (3 decimal places)
+    num area = pi * 5 * 5            # Result: 78.525 (3 decimal places)
+    num circumference = 2 * pi * 5   # Result: 31.41 (3 decimal places)
+}
+
+# Integer mode for whole number calculations  
+precision 0 {
+    num result = 22.0 / 7.0  # Result: 3 (integer, no decimal point)
+}
+```
+
+📖 **See Also**: [Precision Context Blocks](../language_features/precision_blocks.md) for comprehensive documentation on language-level precision control.

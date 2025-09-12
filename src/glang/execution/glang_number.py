@@ -97,8 +97,8 @@ class PrecisionGlangNumber(GlangNumber):
     High-precision implementation of GlangNumber using Python's Decimal.
     
     This implementation provides:
-    - Arbitrary precision arithmetic (configurable)
-    - Consistent rounding behavior
+    - Decimal places precision (not significant digits)
+    - Efficient internal precision management
     - Proper overflow/underflow handling
     - Glang-specific mathematical semantics
     """
@@ -106,10 +106,11 @@ class PrecisionGlangNumber(GlangNumber):
     # Default precision for Glang numbers (28 decimal places)
     DEFAULT_PRECISION = 28
     
+    # Class variable to track current Glang decimal places precision
+    _glang_decimal_places = None
+    
     def __init__(self, value: Union[int, float, str, bool, Decimal]):
-        # Use whatever precision is currently set in the context
-        # The precision block will manage the context
-        
+        # Store the raw decimal with high precision first
         if isinstance(value, Decimal):
             self._decimal = value
         elif isinstance(value, bool):
@@ -122,12 +123,38 @@ class PrecisionGlangNumber(GlangNumber):
         else:
             raise ValueError(f"Cannot create GlangNumber from {type(value)}")
         
-        # Apply current precision context to the created decimal
-        # This ensures precision limits are respected
-        current_prec = getcontext().prec
-        if current_prec != 0 and current_prec < self.DEFAULT_PRECISION:
-            # Round to current precision if it's lower than default
-            self._decimal = +self._decimal  # Force re-evaluation with current context
+        # Apply Glang decimal places precision if set
+        if PrecisionGlangNumber._glang_decimal_places is not None:
+            self._apply_glang_precision()
+    
+    def _apply_glang_precision(self):
+        """Apply Glang decimal places precision to this number."""
+        decimal_places = PrecisionGlangNumber._glang_decimal_places
+        
+        if decimal_places == 0:
+            # Precision 0 means integers - round to nearest whole number
+            self._decimal = self._decimal.quantize(Decimal('1'), rounding='ROUND_HALF_UP')
+        else:
+            # Round to specified decimal places
+            quantize_pattern = Decimal('0.' + '0' * (decimal_places - 1) + '1')
+            self._decimal = self._decimal.quantize(quantize_pattern, rounding='ROUND_HALF_UP')
+    
+    @classmethod
+    def set_glang_precision(cls, decimal_places: Optional[int]):
+        """Set the Glang decimal places precision for new numbers."""
+        cls._glang_decimal_places = decimal_places
+        
+        # Also set Python's internal precision for calculations
+        # Use requested precision + 2 for accurate intermediate calculations
+        if decimal_places is None:
+            getcontext().prec = cls.DEFAULT_PRECISION
+        elif decimal_places == 0:
+            # For integers, use moderate precision for intermediate calculations
+            getcontext().prec = 10
+        else:
+            # For decimal places, use decimal_places + 2 but at least 15
+            # +10 buffer accounts for large numbers like Unix timestamps (10 digits) 
+            getcontext().prec = max(15, decimal_places + 2 + 10)
     
     def add(self, other: 'GlangNumber') -> 'GlangNumber':
         """Add two numbers using Glang arithmetic semantics."""

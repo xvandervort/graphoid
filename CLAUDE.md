@@ -241,25 +241,35 @@ if condition {
     # execute when false  
 }
 
-# Precision context blocks (NEW!)
-precision 5 {
-    # All numeric calculations use 5-digit precision
-    pi = 3.14159265358979323846  # Stored with 5 digits
-    area = pi * radius * radius
+# Precision context blocks - Decimal Places Control (NEW!)
+precision 0 {
+    # Integer arithmetic - no decimal points
+    pi = 3.14159265358979323846  # Result: 3 (integer)
+    area = pi * 10 * 10          # Result: 300 (integer)
 }
 
-precision 50 {
-    # High-precision scientific calculations
-    precise_calculation = complex_math()
+precision 2 {
+    # Financial calculations with 2 decimal places  
+    price = 19.99
+    tax = price * 0.085          # Result: 1.70 (exactly 2 decimal places)
+    total = price + tax          # Result: 21.69 (exactly 2 decimal places)
+}
+
+precision 5 {
+    # Scientific calculations with 5 decimal places
+    pi = 3.14159265358979323846  # Result: 3.14159 (5 decimal places)
+    circumference = 2 * pi * 10  # Result: 62.83180 (5 decimal places)
 }
 
 # Nested precision contexts
-precision 10 {
-    outer_value = 1.0 / 3.0  # 0.3333333333
+precision 3 {
+    outer_value = 22.0 / 7.0     # Result: 3.143 (3 decimal places)
     
-    precision 3 {
-        inner_value = 1.0 / 3.0  # 0.333
+    precision 1 {
+        inner_value = 22.0 / 7.0 # Result: 3.1 (1 decimal place)
     }
+    
+    back_value = 22.0 / 7.0      # Result: 3.143 (3 decimal places restored)
 }
 
 # While loops
@@ -298,6 +308,33 @@ if numbers.filter("even").size() > 0 {
 } else {
     processed = numbers.map("negate")
 }
+```
+
+### Time Module
+```glang
+# Import the time module
+import "time" as Time
+
+# Create time values
+current = Time.now()                            # Current time
+today = Time.today()                           # Start of today (00:00:00 UTC)
+birthday = Time.from_components(1990, 12, 25) # Date only (midnight UTC)
+meeting = Time.from_components(2025, 1, 15, 14, 30, 0) # Full date and time
+parsed = Time.from_string("2025-01-15T14:30:00") # Parse ISO format
+
+# Work with time values
+print("Current: " + current.to_string())      # ISO format: "2025-01-15T14:30:00Z"
+print("Type: " + current.get_type())          # "time"
+
+# Type casting - time values can be cast to/from numbers and strings
+timestamp = current.to_num()                  # Convert to Unix timestamp (number)
+time_from_num = timestamp.to_time()           # Convert number back to time
+time_from_str = "2025-01-15T14:30:00".to_time() # Parse string to time
+
+# All casting maintains round-trip consistency
+original_str = current.to_string()
+round_trip = current.to_num().to_time().to_string()
+print("Consistent: " + (original_str == round_trip).to_string()) # "true"
 ```
 
 ### File Loading
@@ -360,6 +397,7 @@ Glang uses a clean, modern architecture:
 - ✅ Type casting system (to_string, to_num, to_bool) for all basic types
 - ✅ Standard library foundation with math constants module (stdlib/math.gr)
 - ✅ **JSON module** with encode, decode, pretty printing, and validation (json.encode, json.decode, json.is_valid)
+- ✅ **Time module** with single Time type, UTC timestamps, and full type casting (Time.now, Time.from_components, time.to_num, string.to_time)
 - ✅ **Comprehensive test suite** (597+ tests, 64% coverage)
 
 ### Development Guidelines
@@ -373,9 +411,10 @@ Glang uses a clean, modern architecture:
 ### Near-Term Priorities (Q2 2025)
 **Make Glang Practical** - Standard libraries for real-world use:
 - **✅ I/O Library**: File operations, user input, directory management
+- **✅ Time Library**: Single Time type with UTC timestamps and full type casting
 - **⏳ Network Library**: ✅ JSON support, HTTP client, email notifications 
 - **⏳ Database Connectivity**: SQLite, PostgreSQL, MySQL support
-- **⏳ System Library**: OS interaction, processes, date/time
+- **⏳ System Library**: OS interaction, processes
 
 ### Medium-Term Goals (Q3 2025)
 **Build True Graph Foundation** - Transform containers into real graphs:

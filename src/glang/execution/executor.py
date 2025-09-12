@@ -532,6 +532,8 @@ class ASTExecutor(BaseASTVisitor):
             return self._dispatch_data_method(target, method_name, args, position)
         elif target_type == "hash":
             return self._dispatch_hash_method(target, method_name, args, position)
+        elif target_type == "time":
+            return self._dispatch_time_method(target, method_name, args, position)
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, target_type, position)
@@ -622,11 +624,12 @@ class ASTExecutor(BaseASTVisitor):
         # Type-specific methods
         type_methods = {
             'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort', 'to_string', 'to_bool', 'can_accept'],
-            'string': ['length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split', 'trim', 'join', 'matches', 'replace', 'findAll', 'reverse', 'unique', 'chars', 'to_string', 'to_num', 'to_bool'],
-            'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool'],
+            'string': ['length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split', 'trim', 'join', 'matches', 'replace', 'findAll', 'reverse', 'unique', 'chars', 'to_string', 'to_num', 'to_bool', 'to_time'],
+            'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time'],
             'bool': ['flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'],
             'data': ['key', 'value', 'can_accept'],
-            'hash': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept']
+            'hash': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept'],
+            'time': ['get_type', 'to_string', 'to_num']
         }
         
         specific_methods = type_methods.get(target_type, [])
@@ -1210,6 +1213,29 @@ class ASTExecutor(BaseASTVisitor):
             char_strings = [StringValue(node.value, position) for node in char_nodes]
             return ListValue(char_strings, "string", position)
         
+        elif method_name == "to_time":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_time() takes no arguments, got {len(args)}", position)
+            # Parse time string to time value - similar to Time.from_string
+            try:
+                import datetime as python_datetime
+                time_str_val = target.value
+                
+                # Support basic ISO format: "2025-01-15T14:30:00"
+                dt = python_datetime.datetime.fromisoformat(time_str_val.replace('Z', '+00:00'))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=python_datetime.timezone.utc)
+                timestamp = dt.timestamp()
+                from .values import TimeValue
+                return TimeValue(timestamp, position)
+            except ValueError:
+                from .errors import RuntimeError
+                raise RuntimeError(f"Invalid time format: {time_str_val}. Expected ISO format like '2025-01-15T14:30:00'", position)
+            except Exception as e:
+                from .errors import RuntimeError
+                raise RuntimeError(f"Failed to parse time string: {str(e)}", position)
+        
         # Check if it's a universal method
         elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
             return self._dispatch_universal_method(target, method_name, args, position)
@@ -1386,6 +1412,14 @@ class ASTExecutor(BaseASTVisitor):
                     raise ArgumentError(f"rnd_dwn() places must be non-negative, got {places}", position)
                 multiplier = 10 ** places
                 return NumberValue(math.floor(target.value * multiplier) / multiplier, position)
+        
+        elif method_name == "to_time":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_time() takes no arguments, got {len(args)}", position)
+            # Convert timestamp to time value
+            from .values import TimeValue
+            return TimeValue(target.value, position)
         
         # Check if it's a universal method
         elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
@@ -1670,6 +1704,41 @@ class ASTExecutor(BaseASTVisitor):
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "hash", position)
+    
+    def _dispatch_time_method(self, target, method_name: str,
+                             args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
+        """Handle time method calls."""
+        
+        # Import TimeValue here to avoid circular import issues
+        from .values import TimeValue
+        
+        if method_name == "get_type":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_type() takes no arguments, got {len(args)}", position)
+            return StringValue(target.get_type(), position)
+        
+        elif method_name == "to_string":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_string() takes no arguments, got {len(args)}", position)
+            return StringValue(target.to_string(), position)
+        
+        elif method_name == "to_num":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_num() takes no arguments, got {len(args)}", position)
+            # Return the timestamp as a number
+            from .values import NumberValue
+            return NumberValue(target.to_python(), position)
+        
+        # Check if it's a universal method
+        elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
+            return self._dispatch_universal_method(target, method_name, args, position)
+        
+        else:
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, "time", position)
     
     # Additional visitor methods that need to be implemented
     def visit_expression_statement(self, node) -> None:
@@ -2335,23 +2404,31 @@ class ASTExecutor(BaseASTVisitor):
             )
         
         # Validate precision
-        if precision < 1 or precision > 1000:
+        if precision < 0 or precision > 1000:
             raise RuntimeError(
-                f"Precision must be between 1 and 1000, got {precision}",
+                f"Precision must be between 0 and 1000, got {precision}",
                 node.position
             )
         
         # Save current precision
         old_precision = getcontext().prec
         
+        # Import here to avoid circular imports
+        from .glang_number import PrecisionGlangNumber
+        
+        # Save current Glang precision
+        old_glang_precision = PrecisionGlangNumber._glang_decimal_places
+        
         try:
-            # Set new precision for this scope
-            getcontext().prec = precision
+            # Set Glang decimal places precision (this is the new correct behavior)
+            PrecisionGlangNumber.set_glang_precision(precision)
             
             # Execute block with new precision
             self.execute(node.body)
         finally:
-            # Restore previous precision
+            # Restore previous Glang precision
+            PrecisionGlangNumber.set_glang_precision(old_glang_precision)
+            # Also restore Python's precision context
             getcontext().prec = old_precision
         
         self.result = None  # Precision blocks don't return values

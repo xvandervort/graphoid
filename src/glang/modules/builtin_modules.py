@@ -32,6 +32,10 @@ class BuiltinModuleRegistry:
         from .crypto_module import create_crypto_module_namespace
         cls._builtin_modules['crypto'] = create_crypto_module_namespace()
         
+        # Register Time module
+        from .time_module_simple import create_time_module_namespace
+        cls._builtin_modules['time'] = create_time_module_namespace()
+        
         cls._initialized = True
     
     @classmethod

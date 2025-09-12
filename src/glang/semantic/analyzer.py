@@ -99,6 +99,14 @@ class SemanticAnalyzer(BaseASTVisitor):
             # Some methods have known return types
             if expr.method_name == 'len':
                 return 'num'
+            elif expr.method_name == 'get_type':
+                return 'string'  # get_type() always returns a string
+            elif expr.method_name == 'to_string':
+                return 'string'  # to_string() always returns a string
+            elif expr.method_name == 'to_num':
+                return 'num'  # to_num() always returns a number
+            elif expr.method_name == 'to_time':
+                return 'time'  # to_time() always returns a time
             elif expr.method_name in ['map', 'filter', 'select', 'reject']:
                 # These methods return lists - try to infer from target type
                 if isinstance(expr.target, VariableRef):
@@ -123,7 +131,19 @@ class SemanticAnalyzer(BaseASTVisitor):
                   self.symbol_table.lookup_symbol(expr.target.name).symbol_type == 'module'):
                 # Get the module symbol to determine which module it is
                 symbol = self.symbol_table.lookup_symbol(expr.target.name)
+                # For module symbols, we need to check the import to get the original module name
+                # Currently we use the alias name, but we should map aliases to actual module names
                 module_name = symbol.name if symbol else 'unknown'
+                
+                # Handle common module aliases
+                alias_to_module = {
+                    'Time': 'time',
+                    'IO': 'io', 
+                    'Json': 'json',
+                    'Crypto': 'crypto'
+                }
+                if module_name in alias_to_module:
+                    module_name = alias_to_module[module_name]
                 
                 # Map module methods to their return types
                 if module_name == 'io':
@@ -199,6 +219,13 @@ class SemanticAnalyzer(BaseASTVisitor):
                         'from_hex': 'list',      # Converts hex string to bytes
                         'to_base64': 'string',   # Converts bytes to base64 string
                         'from_base64': 'list'    # Converts base64 string to bytes
+                    }
+                elif module_name == 'time':
+                    method_types = {
+                        'now': 'time',
+                        'today': 'time', 
+                        'from_components': 'time',
+                        'from_string': 'time'
                     }
                 else:
                     method_types = {}
@@ -597,14 +624,15 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'matches', 'replace', 'findAll',
                 'length', 'contains', 'up', 'toUpper', 'down', 'toLower',
                 'reverse', 'unique', 'chars',
-                'to_string', 'to_num', 'to_bool'
+                'to_string', 'to_num', 'to_bool', 'to_time'
             } | universal_methods,
-            'num': {'abs', 'round', 'to', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool'} | universal_methods,
+            'num': {'abs', 'round', 'to', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time'} | universal_methods,
             'bool': {'flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'} | universal_methods,
             'data': {'key', 'value'} | universal_methods,
             'hash': {
                 'get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop'
             } | universal_methods,
+            'time': {'get_type', 'to_string', 'to_num'} | universal_methods,
             'module': universal_methods.copy()  # Modules can have any method - validated at runtime
         }
         
