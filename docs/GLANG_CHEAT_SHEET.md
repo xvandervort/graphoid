@@ -734,9 +734,11 @@ birthday = Time.from_components(1990, 12, 25)   # Date only
 meeting = Time.from_components(2025, 1, 15, 14, 30, 0) # Full datetime
 parsed = Time.from_string("2025-01-15T14:30:00") # From ISO string
 
-# Using time values
+# Using time values (parentheses optional for zero-arg methods)
 print(current.to_string())   # "2025-01-15T14:30:00Z" (ISO format)
-print(current.get_type())    # "time"
+print(current.to_string)     # Same result, more elegant syntax
+print(current.get_type())    # "time"  
+print(current.get_type)      # "time" - property-like access
 
 # Type casting (bidirectional)
 timestamp = current.to_num()               # Time → Number (Unix timestamp)

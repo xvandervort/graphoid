@@ -67,12 +67,16 @@ import "time" as Time
 
 t = Time.from_components(2025, 6, 15, 10, 30, 45)
 
-# Get type information
-print(t.get_type())      # "time"
+# Get type information (both syntaxes work)
+print(t.get_type())      # "time" - with parentheses
+print(t.get_type)        # "time" - without parentheses (more elegant)
 
 # String representation (ISO format)
-print(t.to_string())     # "2025-06-15T10:30:45Z"
+print(t.to_string())     # "2025-06-15T10:30:45Z" - with parentheses
+print(t.to_string)       # "2025-06-15T10:30:45Z" - without parentheses
 ```
+
+**Glang Feature**: Zero-argument methods can be called with or without parentheses, making property-like access feel natural.
 
 ### Type Casting
 

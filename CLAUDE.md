@@ -154,6 +154,10 @@ config.get("host") # Get data node: { "host": "localhost" }
 config.has_key("debug")  # Check if key exists: true/false
 config.count_values("localhost")  # Count occurrences: 1
 
+# Zero-argument methods: parentheses are optional
+size = items.size()    # With parentheses  
+size = items.size      # Without parentheses (property-like access)
+
 # Data node operations
 user.key()         # Get key: "name"
 user.value()       # Get value: "Alice"
@@ -323,8 +327,13 @@ meeting = Time.from_components(2025, 1, 15, 14, 30, 0) # Full date and time
 parsed = Time.from_string("2025-01-15T14:30:00") # Parse ISO format
 
 # Work with time values
-print("Current: " + current.to_string())      # ISO format: "2025-01-15T14:30:00Z"
+print("Current: " + current.to_string())      # ISO format: "2025-01-15T14:30:00Z"  
 print("Type: " + current.get_type())          # "time"
+
+# Method calls work with or without parentheses (for zero-argument methods)
+iso_format = current.to_string()              # With parentheses
+iso_format = current.to_string                # Without parentheses (more elegant)
+type_name = current.get_type                  # Property-like access
 
 # Type casting - time values can be cast to/from numbers and strings
 timestamp = current.to_num()                  # Convert to Unix timestamp (number)
