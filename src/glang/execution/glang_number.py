@@ -107,8 +107,8 @@ class PrecisionGlangNumber(GlangNumber):
     DEFAULT_PRECISION = 28
     
     def __init__(self, value: Union[int, float, str, bool, Decimal]):
-        # Set precision for this context
-        getcontext().prec = self.DEFAULT_PRECISION
+        # Use whatever precision is currently set in the context
+        # The precision block will manage the context
         
         if isinstance(value, Decimal):
             self._decimal = value
@@ -121,6 +121,13 @@ class PrecisionGlangNumber(GlangNumber):
             self._decimal = Decimal(value)
         else:
             raise ValueError(f"Cannot create GlangNumber from {type(value)}")
+        
+        # Apply current precision context to the created decimal
+        # This ensures precision limits are respected
+        current_prec = getcontext().prec
+        if current_prec != 0 and current_prec < self.DEFAULT_PRECISION:
+            # Round to current precision if it's lower than default
+            self._decimal = +self._decimal  # Force re-evaluation with current context
     
     def add(self, other: 'GlangNumber') -> 'GlangNumber':
         """Add two numbers using Glang arithmetic semantics."""

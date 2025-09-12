@@ -179,6 +179,14 @@ class LanguageKeywordRegistry:
         ))
         
         self._register_keyword(KeywordDefinition(
+            keyword="precision",
+            category=KeywordCategory.STATEMENT,
+            parser_method="parse_precision_block",
+            description="Precision context block",
+            syntax_example="precision 14 { statements }"
+        ))
+        
+        self._register_keyword(KeywordDefinition(
             keyword="break",
             category=KeywordCategory.STATEMENT,
             parser_method="parse_break_statement",

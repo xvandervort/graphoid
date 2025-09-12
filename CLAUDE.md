@@ -241,6 +241,27 @@ if condition {
     # execute when false  
 }
 
+# Precision context blocks (NEW!)
+precision 5 {
+    # All numeric calculations use 5-digit precision
+    pi = 3.14159265358979323846  # Stored with 5 digits
+    area = pi * radius * radius
+}
+
+precision 50 {
+    # High-precision scientific calculations
+    precise_calculation = complex_math()
+}
+
+# Nested precision contexts
+precision 10 {
+    outer_value = 1.0 / 3.0  # 0.3333333333
+    
+    precision 3 {
+        inner_value = 1.0 / 3.0  # 0.333
+    }
+}
+
 # While loops
 while condition {
     # loop body
@@ -333,6 +354,7 @@ Glang uses a clean, modern architecture:
 - ✅ Hashes as collections of data nodes with Ruby hash-like syntax
 - ✅ Functional programming operations: map, filter, each with built-in transformations
 - ✅ Control flow structures: if/else, while, for-in, break/continue with proper nesting
+- ✅ **Precision context blocks** with language-level numeric precision control (precision N { ... })
 - ✅ CLI program execution with shebang support and command-line arguments
 - ✅ Mathematical methods (abs, sqrt, log, pow, rounding) for numbers
 - ✅ Type casting system (to_string, to_num, to_bool) for all basic types

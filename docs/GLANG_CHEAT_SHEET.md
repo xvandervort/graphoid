@@ -85,6 +85,38 @@ if numbers.filter("even").size() > 0 {
 }
 ```
 
+### Precision Context Blocks
+```glang
+# Control numeric precision for calculations
+precision 5 {
+    # All arithmetic uses 5-digit precision  
+    pi = 3.14159265358979323846  # Stored with 5 digits
+    area = pi * radius * radius
+}
+
+# High precision for scientific calculations
+precision 50 {
+    precise_pi = 3.14159265358979323846
+    very_precise = precise_pi.sqrt()
+}
+
+# Performance-optimized low precision
+precision 3 {
+    for i in range(100000) {
+        quick_calc = i / 7.0  # Fast, low-precision math
+    }
+}
+
+# Nested precision contexts
+precision 10 {
+    outer = 1.0 / 3.0      # 0.3333333333
+    
+    precision 4 {
+        inner = 1.0 / 3.0  # 0.3333 
+    }
+}
+```
+
 ### Loops
 ```glang
 # While loops

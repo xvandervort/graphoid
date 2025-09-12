@@ -322,6 +322,20 @@ class ASTParser:
         
         return WhileStatement(condition=condition, body=body, position=pos)
     
+    def parse_precision_block(self) -> PrecisionBlock:
+        """Parse precision block: precision <value> { statements }"""
+        # Parse 'precision' keyword
+        precision_token = self.consume(TokenType.PRECISION, "Expected 'precision'")
+        pos = SourcePosition(precision_token.line, precision_token.column)
+        
+        # Parse precision value expression (typically a number)
+        precision_value = self.parse_expression()
+        
+        # Parse body block
+        body = self.parse_block()
+        
+        return PrecisionBlock(precision_value=precision_value, body=body, position=pos)
+    
     def parse_for_statement(self) -> ForInStatement:
         """Parse for-in statement: for variable in iterable { statements }"""
         # Parse 'for' keyword

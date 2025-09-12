@@ -96,7 +96,54 @@ hash<num> temperatures = { "morning": 72.5 }    # Values must be numbers
 # Best of both worlds - concise when obvious, explicit when important
 ```
 
-### **4. Functional Programming Without the Complexity** ⚡
+### **4. Precision Context Blocks - Computational Environments** 🎯
+
+**The Problem**: Most languages treat numeric precision as a global setting or require complex library calls:
+- **Python**: Global decimal context affects entire program
+- **JavaScript**: No built-in precision control beyond floating-point
+- **Java**: BigDecimal requires verbose method calls for every operation
+
+**Glang's Innovation**: **Language-Level Precision Contexts**
+
+```glang
+# Standard precision for general calculations
+pi = 3.14159265358979323846
+circle_area = pi * 10 * 10  # Uses default 28-digit precision
+
+# High-precision context for scientific calculations
+precision 50 {
+    pi = 3.14159265358979323846
+    # All arithmetic in this block uses 50-digit precision
+    precise_area = pi * 10 * 10
+}
+
+# Low-precision for performance-critical loops
+precision 4 {
+    for i in range(1000000) {
+        quick_calc = i / 3.0  # Only 4 digits needed
+    }
+}
+
+# Nested precision contexts
+precision 10 {
+    outer = 1.0 / 3.0  # 0.3333333333
+    
+    precision 3 {
+        inner = 1.0 / 3.0  # 0.333
+    }
+    
+    back = 1.0 / 3.0  # 0.3333333333 again
+}
+```
+
+**Why This is Revolutionary**:
+- **Scoped semantics**: Precision changes are localized, not global
+- **Language construct**: Not a method call or library function
+- **Composable**: Nest different precision requirements naturally
+- **Automatic restoration**: Previous precision restored on block exit
+- **Performance control**: Use lower precision where speed matters
+
+### **5. Functional Programming Without the Complexity** ⚡
 
 **The Problem**: Functional programming is powerful but often has a steep learning curve and cryptic syntax.
 
@@ -200,6 +247,7 @@ value.sqrt().rnd(2)        # 4.0 (square root, rounded)
 |---------|------------|---------|------|-------|
 | **Type Safety** | Weak | Duck typing | Duck typing | ✅ **Strong + Inference** |
 | **Immutability** | Shallow freeze | Immutable types | Frozen objects | ✅ **Deep + Contamination** |
+| **Precision Control** | None | Global context | BigDecimal library | ✅ **Language-level contexts** |
 | **Functional Programming** | ES6+ additions | List comprehensions | Enumerable methods | ✅ **Semantic predicates** |
 | **Method Chaining** | Limited | Limited | Excellent | ✅ **Type-safe + Universal** |
 | **Key-Value Data** | Objects/Maps | Dicts | Hashes | ✅ **Unified data nodes** |

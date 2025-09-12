@@ -99,6 +99,13 @@ class ASTExecutor(BaseASTVisitor):
         self.context = context
         self.file_manager = file_manager
         self.result = None
+        
+        # Set default precision if not already set
+        from decimal import getcontext
+        if getcontext().prec == 0 or getcontext().prec == 28:
+            # Use Glang's default precision
+            from ..execution.glang_number import PrecisionGlangNumber
+            getcontext().prec = PrecisionGlangNumber.DEFAULT_PRECISION
     
     def execute(self, node: ASTNode) -> Any:
         """Execute an AST node and return the result."""
@@ -2310,6 +2317,44 @@ class ASTExecutor(BaseASTVisitor):
             self.execute(node.then_block)
         elif node.else_block:
             self.execute(node.else_block)
+    
+    def visit_precision_block(self, node) -> None:
+        """Execute precision context block."""
+        from decimal import getcontext
+        
+        # Evaluate precision value
+        precision_val = self.execute(node.precision_value)
+        
+        # Convert to integer
+        if isinstance(precision_val, NumberValue):
+            precision = int(precision_val.value)
+        else:
+            raise RuntimeError(
+                f"Precision value must be a number, got {precision_val.get_type()}",
+                node.position
+            )
+        
+        # Validate precision
+        if precision < 1 or precision > 1000:
+            raise RuntimeError(
+                f"Precision must be between 1 and 1000, got {precision}",
+                node.position
+            )
+        
+        # Save current precision
+        old_precision = getcontext().prec
+        
+        try:
+            # Set new precision for this scope
+            getcontext().prec = precision
+            
+            # Execute block with new precision
+            self.execute(node.body)
+        finally:
+            # Restore previous precision
+            getcontext().prec = old_precision
+        
+        self.result = None  # Precision blocks don't return values
     
     def visit_while_statement(self, node: WhileStatement) -> None:
         """Execute while loop."""

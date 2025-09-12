@@ -663,6 +663,14 @@ class SemanticAnalyzer(BaseASTVisitor):
         # Visit body block
         node.body.accept(self)
     
+    def visit_precision_block(self, node) -> None:
+        """Visit precision block node."""
+        # Check precision value expression
+        node.precision_value.accept(self)
+        
+        # Visit body block in new scope (precision context)
+        node.body.accept(self)
+    
     def visit_break_statement(self, node: BreakStatement) -> None:
         """Visit break statement node."""
         # TODO: Validate that break is inside a loop

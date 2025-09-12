@@ -296,6 +296,16 @@ class Block(ASTNode):
     def accept(self, visitor):
         return visitor.visit_block(self)
 
+@dataclass
+class PrecisionBlock(Statement):
+    """Precision context: precision <value> { body }"""
+    precision_value: Expression  # Expression that evaluates to precision (integer)
+    body: Block
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_precision_block(self)
+
 @dataclass 
 class IfStatement(Statement):
     """If statement: if condition { then_block } else { else_block }"""
@@ -508,6 +518,11 @@ class ASTVisitor(ABC):
         pass
     
     @abstractmethod
+    def visit_precision_block(self, node: PrecisionBlock):
+        """Visit a precision block."""
+        pass
+    
+    @abstractmethod
     def visit_module_declaration(self, node: ModuleDeclaration):
         """Visit a module declaration."""
         pass
@@ -680,6 +695,11 @@ class BaseASTVisitor(ASTVisitor):
         return node
     
     def visit_import_statement(self, node: ImportStatement):
+        return node
+    
+    def visit_precision_block(self, node: PrecisionBlock):
+        node.precision_value.accept(self)
+        node.body.accept(self)
         return node
     
     def visit_module_declaration(self, node: ModuleDeclaration):
