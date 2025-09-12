@@ -82,6 +82,27 @@ class SemanticAnalyzer(BaseASTVisitor):
             if self.symbol_table.symbol_exists(expr.name):
                 symbol = self.symbol_table.lookup_symbol(expr.name)
                 return symbol.symbol_type
+        elif isinstance(expr, IndexAccess):
+            # For index access, we need to determine what the indexed expression returns
+            # Get the type of the target being indexed
+            target_type = self.infer_type_from_expression(expr.target)
+            if target_type == 'list':
+                # Lists can contain any type - we can't infer the element type yet
+                # This would require type constraints on lists (list<string>, list<num>, etc.)
+                # Special case: if target is a method call that returns a known list type
+                if isinstance(expr.target, MethodCallExpression):
+                    if expr.target.method_name == 'keys':
+                        # keys() returns list<string>
+                        return 'string'
+                return None  # Cannot determine element type without type constraints
+            elif target_type == 'string':
+                # String indexing returns a string (single character)
+                return 'string'
+            elif target_type == 'hash':
+                # Hash indexing returns data nodes
+                return 'data'
+            else:
+                return None  # Cannot determine
         elif isinstance(expr, MethodCallExpression) or isinstance(expr, MethodCall):
             # Get the target type
             target_type = None
@@ -125,6 +146,12 @@ class SemanticAnalyzer(BaseASTVisitor):
             elif expr.method_name in ['get', 'pop']:
                 # Hash methods that return data nodes
                 return 'data'
+            elif expr.method_name == 'keys':
+                # keys() returns a list (of strings, but we can't express that yet)
+                return 'list'
+            elif expr.method_name == 'values':
+                # values() returns a list (of values, type depends on hash constraint)
+                return 'list'
             # Handle I/O module method return types
             elif (isinstance(expr.target, VariableRef) and 
                   self.symbol_table.symbol_exists(expr.target.name) and

@@ -616,82 +616,93 @@ class ASTParser:
         return self.parse_method_call()
     
     def parse_method_call(self) -> Expression:
-        """Parse method calls: expr.method(args)"""
-        expr = self.parse_index_access()
+        """Parse method calls and index access: expr.method(args)[index]"""
+        expr = self.parse_postfix()
+        return expr
+    
+    def parse_postfix(self) -> Expression:
+        """Parse postfix expressions (method calls and index access)."""
+        expr = self.parse_primary()
         
-        while self.match(TokenType.DOT):
-            method_token = self.consume(TokenType.IDENTIFIER, "Expected method name")
-            method_name = method_token.value
-            pos = SourcePosition(method_token.line, method_token.column)
-            
-            # Optional parentheses for method calls
-            self.match(TokenType.LPAREN)
-            
-            # Parse arguments
-            arguments = []
-            # Only parse arguments if we have parentheses or if the next token isn't an operator that should end the method call
-            if not self.check(TokenType.RPAREN) and not self.is_at_end() and \
-               not self.check(TokenType.NEWLINE) and not self.check(TokenType.EOF) and \
-               not self.check(TokenType.DOT) and \
-               not self.check(TokenType.ASSIGN) and \
-               not self.check(TokenType.EQUAL) and not self.check(TokenType.NOT_EQUAL) and \
-               not self.check(TokenType.GREATER) and not self.check(TokenType.LESS) and \
-               not self.check(TokenType.GREATER_EQUAL) and not self.check(TokenType.LESS_EQUAL) and \
-               not self.check(TokenType.NOT_GREATER) and not self.check(TokenType.NOT_LESS) and \
-               not self.check(TokenType.PLUS) and not self.check(TokenType.MINUS) and \
-               not self.check(TokenType.MULTIPLY) and not self.check(TokenType.SLASH) and \
-               not self.check(TokenType.MODULO) and \
-               not self.check(TokenType.PLUS_DOT) and not self.check(TokenType.MINUS_DOT) and \
-               not self.check(TokenType.MULTIPLY_DOT) and not self.check(TokenType.DIVIDE_DOT) and \
-               not self.check(TokenType.MODULO_DOT):
-                arguments.append(self.parse_expression())
+        while True:
+            if self.match(TokenType.DOT):
+                # Method call
+                method_token = self.consume(TokenType.IDENTIFIER, "Expected method name")
+                method_name = method_token.value
+                pos = SourcePosition(method_token.line, method_token.column)
                 
-                # Arguments can be comma-separated or space-separated
-                while self.match(TokenType.COMMA):
-                    arguments.append(self.parse_expression())
-            
-            # Optional closing paren
-            self.match(TokenType.RPAREN)
-            
-            # Create method call expression
-            expr = MethodCallExpression(expr, method_name, arguments, pos)
+                # Optional parentheses for method calls
+                has_parens = self.match(TokenType.LPAREN)
+                
+                # Parse arguments
+                arguments = []
+                if has_parens:
+                    # With parentheses - parse arguments normally
+                    if not self.check(TokenType.RPAREN):
+                        arguments.append(self.parse_expression())
+                        while self.match(TokenType.COMMA):
+                            arguments.append(self.parse_expression())
+                    self.consume(TokenType.RPAREN, "Expected ')' after arguments")
+                else:
+                    # Without parentheses - only parse arguments if next token suggests it
+                    # (and it's not something that should continue the expression)
+                    if not self.is_at_end() and \
+                       not self.check(TokenType.NEWLINE) and not self.check(TokenType.EOF) and \
+                       not self.check(TokenType.DOT) and \
+                       not self.check(TokenType.LBRACKET) and \
+                       not self.check(TokenType.LBRACE) and \
+                       not self.check(TokenType.ASSIGN) and \
+                       not self.check(TokenType.EQUAL) and not self.check(TokenType.NOT_EQUAL) and \
+                       not self.check(TokenType.GREATER) and not self.check(TokenType.LESS) and \
+                       not self.check(TokenType.GREATER_EQUAL) and not self.check(TokenType.LESS_EQUAL) and \
+                       not self.check(TokenType.NOT_GREATER) and not self.check(TokenType.NOT_LESS) and \
+                       not self.check(TokenType.PLUS) and not self.check(TokenType.MINUS) and \
+                       not self.check(TokenType.MULTIPLY) and not self.check(TokenType.SLASH) and \
+                       not self.check(TokenType.MODULO) and \
+                       not self.check(TokenType.PLUS_DOT) and not self.check(TokenType.MINUS_DOT) and \
+                       not self.check(TokenType.MULTIPLY_DOT) and not self.check(TokenType.DIVIDE_DOT) and \
+                       not self.check(TokenType.MODULO_DOT) and \
+                       not self.check(TokenType.RPAREN) and not self.check(TokenType.RBRACKET) and \
+                       not self.check(TokenType.COMMA) and not self.check(TokenType.RBRACE):
+                        arguments.append(self.parse_expression())
+                        while self.match(TokenType.COMMA):
+                            arguments.append(self.parse_expression())
+                
+                # Create method call expression
+                expr = MethodCallExpression(expr, method_name, arguments, pos)
+                
+            elif self.match(TokenType.LBRACKET):
+                # Index or slice access
+                if self.check_slice_syntax():
+                    # Slice access
+                    start = None
+                    if not self.check(TokenType.COLON):
+                        start = self.parse_expression()
+                    
+                    self.consume(TokenType.COLON, "Expected ':'")
+                    
+                    stop = None
+                    if not self.check(TokenType.COLON) and not self.check(TokenType.RBRACKET):
+                        stop = self.parse_expression()
+                    
+                    step = None
+                    if self.match(TokenType.COLON):
+                        if not self.check(TokenType.RBRACKET):
+                            step = self.parse_expression()
+                    
+                    self.consume(TokenType.RBRACKET, "Expected ']'")
+                    expr = SliceAccess(expr, start, stop, step)
+                else:
+                    # Regular index access
+                    index = self.parse_expression()
+                    self.consume(TokenType.RBRACKET, "Expected ']'")
+                    expr = IndexAccess(expr, [index])
+            else:
+                # No more postfix operations
+                break
         
         return expr
     
-    def parse_index_access(self) -> Expression:
-        """Parse index/slice access: expr[index] or expr[start:stop:step]"""
-        expr = self.parse_primary()
-        
-        while self.match(TokenType.LBRACKET):
-            # Check if this is a slice (contains :)
-            if self.check_slice_syntax():
-                start = None
-                if not self.check(TokenType.COLON):
-                    start = self.parse_expression()
-                
-                self.consume(TokenType.COLON, "Expected ':'")
-                
-                stop = None
-                if not self.check(TokenType.COLON) and not self.check(TokenType.RBRACKET):
-                    stop = self.parse_expression()
-                
-                step = None
-                if self.match(TokenType.COLON):
-                    if not self.check(TokenType.RBRACKET):
-                        step = self.parse_expression()
-                
-                self.consume(TokenType.RBRACKET, "Expected ']'")
-                expr = SliceAccess(expr, start, stop, step)
-            else:
-                # Regular index access - support chaining
-                index = self.parse_expression()
-                self.consume(TokenType.RBRACKET, "Expected ']'")
-                
-                # For now, treat each [index] as a separate IndexAccess
-                # This allows for natural chaining: arr[i][j] -> IndexAccess(IndexAccess(arr, [i]), [j])
-                expr = IndexAccess(expr, [index])
-        
-        return expr
     
     def parse_primary(self) -> Expression:
         """Parse primary expressions."""
