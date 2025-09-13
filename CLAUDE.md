@@ -67,6 +67,9 @@ This project uses a Python virtual environment. Make sure it's activated before 
 source .venv/bin/activate  # On Linux/Mac
 # or
 .venv\Scripts\activate     # On Windows
+
+# Install glang package in development mode (required for running glang programs)
+pip install -e ".[dev]"
 ```
 
 ## Development Commands
@@ -76,6 +79,9 @@ source .venv/bin/activate  # On Linux/Mac
 python -m glang.repl
 # or after installation:
 glang
+
+# Execute a .gr file directly
+python -m glang.cli path/to/file.gr
 
 # Quick demo (scripted)
 echo -e "string name = \"Alice\"\\nname\\n/namespace\\n/exit" | glang
@@ -203,6 +209,59 @@ names.map("upper").each("print")  # Print each uppercase name
 **String/Collection:** `empty`, `non_empty`, `uppercase`, `lowercase`, `alphabetic`/`alpha`, `numeric`/`digit`  
 **Type Checks:** `is_string`/`string`, `is_number`/`number`, `is_bool`/`boolean`, `is_list`/`list`  
 **General:** `truthy`, `falsy`
+
+### Enhanced String Methods - Unified Interface
+
+Glang provides powerful string processing methods with a clean, unified interface that eliminates the need for regular expressions in most cases:
+
+```glang
+text = "Hello World 123! Contact support@example.com or call 555-1234"
+
+# Basic string checks
+text.starts_with("Hello")                   # Check if text starts with prefix: true
+text.ends_with("1234")                      # Check if text ends with suffix: true
+
+# Unified contains() method - single method with mode parameter
+text.contains("any", "digits")              # Check if text contains any digits: true
+text.contains("all", "letters", "digits")   # Check if text has both letters and digits: true  
+text.contains("only", "letters", "spaces")  # Check if text contains only letters and spaces: false
+text.contains("World")                       # Backward compatibility: substring search: true
+
+# Unified extract() method - single method with pattern parameter
+numbers = text.extract("numbers")           # Extract all numbers: ["123", "555", "1234"]
+words = text.extract("words")               # Extract all words: ["Hello", "World", "Contact", ...]
+emails = text.extract("emails")             # Extract email addresses: ["support@example.com"]
+
+# Unified count() method - single method with pattern parameter  
+digit_count = text.count("digits")          # Count digits in text: 10
+word_count = text.count("words")            # Count words in text: 8
+at_count = text.count_chars("@")            # Count specific characters: 1
+
+# Find first occurrence
+first_digit_pos = text.find_first("digits") # Position of first digit: 12
+first_space_pos = text.find_first_char(" ") # Position of first space: 5
+
+# Simple validation methods
+email = "user@example.com"
+email.is_email()                            # true - valid email format
+"123.45".is_number()                        # true - valid number
+"https://example.com".is_url()              # true - valid URL
+
+# Enhanced splitting
+mixed = "apple,banana;orange|grape"
+fruits = mixed.split_on_any(",;|")          # ["apple", "banana", "orange", "grape"]
+```
+
+#### Pattern Types Supported
+**Character Types:** `digits`/`numbers`, `letters`, `uppercase`, `lowercase`, `spaces`/`whitespace`, `punctuation`, `symbols`, `alphanumeric`  
+**Content Types:** `words`, `emails` (for extraction)
+
+#### Key Benefits
+1. **No Regex Required:** Handle 90% of string processing without learning regular expressions
+2. **Unified Interface:** Learn `method(mode, pattern...)` instead of dozens of method names  
+3. **Semantic & Readable:** `text.contains("any", "digits")` is clearer than regex patterns
+4. **Backward Compatible:** Old `contains("substring")` still works alongside new interface
+5. **Extensible:** New patterns can be added without creating new methods
 
 ### Functions and Lambdas
 
@@ -353,7 +412,9 @@ round_trip = current.to_num().to_time().to_string()
 print("Consistent: " + (original_str == round_trip).to_string()) # "true"
 ```
 
-### File Loading
+### File Operations
+
+#### File Loading
 ```glang
 # Load another .gr file (language-level)
 load "config.gr"     # Variables from config.gr are now available
@@ -366,6 +427,35 @@ load "config.gr"     # Variables from config.gr are now available
 if debug {
     print("Debug mode enabled")
 }
+```
+
+#### File Handle I/O
+```glang
+import "io" as io
+
+# Read capabilities - auto-close on EOF
+read_handle = io.open("data.txt", "r")
+content = read_handle.read()        # Reads all content, auto-closes
+# read_handle.read()                # Error: capability exhausted
+
+# Write capabilities - manual control  
+write_handle = io.open("output.txt", "w")
+write_handle.write("Line 1\n")
+write_handle.write("Line 2\n") 
+write_handle.close()                # Must manually close
+
+# Incremental processing
+input = io.open("large_file.txt", "r")
+output = io.open("processed.txt", "w")
+
+while true {
+    line = input.read_line()
+    if line == "" {                 # EOF reached, auto-closed
+        break
+    }
+    output.write(line.upper() + "\n")
+}
+output.close()
 ```
 
 ## Architecture Notes
@@ -411,6 +501,7 @@ Glang uses a clean, modern architecture:
 - ✅ CLI program execution with shebang support and command-line arguments
 - ✅ Mathematical methods (abs, sqrt, log, pow, rounding) for numbers
 - ✅ Type casting system (to_string, to_num, to_bool) for all basic types
+- ✅ **File handle I/O** with boundary capability semantics (auto-close on EOF for reads, manual control for writes)
 - ✅ Standard library foundation with math constants module (stdlib/math.gr)
 - ✅ **JSON module** with encode, decode, pretty printing, and validation (json.encode, json.decode, json.is_valid)
 - ✅ **Time module** with single Time type, UTC timestamps, and full type casting (Time.now, Time.from_components, time.to_num, string.to_time)
@@ -426,7 +517,7 @@ Glang uses a clean, modern architecture:
 
 ### Near-Term Priorities (Q2 2025)
 **Make Glang Practical** - Standard libraries for real-world use:
-- **✅ I/O Library**: File operations, user input, directory management
+- **✅ I/O Library**: File operations, file handle I/O with auto-close semantics, user input, directory management
 - **✅ Time Library**: Single Time type with UTC timestamps and full type casting
 - **⏳ Network Library**: ✅ JSON support, HTTP client, email notifications 
 - **⏳ Database Connectivity**: SQLite, PostgreSQL, MySQL support

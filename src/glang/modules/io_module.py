@@ -11,7 +11,7 @@ from .network_interface import get_network_provider
 
 from ..execution.values import (
     GlangValue, StringValue, BooleanValue, NumberValue, 
-    ListValue, DataValue, HashValue
+    ListValue, DataValue, HashValue, FileHandleValue
 )
 from ..execution.errors import RuntimeError
 from ..ast.nodes import SourcePosition
@@ -112,6 +112,52 @@ class IOModule:
             raise RuntimeError(f"Permission denied: {path}", position)
         except Exception as e:
             raise RuntimeError(f"Error appending to file {path}: {str(e)}", position)
+    
+    @staticmethod
+    def open(filepath: GlangValue, mode: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Create a file boundary capability.
+        
+        Usage in Glang:
+            read_capability = io.open("data.txt", "r")     # Read capability
+            write_capability = io.open("output.txt", "w")  # Write capability (overwrites)
+            append_capability = io.open("log.txt", "a")    # Append capability
+            
+        Returns a boundary capability that provides controlled, unidirectional access
+        to external file resources. The capability is immutable and can only perform
+        operations consistent with its type (read, write, or append).
+        """
+        if not isinstance(filepath, StringValue):
+            raise RuntimeError(
+                f"io.open expects string filepath, got {filepath.get_type()}",
+                position
+            )
+        
+        if not isinstance(mode, StringValue):
+            raise RuntimeError(
+                f"io.open expects string mode, got {mode.get_type()}",
+                position
+            )
+        
+        path = filepath.value
+        mode_str = mode.value
+        
+        # Map mode strings to capability types
+        mode_mapping = {
+            "r": "read",
+            "w": "write", 
+            "a": "append"
+        }
+        
+        if mode_str not in mode_mapping:
+            raise RuntimeError(
+                f"io.open mode must be 'r', 'w', or 'a', got '{mode_str}'",
+                position
+            )
+        
+        capability_type = mode_mapping[mode_str]
+        
+        # Create boundary capability (lazy initialization - doesn't open file yet)
+        return FileHandleValue(path, capability_type, position)
     
     @staticmethod
     def exists(path: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
@@ -860,6 +906,7 @@ def create_io_module_namespace():
         'read_file': IOModule.read_file,
         'write_file': IOModule.write_file,
         'append_file': IOModule.append_file,
+        'open': IOModule.open,  # File handle support
         'read_binary': IOModule.read_binary,
         'write_binary': IOModule.write_binary,
         'read_lines': IOModule.read_lines,

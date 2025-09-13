@@ -152,6 +152,20 @@ class SemanticAnalyzer(BaseASTVisitor):
             elif expr.method_name == 'values':
                 # values() returns a list (of values, type depends on hash constraint)
                 return 'list'
+            # Handle file handle method return types
+            elif target_type == 'file':
+                file_method_types = {
+                    'write': 'bool',
+                    'read': 'string',
+                    'read_line': 'string',
+                    'flush': 'bool',
+                    'close': 'bool',
+                    'kill': 'bool',
+                    'capability_type': 'string',
+                    'type': 'string',  # Universal method
+                }
+                if expr.method_name in file_method_types:
+                    return file_method_types[expr.method_name]
             # Handle I/O module method return types
             elif (isinstance(expr.target, VariableRef) and 
                   self.symbol_table.symbol_exists(expr.target.name) and
@@ -183,6 +197,7 @@ class SemanticAnalyzer(BaseASTVisitor):
                         'write_lines': 'bool', 
                         'write_binary': 'bool', # Returns boolean success indicator
                         'append_file': 'bool',
+                        'open': 'file',           # Returns file handle
                         'exists': 'bool',
                         'is_file': 'bool',
                         'is_dir': 'bool',
@@ -334,7 +349,7 @@ class SemanticAnalyzer(BaseASTVisitor):
     def visit_variable_declaration(self, node: VariableDeclaration) -> None:
         """Analyze variable declarations."""
         # Validate type
-        valid_types = {'list', 'string', 'num', 'bool', 'data', 'hash', 'function', 'any'}
+        valid_types = {'list', 'string', 'num', 'bool', 'data', 'hash', 'function', 'file', 'any'}
         if node.var_type not in valid_types:
             self.report_error(InvalidTypeError(node.var_type, node.position))
             return
@@ -647,10 +662,14 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'to_string', 'to_bool'
             } | universal_methods,
             'string': {
-                'size', 'empty', 'upper', 'lower', 'split', 'trim', 'join',
-                'matches', 'replace', 'findAll',
-                'length', 'contains', 'up', 'toUpper', 'down', 'toLower',
+                'size', 'empty', 'upper', 'lower', 'split', 'split_on_any', 'trim', 'join',
+                'matches', 'replace', 'find_all', 'findAll',
+                'length', 'contains', 'extract', 
+                'count', 'count_chars', 'find_first', 'find_first_char',
+                'is_email', 'is_number', 'is_url',
+                'up', 'toUpper', 'down', 'toLower',
                 'reverse', 'unique', 'chars',
+                'starts_with', 'ends_with',
                 'to_string', 'to_num', 'to_bool', 'to_time'
             } | universal_methods,
             'num': {'abs', 'round', 'to', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time'} | universal_methods,
@@ -660,6 +679,7 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop'
             } | universal_methods,
             'time': {'get_type', 'to_string', 'to_num'} | universal_methods,
+            'file': {'write', 'read', 'read_line', 'flush', 'close', 'kill', 'capability_type'} | universal_methods,
             'module': universal_methods.copy()  # Modules can have any method - validated at runtime
         }
         

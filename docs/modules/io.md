@@ -47,6 +47,99 @@ while true {
 }
 ```
 
+## File Handle Operations
+
+For incremental file I/O operations, use file handles that provide controlled access to files:
+
+### open(filepath, mode)
+Creates a file handle capability for incremental I/O. Returns a file handle object.
+
+**Modes:**
+- `"r"` - Read-only capability (auto-closes on EOF)
+- `"w"` - Write-only capability (manual close required)
+- `"a"` - Append-only capability (manual close required)
+
+```glang
+import "io" as io
+
+# Read handle - auto-closes when EOF reached
+read_handle = io.open("data.txt", "r")
+content = read_handle.read()  # Reads entire file, auto-closes
+# read_handle.read()          # Error: capability exhausted
+
+# Write handle - manual control
+write_handle = io.open("output.txt", "w")
+write_handle.write("Line 1\n")
+write_handle.write("Line 2\n")
+write_handle.close()  # Manual close required
+
+# Append handle
+append_handle = io.open("log.txt", "a")
+append_handle.write("New log entry\n")
+append_handle.close()
+```
+
+### File Handle Methods
+
+**Read Capabilities (auto-close on EOF):**
+- `read()` - Reads entire file content, auto-closes on completion
+- `read_line()` - Reads next line, auto-closes when EOF reached
+- `close()` - Manually close (usually not needed for reads)
+- `capability_type()` - Returns `"read"`
+
+**Write/Append Capabilities (manual control):**
+- `write(content)` - Writes content to file
+- `flush()` - Flushes write buffers to disk
+- `close()` - Closes file (can be reopened for more writing)
+- `capability_type()` - Returns `"write"` or `"append"`
+
+**All Capabilities:**
+- `kill()` - Permanently destroys capability (cannot be reopened)
+
+```glang
+# Incremental file processing
+input_handle = io.open("large_file.txt", "r")
+output_handle = io.open("processed.txt", "w")
+
+# Process line by line (read handle auto-closes at EOF)
+while true {
+    line = input_handle.read_line()
+    if line == "" {  # EOF reached, handle auto-closed
+        break
+    }
+    processed_line = line.upper()
+    output_handle.write(processed_line + "\n")
+}
+
+output_handle.close()  # Must manually close write handles
+```
+
+### File Handle Lifecycle
+
+**Read Capabilities** - Auto-close and exhaustion:
+```glang
+handle = io.open("file.txt", "r")
+content = handle.read()    # Auto-closes on EOF
+# handle.read()            # Error: "EOF reached, capability exhausted"
+```
+
+**Write Capabilities** - Manual control:
+```glang
+handle = io.open("file.txt", "w") 
+handle.write("First batch")
+handle.close()
+handle.write("Second batch")  # Reopens file, overwrites content
+handle.close()
+```
+
+**Permanent Destruction:**
+```glang
+handle = io.open("file.txt", "w")
+handle.write("content")
+handle.kill()              # Permanently destroyed
+# handle.write("more")     # Error: cannot use killed capability
+```
+
 ## File Reading Operations
 
 ### read_file(path)

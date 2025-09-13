@@ -393,6 +393,8 @@ spaced.trim()              # "hello"
 text.chars()               # ["H", "e", "l", "l", "o", ",", " ", "W", "o", "r", "l", "d", "!"]
 text.length()              # 13
 text.contains("World")     # true
+text.starts_with("Hello")  # true
+text.ends_with("!")        # true
 ```
 
 ### String Splitting
@@ -412,6 +414,35 @@ lines = content.split("\n")  # ["line1", "line2", "line3"]
 # Split by any character
 path = "folder/subfolder/file.txt"
 parts = path.split("/")    # ["folder", "subfolder", "file.txt"]
+```
+
+### String Prefix and Suffix Checking
+```glang
+filename = "document.pdf"
+url = "https://example.com"
+email = "user@domain.com"
+
+# Check file extensions
+if filename.ends_with(".pdf") {
+    print("This is a PDF file")
+}
+
+# Check URL protocols
+if url.starts_with("https://") {
+    print("Secure connection")
+} else if url.starts_with("http://") {
+    print("Insecure connection")
+}
+
+# Validate email domains
+if email.ends_with("@domain.com") {
+    print("Internal email")
+}
+
+# Case-sensitive checks
+name = "Hello World"
+name.starts_with("hello")  # false (case-sensitive)
+name.starts_with("Hello")  # true
 ```
 
 ### Practical String Processing

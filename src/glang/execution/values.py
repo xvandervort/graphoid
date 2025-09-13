@@ -10,12 +10,15 @@ from abc import ABC, abstractmethod
 from typing import Any, List, Optional, Union, Tuple
 import sys
 import os
+import uuid
 from .glang_number import GlangNumber, create_glang_number
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
 
 from glang.ast.nodes import SourcePosition
+
+
 
 
 class GlangValue(ABC):
@@ -386,6 +389,24 @@ class StringValue(GlangValue):
             result_chars.extend(element.to_char_nodes())
         
         return self.from_char_nodes(result_chars)
+    
+    def starts_with(self, prefix: 'StringValue') -> 'BooleanValue':
+        """Check if string starts with the given prefix."""
+        if not isinstance(prefix, StringValue):
+            raise ValueError(f"Prefix must be string, got {prefix.get_type()}")
+        
+        # Use Python's built-in for now, but could be implemented with char nodes
+        result = self.value.startswith(prefix.value)
+        return BooleanValue(result, self.position)
+    
+    def ends_with(self, suffix: 'StringValue') -> 'BooleanValue':
+        """Check if string ends with the given suffix."""
+        if not isinstance(suffix, StringValue):
+            raise ValueError(f"Suffix must be string, got {suffix.get_type()}")
+        
+        # Use Python's built-in for now, but could be implemented with char nodes
+        result = self.value.endswith(suffix.value)
+        return BooleanValue(result, self.position)
     
     # Override universal methods for string-specific behavior
     def universal_size(self) -> 'NumberValue':
@@ -1239,3 +1260,139 @@ class TimeValue(GlangValue):
     
     def to_display_string(self) -> str:
         return self.to_string()
+
+
+class FileHandleValue(GlangValue):
+    """A Glang file handle representing a boundary capability.
+    
+    File handles are immutable boundary capabilities that provide controlled,
+    unidirectional access to external file resources. They are not nodes or edges
+    in the program's data graph, but rather portals that allow data to cross
+    the boundary between the internal graph and the external filesystem.
+    """
+    
+    def __init__(self, filepath: str, capability_type: str, position: Optional[SourcePosition] = None):
+        super().__init__(position)
+        # Immutable identity properties
+        self.filepath = filepath
+        self.capability_type = capability_type  # "read", "write", or "append"
+        self.capability_id = id(self)  # Unique identity for this capability
+        
+        # Internal state (managed by boundary operations)
+        self._python_handle = None  # Lazy initialization
+        self._is_active = False
+        self._buffer = ""  # Internal buffer for read operations
+        self._position = 0  # Logical position in file
+        self._is_killed = False  # Permanent destruction flag
+        self._eof_reached = False  # For read capabilities: true when EOF reached and auto-closed
+    
+    def get_type(self) -> str:
+        return "file"
+    
+    def get_capability_type(self) -> str:
+        """Return the specific capability type (read/write/append)."""
+        return self.capability_type
+    
+    def is_read_capability(self) -> bool:
+        """Check if this is a read capability."""
+        return self.capability_type == "read"
+    
+    def is_write_capability(self) -> bool:
+        """Check if this is a write capability."""
+        return self.capability_type in ["write", "append"]
+    
+    def to_python(self) -> dict:
+        """Return a representation of the capability (not the Python file handle)."""
+        return {
+            "filepath": self.filepath,
+            "capability_type": self.capability_type,
+            "capability_id": self.capability_id,
+            "is_active": self._is_active,
+            "position": self._position
+        }
+    
+    def to_display_string(self) -> str:
+        if self._is_killed:
+            status = "killed"
+        elif self._eof_reached:
+            status = "exhausted (EOF)"
+        elif self._is_active:
+            status = "active"
+        else:
+            status = "inactive"
+        return f"<{self.capability_type}-capability '{self.filepath}' {status}>"
+    
+    def universal_size(self) -> 'NumberValue':
+        """For a file capability, size represents logical position in the stream."""
+        return NumberValue(self._position, self.position)
+    
+    def universal_inspect(self) -> 'StringValue':
+        """Return detailed inspection information about this boundary capability."""
+        info = f"File boundary capability:\n"
+        info += f"  Path: {self.filepath}\n"
+        info += f"  Type: {self.capability_type}\n"
+        if self._is_killed:
+            info += f"  Status: killed (permanently destroyed)\n"
+        else:
+            info += f"  Status: {'active' if self._is_active else 'inactive'}\n"
+            info += f"  Position: {self._position}\n"
+        info += f"  Capability ID: {self.capability_id}"
+        return StringValue(info, self.position)
+    
+    def _ensure_active(self):
+        """Lazy initialization of the actual file handle."""
+        if self._is_killed:
+            raise RuntimeError(f"Cannot activate killed {self.capability_type} capability for {self.filepath}")
+        
+        # Read capabilities that reached EOF cannot be reactivated
+        if self.capability_type == "read" and self._eof_reached:
+            raise RuntimeError(f"Cannot reactivate {self.capability_type} capability for {self.filepath}: EOF reached, capability exhausted")
+        
+        if not self._is_active:
+            try:
+                if self.capability_type == "read":
+                    self._python_handle = open(self.filepath, 'r', encoding='utf-8')
+                elif self.capability_type == "write":
+                    # Reactivation resets to beginning of file
+                    self._python_handle = open(self.filepath, 'w', encoding='utf-8')
+                    self._position = 0  # Reset position on reactivation
+                elif self.capability_type == "append":
+                    self._python_handle = open(self.filepath, 'a', encoding='utf-8')
+                self._is_active = True
+            except Exception as e:
+                raise RuntimeError(f"Cannot activate {self.capability_type} capability for {self.filepath}: {str(e)}")
+    
+    def _ensure_inactive(self):
+        """Close the boundary and release resources."""
+        if self._is_active and self._python_handle:
+            self._python_handle.close()
+            self._python_handle = None
+            self._is_active = False
+            
+            # Mark read capabilities as EOF-reached (cannot be reopened)
+            if self.capability_type == "read":
+                self._eof_reached = True
+    
+    def _kill_capability(self):
+        """Permanently destroy this capability (flush, close, and prevent reactivation).
+        
+        This is the proper cleanup method that should be called when the capability
+        is no longer needed. After killing, the capability cannot be reactivated.
+        """
+        if self._is_killed:
+            return  # Already killed
+            
+        # Ensure proper cleanup: flush and close if active
+        if self._is_active and self._python_handle:
+            try:
+                if self.is_write_capability():
+                    self._python_handle.flush()
+                self._python_handle.close()
+            except Exception:
+                pass  # Ignore errors during cleanup
+            finally:
+                self._python_handle = None
+                self._is_active = False
+        
+        # Mark as permanently destroyed
+        self._is_killed = True

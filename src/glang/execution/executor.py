@@ -534,6 +534,8 @@ class ASTExecutor(BaseASTVisitor):
             return self._dispatch_hash_method(target, method_name, args, position)
         elif target_type == "time":
             return self._dispatch_time_method(target, method_name, args, position)
+        elif target_type == "file":
+            return self._dispatch_file_method(target, method_name, args, position)
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, target_type, position)
@@ -624,7 +626,7 @@ class ASTExecutor(BaseASTVisitor):
         # Type-specific methods
         type_methods = {
             'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort', 'to_string', 'to_bool', 'can_accept'],
-            'string': ['length', 'contains', 'up', 'toUpper', 'down', 'toLower', 'split', 'trim', 'join', 'matches', 'replace', 'findAll', 'reverse', 'unique', 'chars', 'to_string', 'to_num', 'to_bool', 'to_time'],
+            'string': ['length', 'contains', 'extract', 'count', 'count_chars', 'find_first', 'find_first_char', 'up', 'toUpper', 'down', 'toLower', 'split', 'split_on_any', 'trim', 'join', 'matches', 'replace', 'find_all', 'findAll', 'is_email', 'is_number', 'is_url', 'reverse', 'unique', 'chars', 'starts_with', 'ends_with', 'to_string', 'to_num', 'to_bool', 'to_time'],
             'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time'],
             'bool': ['flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'],
             'data': ['key', 'value', 'can_accept'],
@@ -1042,17 +1044,118 @@ class ASTExecutor(BaseASTVisitor):
             
             return NumberValue(len(target.value), position)
         
-        # Contains method
+        # Contains method - unified interface with backward compatibility
         elif method_name == "contains":
-            if len(args) != 1:
-                from .errors import ArgumentError
-                raise ArgumentError(f"contains() takes 1 argument, got {len(args)}", position)
+            if len(args) == 1:
+                # Backward compatibility: substring search
+                if not isinstance(args[0], StringValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"contains() argument must be string, got {args[0].get_type()}", position)
+                
+                return BooleanValue(args[0].value in target.value, position)
             
-            if not isinstance(args[0], StringValue):
-                from .errors import ArgumentError
-                raise ArgumentError(f"contains() argument must be string, got {args[0].get_type()}", position)
+            elif len(args) >= 2:
+                # New unified interface: contains(mode, pattern, ...)
+                if not isinstance(args[0], StringValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"contains() first argument (mode) must be string, got {args[0].get_type()}", position)
+                
+                mode = args[0].value.lower()
+                text = target.value
+                
+                def check_pattern(pattern_type):
+                    """Helper function to check if text matches a pattern type"""
+                    pattern_type = pattern_type.lower()
+                    if pattern_type == "digits" or pattern_type == "numbers":
+                        return any(c.isdigit() for c in text)
+                    elif pattern_type == "letters":
+                        return any(c.isalpha() for c in text)
+                    elif pattern_type == "uppercase":
+                        return any(c.isupper() for c in text)
+                    elif pattern_type == "lowercase":
+                        return any(c.islower() for c in text)
+                    elif pattern_type == "spaces" or pattern_type == "whitespace":
+                        return any(c.isspace() for c in text)
+                    elif pattern_type == "punctuation":
+                        import string
+                        return any(c in string.punctuation for c in text)
+                    elif pattern_type == "symbols":
+                        import string
+                        return any(c in string.punctuation + "~`!@#$%^&*()_+-=[]{}|;':\",./<>?" for c in text)
+                    elif pattern_type == "alphanumeric":
+                        return any(c.isalnum() for c in text)
+                    else:
+                        from .errors import ArgumentError
+                        raise ArgumentError(f"Unknown pattern type '{pattern_type}'. Available: digits, letters, uppercase, lowercase, spaces, punctuation, symbols, alphanumeric", position)
+                
+                def char_matches_pattern(char, pattern_type):
+                    """Helper function to check if a single character matches a pattern type"""
+                    pattern_type = pattern_type.lower()
+                    if pattern_type == "digits" or pattern_type == "numbers":
+                        return char.isdigit()
+                    elif pattern_type == "letters":
+                        return char.isalpha()
+                    elif pattern_type == "uppercase":
+                        return char.isupper()
+                    elif pattern_type == "lowercase":
+                        return char.islower()
+                    elif pattern_type == "spaces" or pattern_type == "whitespace":
+                        return char.isspace()
+                    elif pattern_type == "punctuation":
+                        import string
+                        return char in string.punctuation
+                    elif pattern_type == "symbols":
+                        import string
+                        return char in string.punctuation + "~`!@#$%^&*()_+-=[]{}|;':\",./<>?"
+                    elif pattern_type == "alphanumeric":
+                        return char.isalnum()
+                    return False
+                
+                if mode == "any":
+                    if len(args) != 2:
+                        from .errors import ArgumentError
+                        raise ArgumentError(f"contains('any', pattern) takes exactly 2 arguments, got {len(args)}", position)
+                    
+                    if not isinstance(args[1], StringValue):
+                        from .errors import ArgumentError
+                        raise ArgumentError(f"contains() pattern must be string, got {args[1].get_type()}", position)
+                    
+                    result = check_pattern(args[1].value)
+                    return BooleanValue(result, position)
+                
+                elif mode == "all":
+                    for i in range(1, len(args)):
+                        if not isinstance(args[i], StringValue):
+                            from .errors import ArgumentError
+                            raise ArgumentError(f"contains() pattern must be string, got {args[i].get_type()}", position)
+                        
+                        if not check_pattern(args[i].value):
+                            return BooleanValue(False, position)
+                    
+                    return BooleanValue(True, position)
+                
+                elif mode == "only":
+                    pattern_types = [args[i].value for i in range(1, len(args))]
+                    
+                    for char in text:
+                        char_matches_any = False
+                        for pattern_type in pattern_types:
+                            if char_matches_pattern(char, pattern_type):
+                                char_matches_any = True
+                                break
+                        
+                        if not char_matches_any:
+                            return BooleanValue(False, position)
+                    
+                    return BooleanValue(True, position)
+                
+                else:
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"contains() mode must be 'any', 'all', or 'only', got '{mode}'", position)
             
-            return BooleanValue(args[0].value in target.value, position)
+            else:
+                from .errors import ArgumentError
+                raise ArgumentError(f"contains() takes at least 1 argument (substring) or 2+ arguments (mode, pattern, ...), got {len(args)}", position)
         
         # Upper case methods (up and toUpper as alias)
         elif method_name in ["up", "toUpper"]:
@@ -1157,14 +1260,14 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"Invalid regex pattern: {e}", position)
         
-        elif method_name == "findAll":
+        elif method_name == "find_all" or method_name == "findAll":
             if len(args) != 1:
                 from .errors import ArgumentError
-                raise ArgumentError(f"findAll() takes 1 argument, got {len(args)}", position)
+                raise ArgumentError(f"find_all() takes 1 argument, got {len(args)}", position)
             
             if not isinstance(args[0], StringValue):
                 from .errors import ArgumentError
-                raise ArgumentError(f"findAll() argument must be string, got {args[0].get_type()}", position)
+                raise ArgumentError(f"find_all() argument must be string, got {args[0].get_type()}", position)
             
             import re
             pattern = args[0].value
@@ -1175,6 +1278,226 @@ class ASTExecutor(BaseASTVisitor):
             except re.error as e:
                 from .errors import ArgumentError
                 raise ArgumentError(f"Invalid regex pattern: {e}", position)
+        
+        # Unified extraction method
+        elif method_name == "extract":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"extract() takes 1 argument (pattern), got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"extract() pattern must be string, got {args[0].get_type()}", position)
+            
+            pattern_type = args[0].value.lower()
+            text = target.value
+            
+            if pattern_type == "numbers":
+                import re
+                # Find numbers including integers and floats
+                number_pattern = r'-?\d+\.?\d*'
+                matches = re.findall(number_pattern, text)
+                # Filter out empty strings and lone dots
+                valid_matches = [match for match in matches if match and match != '.' and not match.endswith('.')]
+                result_elements = [StringValue(match, position) for match in valid_matches]
+                return ListValue(result_elements, "string", position)
+            
+            elif pattern_type == "words":
+                import re
+                # Extract sequences of letters (word characters)
+                word_pattern = r'[a-zA-Z]+'
+                matches = re.findall(word_pattern, text)
+                result_elements = [StringValue(match, position) for match in matches]
+                return ListValue(result_elements, "string", position)
+            
+            elif pattern_type == "emails":
+                import re
+                # Basic email pattern - not perfect but covers most common cases
+                email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+                matches = re.findall(email_pattern, text)
+                result_elements = [StringValue(match, position) for match in matches]
+                return ListValue(result_elements, "string", position)
+            
+            else:
+                from .errors import ArgumentError
+                raise ArgumentError(f"Unknown extraction pattern '{pattern_type}'. Available: numbers, words, emails", position)
+        
+        # Validation methods
+        elif method_name == "is_email":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"is_email() takes no arguments, got {len(args)}", position)
+            
+            import re
+            # Basic email validation - covers most common cases
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            result = bool(re.match(email_pattern, target.value))
+            return BooleanValue(result, position)
+        
+        elif method_name == "is_number":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"is_number() takes no arguments, got {len(args)}", position)
+            
+            try:
+                float(target.value)
+                return BooleanValue(True, position)
+            except ValueError:
+                return BooleanValue(False, position)
+        
+        elif method_name == "is_url":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"is_url() takes no arguments, got {len(args)}", position)
+            
+            import re
+            # Basic URL pattern - covers http, https, ftp
+            url_pattern = r'^https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(/.*)?$|^ftp://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(/.*)?$'
+            result = bool(re.match(url_pattern, target.value))
+            return BooleanValue(result, position)
+        
+        # Enhanced split methods
+        elif method_name == "split_on_any":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"split_on_any() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"split_on_any() argument must be string, got {args[0].get_type()}", position)
+            
+            import re
+            # Escape special regex characters and create character class
+            delimiter_chars = args[0].value
+            escaped_chars = re.escape(delimiter_chars)
+            pattern = f'[{escaped_chars}]+'
+            
+            parts = re.split(pattern, target.value)
+            # Filter out empty strings
+            filtered_parts = [part for part in parts if part]
+            result_elements = [StringValue(part, position) for part in filtered_parts]
+            return ListValue(result_elements, "string", position)
+        
+        # Count methods
+        elif method_name == "count":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"count() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"count() argument must be string, got {args[0].get_type()}", position)
+            
+            pattern_type = args[0].value.lower()
+            text = target.value
+            count = 0
+            
+            if pattern_type == "digits" or pattern_type == "numbers":
+                count = sum(1 for c in text if c.isdigit())
+            elif pattern_type == "letters":
+                count = sum(1 for c in text if c.isalpha())
+            elif pattern_type == "uppercase":
+                count = sum(1 for c in text if c.isupper())
+            elif pattern_type == "lowercase":
+                count = sum(1 for c in text if c.islower())
+            elif pattern_type == "spaces" or pattern_type == "whitespace":
+                count = sum(1 for c in text if c.isspace())
+            elif pattern_type == "punctuation":
+                count = sum(1 for c in text if c in __import__('string').punctuation)
+            elif pattern_type == "symbols":
+                import string
+                count = sum(1 for c in text if c in string.punctuation + "~`!@#$%^&*()_+-=[]{}|;':\",./<>?")
+            elif pattern_type == "alphanumeric":
+                count = sum(1 for c in text if c.isalnum())
+            elif pattern_type == "words":
+                import re
+                # Count sequences of letters (word characters)
+                words = re.findall(r'[a-zA-Z]+', text)
+                count = len(words)
+            elif len(pattern_type) == 1:
+                # Single character count
+                count = text.count(pattern_type)
+            else:
+                from .errors import ArgumentError
+                raise ArgumentError(f"Unknown pattern type or multi-character string '{pattern_type}'. Use count_chars() for multi-character strings or use pattern types: digits, letters, uppercase, lowercase, spaces, punctuation, symbols, alphanumeric, words", position)
+            
+            return NumberValue(count, position)
+        
+        elif method_name == "count_chars":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"count_chars() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"count_chars() argument must be string, got {args[0].get_type()}", position)
+            
+            substring = args[0].value
+            count = target.value.count(substring)
+            return NumberValue(count, position)
+        
+        
+        # Find first methods
+        elif method_name == "find_first":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"find_first() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"find_first() argument must be string, got {args[0].get_type()}", position)
+            
+            pattern_type = args[0].value.lower()
+            text = target.value
+            
+            for i, char in enumerate(text):
+                if pattern_type == "digits" or pattern_type == "numbers":
+                    if char.isdigit():
+                        return NumberValue(i, position)
+                elif pattern_type == "letters":
+                    if char.isalpha():
+                        return NumberValue(i, position)
+                elif pattern_type == "uppercase":
+                    if char.isupper():
+                        return NumberValue(i, position)
+                elif pattern_type == "lowercase":
+                    if char.islower():
+                        return NumberValue(i, position)
+                elif pattern_type == "spaces" or pattern_type == "whitespace":
+                    if char.isspace():
+                        return NumberValue(i, position)
+                elif pattern_type == "punctuation":
+                    if char in __import__('string').punctuation:
+                        return NumberValue(i, position)
+                elif pattern_type == "symbols":
+                    import string
+                    if char in string.punctuation + "~`!@#$%^&*()_+-=[]{}|;':\",./<>?":
+                        return NumberValue(i, position)
+                elif pattern_type == "alphanumeric":
+                    if char.isalnum():
+                        return NumberValue(i, position)
+                elif len(pattern_type) == 1:
+                    if char == pattern_type:
+                        return NumberValue(i, position)
+                else:
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"Unknown pattern type or multi-character string '{pattern_type}'. Use find_first_char() for multi-character strings or use pattern types: digits, letters, uppercase, lowercase, spaces, punctuation, symbols, alphanumeric", position)
+            
+            # Return -1 if not found (consistent with indexOf)
+            return NumberValue(-1, position)
+        
+        elif method_name == "find_first_char":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"find_first_char() takes 1 argument, got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"find_first_char() argument must be string, got {args[0].get_type()}", position)
+            
+            substring = args[0].value
+            index = target.value.find(substring)
+            return NumberValue(index, position)  # Returns -1 if not found
         
         
         # Graph operations that work on character level
@@ -1235,6 +1558,29 @@ class ASTExecutor(BaseASTVisitor):
             except Exception as e:
                 from .errors import RuntimeError
                 raise RuntimeError(f"Failed to parse time string: {str(e)}", position)
+        
+        # Starts with and ends with methods
+        elif method_name == "starts_with":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"starts_with() takes 1 argument (prefix), got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"starts_with() argument must be string, got {args[0].get_type()}", position)
+            
+            return target.starts_with(args[0])
+        
+        elif method_name == "ends_with":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"ends_with() takes 1 argument (suffix), got {len(args)}", position)
+            
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"ends_with() argument must be string, got {args[0].get_type()}", position)
+            
+            return target.ends_with(args[0])
         
         # Check if it's a universal method
         elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
@@ -1739,6 +2085,177 @@ class ASTExecutor(BaseASTVisitor):
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "time", position)
+    
+    def _dispatch_file_method(self, target, method_name: str,
+                             args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
+        """Handle boundary operations on file capabilities.
+        
+        File handles are boundary capabilities that provide controlled, unidirectional
+        access to external resources. Operations are strictly constrained by capability type.
+        """
+        
+        # Import FileHandleValue here to avoid circular import issues
+        from .values import FileHandleValue
+        
+        if not isinstance(target, FileHandleValue):
+            raise RuntimeError(f"Expected file capability, got {target.get_type()}", position)
+        
+        # Boundary operation: write (only for write/append capabilities)
+        if method_name == "write":
+            if not target.is_write_capability():
+                raise RuntimeError(
+                    f"Cannot write to {target.get_capability_type()} capability. "
+                    f"Writing requires write or append capability.", 
+                    position
+                )
+            
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"write() takes 1 argument, got {len(args)}", position)
+            
+            # Convert argument to string (using Glang's string representation)
+            content = args[0]
+            if isinstance(content, StringValue):
+                content_str = content.value
+            else:
+                content_str = content.to_display_string()
+            
+            try:
+                target._ensure_active()
+                target._python_handle.write(content_str)
+                # Update logical position
+                target._position += len(content_str)
+                return BooleanValue(True, position)
+            except Exception as e:
+                raise RuntimeError(f"Error in write boundary operation: {str(e)}", position)
+        
+        # Boundary operation: read (only for read capabilities)
+        elif method_name == "read":
+            if not target.is_read_capability():
+                raise RuntimeError(
+                    f"Cannot read from {target.get_capability_type()} capability. "
+                    f"Reading requires read capability.", 
+                    position
+                )
+            
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"read() takes no arguments, got {len(args)}", position)
+            
+            try:
+                target._ensure_active()
+                content = target._python_handle.read()
+                # Update logical position
+                target._position += len(content)
+                
+                # Auto-close on EOF: read() always reads to end of file
+                target._ensure_inactive()
+                
+                return StringValue(content, position)
+            except Exception as e:
+                raise RuntimeError(f"Error in read boundary operation: {str(e)}", position)
+        
+        # Boundary operation: read_line (only for read capabilities)
+        elif method_name == "read_line":
+            if not target.is_read_capability():
+                raise RuntimeError(
+                    f"Cannot read from {target.get_capability_type()} capability. "
+                    f"Line reading requires read capability.", 
+                    position
+                )
+            
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"read_line() takes no arguments, got {len(args)}", position)
+            
+            try:
+                target._ensure_active()
+                line = target._python_handle.readline()
+                
+                # Check if we hit EOF (empty string means EOF)
+                if line == "":
+                    # Auto-close on EOF
+                    target._ensure_inactive()
+                    return StringValue("", position)
+                
+                # Remove trailing newline if present
+                if line.endswith('\n'):
+                    line = line[:-1]
+                    target._position += len(line) + 1  # Include newline in position
+                else:
+                    target._position += len(line)
+                    # If no newline, we're at EOF, so auto-close
+                    target._ensure_inactive()
+                
+                return StringValue(line, position)
+            except Exception as e:
+                raise RuntimeError(f"Error in read_line boundary operation: {str(e)}", position)
+        
+        # Boundary operation: flush (only for write capabilities)
+        elif method_name == "flush":
+            if not target.is_write_capability():
+                raise RuntimeError(
+                    f"Cannot flush {target.get_capability_type()} capability. "
+                    f"Flushing requires write or append capability.", 
+                    position
+                )
+            
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"flush() takes no arguments, got {len(args)}", position)
+            
+            try:
+                target._ensure_active()
+                target._python_handle.flush()
+                return BooleanValue(True, position)
+            except Exception as e:
+                raise RuntimeError(f"Error in flush boundary operation: {str(e)}", position)
+        
+        # Boundary operation: close (for all capabilities)
+        elif method_name == "close":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"close() takes no arguments, got {len(args)}", position)
+            
+            try:
+                target._ensure_inactive()
+                return BooleanValue(True, position)
+            except Exception as e:
+                raise RuntimeError(f"Error in close boundary operation: {str(e)}", position)
+        
+        # Capability lifecycle: kill (permanent destruction)
+        elif method_name == "kill":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"kill() takes no arguments, got {len(args)}", position)
+            
+            try:
+                target._kill_capability()
+                return BooleanValue(True, position)
+            except Exception as e:
+                raise RuntimeError(f"Error in kill capability operation: {str(e)}", position)
+        
+        # Capability introspection methods
+        elif method_name == "capability_type":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"capability_type() takes no arguments, got {len(args)}", position)
+            return StringValue(target.get_capability_type(), position)
+        
+        # Check if it's a universal method
+        elif method_name in ['type', 'size', 'inspect']:
+            return self._dispatch_universal_method(target, method_name, args, position)
+        
+        else:
+            from .errors import MethodNotFoundError
+            available_methods = ['write', 'flush', 'close', 'kill'] if target.is_write_capability() else ['read', 'read_line', 'close', 'kill']
+            available_methods.extend(['capability_type', 'type', 'size', 'inspect'])
+            raise MethodNotFoundError(
+                method_name, 
+                f"{target.get_capability_type()}-capability", 
+                position,
+                f"Available methods for {target.get_capability_type()} capability: {', '.join(available_methods)}"
+            )
     
     # Additional visitor methods that need to be implemented
     def visit_expression_statement(self, node) -> None:
