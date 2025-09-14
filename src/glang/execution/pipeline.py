@@ -111,6 +111,9 @@ class ExecutionSession:
         self.module_manager = ModuleManager(self.file_manager)
         # Create execution context that shares the symbol table
         self.execution_context = ExecutionContext(self.semantic_session.get_symbol_table(), self.module_manager)
+        
+        # Add primitive functions to execution context
+        self._initialize_primitives()
     
     def execute_statement(self, input_str: str) -> ExecutionResult:
         """Execute statement in persistent context."""
@@ -295,24 +298,47 @@ class ExecutionSession:
         return self.execution_context.get_variable(name)
     
     def list_variables(self) -> dict:
-        """Get list of variables with their types and values."""
+        """Get list of user variables with their types and values (excludes primitive functions)."""
         variables = {}
         
-        # Get variables from execution context
+        # Get variables from execution context, excluding primitive functions
         for name, value in self.execution_context.variables.items():
-            variables[name] = {
-                'name': name,
-                'type': value.get_type(),
-                'value': value,
-                'display': value.to_display_string()
-            }
+            # Skip primitive functions (those starting with _builtin)
+            if not name.startswith('_builtin'):
+                variables[name] = {
+                    'name': name,
+                    'type': value.get_type(),
+                    'value': value,
+                    'display': value.to_display_string()
+                }
         
         return variables
     
     def clear_variables(self) -> None:
-        """Clear all variables from the session."""
+        """Clear all user variables from the session (preserves primitive functions)."""
+        # Clear semantic symbol table
         self.semantic_session.persistent_symbol_table = SymbolTable()
-        self.execution_context = ExecutionContext(self.semantic_session.get_symbol_table())
+        
+        # Clear user variables from execution context while preserving primitives
+        user_variables = [name for name in self.execution_context.variables.keys() 
+                         if not name.startswith('_builtin')]
+        for var_name in user_variables:
+            del self.execution_context.variables[var_name]
+        
+        # Update execution context to use new symbol table
+        self.execution_context.symbol_table = self.semantic_session.get_symbol_table()
+        
+        # Re-add primitives to the new semantic symbol table only
+        from ..semantic.symbol_table import Symbol
+        for name in self.execution_context.variables.keys():
+            if name.startswith('_builtin'):
+                symbol = Symbol(name, "function", None)
+                try:
+                    self.semantic_session.persistent_symbol_table.declare_symbol(symbol)
+                except Exception as e:
+                    # Handle symbol already declared error gracefully
+                    if "already declared" not in str(e):
+                        raise
     
     def get_session_info(self) -> dict:
         """Get information about the current session."""
@@ -323,6 +349,27 @@ class ExecutionSession:
             'variables': list(variables.keys()),
             'symbol_table_size': len(self.semantic_session.get_symbol_table().symbols)
         }
+    
+    def _initialize_primitives(self) -> None:
+        """Initialize primitive functions in both execution context and semantic symbol table."""
+        from ..modules.primitives import create_primitives_namespace
+        from ..semantic.symbol_table import Symbol
+        
+        # Get the primitives namespace
+        primitives_namespace = create_primitives_namespace()
+        
+        # Add all primitive functions to the execution context as global variables
+        for name, func in primitives_namespace.symbols.items():
+            self.execution_context.set_variable(name, func)
+            
+            # Also add to semantic symbol table so analysis passes  
+            symbol = Symbol(name, "function", None)
+            try:
+                self.semantic_session.persistent_symbol_table.declare_symbol(symbol)
+            except Exception as e:
+                # Handle symbol already declared error gracefully
+                if "already declared" not in str(e):
+                    raise
 
 
 # Convenience functions for quick testing

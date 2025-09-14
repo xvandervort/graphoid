@@ -1,0 +1,32 @@
+# Glang Random Number Generation Module
+# Simplified version that directly exposes primitive functions
+
+module random
+
+# Direct access to secure random functions (cryptographically secure)
+secure_random = _builtin_secure_random
+secure_randint = _builtin_secure_randint  
+secure_uniform = _builtin_secure_uniform
+secure_normal = _builtin_secure_normal
+secure_exponential = _builtin_secure_exponential
+secure_gamma = _builtin_secure_gamma
+secure_token = _builtin_secure_token
+
+# Direct access to deterministic random functions (for testing/reproducibility)
+deterministic_random = _builtin_deterministic_random
+deterministic_randint = _builtin_deterministic_randint
+deterministic_uniform = _builtin_deterministic_uniform  
+deterministic_normal = _builtin_deterministic_normal
+deterministic_exponential = _builtin_deterministic_exponential
+deterministic_gamma = _builtin_deterministic_gamma
+
+# Utility functions
+seed = _builtin_seed_generator
+reset = _builtin_reset_generator
+uuid4 = _builtin_uuid4
+uuid1 = _builtin_uuid1
+
+# Default random functions (use secure by default)
+random = _builtin_secure_random
+randint = _builtin_secure_randint
+uniform = _builtin_secure_uniform

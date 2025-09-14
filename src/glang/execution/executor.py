@@ -301,10 +301,11 @@ class ASTExecutor(BaseASTVisitor):
                 symbol_value = module.namespace.get_symbol(symbol_name)
                 
                 if symbol_value is not None:
-                    # Check if it's a built-in function that needs to be called
+                    # Check if it's a function that needs to be called
                     from ..execution.function_value import BuiltinFunctionValue
+                    from .values import FunctionValue
                     if isinstance(symbol_value, BuiltinFunctionValue):
-                        # Execute arguments
+                        # Execute arguments for built-in function
                         arg_values = []
                         for arg in node.arguments:
                             arg_value = self.execute(arg)
@@ -315,12 +316,24 @@ class ASTExecutor(BaseASTVisitor):
                         # Call the built-in function
                         self.result = symbol_value.call(arg_values, node.position)
                         return
+                    elif isinstance(symbol_value, FunctionValue):
+                        # Execute arguments for user-defined function
+                        arg_values = []
+                        for arg in node.arguments:
+                            arg_value = self.execute(arg)
+                            if not isinstance(arg_value, GlangValue):
+                                arg_value = python_to_glang_value(arg_value, arg.position if hasattr(arg, 'position') else node.position)
+                            arg_values.append(arg_value)
+                        
+                        # Call the user-defined function using call_function
+                        self.result = self.call_function(symbol_value, arg_values, node.position)
+                        return
                     elif len(node.arguments) == 0:
                         # It's a property/constant access (like math.pi)
                         self.result = symbol_value
                         return
                     else:
-                        # It's a symbol but not a BuiltinFunction and has arguments
+                        # It's a symbol but not a callable and has arguments
                         # This shouldn't happen with our current module system
                         from ..modules.errors import ModuleSymbolError
                         raise ModuleSymbolError(node.target.name, symbol_name, node.position)
@@ -3061,6 +3074,7 @@ class ASTExecutor(BaseASTVisitor):
     def visit_function_call(self, node: FunctionCall) -> Any:
         """Execute function call."""
         from .values import FunctionValue, LambdaValue
+        from .function_value import BuiltinFunctionValue
         
         # Look up function
         func_value = self.context.get_variable(node.name)
@@ -3068,7 +3082,7 @@ class ASTExecutor(BaseASTVisitor):
             from .errors import VariableNotFoundError
             raise VariableNotFoundError(f"Function '{node.name}' not found", node.position)
         
-        if not isinstance(func_value, (FunctionValue, LambdaValue)):
+        if not isinstance(func_value, (FunctionValue, LambdaValue, BuiltinFunctionValue)):
             from .errors import RuntimeError
             raise RuntimeError(f"'{node.name}' is not a function", node.position)
         
@@ -3147,6 +3161,10 @@ class ASTExecutor(BaseASTVisitor):
             finally:
                 # Restore variable state
                 self.context.variables = old_vars
+        
+        elif hasattr(func_value, 'call'):  # BuiltinFunctionValue
+            # Call the builtin function directly
+            return func_value.call(arguments, position)
     
     def visit_block(self, node: Block) -> None:
         """Execute block of statements."""

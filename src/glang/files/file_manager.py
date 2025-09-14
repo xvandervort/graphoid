@@ -185,6 +185,7 @@ class FileManager:
     def _parse_file_content(self, content: str) -> List[str]:
         """
         Parse .gr file content into executable statements.
+        Handles multi-line constructs like function definitions.
         
         Args:
             content: Raw file content
@@ -193,13 +194,43 @@ class FileManager:
             List of executable statements (comments and empty lines removed)
         """
         statements = []
+        lines = content.split('\n')
+        i = 0
         
-        for line in content.split('\n'):
-            # Strip whitespace
-            line = line.strip()
+        while i < len(lines):
+            line = lines[i].strip()
             
             # Skip empty lines and comments
-            if line and not line.startswith('#'):
+            if not line or line.startswith('#'):
+                i += 1
+                continue
+            
+            # Check if this is a multi-line construct (function, if, while, for)
+            if (line.startswith('func ') or 
+                line.startswith('if ') or 
+                line.startswith('while ') or 
+                line.startswith('for ') or
+                line.startswith('precision ')):
+                
+                # Find the complete multi-line statement
+                statement_lines = [line]
+                brace_count = line.count('{') - line.count('}')
+                i += 1
+                
+                # Continue collecting lines until braces are balanced
+                while i < len(lines) and brace_count > 0:
+                    next_line = lines[i].strip()
+                    if next_line and not next_line.startswith('#'):
+                        statement_lines.append(next_line)
+                        brace_count += next_line.count('{') - next_line.count('}')
+                    i += 1
+                
+                # Join all lines of the multi-line statement
+                complete_statement = ' '.join(statement_lines)
+                statements.append(complete_statement)
+            else:
+                # Single-line statement
                 statements.append(line)
+                i += 1
         
         return statements

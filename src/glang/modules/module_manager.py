@@ -272,6 +272,12 @@ class ModuleManager:
                     if os.path.exists(candidate):
                         return os.path.abspath(candidate)
         
+        # Try stdlib directory
+        stdlib_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'stdlib')
+        stdlib_candidate = os.path.join(stdlib_dir, filename)
+        if os.path.exists(stdlib_candidate):
+            return os.path.abspath(stdlib_candidate)
+        
         # Try current directory
         if os.path.exists(filename):
             return os.path.abspath(filename)
@@ -291,6 +297,12 @@ class ModuleManager:
             candidate = os.path.join(context_dir, filename)
             if os.path.exists(candidate):
                 return True
+        
+        # Try stdlib directory
+        stdlib_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'stdlib')
+        stdlib_candidate = os.path.join(stdlib_dir, filename)
+        if os.path.exists(stdlib_candidate):
+            return True
         
         # Try current directory
         if os.path.exists(filename):

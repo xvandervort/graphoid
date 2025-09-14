@@ -47,22 +47,16 @@ class BuiltinFunctionValue(GlangValue):
             The result as a GlangValue
         """
         try:
-            # Call the function with unpacked arguments and position
-            if len(args) == 0:
-                # No arguments case
-                return self.func(position=position)
-            elif len(args) == 1:
-                # Single argument case
-                return self.func(args[0], position=position)
-            elif len(args) == 2:
-                # Two argument case
-                return self.func(args[0], args[1], position=position)
-            elif len(args) == 3:
-                # Three argument case
-                return self.func(args[0], args[1], args[2], position=position)
-            else:
-                # For more arguments, pass as a list
+            # Determine if function accepts position parameter
+            import inspect
+            sig = inspect.signature(self.func)
+            accepts_position = 'position' in sig.parameters
+            
+            # Call the function with appropriate arguments
+            if accepts_position:
                 return self.func(*args, position=position)
+            else:
+                return self.func(*args)
         except TypeError as e:
             # Handle argument count mismatch
             from ..execution.errors import RuntimeError
@@ -80,3 +74,18 @@ class BuiltinFunctionValue(GlangValue):
         """Return inspection info for built-in function."""
         info = f"<builtin function {self.name}>"
         return StringValue(info, self.position)
+    
+    def arity(self) -> int:
+        """Return the number of parameters this function expects.
+        
+        For builtin functions, we'll use introspection of the Python function.
+        """
+        import inspect
+        try:
+            sig = inspect.signature(self.func)
+            # Count parameters, excluding 'position' parameter if present
+            params = [p for name, p in sig.parameters.items() if name != 'position']
+            return len(params)
+        except (ValueError, TypeError):
+            # If we can't inspect the signature, assume variable args
+            return 0  # Accept any number of arguments

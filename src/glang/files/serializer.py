@@ -29,8 +29,8 @@ class NamespaceSerializer:
         lines.append(f"# Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append("")
         
-        # Get all variables from the execution context
-        variables = execution_session.execution_context.variables
+        # Get user variables from the execution context (excludes primitive functions)
+        variables = execution_session.list_variables()
         
         if not variables:
             lines.append("# No variables defined")
@@ -39,7 +39,8 @@ class NamespaceSerializer:
         
         # Serialize each variable as a declaration
         lines.append("# Variable declarations")
-        for var_name, value in variables.items():
+        for var_name, var_info in variables.items():
+            value = var_info['value']  # Extract the GlangValue from the info dict
             declaration = self._serialize_variable_declaration(var_name, value)
             lines.append(declaration)
         

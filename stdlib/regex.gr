@@ -1,0 +1,13 @@
+# Glang Regular Expression Module
+# Simplified version that directly exposes primitive functions
+
+module regex
+
+# Core regex functions
+compile = _builtin_regex_compile
+match = _builtin_regex_match
+search = _builtin_regex_search
+findall = _builtin_regex_findall
+findgroups = _builtin_regex_findgroups
+replace = _builtin_regex_replace
+split = _builtin_regex_split
