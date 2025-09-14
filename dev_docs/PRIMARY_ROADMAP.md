@@ -57,6 +57,9 @@ Transform Glang from a practical programming language into a revolutionary platf
 - [ ] **Function-Based Behaviors**: Attach user-written functions as behaviors
 - [ ] **Conditional Behaviors**: Apply behaviors based on context or conditions
 - [ ] **Behavior Inheritance**: Child containers inherit parent behaviors
+- [ ] **History Tracking**: Audit trail of all value transformations (before/after)
+- [ ] **Derived Column Operations**: Calculate new values from neighboring data
+- [ ] **Pattern-Based Transformations**: Rules that trigger on data patterns
 - [ ] **Domain-Specific Behavior Libraries**: Pre-built behavior sets for common domains
 
 #### 1.5 Performance & Stability
@@ -326,6 +329,109 @@ lab_results.apply_behaviors(MedicalBehaviors.lab_standards)  # Multiple behavior
 
 financial_data = []
 financial_data.apply_behaviors(FinancialBehaviors.currency_processing)
+```
+
+#### History Tracking and Transformation Audit
+```glang
+# Enable history tracking to see before/after transformations
+patient_data = []
+patient_data.enable_history()              # Track all transformations
+patient_data.add_rule("nil_to_zero")
+patient_data.add_rule("validate_range", 95, 105)
+
+patient_data.append(nil)                   # Value: 0
+patient_data.append(110)                   # Value: 105
+
+# Access transformation history
+history = patient_data.get_history(0)     # First element's transformation chain
+print(history)  # [
+                #   { original: nil, rule: "nil_to_zero", result: 0 },
+                # ]
+
+history = patient_data.get_history(1)     # Second element's history
+print(history)  # [
+                #   { original: 110, rule: "validate_range", result: 105, params: [95, 105] }
+                # ]
+
+# Query transformations
+transformed_items = patient_data.find_transformed()           # All items that were changed
+nil_conversions = patient_data.find_by_rule("nil_to_zero")   # Items affected by specific rule
+original_values = patient_data.get_original_values()         # Pre-transformation values
+```
+
+#### Derived Column Operations (Advanced Graph Features)
+```glang
+# Create derived values based on neighboring data and patterns
+data_table = [
+    { "name": "Alice", "height": 165, "weight": 60 },
+    { "name": "Bob", "height": 180, "weight": 75 },
+    { "name": "Charlie", "height": 175, "weight": 70 }
+]
+
+# Add derived column behavior based on neighboring values
+data_table.add_derived_rule("bmi", func(row) {
+    # Calculate BMI from height and weight in same row
+    height_m = row["height"] / 100
+    return row["weight"] / (height_m * height_m)
+})
+
+# Results in:
+# { "name": "Alice", "height": 165, "weight": 60, "bmi": 22.04 }
+# { "name": "Bob", "height": 180, "weight": 75, "bmi": 23.15 }
+
+# Advanced: Cross-row calculations
+sensor_readings = [
+    { "time": 1, "temp": 20.5, "humidity": 45 },
+    { "time": 2, "temp": 21.0, "humidity": 47 },
+    { "time": 3, "temp": 20.8, "humidity": 46 }
+]
+
+# Add derived column that depends on previous row
+sensor_readings.add_derived_rule("temp_change", func(row, context) {
+    if context.previous_row {
+        return row["temp"] - context.previous_row["temp"]
+    }
+    return 0  # First row has no change
+})
+
+# Pattern-based derived columns
+financial_data.add_derived_rule("trend", func(row, context) {
+    # If price increased AND volume > 1000, mark as "bullish"
+    if row["price_change"] > 0 && context.neighbor("volume") > 1000 {
+        return "bullish"
+    } else if row["price_change"] < 0 && context.neighbor("volume") > 1000 {
+        return "bearish"
+    }
+    return "neutral"
+})
+
+# Conditional derived columns based on patterns
+medical_data.add_derived_rule_when("risk_score",
+    condition: func(row) { return row["age"] > 65 },
+    calculation: func(row) {
+        # Complex risk calculation only for seniors
+        return calculate_senior_risk(row["bp"], row["cholesterol"], row["bmi"])
+    }
+)
+```
+
+#### Graph-Aware Transformations
+```glang
+# Future: True graph operations where behaviors understand relationships
+social_network = create_graph()
+social_network.add_derived_rule("influence_score", func(person, graph) {
+    # Calculate influence based on network connections
+    followers = graph.get_connections(person, "follows")
+    return followers.count() * avg_engagement_rate(followers)
+})
+
+# Propagation behaviors across graph edges
+social_network.add_propagation_rule("trending_topic", func(topic, connections) {
+    # If topic appears in X% of connected nodes, propagate to all
+    if topic_frequency(connections) > 0.3 {
+        return propagate_to_all(topic, connections)
+    }
+})
 ```
 
 ### Specialized Libraries
