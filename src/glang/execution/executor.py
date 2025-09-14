@@ -165,12 +165,25 @@ class ASTExecutor(BaseASTVisitor):
                             value.position or node.position
                         )
         
+        # Apply behaviors if present
+        if node.behaviors:
+            behavior_pipeline = self._build_behavior_pipeline(node.behaviors)
+            if isinstance(initializer_value, ListValue):
+                initializer_value = behavior_pipeline.apply_to_list(initializer_value)
+            elif isinstance(initializer_value, HashValue):
+                # For hashes, we'd need to apply to specific keys
+                # For now, just apply to the hash as a whole (limited functionality)
+                pass  
+            else:
+                initializer_value = behavior_pipeline.apply(initializer_value)
+        
         # Store in context
         self.context.set_variable(node.name, initializer_value)
         
         # Return description of what was declared
         constraint_str = f"<{node.type_constraint}>" if node.type_constraint else ""
-        self.result = f"Declared {node.var_type}{constraint_str} variable '{node.name}'"
+        behavior_str = f" with {len(node.behaviors.behaviors)} behaviors" if node.behaviors else ""
+        self.result = f"Declared {node.var_type}{constraint_str} variable '{node.name}'{behavior_str}"
     
     def visit_assignment(self, node: Assignment) -> None:
         """Execute assignment statement."""
@@ -3139,3 +3152,38 @@ class ASTExecutor(BaseASTVisitor):
         """Execute block of statements."""
         for statement in node.statements:
             self.execute(statement)
+    
+    def visit_behavior_call(self, node) -> None:
+        """Execute behavior call - shouldn't be called directly."""
+        # This is handled by _build_behavior_pipeline
+        raise RuntimeError("BehaviorCall nodes should not be executed directly")
+    
+    def visit_behavior_list(self, node) -> None:
+        """Execute behavior list - shouldn't be called directly."""
+        # This is handled by _build_behavior_pipeline
+        raise RuntimeError("BehaviorList nodes should not be executed directly")
+    
+    def _build_behavior_pipeline(self, behavior_list_node):
+        """Build a BehaviorPipeline from a BehaviorList AST node."""
+        from glang.behaviors import BehaviorPipeline
+        
+        pipeline = BehaviorPipeline()
+        
+        for behavior in behavior_list_node.behaviors:
+            if isinstance(behavior, str):
+                # Simple behavior name
+                pipeline.add(behavior)
+            else:
+                # BehaviorCall with arguments
+                args = []
+                for arg_node in behavior.arguments:
+                    arg_value = self.execute(arg_node)
+                    # Convert to Python values for behavior arguments
+                    if hasattr(arg_value, 'to_python'):
+                        args.append(arg_value.to_python())
+                    else:
+                        args.append(arg_value)
+                
+                pipeline.add(behavior.name, *args)
+        
+        return pipeline

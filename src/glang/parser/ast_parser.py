@@ -157,6 +157,26 @@ class ASTParser:
                 return False
             self.advance()
             
+            # Optional "with [behaviors...]"
+            if self.check_identifier("with"):
+                self.advance()  # consume "with"
+                if not self.check(TokenType.LBRACKET):
+                    return False
+                # Skip over the behavior list
+                bracket_depth = 0
+                while not self.is_at_end():
+                    if self.check(TokenType.LBRACKET):
+                        bracket_depth += 1
+                    elif self.check(TokenType.RBRACKET):
+                        bracket_depth -= 1
+                        if bracket_depth == 0:
+                            self.advance()  # consume the final ']'
+                            break
+                    self.advance()
+                
+                if bracket_depth != 0:
+                    return False  # Unmatched brackets
+            
             return self.check(TokenType.ASSIGN)
             
         finally:
@@ -189,6 +209,12 @@ class ASTParser:
         else:
             raise ParseError("Expected variable name", self.peek())
         
+        # Optional behaviors: with [behavior1, behavior2, ...]
+        behaviors = None
+        if self.check_identifier("with"):
+            self.advance()  # consume "with"
+            behaviors = self.parse_behavior_list()
+        
         # Equals
         self.consume(TokenType.ASSIGN, "Expected '=' after variable name")
         
@@ -200,6 +226,7 @@ class ASTParser:
             name=name, 
             initializer=initializer,
             type_constraint=type_constraint,
+            behaviors=behaviors,
             position=pos
         )
     
@@ -1065,3 +1092,55 @@ class ASTParser:
             return False
         finally:
             self.current = saved_pos
+    
+    def check_identifier(self, value: str) -> bool:
+        """Check if current token is an identifier with specific value."""
+        return (self.check(TokenType.IDENTIFIER) and 
+                self.peek().value == value)
+    
+    def parse_behavior_list(self) -> 'BehaviorList':
+        """Parse behavior list: [behavior1, behavior2(arg1, arg2), ...]"""
+        pos = SourcePosition(self.peek().line, self.peek().column)
+        
+        # Consume opening bracket
+        self.consume(TokenType.LBRACKET, "Expected '[' to start behavior list")
+        
+        behaviors = []
+        
+        # Parse behaviors until closing bracket
+        while not self.check(TokenType.RBRACKET) and not self.is_at_end():
+            if self.check(TokenType.IDENTIFIER):
+                behavior_name = self.advance().value
+                
+                # Check if it's a behavior call with arguments
+                if self.check(TokenType.LPAREN):
+                    self.advance()  # consume '('
+                    
+                    # Parse arguments
+                    arguments = []
+                    while not self.check(TokenType.RPAREN) and not self.is_at_end():
+                        arguments.append(self.parse_expression())
+                        
+                        if self.match(TokenType.COMMA):
+                            continue
+                        elif not self.check(TokenType.RPAREN):
+                            raise ParseError("Expected ',' or ')' in behavior arguments", self.peek())
+                    
+                    self.consume(TokenType.RPAREN, "Expected ')' after behavior arguments")
+                    behaviors.append(BehaviorCall(behavior_name, arguments, pos))
+                else:
+                    # Simple behavior name
+                    behaviors.append(behavior_name)
+            else:
+                raise ParseError("Expected behavior name", self.peek())
+            
+            # Handle comma separation
+            if self.match(TokenType.COMMA):
+                continue
+            elif not self.check(TokenType.RBRACKET):
+                raise ParseError("Expected ',' or ']' in behavior list", self.peek())
+        
+        # Consume closing bracket
+        self.consume(TokenType.RBRACKET, "Expected ']' to close behavior list")
+        
+        return BehaviorList(behaviors, pos)

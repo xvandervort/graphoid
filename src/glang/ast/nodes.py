@@ -168,12 +168,32 @@ class Statement(ASTNode):
     pass
 
 @dataclass
+class BehaviorCall(Expression):
+    """Behavior call with parameters: validate_range(95, 105)"""
+    name: str
+    arguments: List[Expression]
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_behavior_call(self)
+
+@dataclass  
+class BehaviorList(Expression):
+    """List of behaviors: [nil_to_zero, validate_range(0, 100)]"""
+    behaviors: List[Union[str, 'BehaviorCall']]
+    position: Optional[SourcePosition] = None
+    
+    def accept(self, visitor):
+        return visitor.visit_behavior_list(self)
+
+@dataclass
 class VariableDeclaration(Statement):
     """Variable declaration: string name = "value" or list<num> nums = [1, 2]"""
     var_type: str  # 'string', 'num', 'bool', 'list'
     name: str
     initializer: Expression
     type_constraint: Optional[str] = None  # For list<num> etc
+    behaviors: Optional[BehaviorList] = None  # For with [behaviors...]
     position: Optional[SourcePosition] = None
     
     def accept(self, visitor):

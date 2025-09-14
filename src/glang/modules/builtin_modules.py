@@ -36,6 +36,14 @@ class BuiltinModuleRegistry:
         from .time_module_simple import create_time_module_namespace
         cls._builtin_modules['time'] = create_time_module_namespace()
         
+        # Register Regex module
+        from .regex_module import create_regex_module_namespace
+        cls._builtin_modules['regex'] = create_regex_module_namespace()
+        
+        # Register Random module
+        from .random_module import create_random_module_namespace
+        cls._builtin_modules['random'] = create_random_module_namespace()
+        
         cls._initialized = True
     
     @classmethod

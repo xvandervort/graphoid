@@ -31,8 +31,8 @@ Transform Glang from a practical programming language into a revolutionary platf
 - [x] Complete I/O operations (file, network, console)
 - [x] String manipulation utilities
 - [x] Date/time handling (with precision integration and data node consistency)
-- [ ] Regular expressions
-- [ ] Random number generation
+- [x] Regular expressions (comprehensive pattern matching and text processing)
+- [x] Random number generation (secure, deterministic, statistical distributions)
 
 #### 1.2 Developer Experience
 - [ ] Comprehensive error messages with stack traces
@@ -171,9 +171,11 @@ The following documents have been superseded by this roadmap:
 2. ✅ ~~Add string manipulation functions~~
 3. ✅ ~~Write v0.9 release notes~~
 4. ✅ ~~Update README with roadmap reference~~
-5. Add date/time handling module
-6. Implement regular expression enhancements
-7. Create random number generation module
+5. ✅ ~~Add date/time handling module~~
+6. ✅ ~~Implement regular expression module~~
+7. ✅ ~~Create random number generation module~~
+8. ✅ ~~Add composable behavior system (bonus feature)~~
+9. Improve error handling with enhanced stack traces
 
 ### Q1 2025
 1. Finish standard library modules

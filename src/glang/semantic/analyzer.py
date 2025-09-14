@@ -388,6 +388,10 @@ class SemanticAnalyzer(BaseASTVisitor):
         except ValueError as e:
             self.report_error(SemanticError(str(e), node.position))
         
+        # Analyze behaviors if present
+        if node.behaviors:
+            node.behaviors.accept(self)
+        
         # Analyze initializer
         if node.initializer:
             node.initializer.accept(self)
@@ -823,3 +827,32 @@ class SemanticAnalyzer(BaseASTVisitor):
         # For now, skip analyzing the lambda body during declaration
         # The parameters are only valid within the lambda's execution context
         pass
+    
+    def visit_behavior_call(self, node) -> None:
+        """Analyze behavior call expressions."""
+        # Import here to avoid circular dependency
+        from glang.behaviors import registry
+        
+        # Check if behavior exists
+        if not registry.get(node.name):
+            self.errors.append(SemanticError(
+                f"Unknown behavior '{node.name}'",
+                node.position))
+        
+        # Analyze arguments
+        for arg in node.arguments:
+            arg.accept(self)
+    
+    def visit_behavior_list(self, node) -> None:
+        """Analyze behavior list expressions."""
+        for behavior in node.behaviors:
+            if isinstance(behavior, str):
+                # Import here to avoid circular dependency
+                from glang.behaviors import registry
+                if not registry.get(behavior):
+                    self.errors.append(SemanticError(
+                        f"Unknown behavior '{behavior}'",
+                        node.position))
+            else:
+                # It's a BehaviorCall
+                behavior.accept(self)

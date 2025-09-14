@@ -1333,6 +1333,222 @@ config_key = crypto.from_hex(io.read_file("key.txt"))  # ✅ Read from secure fi
 hardcoded = [1, 2, 3, 4]              # ❌ Never hardcode keys
 ```
 
+## 🔍 Regex Module
+
+The regex module provides powerful pattern matching and text processing capabilities for complex string operations.
+
+### Import and Basic Usage
+```glang
+import "regex"
+
+# Basic pattern matching
+phone_pattern = "\\d{3}-\\d{3}-\\d{4}"
+text = "Call 555-123-4567 for help"
+
+# Check if pattern exists anywhere
+found = regex.search(phone_pattern, text)       # true
+
+# Validate entire text matches pattern
+phone = "555-123-4567"
+is_valid = regex.validate(phone_pattern, phone) # true
+
+# Check if pattern matches at start
+starts_with = regex.match(phone_pattern, text)  # false
+```
+
+### Text Extraction
+```glang
+import "regex"
+
+# Extract all numbers
+text = "Order 123 contains 45 items costing $67.89"
+numbers = regex.find_all("\\d+", text)
+# Returns: ["123", "45", "67", "89"]
+
+# Extract with capture groups
+data_pattern = "(\\w+):\\s*([^,]+)"
+text = "name: Alice, age: 30, city: New York"
+groups = regex.find_groups(data_pattern, text)
+# Returns: [["name", "Alice"], ["age", "30"], ["city", "New York"]]
+```
+
+### Text Transformation
+```glang
+import "regex"
+
+# Simple replacement
+text = "I have 42 apples and 17 oranges"
+result = regex.replace("\\d+", "X", text)
+# Result: "I have X apples and X oranges"
+
+# Replacement with capture groups
+email_pattern = "(\\w+)@(\\w+\\.\\w+)"
+text = "Contact alice@example.com for help"
+result = regex.replace(email_pattern, "$1 at $2", text)
+# Result: "Contact alice at example.com for help"
+
+# Split on pattern
+text = "apple,banana;orange:grape|kiwi"
+parts = regex.split("[,;:|]", text)
+# Returns: ["apple", "banana", "orange", "grape", "kiwi"]
+```
+
+### Common Patterns
+```glang
+import "regex"
+
+# Email validation
+email_pattern = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+is_email = regex.validate(email_pattern, "user@example.com")  # true
+
+# Phone number extraction
+phone_pattern = "\\b\\d{3}-\\d{3}-\\d{4}\\b"
+text = "Call 555-123-4567 or 555-987-6543 for help"
+phones = regex.find_all(phone_pattern, text)
+# Returns: ["555-123-4567", "555-987-6543"]
+
+# HTML tag removal
+html_text = "<p>Hello <b>World</b>! Visit <a href='link'>here</a>.</p>"
+clean = regex.replace("<[^>]+>", "", html_text)
+# Result: "Hello World! Visit here."
+```
+
+### Regex Flags
+```glang
+import "regex"
+
+# Case insensitive search
+found = regex.search("hello", "HELLO WORLD", "i")        # true
+
+# Multiline mode
+text = "Hello\nWorld"
+found = regex.search("^World", text, "m")                # true
+
+# Combine flags
+pattern = "^hello.*world$"
+text = "HELLO\nWORLD"
+found = regex.search(pattern, text, "ims")               # true (case-insensitive + multiline + dotall)
+```
+
+## 🎲 Random Module
+
+The random module provides comprehensive random number generation, statistical distributions, and secure randomness.
+
+### Import and Basic Usage
+```glang
+import "random" as rand
+
+# Basic random numbers
+dice_roll = rand.randint(1, 6)                    # 1-6 inclusive
+probability = rand.random()                       # 0.0 to 1.0 (exclusive)
+price = rand.uniform(10.0, 50.0)                 # 10.0 to 50.0 (exclusive)
+
+# Random choice from list
+colors = ["red", "green", "blue", "yellow"]
+chosen = rand.choice(colors)                      # Pick one random color
+```
+
+### Statistical Distributions
+```glang
+import "random" as rand
+
+# Normal distribution (bell curve)
+height = rand.normal(170.0, 10.0)                # Mean=170cm, std=10cm
+iq_score = rand.normal(100.0, 15.0)              # Mean=100, std=15
+
+# Exponential distribution (time intervals)
+wait_time = rand.exponential(0.5)                # Average wait = 1/0.5 = 2 units
+service_time = rand.exponential(1.0)             # Average service = 1 unit
+
+# Gamma distribution (positive skewed data)
+task_duration = rand.gamma(2.0, 3.0)             # Shape=2, Scale=3
+```
+
+### Random Sampling
+```glang
+import "random" as rand
+
+# Sample without replacement
+population = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+sample_data = rand.sample(population, 3)         # Pick 3 unique elements
+
+# Shuffle list (returns new shuffled copy)
+original = [1, 2, 3, 4, 5]
+shuffled = rand.shuffle(original)                # New shuffled list
+# original remains unchanged
+
+# Random choice (with replacement)
+responses = ["Yes", "No", "Maybe", "Ask again"]
+answer = rand.choice(responses)                  # Magic 8-ball
+```
+
+### Seeding for Reproducibility
+```glang
+import "random" as rand
+
+# Seed for reproducible results
+rand.seed(12345)
+sequence1 = [rand.randint(1, 10), rand.randint(1, 10), rand.randint(1, 10)]
+
+rand.seed(12345)  # Same seed
+sequence2 = [rand.randint(1, 10), rand.randint(1, 10), rand.randint(1, 10)]
+# sequence1 == sequence2 (true)
+
+# Reset to secure random mode
+rand.reset()
+secure_value = rand.random()                     # Cryptographically secure
+```
+
+### Secure Random Generation
+```glang
+import "random" as rand
+
+# Always cryptographically secure (ignores seeding)
+secure_number = rand.secure_random()             # Secure float
+secure_int = rand.secure_randint(1000, 9999)    # Secure 4-digit PIN
+
+# Secure tokens for authentication
+session_token = rand.secure_token(32)           # 64-character hex string
+api_key = rand.secure_token(16)                 # 32-character hex string
+
+# UUID generation
+user_id = rand.uuid4()                          # Random UUID
+record_id = rand.uuid1()                        # Time-based UUID
+```
+
+### Practical Examples
+```glang
+import "random" as rand
+
+# Game mechanics
+func roll_dice(sides) {
+    return rand.randint(1, sides)
+}
+d6 = roll_dice(6)                               # Standard die
+d20 = roll_dice(20)                             # RPG die
+
+# Password generation
+func generate_password(length) {
+    chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    password = ""
+    for i = 0; i < length; i = i + 1 {
+        idx = rand.secure_randint(0, chars.length() - 1)
+        password = password + chars[idx]
+    }
+    return password
+}
+
+secure_password = generate_password(12)         # 12-character password
+
+# A/B testing with consistent assignment
+func assign_test_group(user_id) {
+    rand.seed(user_id)                          # Consistent assignment
+    group = if rand.random() < 0.5 { "A" } else { "B" }
+    rand.reset()                                # Back to secure mode
+    return group
+}
+```
+
 ---
 
 *Happy coding with Glang! 🚀*

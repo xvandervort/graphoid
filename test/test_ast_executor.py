@@ -103,7 +103,12 @@ class TestASTExecutor:
         # Create declaration node
         initializer = StringLiteral('"hello"', SourcePosition(1, 15))
         declaration = VariableDeclaration(
-            "string", "test_var", initializer, None, SourcePosition(1, 1)
+            var_type="string", 
+            name="test_var", 
+            initializer=initializer, 
+            type_constraint=None,
+            behaviors=None,
+            position=SourcePosition(1, 1)
         )
         
         result = self.executor.execute(declaration)
@@ -125,7 +130,12 @@ class TestASTExecutor:
         elements = [NumberLiteral(1), NumberLiteral(2), NumberLiteral(3)]
         initializer = ListLiteral(elements, SourcePosition(1, 20))
         declaration = VariableDeclaration(
-            "list", "numbers", initializer, "num", SourcePosition(1, 1)
+            var_type="list", 
+            name="numbers", 
+            initializer=initializer, 
+            type_constraint="num",
+            behaviors=None,
+            position=SourcePosition(1, 1)
         )
         
         result = self.executor.execute(declaration)
@@ -346,7 +356,12 @@ class TestExecutorIntegration:
         ]
         initializer = ListLiteral(elements, SourcePosition(1, 24))
         declaration = VariableDeclaration(
-            "list", "names", initializer, "string", SourcePosition(1, 1)
+            var_type="list", 
+            name="names", 
+            initializer=initializer, 
+            type_constraint="string",
+            behaviors=None,
+            position=SourcePosition(1, 1)
         )
         
         self.executor.execute(declaration)
