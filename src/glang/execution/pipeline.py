@@ -42,7 +42,11 @@ class ExecutionResult:
         """Get formatted error message with context if available."""
         if self.success or not self.error:
             return None
-        
+
+        # Check if error has enhanced stack trace
+        if hasattr(self.error, 'get_enhanced_message'):
+            return self.error.get_enhanced_message()
+
         if self.source_code and self.source_name:
             from ..errors import ErrorFormatter
             return ErrorFormatter.format_error_with_context(
@@ -87,16 +91,23 @@ class ExecutionPipeline:
         # Phase 3: Execute
         context = ExecutionContext(analysis_result.symbol_table)
         executor = ASTExecutor(context)
-        
+
+        # Set up stack trace collection with source code
+        from .stack_trace import get_stack_collector
+        stack_collector = get_stack_collector()
+        stack_collector.set_source_code(input_str)
+
         try:
             result = executor.execute(analysis_result.ast)
-            return ExecutionResult(result, context, True)
+            return ExecutionResult(result, context, True, source_code=input_str, source_name="<input>")
         except GlangRuntimeError as e:
-            return ExecutionResult(None, context, False, e)
+            return ExecutionResult(None, context, False, e, source_code=input_str, source_name="<input>")
         except Exception as e:
-            # Wrap unexpected errors
-            wrapped_error = GlangRuntimeError(f"Unexpected execution error: {str(e)}")
-            return ExecutionResult(None, context, False, wrapped_error)
+            # Wrap unexpected errors with stack trace
+            from .stack_trace import create_enhanced_error_trace
+            stack_trace = create_enhanced_error_trace(f"Unexpected execution error: {str(e)}", "RuntimeError")
+            wrapped_error = GlangRuntimeError(f"Unexpected execution error: {str(e)}", stack_trace=stack_trace)
+            return ExecutionResult(None, context, False, wrapped_error, source_code=input_str, source_name="<input>")
 
 
 class ExecutionSession:

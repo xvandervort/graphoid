@@ -2,10 +2,10 @@
 Glang Runtime Error System
 
 Provides runtime error handling with source position information
-for better error reporting during AST execution.
+and enhanced stack traces for better error reporting during AST execution.
 """
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import sys
 import os
 
@@ -14,27 +14,43 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
 
 from glang.ast.nodes import SourcePosition
 
+if TYPE_CHECKING:
+    from .stack_trace import EnhancedStackTrace
+
 
 class RuntimeError(Exception):
-    """Base runtime error with position information."""
-    
-    def __init__(self, message: str, position: Optional[SourcePosition] = None):
+    """Base runtime error with position information and optional stack trace."""
+
+    def __init__(self, message: str, position: Optional[SourcePosition] = None, stack_trace: Optional['EnhancedStackTrace'] = None):
         self.message = message
         self.position = position
+        self.stack_trace = stack_trace
         super().__init__(self._format_error())
-    
+
     def _format_error(self) -> str:
         if self.position:
             return f"Runtime error: {self.message} at line {self.position.line}, column {self.position.column}"
         return f"Runtime error: {self.message}"
 
+    def get_enhanced_message(self) -> str:
+        """Get enhanced error message with stack trace if available."""
+        if self.stack_trace:
+            return self.stack_trace.format_full_trace()
+        return self._format_error()
+
+    def get_compact_message(self) -> str:
+        """Get compact error message with call chain if available."""
+        if self.stack_trace:
+            return self.stack_trace.format_compact_trace()
+        return self._format_error()
+
 
 class VariableNotFoundError(RuntimeError):
     """Variable not found in execution context."""
-    
-    def __init__(self, variable_name: str, position: Optional[SourcePosition] = None):
+
+    def __init__(self, variable_name: str, position: Optional[SourcePosition] = None, stack_trace: Optional['EnhancedStackTrace'] = None):
         message = f"Variable '{variable_name}' not found"
-        super().__init__(message, position)
+        super().__init__(message, position, stack_trace)
         self.variable_name = variable_name
 
 

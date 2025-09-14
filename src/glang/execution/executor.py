@@ -17,6 +17,7 @@ from glang.ast.nodes import *
 from glang.semantic.symbol_table import SymbolTable
 from .values import *
 from .errors import RuntimeError, VariableNotFoundError, TypeConstraintError
+from .stack_trace import get_stack_collector, create_enhanced_error_trace, push_execution_frame, pop_execution_frame, update_frame_variables
 
 
 class BreakException(Exception):
@@ -408,7 +409,8 @@ class ASTExecutor(BaseASTVisitor):
         """Evaluate variable reference."""
         value = self.context.get_variable(node.name)
         if value is None:
-            raise VariableNotFoundError(node.name, node.position)
+            stack_trace = create_enhanced_error_trace(f"Variable '{node.name}' not found", "VariableNotFoundError")
+            raise VariableNotFoundError(node.name, node.position, stack_trace)
         self.result = value
     
     def visit_string_literal(self, node: StringLiteral) -> None:
@@ -3084,7 +3086,8 @@ class ASTExecutor(BaseASTVisitor):
         func_value = self.context.get_variable(node.name)
         if func_value is None:
             from .errors import VariableNotFoundError
-            raise VariableNotFoundError(f"Function '{node.name}' not found", node.position)
+            stack_trace = create_enhanced_error_trace(f"Function '{node.name}' not found", "VariableNotFoundError")
+            raise VariableNotFoundError(f"Function '{node.name}' not found", node.position, stack_trace)
         
         if not isinstance(func_value, (FunctionValue, LambdaValue, BuiltinFunctionValue)):
             from .errors import RuntimeError
@@ -3124,18 +3127,26 @@ class ASTExecutor(BaseASTVisitor):
     def call_function(self, func_value: 'GlangValue', arguments: List['GlangValue'], position: Optional[SourcePosition] = None) -> Any:
         """Call a function or lambda with given arguments."""
         from .values import FunctionValue, LambdaValue
-        
+
         if isinstance(func_value, FunctionValue):
+            # Push stack frame for function call
+            func_args = dict(zip(func_value.parameters, [str(arg) for arg in arguments]))
+            push_execution_frame(func_value.name, position, func_args)
+
             # Create new execution context for function scope
             # For now, we'll use a simple approach without proper scoping
             # Save current variable state
             old_vars = self.context.variables.copy()
-            
+
             try:
                 # Bind parameters to arguments
                 for param_name, arg_value in zip(func_value.parameters, arguments):
                     self.context.set_variable(param_name, arg_value)
-                
+
+                # Update stack frame with current variables
+                current_vars = {name: str(value) for name, value in self.context.variables.items()}
+                update_frame_variables(current_vars)
+
                 # Execute function body
                 try:
                     self.execute(func_value.body)
@@ -3144,25 +3155,37 @@ class ASTExecutor(BaseASTVisitor):
                     return NoneValue()
                 except ReturnException as ret:
                     return ret.value if ret.value is not None else NoneValue()
-                
+
             finally:
+                # Pop stack frame
+                pop_execution_frame()
                 # Restore variable state
                 self.context.variables = old_vars
         
         elif isinstance(func_value, LambdaValue):
+            # Push stack frame for lambda call
+            lambda_args = dict(zip(func_value.parameters, [str(arg) for arg in arguments]))
+            push_execution_frame("<lambda>", position, lambda_args)
+
             # Similar to function but execute expression instead of block
             old_vars = self.context.variables.copy()
-            
+
             try:
                 # Bind parameters to arguments
                 for param_name, arg_value in zip(func_value.parameters, arguments):
                     self.context.set_variable(param_name, arg_value)
-                
+
+                # Update stack frame with current variables
+                current_vars = {name: str(value) for name, value in self.context.variables.items()}
+                update_frame_variables(current_vars)
+
                 # Execute lambda body (expression)
                 result = self.execute(func_value.body)
                 return result
-                
+
             finally:
+                # Pop stack frame
+                pop_execution_frame()
                 # Restore variable state
                 self.context.variables = old_vars
         
