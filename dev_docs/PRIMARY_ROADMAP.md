@@ -35,20 +35,28 @@ Transform Glang from a practical programming language into a revolutionary platf
 - [x] Random number generation (secure, deterministic, statistical distributions)
 
 #### 1.2 Developer Experience
-- [ ] Comprehensive error messages with stack traces
+- [ ] Enhanced error messages with stack traces (complements error-as-data pattern)
 - [ ] Debugger support
 - [ ] IDE integration (VS Code extension)
 - [x] Package manager design (see PACKAGING_SYSTEM_DESIGN.md)
 - [ ] Package manager implementation (glang-package command)
 - [ ] Documentation generator
 
-#### 1.3 Performance & Stability
+#### 1.3 Core Language Features
+- [ ] **Pattern Matching**: `match` expressions for elegant control flow and data destructuring
+- [ ] **Status Symbols**: Limited symbols (`:ok`, `:error`) for result patterns
+- [ ] **Error-as-Data**: Result lists `[:ok, value]` / `[:error, message]` for clean error handling
+- [ ] **Implicit Success Wrapping**: Auto-wrap plain returns as `[:ok, value]` 
+- [ ] **Module Scoping**: Functions can access module-level variables
+- [ ] **None Literal**: Add `none` as a language keyword for null values
+
+#### 1.4 Performance & Stability
 - [ ] Performance benchmarking suite
 - [ ] Memory leak detection
 - [ ] Optimization pass on hot paths
 - [ ] Achieve 85% test coverage
 
-**Deliverables**: v0.9 release with standard library
+**Deliverables**: v0.9 release with standard library and modern error handling
 
 ### 🎯 Phase 2: Graph Foundation (Q3-Q4 2025)
 **Goal**: Transform containers into true graph structures
@@ -183,6 +191,53 @@ The following documents have been superseded by this roadmap:
 3. Implement basic packaging system (glang-package commands)
 4. Create VS Code extension prototype
 5. Begin Phase 2 design review
+
+---
+
+## 📦 Not Yet Scheduled
+
+*Features and requests that are acknowledged but not yet assigned to specific phases*
+
+### Infrastructure & Tooling
+- Database drivers (PostgreSQL, SQLite, MySQL, MongoDB)
+- HTTP client libraries and web frameworks
+- Testing framework beyond basic assertions
+- Code formatting tool (glfmt)
+- Linting and static analysis tools
+- REPL improvements (syntax highlighting, auto-completion)
+- Language server protocol (LSP) implementation
+
+### Platform & Deployment  
+- Cross-platform compilation targets
+- WebAssembly compilation support
+- Mobile platform support (iOS/Android)
+- Container/Docker integration
+- Cloud deployment tools
+- Binary distribution system
+
+### Advanced Language Features
+- Generics/parametric types
+- Async/await and concurrent programming
+- Macro system or metaprogramming
+- Foreign function interface (FFI) for C libraries
+- Memory management optimization
+- JIT compilation for performance
+
+### Ecosystem & Community
+- Package registry and hosting
+- Documentation hosting (docs.glang.dev)
+- Community forums and support channels
+- Tutorial and learning materials
+- Conference presentations and outreach
+- Commercial support and consulting
+
+### Specialized Libraries
+- Machine learning and data science bindings
+- Graphics and game development libraries  
+- Cryptography and security libraries
+- Audio/video processing
+- Scientific computing modules
+- GUI toolkit (native desktop applications)
 
 ---
 

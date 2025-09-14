@@ -563,6 +563,8 @@ Glang uses a clean, modern architecture:
 
 ## Future Vision: The Path to Revolutionary Graph Computing
 
+**For detailed roadmap and development phases, see [`dev_docs/PRIMARY_ROADMAP.md`](dev_docs/PRIMARY_ROADMAP.md)**
+
 ### Near-Term Priorities (Q1-Q2 2025)
 **Make Glang Practical** - Standard libraries for real-world use:
 - **✅ I/O Library**: File operations, file handle I/O with auto-close semantics, user input, directory management
