@@ -64,9 +64,18 @@ class BooleanLiteral(Expression):
     """Boolean literal: true or false"""
     value: bool
     position: Optional[SourcePosition] = None
-    
+
     def accept(self, visitor):
         return visitor.visit_boolean_literal(self)
+
+@dataclass
+class SymbolLiteral(Expression):
+    """Symbol literal: :ok, :error, :pending, etc."""
+    name: str  # The symbol name without the colon
+    position: Optional[SourcePosition] = None
+
+    def accept(self, visitor):
+        return visitor.visit_symbol_literal(self)
 
 @dataclass
 class ListLiteral(Expression):

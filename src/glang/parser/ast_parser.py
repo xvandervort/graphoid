@@ -731,6 +731,21 @@ class ASTParser:
         return expr
     
     
+    def parse_list_element(self) -> Expression:
+        """Parse a list element, allowing symbols only for result patterns like [:ok, value]."""
+        # Allow symbols in list contexts for result patterns
+        if self.check(TokenType.SYMBOL):
+            token = self.advance()
+            # Only allow specific status symbols for result patterns
+            symbol_name = token.value[1:] if token.value.startswith(':') else token.value
+            if symbol_name in ['ok', 'error', 'pending', 'success', 'failure', 'warning']:
+                return SymbolLiteral(symbol_name, SourcePosition(token.line, token.column))
+            else:
+                raise ParseError(f"Symbol '{token.value}' not allowed. Only status symbols (:ok, :error, :pending, :success, :failure, :warning) are permitted in result patterns.", token)
+
+        # Otherwise parse as normal expression
+        return self.parse_expression()
+
     def parse_primary(self) -> Expression:
         """Parse primary expressions."""
         
@@ -754,18 +769,21 @@ class ASTParser:
             # Remove quotes and handle escape sequences
             value = self.process_string_literal(token.value)
             return StringLiteral(value, SourcePosition(token.line, token.column))
-        
+
+        # Symbols are not allowed in general user code - only for internal system use
+        # They can appear in specific contexts like result pattern lists
+
         # List literals
         if self.match(TokenType.LBRACKET):
             bracket_token = self.previous()
             elements = []
             
             if not self.check(TokenType.RBRACKET):
-                elements.append(self.parse_expression())
-                
+                elements.append(self.parse_list_element())
+
                 while self.match(TokenType.COMMA):
-                    elements.append(self.parse_expression())
-            
+                    elements.append(self.parse_list_element())
+
             self.consume(TokenType.RBRACKET, "Expected ']' after list elements")
             return ListLiteral(elements, SourcePosition(bracket_token.line, bracket_token.column))
         

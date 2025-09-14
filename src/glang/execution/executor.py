@@ -428,7 +428,11 @@ class ASTExecutor(BaseASTVisitor):
     def visit_boolean_literal(self, node: BooleanLiteral) -> None:
         """Evaluate boolean literal."""
         self.result = BooleanValue(node.value, node.position)
-    
+
+    def visit_symbol_literal(self, node: SymbolLiteral) -> None:
+        """Evaluate symbol literal."""
+        self.result = SymbolValue(node.name, node.position)
+
     def visit_list_literal(self, node: ListLiteral) -> None:
         """Evaluate list literal."""
         elements = []

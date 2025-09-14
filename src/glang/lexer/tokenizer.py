@@ -19,9 +19,10 @@ def _create_dynamic_token_type():
     base_tokens = {
         # Literals
         "IDENTIFIER": "IDENTIFIER",
-        "STRING_LITERAL": "STRING_LITERAL", 
+        "STRING_LITERAL": "STRING_LITERAL",
         "NUMBER_LITERAL": "NUMBER_LITERAL",
         "BOOLEAN_LITERAL": "BOOLEAN_LITERAL",
+        "SYMBOL": "SYMBOL",  # Symbol literals like :ok, :error
         
         # Operators & Punctuation  
         "DOT": "DOT",                    # .
@@ -122,7 +123,11 @@ class Tokenizer:
             # Include negative numbers
             (r'-?\d+\.\d+', TokenType.NUMBER_LITERAL),
             (r'-?\d+', TokenType.NUMBER_LITERAL),
-            
+
+            # Symbol literals (must come before identifiers)
+            # Symbols are :followed by identifier characters
+            (r':[a-zA-Z_][a-zA-Z0-9_]*', TokenType.SYMBOL),
+
             # Identifiers (variable names, method names, and keywords - post-processed)
             (r'[a-zA-Z_][a-zA-Z0-9_]*', TokenType.IDENTIFIER),
             

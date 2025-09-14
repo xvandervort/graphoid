@@ -7,7 +7,7 @@ proper operations and constraint validation.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, List, Optional, Union, Tuple
+from typing import Any, Dict, List, Optional, Union, Tuple
 import sys
 import os
 import uuid
@@ -418,6 +418,78 @@ class StringValue(GlangValue):
         """String-specific inspection showing character count."""
         info = f'"{self.value}" (string, {len(self.value)} chars)'
         return StringValue(info, self.position)
+
+
+class SymbolValue(GlangValue):
+    """Runtime symbol value - an immutable named constant like :ok or :error.
+
+    Symbols are lightweight, immutable identifiers that are compared by identity.
+    They're perfect for status codes, flags, and pattern matching.
+    """
+
+    # Class-level registry to ensure symbol uniqueness (interning)
+    _symbol_registry: Dict[str, 'SymbolValue'] = {}
+
+    def __new__(cls, name: str, position: Optional[SourcePosition] = None):
+        """Ensure each symbol name maps to a single instance (interning)."""
+        # Remove the leading colon if present (from lexer)
+        if name.startswith(':'):
+            name = name[1:]
+
+        # Check if this symbol already exists
+        if name in cls._symbol_registry:
+            existing = cls._symbol_registry[name]
+            # Update position if provided
+            if position:
+                existing.position = position
+            return existing
+
+        # Create new symbol instance
+        instance = super().__new__(cls)
+        cls._symbol_registry[name] = instance
+        return instance
+
+    def __init__(self, name: str, position: Optional[SourcePosition] = None):
+        """Initialize a symbol value."""
+        # Only initialize if not already initialized
+        if hasattr(self, '_initialized'):
+            return
+
+        super().__init__(position)
+        # Remove the leading colon if present
+        if name.startswith(':'):
+            name = name[1:]
+        self.name = name
+        self._initialized = True
+
+    def to_python(self) -> str:
+        """Return the symbol name without the colon."""
+        return self.name
+
+    def get_type(self) -> str:
+        return "symbol"
+
+    def to_display_string(self) -> str:
+        """Display symbols with leading colon."""
+        return f":{self.name}"
+
+    def __eq__(self, other) -> bool:
+        """Symbols are equal if they have the same name."""
+        if not isinstance(other, SymbolValue):
+            return False
+        return self.name == other.name
+
+    def __hash__(self) -> int:
+        """Symbols are hashable by their name."""
+        return hash(self.name)
+
+    def __repr__(self) -> str:
+        return f"SymbolValue(:{self.name})"
+
+    @classmethod
+    def get_or_create(cls, name: str, position: Optional[SourcePosition] = None) -> 'SymbolValue':
+        """Get existing symbol or create new one."""
+        return cls(name, position)
 
 
 class NumberValue(GlangValue):
@@ -1078,6 +1150,8 @@ class ListValue(GlangValue, GraphContainer):
             return left.equals(right)
         elif isinstance(left, NoneValue) and isinstance(right, NoneValue):
             return True
+        elif isinstance(left, SymbolValue) and isinstance(right, SymbolValue):
+            return left.name == right.name
         else:
             # For any unknown types, fall back to Python equality
             # This should not happen in practice
@@ -1245,31 +1319,6 @@ class LambdaValue(GlangValue):
         return len(self.parameters)
 
 
-class SymbolValue(GlangValue):
-    """Runtime symbol value for narrow uses like behavior names.
-
-    Symbols are lightweight identifiers that start with ':' and are used
-    primarily for behavior rules and other meta-programming features.
-    """
-
-    def __init__(self, name: str, position: Optional[SourcePosition] = None):
-        super().__init__(position)
-        self.name = name  # Store without the leading ':'
-
-    def to_python(self) -> str:
-        return self.name
-
-    def get_type(self) -> str:
-        return "symbol"
-
-    def to_display_string(self) -> str:
-        return f":{self.name}"
-
-    def __eq__(self, other) -> bool:
-        return isinstance(other, SymbolValue) and self.name == other.name
-
-    def __hash__(self) -> int:
-        return hash(('symbol', self.name))
 
 
 class NoneValue(GlangValue):
