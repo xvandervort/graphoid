@@ -77,6 +77,8 @@ class SemanticAnalyzer(BaseASTVisitor):
             return 'data'
         elif isinstance(expr, MapLiteral):
             return 'hash'
+        elif isinstance(expr, SymbolLiteral):
+            return 'symbol'
         elif isinstance(expr, VariableRef):
             # Look up the type of the referenced variable
             if self.symbol_table.symbol_exists(expr.name):
@@ -87,8 +89,14 @@ class SemanticAnalyzer(BaseASTVisitor):
             # Get the type of the target being indexed
             target_type = self.infer_type_from_expression(expr.target)
             if target_type == 'list':
-                # Lists can contain any type - we can't infer the element type yet
-                # This would require type constraints on lists (list<string>, list<num>, etc.)
+                # Special case: if indexing into a literal list with a literal index
+                if isinstance(expr.target, ListLiteral) and isinstance(expr.index, NumberLiteral):
+                    index_val = int(expr.index.value)
+                    if 0 <= index_val < len(expr.target.elements):
+                        # Infer type from the specific element
+                        element = expr.target.elements[index_val]
+                        return self.infer_type_from_expression(element)
+
                 # Special case: if target is a method call that returns a known list type
                 if isinstance(expr.target, MethodCallExpression):
                     if expr.target.method_name == 'keys':
@@ -341,7 +349,12 @@ class SemanticAnalyzer(BaseASTVisitor):
                         return 'string'  # String indexing returns string
                     elif symbol.symbol_type == 'hash':
                         return 'data'  # Hash indexing returns data node
-        
+        elif isinstance(expr, MatchExpression):
+            # For match expressions, infer type from the first arm's result
+            # All arms should return the same type (this could be enforced later)
+            if expr.arms:
+                return self.infer_type_from_expression(expr.arms[0].result)
+
         return None  # Cannot infer type
     
     # Statement visitors
@@ -427,10 +440,8 @@ class SemanticAnalyzer(BaseASTVisitor):
                 inferred_type = self.infer_type_from_expression(node.value)
                 
                 if inferred_type is None:
-                    # If we can't infer the type, report an error
-                    self.report_error(SemanticError(
-                        f"Cannot infer type for variable '{var_name}'", node.target.position))
-                    return
+                    # If we can't infer the type, use 'any' as a fallback
+                    inferred_type = 'any'
                 
                 # Create a symbol for the new variable with inferred type
                 inferred_symbol = Symbol(var_name, inferred_type, None, node.target.position)
@@ -856,3 +867,92 @@ class SemanticAnalyzer(BaseASTVisitor):
             else:
                 # It's a BehaviorCall
                 behavior.accept(self)
+
+    def visit_match_expression(self, node) -> None:
+        """Analyze match expressions."""
+        # Analyze the expression being matched
+        node.expr.accept(self)
+
+        # Analyze each match arm
+        for arm in node.arms:
+            # Track pattern variables and shadowed symbols for this arm
+            pattern_vars = []
+            shadowed_symbols = {}
+
+            try:
+                # Analyze pattern and register pattern variables
+                pattern_vars, shadowed_symbols = self.analyze_pattern_bindings(arm.pattern)
+
+                # Analyze result expression with pattern variables in scope
+                arm.result.accept(self)
+            finally:
+                # Remove pattern variables and restore shadowed symbols after analyzing this arm
+                for var_name in pattern_vars:
+                    self.symbol_table.remove_symbol(var_name)
+
+                # Restore shadowed symbols
+                for var_name, symbol in shadowed_symbols.items():
+                    self.symbol_table.declare_symbol(symbol)
+
+    def visit_symbol_literal(self, node) -> None:
+        """Analyze symbol literals (like :ok, :error)."""
+        # Symbol literals need no special analysis
+        pass
+
+    def analyze_pattern(self, pattern) -> None:
+        """Analyze pattern nodes."""
+        from ..ast.nodes import ListPattern, VariablePattern, LiteralPattern, WildcardPattern
+
+        if isinstance(pattern, ListPattern):
+            # Analyze each element pattern
+            for element in pattern.elements:
+                self.analyze_pattern(element)
+        elif isinstance(pattern, VariablePattern):
+            # Variables in patterns are bindings, not references
+            # No need to check if they exist - they're being created
+            pass
+        elif isinstance(pattern, (LiteralPattern, WildcardPattern)):
+            # Literals and wildcards need no analysis
+            pass
+
+    def analyze_pattern_bindings(self, pattern) -> tuple[List[str], dict]:
+        """Analyze pattern bindings and register variables.
+
+        Returns:
+            Tuple of (pattern_vars, shadowed_symbols) where:
+            - pattern_vars: List of variable names that were registered
+            - shadowed_symbols: Dict mapping variable names to their original Symbol objects
+        """
+        from typing import List
+        from ..ast.nodes import ListPattern, VariablePattern, LiteralPattern, WildcardPattern
+        from .symbol_table import Symbol
+
+        pattern_vars = []
+        shadowed_symbols = {}
+
+        if isinstance(pattern, ListPattern):
+            # Register bindings for each element pattern
+            for element in pattern.elements:
+                element_vars, element_shadowed = self.analyze_pattern_bindings(element)
+                pattern_vars.extend(element_vars)
+                shadowed_symbols.update(element_shadowed)
+        elif isinstance(pattern, VariablePattern):
+            # Register the pattern variable as a symbol with 'any' type
+            # We use 'any' since we can't determine the exact type at semantic analysis time
+
+            # Check if variable already exists (shadowing case)
+            if self.symbol_table.symbol_exists(pattern.name):
+                existing_symbol = self.symbol_table.lookup_symbol(pattern.name)
+                shadowed_symbols[pattern.name] = existing_symbol
+                # Temporarily remove the existing symbol
+                self.symbol_table.remove_symbol(pattern.name)
+
+            # Add the pattern variable
+            symbol = Symbol(pattern.name, 'any', None, pattern.position)
+            self.symbol_table.declare_symbol(symbol)
+            pattern_vars.append(pattern.name)
+        elif isinstance(pattern, (LiteralPattern, WildcardPattern)):
+            # Literals and wildcards don't create bindings
+            pass
+
+        return pattern_vars, shadowed_symbols

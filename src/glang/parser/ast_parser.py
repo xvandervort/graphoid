@@ -28,31 +28,55 @@ class ASTParser:
         self.tokens: List[Token] = []
         self.current = 0
     
-    def parse(self, input_str: str) -> Statement:
+    def parse(self, input_str: str):
         """
         Parse input string into AST.
-        
+
         Args:
             input_str: The glang code to parse
-            
+
         Returns:
-            A Statement AST node
-            
+            A Block AST node containing all statements, or a single Statement if only one
+
         Raises:
             ParseError: If the input has syntax errors
         """
         self.tokens = self.tokenizer.tokenize(input_str)
         self.current = 0
-        
+
         # Skip leading newlines
         while self.match(TokenType.NEWLINE):
             pass
-            
+
         if self.is_at_end():
             # Return NoOp for empty input (e.g., comment-only lines)
             return NoOp(SourcePosition(1, 1))
-        
-        return self.parse_statement()
+
+        # Parse all statements
+        statements = []
+
+        while not self.is_at_end():
+            # Skip newlines between statements
+            while self.match(TokenType.NEWLINE):
+                pass
+
+            if self.is_at_end():
+                break
+
+            stmt = self.parse_statement()
+            statements.append(stmt)
+
+            # Skip trailing newlines
+            while self.match(TokenType.NEWLINE):
+                pass
+
+        # If only one statement, return it directly
+        # Otherwise return a Block
+        if len(statements) == 1:
+            return statements[0]
+        else:
+            from ..ast.nodes import Block
+            return Block(statements, SourcePosition(1, 1))
     
     def parse_statement(self) -> Statement:
         """Parse a statement."""
@@ -395,9 +419,165 @@ class ASTParser:
         """Parse continue statement: continue"""
         continue_token = self.consume(TokenType.CONTINUE, "Expected 'continue'")
         pos = SourcePosition(continue_token.line, continue_token.column)
-        
+
         return ContinueStatement(position=pos)
-    
+
+    def parse_match_expression(self) -> 'MatchExpression':
+        """Parse match expression: match expr { pattern => result, ... }"""
+        from ..ast.nodes import MatchExpression, MatchArm
+
+        match_token = self.consume(TokenType.MATCH, "Expected 'match'")
+        pos = SourcePosition(match_token.line, match_token.column)
+
+        # Parse expression to match against
+        expr = self.parse_expression()
+
+        # Parse match arms block
+        self.consume(TokenType.LBRACE, "Expected '{' after match expression")
+
+        arms = []
+        while not self.check(TokenType.RBRACE) and not self.is_at_end():
+            # Skip newlines before pattern
+            while self.check(TokenType.NEWLINE):
+                self.advance()
+
+            # Check if we hit the closing brace after skipping newlines
+            if self.check(TokenType.RBRACE):
+                break
+
+            # Parse pattern
+            pattern = self.parse_pattern()
+
+            # Parse arrow
+            self.consume(TokenType.ARROW, "Expected '=>' after pattern")
+
+            # Parse result expression
+            result = self.parse_expression()
+
+            # Create match arm
+            arm = MatchArm(pattern=pattern, result=result, position=pos)
+            arms.append(arm)
+
+            # Optional comma between arms
+            if self.check(TokenType.COMMA):
+                self.advance()
+
+            # Skip newlines after comma
+            while self.check(TokenType.NEWLINE):
+                self.advance()
+
+        self.consume(TokenType.RBRACE, "Expected '}' after match arms")
+
+        return MatchExpression(expr=expr, arms=arms, position=pos)
+
+    def parse_pattern(self) -> 'Pattern':
+        """Parse a pattern for pattern matching."""
+        from ..ast.nodes import (
+            LiteralPattern, VariablePattern, WildcardPattern,
+            ListPattern, SymbolLiteral
+        )
+
+        # Wildcard pattern: _
+        if self.check(TokenType.IDENTIFIER) and self.peek().value == "_":
+            token = self.advance()
+            pos = SourcePosition(token.line, token.column)
+            return WildcardPattern(position=pos)
+
+        # List pattern: [], [a, b], [first, ...rest]
+        if self.check(TokenType.LBRACKET):
+            return self.parse_list_pattern()
+
+        # Literal patterns: numbers, strings, booleans
+        if self.check(TokenType.NUMBER_LITERAL):
+            token = self.advance()
+            value = float(token.value) if '.' in token.value else int(token.value)
+            pos = SourcePosition(token.line, token.column)
+            return LiteralPattern(value=value, position=pos)
+
+        if self.check(TokenType.STRING_LITERAL):
+            token = self.advance()
+            # Remove quotes and handle escape sequences
+            value = self.process_string_literal(token.value)
+            pos = SourcePosition(token.line, token.column)
+            return LiteralPattern(value=value, position=pos)
+
+        if self.match(TokenType.TRUE, TokenType.FALSE):
+            token = self.previous()
+            value = token.type == TokenType.TRUE
+            pos = SourcePosition(token.line, token.column)
+            return LiteralPattern(value=value, position=pos)
+
+        # Symbol pattern (for status symbols like :ok, :error)
+        if self.check(TokenType.SYMBOL):
+            token = self.advance()
+            symbol_name = token.value[1:] if token.value.startswith(':') else token.value
+            # Validate it's a status symbol
+            if symbol_name in ['ok', 'error', 'pending', 'success', 'failure', 'warning']:
+                from ..execution.values import SymbolValue
+                pos = SourcePosition(token.line, token.column)
+                # Create a SymbolValue for pattern matching
+                symbol_value = SymbolValue(symbol_name, pos)
+                return LiteralPattern(value=symbol_value, position=pos)
+            else:
+                raise ParseError(f"Symbol '{token.value}' not allowed in patterns. Only status symbols (:ok, :error, :pending, :success, :failure, :warning) are permitted.", token)
+
+        # Variable pattern: identifier or type keywords (when used as variable names)
+        if self.check(TokenType.IDENTIFIER):
+            token = self.advance()
+            pos = SourcePosition(token.line, token.column)
+            return VariablePattern(name=token.value, position=pos)
+
+        # Allow type keywords to be used as variable names in patterns
+        if self.tokenizer.is_type_keyword(self.peek().type):
+            token = self.advance()
+            pos = SourcePosition(token.line, token.column)
+            return VariablePattern(name=token.value, position=pos)
+
+        raise ParseError(f"Expected pattern, got {self.peek().type}", self.peek())
+
+    def parse_list_pattern(self) -> 'ListPattern':
+        """Parse list pattern: [], [a, b], [first, ...rest]"""
+        from ..ast.nodes import ListPattern
+
+        bracket_token = self.consume(TokenType.LBRACKET, "Expected '['")
+        pos = SourcePosition(bracket_token.line, bracket_token.column)
+
+        elements = []
+        rest_variable = None
+
+        if not self.check(TokenType.RBRACKET):
+            # Parse first pattern
+            if self.check(TokenType.DOT) and self.peek_ahead(1).type == TokenType.DOT and self.peek_ahead(2).type == TokenType.DOT:
+                # Handle ...rest at beginning (unusual but possible)
+                self.advance()  # first dot
+                self.advance()  # second dot
+                self.advance()  # third dot
+                if self.check(TokenType.IDENTIFIER):
+                    rest_variable = self.advance().value
+                else:
+                    raise ParseError("Expected identifier after '...'", self.peek())
+            else:
+                elements.append(self.parse_pattern())
+
+                # Parse remaining patterns
+                while self.match(TokenType.COMMA):
+                    # Check for ...rest syntax
+                    if self.check(TokenType.DOT) and self.peek_ahead(1).type == TokenType.DOT and self.peek_ahead(2).type == TokenType.DOT:
+                        self.advance()  # first dot
+                        self.advance()  # second dot
+                        self.advance()  # third dot
+                        if self.check(TokenType.IDENTIFIER):
+                            rest_variable = self.advance().value
+                        else:
+                            raise ParseError("Expected identifier after '...'", self.peek())
+                        break  # ...rest must be last
+                    else:
+                        elements.append(self.parse_pattern())
+
+        self.consume(TokenType.RBRACKET, "Expected ']' after list pattern")
+
+        return ListPattern(elements=elements, rest_variable=rest_variable, position=pos)
+
     def parse_function_declaration(self) -> FunctionDeclaration:
         """Parse function declaration: func name(param1, param2) { body }"""
         from ..ast.nodes import FunctionDeclaration
@@ -756,7 +936,11 @@ class ASTParser:
         if self.match(TokenType.FALSE):
             token = self.previous()
             return BooleanLiteral(False, SourcePosition(token.line, token.column))
-        
+
+        # Match expressions
+        if self.check(TokenType.MATCH):
+            return self.parse_match_expression()
+
         # Number literals
         if self.check(TokenType.NUMBER_LITERAL):
             token = self.advance()
@@ -777,12 +961,25 @@ class ASTParser:
         if self.match(TokenType.LBRACKET):
             bracket_token = self.previous()
             elements = []
-            
+
+            # Skip newlines after opening bracket
+            while self.check(TokenType.NEWLINE):
+                self.advance()
+
             if not self.check(TokenType.RBRACKET):
                 elements.append(self.parse_list_element())
 
                 while self.match(TokenType.COMMA):
-                    elements.append(self.parse_list_element())
+                    # Skip newlines after comma
+                    while self.check(TokenType.NEWLINE):
+                        self.advance()
+
+                    if not self.check(TokenType.RBRACKET):
+                        elements.append(self.parse_list_element())
+
+            # Skip newlines before closing bracket
+            while self.check(TokenType.NEWLINE):
+                self.advance()
 
             self.consume(TokenType.RBRACKET, "Expected ']' after list elements")
             return ListLiteral(elements, SourcePosition(bracket_token.line, bracket_token.column))

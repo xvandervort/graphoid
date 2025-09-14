@@ -201,7 +201,16 @@ class LanguageKeywordRegistry:
             description="Continue to next loop iteration",
             syntax_example="continue"
         ))
-        
+
+        # Pattern matching keywords
+        self._register_keyword(KeywordDefinition(
+            keyword="match",
+            category=KeywordCategory.STATEMENT,
+            parser_method="parse_match_expression",
+            description="Pattern matching expression",
+            syntax_example="match value { pattern => result }"
+        ))
+
         # Function keywords
         self._register_keyword(KeywordDefinition(
             keyword="func",

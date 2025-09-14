@@ -3209,3 +3209,132 @@ class ASTExecutor(BaseASTVisitor):
                 pipeline.add(behavior.name, *args)
         
         return pipeline
+
+    def visit_match_expression(self, node) -> Any:
+        """Execute match expression."""
+        from .errors import MatchError
+
+        # Evaluate the expression to match against
+        target_value = self.execute(node.expr)
+
+        # Try each arm in order
+        for arm in node.arms:
+            # Try to match pattern
+            bindings = self.match_pattern(arm.pattern, target_value)
+            if bindings is not None:
+                # Pattern matched! Save current variables and add bindings
+                saved_vars = {}
+                for var_name in bindings.keys():
+                    if self.context.has_variable(var_name):
+                        saved_vars[var_name] = self.context.get_variable(var_name)
+
+                try:
+                    # Add pattern variable bindings
+                    for var_name, var_value in bindings.items():
+                        self.context.set_variable(var_name, var_value)
+
+                    # Execute result expression with bindings
+                    result = self.execute(arm.result)
+                    return result
+                finally:
+                    # Restore original variables and remove pattern bindings
+                    for var_name in bindings.keys():
+                        if var_name in saved_vars:
+                            self.context.set_variable(var_name, saved_vars[var_name])
+                        elif var_name in self.context.variables:
+                            del self.context.variables[var_name]
+
+        # No patterns matched
+        raise MatchError(f"No pattern matched value {target_value.to_display_string()}", node.position)
+
+    def match_pattern(self, pattern, value):
+        """
+        Try to match a pattern against a value.
+        Returns dict of variable bindings if match succeeds, None if it fails.
+        """
+        from .values import ListValue, SymbolValue
+
+        if type(pattern).__name__ == 'WildcardPattern':
+            # Wildcard matches anything, no bindings
+            return {}
+
+        elif type(pattern).__name__ == 'VariablePattern':
+            # Variable matches anything and binds the value
+            return {pattern.name: value}
+
+        elif type(pattern).__name__ == 'LiteralPattern':
+            # Literal pattern must match exactly
+            if isinstance(pattern.value, SymbolValue):
+                # Symbol pattern - check if value is SymbolValue with same name
+                if isinstance(value, SymbolValue) and value.name == pattern.value.name:
+                    return {}
+                return None
+            else:
+                # Other literal patterns (numbers, strings, booleans)
+                if hasattr(value, 'value'):
+                    if value.value == pattern.value:
+                        return {}
+                elif value == pattern.value:
+                    return {}
+                return None
+
+        elif type(pattern).__name__ == 'ListPattern':
+            # List pattern must match ListValue
+            if not isinstance(value, ListValue):
+                return None
+
+            # Handle rest variable (...rest syntax)
+            if pattern.rest_variable:
+                # Pattern like [first, ...rest]
+                required_elements = len(pattern.elements)
+                if len(value.elements) < required_elements:
+                    return None
+
+                bindings = {}
+
+                # Match fixed elements
+                for i, elem_pattern in enumerate(pattern.elements):
+                    elem_bindings = self.match_pattern(elem_pattern, value.elements[i])
+                    if elem_bindings is None:
+                        return None
+                    bindings.update(elem_bindings)
+
+                # Bind rest elements
+                rest_elements = value.elements[required_elements:]
+                rest_list = ListValue(rest_elements, value.position)
+                bindings[pattern.rest_variable] = rest_list
+
+                return bindings
+            else:
+                # Pattern like [a, b, c] - must match exact length
+                if len(value.elements) != len(pattern.elements):
+                    return None
+
+                bindings = {}
+                for elem_pattern, elem_value in zip(pattern.elements, value.elements):
+                    elem_bindings = self.match_pattern(elem_pattern, elem_value)
+                    if elem_bindings is None:
+                        return None
+                    bindings.update(elem_bindings)
+
+                return bindings
+
+        else:
+            # Unknown pattern type
+            return None
+
+    def visit_literal_pattern(self, node) -> Any:
+        """Patterns are not executed directly."""
+        raise RuntimeError("Patterns should not be executed directly")
+
+    def visit_variable_pattern(self, node) -> Any:
+        """Patterns are not executed directly."""
+        raise RuntimeError("Patterns should not be executed directly")
+
+    def visit_wildcard_pattern(self, node) -> Any:
+        """Patterns are not executed directly."""
+        raise RuntimeError("Patterns should not be executed directly")
+
+    def visit_list_pattern(self, node) -> Any:
+        """Patterns are not executed directly."""
+        raise RuntimeError("Patterns should not be executed directly")

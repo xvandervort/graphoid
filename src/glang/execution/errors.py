@@ -79,9 +79,16 @@ class LoadRequest(Exception):
 
 class ImportRequest(Exception):
     """Special exception to request module import from execution session."""
-    
+
     def __init__(self, filename: str, alias: Optional[str] = None, position: Optional[SourcePosition] = None):
         self.filename = filename
         self.alias = alias
         self.position = position
         super().__init__(f"Import request: {filename} as {alias}")
+
+
+class MatchError(RuntimeError):
+    """Error when no pattern matches in a match expression."""
+
+    def __init__(self, message: str, position: Optional[SourcePosition] = None):
+        super().__init__(message, position)
