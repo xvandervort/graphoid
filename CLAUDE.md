@@ -296,24 +296,54 @@ func fibonacci(n) {
 }
 ```
 
-### Behavior System (NEW!)
+### Intrinsic Behavior System (NEW!)
 
-Glang provides a powerful **composable behavior system** for custom node types, allowing domain-specific transformations and validations without language complexity:
+Glang provides a powerful **intrinsic behavior system** where data structures (lists, hashes, and future graphs) can have behaviors attached that automatically apply to all values during operations:
 
-```python
-# Currently available as Python API (future: native syntax)
-from glang.behaviors import BehaviorPipeline
+```glang
+# Create a list with automatic nil handling
+temperatures = [98.6, nil, 102.5]
+temperatures.add_rule("nil_to_zero")        # Attach behavior to the list itself
 
-# Create pipeline for medical data
-temp_pipeline = BehaviorPipeline()
-temp_pipeline.add("nil_to_zero")           # Missing readings become 0
-temp_pipeline.add("validate_range", 95, 105)  # Normal body temp range
-temp_pipeline.add("round_to_int")          # Round for display
+# The nil is immediately transformed to 0
+print(temperatures)                         # [98.6, 0, 102.5]
 
-# Apply to list of readings
-readings = ListValue([NumberValue(98.6), NoneValue(), NumberValue(110)])
-validated = temp_pipeline.apply_to_list(readings)
-# Result: [99, 95, 105]
+# All future nils are automatically transformed
+temperatures.append(nil)                    # Becomes 0 automatically
+print(temperatures)                         # [98.6, 0, 102.5, 0]
+
+# Add range validation behavior
+temperatures.add_rule("validate_range", 95, 105)  # Clamp to normal body temp
+
+# Existing and new values are clamped
+temperatures.append(110)                    # Automatically clamped to 105
+print(temperatures)                         # [98.6, 0, 102.5, 0, 105]
+
+# Symbol syntax (coming soon with parser support)
+temperatures.add_rule(:positive)            # Cleaner syntax with symbols
+
+# Query and manage behaviors
+temperatures.has_rule("nil_to_zero")        # true
+temperatures.get_rules()                     # ["nil_to_zero", "positive", "validate_range"]
+temperatures.remove_rule("positive")        # Remove specific behavior
+temperatures.clear_rules()                   # Remove all behaviors
+```
+
+#### Hash Behaviors
+```glang
+# Behaviors work on hashes too
+config = { "timeout": nil, "retries": -5, "port": 9999 }
+config.add_rule("nil_to_zero")              # nil values become 0
+config.add_rule("positive")                 # negative values become positive
+config.add_rule("validate_range", 1, 9000)  # clamp port numbers
+
+print(config["timeout"])                    # 0 (was nil)
+print(config["retries"])                    # 5 (was -5)
+print(config["port"])                        # 9000 (was 9999, clamped)
+
+# New values are automatically processed
+config["max_connections"] = nil             # Becomes 0
+config["min_threads"] = -10                 # Becomes 10 (positive), then clamped to 10
 ```
 
 #### Standard Behaviors
@@ -325,23 +355,25 @@ validated = temp_pipeline.apply_to_list(readings)
 - **round_to_int** - Round numbers to integers
 - **positive** - Ensure numbers are positive
 
-#### Custom Behaviors
-```python
-# Create domain-specific behaviors
-blood_pressure_parser = create_behavior(
-    "parse_bp",
-    transform=lambda v: parse_bp_string(v) if is_string(v) else v
-)
+#### Key Benefits
+- **Intrinsic to Data**: Behaviors are part of the container, not external processors
+- **Automatic Application**: Once attached, behaviors apply to all current and future values
+- **One-Step Process**: `list.add_rule("nil_to_zero")` - that's it!
+- **Type-Safe**: Behaviors respect and work with type constraints
+- **Composable**: Multiple behaviors apply in order
+- **Graph Foundation**: Since lists and hashes are graph structures, behaviors are inherited by all graph types
 
-# Register and use
-registry.register("parse_bp", blood_pressure_parser)
+#### Future: Custom Behaviors
+```glang
+# Future syntax for custom behaviors (not yet implemented)
+func normalize_temperature(value) {
+    if value < 95 { return 95 }
+    if value > 105 { return 105 }
+    return value
+}
+
+temperatures.add_rule(:normalize_temperature)  # Use custom function as behavior
 ```
-
-This system enables:
-- **Type-safe transformations** without runtime errors
-- **Composable pipelines** for complex validations
-- **Domain-specific logic** (medical, financial, config)
-- **Future graph support** - behaviors will work with graph nodes
 
 ### Control Flow
 
@@ -552,7 +584,7 @@ Glang uses a clean, modern architecture:
 - ✅ Standard library foundation with math constants module (stdlib/math.gr)
 - ✅ **JSON module** with encode, decode, pretty printing, and validation (json.encode, json.decode, json.is_valid)
 - ✅ **Time module** with single Time type, UTC timestamps, and full type casting (Time.now, Time.from_components, time.to_num, string.to_time)
-- ✅ **Behavior system** for custom node types with composable transformations and validations (behaviors.py)
+- ✅ **Intrinsic behavior system** where lists/hashes have built-in behaviors that auto-apply to all values (GraphContainer mixin)
 - ✅ **Comprehensive test suite** (609+ tests, 64% coverage)
 
 ### Development Guidelines

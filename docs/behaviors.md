@@ -1,261 +1,249 @@
-# Glang Behavior System
-
-The behavior system provides a powerful way to transform and validate data in Glang containers (lists, hashes, and future graphs) without adding language complexity.
+# Glang Intrinsic Behavior System
 
 ## Overview
 
-Behaviors are composable transformations that can:
-- Transform values (e.g., nil → 0, "green" → 2)
-- Validate and constrain data (e.g., clamp to range)
-- Handle missing or invalid data gracefully
-- Create domain-specific logic for your application
+Glang's intrinsic behavior system allows you to attach transformation and validation rules directly to data structures (lists and hashes). Once attached, these behaviors automatically apply to all current and future values in the container.
 
-## Quick Start
+## Key Concepts
 
-```python
-from glang.behaviors import BehaviorPipeline
-from glang.execution.values import NumberValue, NoneValue, ListValue
+### Intrinsic vs External
+Unlike traditional approaches where you apply transformations externally, Glang behaviors are **intrinsic** - they become part of the data structure itself:
 
-# Create a pipeline for sensor data
-sensor_pipeline = BehaviorPipeline()
-sensor_pipeline.add("nil_to_zero")           # Handle missing readings
-sensor_pipeline.add("validate_range", -50, 150)  # Temperature range
-sensor_pipeline.add("round_to_int")          # Round for display
+```glang
+# Traditional (external) approach - NOT how Glang works
+processed = transform(data, rule)  # Must remember to transform each time
 
-# Apply to a single value
-result = sensor_pipeline.apply(NoneValue())  # Returns NumberValue(0)
+# Glang (intrinsic) approach - behaviors are part of the data
+data.add_rule("nil_to_zero")       # One-time setup
+data.append(nil)                   # Automatically becomes 0
+```
 
-# Apply to a list
-readings = ListValue([NumberValue(23.7), NoneValue(), NumberValue(200)])
-validated = sensor_pipeline.apply_to_list(readings)
-# Result: [24, 0, 150]
+### Automatic Application
+Behaviors apply automatically in two scenarios:
+1. **Retroactively** to all existing values when a rule is added
+2. **Proactively** to all new values during operations (append, set, etc.)
+
+## Basic Usage
+
+### Adding Behaviors to Lists
+
+```glang
+# Create a list with some problematic values
+readings = [98.6, nil, 102.5, nil, -5]
+
+# Add behavior to handle nil values
+readings.add_rule("nil_to_zero")
+print(readings)  # [98.6, 0, 102.5, 0, -5]
+
+# Add behavior to ensure positive values
+readings.add_rule("positive")
+print(readings)  # [98.6, 0, 102.5, 0, 5]
+
+# New values are automatically processed
+readings.append(nil)      # Becomes 0
+readings.append(-10)      # Becomes 10
+print(readings)           # [98.6, 0, 102.5, 0, 5, 0, 10]
+```
+
+### Adding Behaviors to Hashes
+
+```glang
+# Create configuration with questionable values
+config = {
+    "timeout": nil,
+    "retries": -5,
+    "port": 99999,
+    "debug": true
+}
+
+# Add behaviors to sanitize configuration
+config.add_rule("nil_to_zero")              # Handle missing values
+config.add_rule("positive")                 # No negative numbers
+config.add_rule("validate_range", 1, 65535) # Valid port range
+
+print(config["timeout"])  # 0 (was nil)
+print(config["retries"])  # 5 (was -5)
+print(config["port"])     # 65535 (was 99999, clamped)
+
+# New entries are automatically processed
+config["max_connections"] = nil   # Becomes 0
+config["min_threads"] = -10       # Becomes 10
+```
+
+## Behaviors with Parameters
+
+Some behaviors accept parameters to customize their operation:
+
+```glang
+# Temperature readings that should be in Fahrenheit body temp range
+temps = [32, 98.6, 212, nil]
+
+# Add range validation with parameters
+temps.add_rule("validate_range", 95, 105)  # Normal body temp range
+temps.add_rule("nil_to_zero")
+
+print(temps)  # [95, 98.6, 105, 0]
+```
+
+## Managing Behaviors
+
+### Query Behaviors
+
+```glang
+list = [1, 2, 3]
+list.add_rule("positive")
+list.add_rule("round_to_int")
+
+# Check if a specific rule exists
+has_positive = list.has_rule("positive")    # true
+has_negative = list.has_rule("negative")    # false
+
+# Get all active rules (sorted alphabetically)
+rules = list.get_rules()                    # ["positive", "round_to_int"]
+```
+
+### Remove Behaviors
+
+```glang
+# Remove a specific behavior
+removed = list.remove_rule("positive")      # Returns true if removed
+
+# Clear all behaviors
+list.clear_rules()                          # Remove all behaviors
 ```
 
 ## Standard Behaviors
 
-### nil_to_zero
-Converts nil/none values to 0. Useful for missing numeric data.
-```python
-pipeline.add("nil_to_zero")
+### Value Transformation
+- `nil_to_zero` - Convert nil/null values to 0
+- `nil_to_empty` - Convert nil/null values to empty string ""
+- `positive` - Make negative numbers positive (absolute value)
+- `round_to_int` - Round decimal numbers to integers
+
+### String Transformation
+- `uppercase` - Convert strings to UPPERCASE
+- `lowercase` - Convert strings to lowercase
+- `map_colors` - Map color names to numbers (red→1, green→2, blue→3, etc.)
+
+### Validation
+- `validate_range(min, max)` - Clamp numbers to specified range
+
+## Multiple Behaviors
+
+Behaviors are applied in the order they were added:
+
+```glang
+data = [nil, -50.7]
+
+# Order matters!
+data.add_rule("nil_to_zero")    # First: nil → 0
+data.add_rule("positive")       # Second: negatives → positive
+data.add_rule("round_to_int")   # Third: decimals → integers
+
+print(data)  # [0, 51]
+# nil → 0 → 0 → 0
+# -50.7 → -50.7 → 50.7 → 51
 ```
 
-### nil_to_empty
-Converts nil/none values to empty string. Useful for missing text data.
-```python
-pipeline.add("nil_to_empty")
+## Type Constraints
+
+Behaviors work seamlessly with type constraints:
+
+```glang
+# List constrained to numbers
+list<num> scores = [95, 87, nil]
+
+# This behavior maintains the type constraint
+scores.add_rule("nil_to_zero")  # nil → 0 (still a number)
+
+scores.append(nil)               # Becomes 0, satisfies constraint
+scores.append("text")            # ERROR: Cannot append string to list<num>
 ```
 
-### validate_range(min, max)
-Clamps numeric values to a specified range.
-```python
-pipeline.add("validate_range", 0, 100)  # Clamp to 0-100
-```
+## Symbol Syntax (Future)
 
-### map_colors
-Maps color name strings to numeric values.
-- "red" → 1, "green" → 2, "blue" → 3, "yellow" → 4
-- "black" → 0, "white" → 5
-```python
-pipeline.add("map_colors")
-```
+Once the parser supports symbols, you'll be able to use cleaner syntax:
 
-### uppercase / lowercase
-Converts string case.
-```python
-pipeline.add("uppercase")  # "hello" → "HELLO"
-pipeline.add("lowercase")  # "WORLD" → "world"
-```
-
-### round_to_int
-Rounds numeric values to nearest integer.
-```python
-pipeline.add("round_to_int")  # 3.7 → 4
-```
-
-### positive
-Ensures numeric values are positive (converts negative to absolute value).
-```python
-pipeline.add("positive")  # -5 → 5
-```
-
-## Creating Custom Behaviors
-
-You can create domain-specific behaviors for your application:
-
-```python
-from glang.behaviors import create_behavior, BehaviorRegistry
-
-# Simple transformation
-double_behavior = create_behavior(
-    "double",
-    transform=lambda value: NumberValue(value.value * 2) 
-                            if isinstance(value, NumberValue) 
-                            else value
-)
-
-# Validation with fallback
-def validate_even(value):
-    if isinstance(value, NumberValue):
-        return value.value % 2 == 0
-    return True
-
-def make_even(value):
-    if isinstance(value, NumberValue) and value.value % 2 != 0:
-        return NumberValue(value.value + 1)
-    return value
-
-even_only = create_behavior(
-    "even_only",
-    validate=validate_even,
-    on_invalid=make_even
-)
-
-# Register for use
-registry = BehaviorRegistry()
-registry.register("double", double_behavior)
-registry.register("even_only", even_only)
-
-# Use in pipeline
-pipeline = BehaviorPipeline(registry)
-pipeline.add("double")
-pipeline.add("even_only")
+```glang
+# Future syntax with symbols (not yet implemented)
+list.add_rule(:nil_to_zero)              # Cleaner than "nil_to_zero"
+list.add_rule(:validate_range, 0, 100)   # With parameters
+list.has_rule(:positive)                 # Query with symbol
+list.remove_rule(:round_to_int)          # Remove with symbol
 ```
 
 ## Practical Examples
 
-### Medical Data Validation
-```python
-# Blood pressure readings with safety constraints
-bp_pipeline = BehaviorPipeline()
-bp_pipeline.add("nil_to_zero")
-bp_pipeline.add("validate_range", 60, 200)  # Reasonable BP range
-
-readings = ListValue([
-    NumberValue(120),    # Normal
-    NoneValue(),         # Missing → 60
-    NumberValue(250),    # Too high → 200
-])
-validated = bp_pipeline.apply_to_list(readings)
-```
-
-### Configuration Normalization
-```python
-# Server port configuration
-config_pipeline = BehaviorPipeline()
-config_pipeline.add("nil_to_zero")
-config_pipeline.add("validate_range", 1024, 65535)  # Valid port range
-
-config = HashValue([
-    ("port", NumberValue(8080)),        # Valid → 8080
-    ("admin_port", NumberValue(80)),    # Too low → 1024
-    ("debug_port", NoneValue()),        # Missing → 1024
-])
-
-# Apply to specific hash keys
-config_pipeline.apply_to_hash_value(config, "admin_port")
-config_pipeline.apply_to_hash_value(config, "debug_port")
-```
-
-### Financial Data Processing
-```python
-# Price validation with rounding
-price_pipeline = BehaviorPipeline()
-price_pipeline.add("nil_to_zero")
-price_pipeline.add("positive")           # No negative prices
-price_pipeline.add("validate_range", 0.01, 999999)
-price_pipeline.add("round_to_int")       # Round to cents
-
-prices = ListValue([
-    NumberValue(19.99),     # Valid
-    NumberValue(-5),        # Negative → 5
-    NoneValue(),            # Missing → 0.01
-    NumberValue(1000000),   # Too high → 999999
-])
-```
-
-## Behavior Composition
-
-Behaviors apply in the order they're added to the pipeline:
-
-```python
-pipeline = BehaviorPipeline()
-pipeline.add("nil_to_zero")       # 1st: Handle missing data
-pipeline.add("positive")          # 2nd: Make positive
-pipeline.add("validate_range", 0, 100)  # 3rd: Clamp to range
-pipeline.add("round_to_int")      # 4th: Round result
-
-# For input: NoneValue()
-# Step 1: nil → 0
-# Step 2: 0 → 0 (already positive)
-# Step 3: 0 → 0 (within range)
-# Step 4: 0 → 0 (already integer)
-# Result: 0
-```
-
-## Future: Native Glang Syntax
-
-Currently, behaviors are accessed through the Python API. Future versions will support native Glang syntax:
+### Configuration Validation
 
 ```glang
-# Future syntax (not yet implemented)
-temperature: num with [NilToZero, ValidateRange(95, 105)]
-priority: var with [MapColors, NilToZero]
+# Database configuration with sensible defaults
+db_config = {
+    "host": "localhost",
+    "port": nil,
+    "timeout": -1,
+    "max_connections": 1000000
+}
 
-# Applied automatically on assignment
-temperature = nil        # Becomes 95 (nil → 0 → clamped to 95)
-priority = "green"       # Becomes 2
+# Apply behaviors for production safety
+db_config.add_rule("nil_to_zero")
+db_config.add_rule("positive")
+db_config.add_rule("validate_range", 1, 10000)
+
+# Results in safe configuration:
+# port: 0 → 3306 (would need custom behavior for default)
+# timeout: -1 → 1
+# max_connections: 1000000 → 10000 (clamped)
 ```
 
-## Use Cases
+### Sensor Data Cleaning
 
-The behavior system is ideal for:
+```glang
+# Temperature sensors sometimes report invalid data
+sensor_readings = []
+sensor_readings.add_rule("nil_to_zero")          # Handle missing readings
+sensor_readings.add_rule("validate_range", -50, 150)  # Reasonable Earth temps
 
-- **Medical/Healthcare**: Validate vital signs, handle missing readings
-- **Financial**: Normalize prices, validate amounts, handle currencies
-- **Configuration**: Validate settings, provide defaults
-- **IoT/Sensors**: Handle missing data, validate ranges, filter noise
-- **Gaming**: Clamp stats, validate inputs, normalize values
-- **Data Import**: Clean messy data, handle nulls, standardize formats
-
-## Performance Considerations
-
-- Behaviors are applied eagerly (not lazy)
-- Pipeline order matters for both correctness and performance
-- Custom behaviors should be stateless for thread safety
-- Behaviors can be reused across multiple pipelines
-
-## API Reference
-
-### BehaviorPipeline
-```python
-pipeline = BehaviorPipeline(registry=None)  # Use custom or global registry
-pipeline.add(behavior_name, *args)          # Add behavior to pipeline
-pipeline.apply(value)                       # Apply to single value
-pipeline.apply_to_list(list_value)          # Apply to all list elements
-pipeline.apply_to_hash_value(hash, key)     # Apply to specific hash key
+# Now just append data without worrying about validation
+sensor_readings.append(72.5)    # Valid: 72.5
+sensor_readings.append(nil)     # Becomes: 0
+sensor_readings.append(9999)    # Clamped: 150
+sensor_readings.append(-100)    # Clamped: -50
 ```
 
-### create_behavior
-```python
-behavior = create_behavior(
-    name,                    # Behavior name
-    transform=None,          # Transform function (value → value)
-    validate=None,           # Validation function (value → bool)
-    on_invalid=None          # Fallback for invalid values
-)
-```
+### Financial Calculations
 
-### BehaviorRegistry
-```python
-registry = BehaviorRegistry()        # Create custom registry
-registry.register(name, behavior)    # Register custom behavior
-behavior = registry.get(name)        # Retrieve behavior
+```glang
+# Prices should never be negative and always rounded to cents
+prices = []
+prices.add_rule("positive")
+prices.add_rule("round_to", 2)  # Round to 2 decimal places
+
+prices.append(19.999)   # Becomes: 20.00
+prices.append(-5.50)    # Becomes: 5.50
+prices.append(nil)      # Would need nil_to_zero first
 ```
 
 ## Best Practices
 
-1. **Order matters**: Place nil handlers before validators
-2. **Be explicit**: Name behaviors clearly (e.g., "celsius_to_fahrenheit" not "convert")
-3. **Compose small behaviors**: Better to chain simple behaviors than create complex ones
-4. **Document domain logic**: Explain why certain validations/transformations are needed
-5. **Test edge cases**: Especially nil, negative, and out-of-range values
+1. **Add behaviors early** - Set up behaviors when creating the container
+2. **Order matters** - Add behaviors in logical transformation order
+3. **Document behaviors** - Comment which behaviors are active and why
+4. **Test edge cases** - Verify behaviors handle nil, negative, and extreme values
+5. **Use type constraints** - Combine behaviors with type constraints for safety
+
+## Performance Considerations
+
+- Behaviors are applied during operations (append, set), not on access
+- Adding a behavior to existing data applies it once to all elements
+- Removing behaviors doesn't undo previous transformations
+- Behaviors are lightweight - just function calls during mutations
+
+## Future Enhancements
+
+The behavior system will be extended with:
+- Custom behaviors defined in Glang functions
+- Behavior inheritance in graph hierarchies
+- Conditional behaviors based on context
+- Behavior composition and pipelines
+- Graph-specific behaviors for nodes and edges

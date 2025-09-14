@@ -12,6 +12,7 @@ import sys
 import os
 import uuid
 from .glang_number import GlangNumber, create_glang_number
+from ..graph_container import GraphContainer
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
@@ -566,7 +567,7 @@ class NumberValue(GlangValue):
 
 class BooleanValue(GlangValue):
     """Runtime boolean value."""
-    
+
     def __init__(self, value: bool, position: Optional[SourcePosition] = None):
         super().__init__(position)
         self.value = value
@@ -789,12 +790,13 @@ class GlangHashTable:
                 self.set(key, value)
 
 
-class HashValue(GlangValue):
-    """Runtime hash value - collection of data nodes (key-value pairs)."""
-    
+class HashValue(GlangValue, GraphContainer):
+    """Runtime hash value - collection of data nodes (key-value pairs) with behavior support."""
+
     def __init__(self, pairs: List[Tuple[str, GlangValue]], constraint: Optional[str] = None,
                  position: Optional[SourcePosition] = None):
-        super().__init__(position)
+        GlangValue.__init__(self, position)
+        GraphContainer.__init__(self)
         # Use Glang hash table instead of Python dict
         self.pairs = GlangHashTable()
         for key, value in pairs:
@@ -829,19 +831,31 @@ class HashValue(GlangValue):
         return self.pairs.get(key)
     
     def set(self, key: str, value: GlangValue) -> None:
-        """Set value for key (with constraint validation)."""
+        """Set value for key (with behavior application and constraint validation)."""
         self._check_not_frozen("set key")
         self._check_contamination_compatibility(value, "set key")
-        
+
+        # Apply behaviors if any
+        if self._has_behaviors():
+            value = self._apply_behaviors(value)
+
         if not self.validate_constraint(value):
             from .errors import TypeConstraintError
             raise TypeConstraintError(
                 f"Cannot assign {value.get_type()} to hash<{self.constraint}>",
                 value.position
             )
-        
+
         self.pairs.set(key, value)
         self._update_frozen_flag()
+
+    def _apply_behaviors_to_existing(self):
+        """Apply behaviors to all existing values in the hash."""
+        for key in self.pairs.keys():
+            current_value = self.pairs.get(key)
+            if current_value:
+                processed_value = self._apply_behaviors(current_value)
+                self.pairs.set(key, processed_value)
     
     def has_key(self, key: str) -> bool:
         """Check if key exists in map."""
@@ -930,12 +944,13 @@ class HashValue(GlangValue):
         return True, ""
 
 
-class ListValue(GlangValue):
-    """Runtime list value with optional type constraints."""
-    
-    def __init__(self, elements: List[GlangValue], constraint: Optional[str] = None, 
+class ListValue(GlangValue, GraphContainer):
+    """Runtime list value with optional type constraints and behavior support."""
+
+    def __init__(self, elements: List[GlangValue], constraint: Optional[str] = None,
                  position: Optional[SourcePosition] = None):
-        super().__init__(position)
+        GlangValue.__init__(self, position)
+        GraphContainer.__init__(self)
         self.elements = elements
         self.constraint = constraint
         # Check if any elements are frozen
@@ -958,19 +973,28 @@ class ListValue(GlangValue):
         return value.get_type() == self.constraint
     
     def append(self, value: GlangValue) -> None:
-        """Append value to list (with constraint validation)."""
+        """Append value to list (with behavior application and constraint validation)."""
         self._check_not_frozen("append")
         self._check_contamination_compatibility(value, "append")
-        
+
+        # Apply behaviors if any
+        if self._has_behaviors():
+            value = self._apply_behaviors(value)
+
         if not self.validate_constraint(value):
             from .errors import TypeConstraintError
             raise TypeConstraintError(
                 f"Cannot append {value.get_type()} to list<{self.constraint}>",
                 value.position
             )
-        
+
         self.elements.append(value)
         self._update_frozen_flag()
+
+    def _apply_behaviors_to_existing(self):
+        """Apply behaviors to all existing elements in the list."""
+        for i in range(len(self.elements)):
+            self.elements[i] = self._apply_behaviors(self.elements[i])
     
     def get_element(self, index: int) -> GlangValue:
         """Get element at index (with bounds checking)."""
@@ -980,21 +1004,25 @@ class ListValue(GlangValue):
         return self.elements[index]
     
     def set_element(self, index: int, value: GlangValue) -> None:
-        """Set element at index (with constraint validation)."""
+        """Set element at index (with behavior application and constraint validation)."""
         if not -len(self.elements) <= index < len(self.elements):
             from .errors import RuntimeError
             raise RuntimeError(f"List index {index} out of range", value.position)
-        
+
         self._check_not_frozen("set element")
         self._check_contamination_compatibility(value, "set element")
-        
+
+        # Apply behaviors if any
+        if self._has_behaviors():
+            value = self._apply_behaviors(value)
+
         if not self.validate_constraint(value):
             from .errors import TypeConstraintError
             raise TypeConstraintError(
                 f"Cannot assign {value.get_type()} to list<{self.constraint}>",
                 value.position
             )
-        
+
         self.elements[index] = value
         self._update_frozen_flag()
     
@@ -1217,9 +1245,36 @@ class LambdaValue(GlangValue):
         return len(self.parameters)
 
 
+class SymbolValue(GlangValue):
+    """Runtime symbol value for narrow uses like behavior names.
+
+    Symbols are lightweight identifiers that start with ':' and are used
+    primarily for behavior rules and other meta-programming features.
+    """
+
+    def __init__(self, name: str, position: Optional[SourcePosition] = None):
+        super().__init__(position)
+        self.name = name  # Store without the leading ':'
+
+    def to_python(self) -> str:
+        return self.name
+
+    def get_type(self) -> str:
+        return "symbol"
+
+    def to_display_string(self) -> str:
+        return f":{self.name}"
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, SymbolValue) and self.name == other.name
+
+    def __hash__(self) -> int:
+        return hash(('symbol', self.name))
+
+
 class NoneValue(GlangValue):
     """Runtime value representing absence of value (like null/None)."""
-    
+
     def __init__(self, position: Optional[SourcePosition] = None):
         super().__init__(position)
         

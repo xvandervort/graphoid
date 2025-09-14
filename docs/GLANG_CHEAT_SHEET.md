@@ -274,6 +274,50 @@ numbers.reject("odd")     # Opposite of filter
 numbers.filter("positive").map("double").each("print")
 ```
 
+## 🛡️ Intrinsic Behaviors (NEW!)
+
+### Adding Behaviors to Lists
+```glang
+# Create list with behaviors that auto-apply to all values
+temps = [98.6, nil, 105.2, -10]
+temps.add_rule("nil_to_zero")         # nil becomes 0
+temps.add_rule("validate_range", 95, 105)  # Clamp to range
+
+print(temps)                           # [98.6, 0, 105, 95]
+
+# New values are automatically processed
+temps.append(nil)                      # Becomes 0
+temps.append(110)                      # Clamped to 105
+```
+
+### Adding Behaviors to Hashes
+```glang
+# Behaviors work on hash values too
+config = { "timeout": nil, "retries": -5 }
+config.add_rule("nil_to_zero")        # nil → 0
+config.add_rule("positive")           # negative → positive
+
+print(config["timeout"])              # 0 (was nil)
+print(config["retries"])              # 5 (was -5)
+```
+
+### Managing Behaviors
+```glang
+# Query and manage behaviors
+list.has_rule("nil_to_zero")          # Check if rule exists
+list.get_rules()                       # Get all active rules
+list.remove_rule("positive")          # Remove specific rule
+list.clear_rules()                     # Remove all rules
+```
+
+### Standard Behaviors
+- `nil_to_zero` - Convert nil to 0
+- `nil_to_empty` - Convert nil to ""
+- `positive` - Make negatives positive
+- `round_to_int` - Round to integer
+- `uppercase`/`lowercase` - String case
+- `validate_range(min, max)` - Clamp to range
+
 ## 🧮 Mathematical Methods
 
 ### Number Methods

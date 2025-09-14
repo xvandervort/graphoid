@@ -46,11 +46,20 @@ Transform Glang from a practical programming language into a revolutionary platf
 - [ ] **Pattern Matching**: `match` expressions for elegant control flow and data destructuring
 - [ ] **Status Symbols**: Limited symbols (`:ok`, `:error`) for result patterns
 - [ ] **Error-as-Data**: Result lists `[:ok, value]` / `[:error, message]` for clean error handling
-- [ ] **Implicit Success Wrapping**: Auto-wrap plain returns as `[:ok, value]` 
+- [ ] **Implicit Success Wrapping**: Auto-wrap plain returns as `[:ok, value]`
 - [ ] **Module Scoping**: Functions can access module-level variables
 - [ ] **None Literal**: Add `none` as a language keyword for null values
+- [ ] **Symbol Lexing/Parsing**: Support `:symbol` syntax for behavior names and status codes
 
-#### 1.4 Performance & Stability
+#### 1.4 Enhanced Behavior System
+- [x] **Intrinsic Behaviors**: Behaviors attached directly to data structures (completed)
+- [ ] **Custom Value Mappings**: User-defined conversions (`"red" → 7`, `"kg" → "mass"`)
+- [ ] **Function-Based Behaviors**: Attach user-written functions as behaviors
+- [ ] **Conditional Behaviors**: Apply behaviors based on context or conditions
+- [ ] **Behavior Inheritance**: Child containers inherit parent behaviors
+- [ ] **Domain-Specific Behavior Libraries**: Pre-built behavior sets for common domains
+
+#### 1.5 Performance & Stability
 - [ ] Performance benchmarking suite
 - [ ] Memory leak detection
 - [ ] Optimization pass on hot paths
@@ -182,7 +191,7 @@ The following documents have been superseded by this roadmap:
 5. ✅ ~~Add date/time handling module~~
 6. ✅ ~~Implement regular expression module~~
 7. ✅ ~~Create random number generation module~~
-8. ✅ ~~Add composable behavior system (bonus feature)~~
+8. ✅ ~~Add intrinsic behavior system for automatic value transformation~~
 9. Improve error handling with enhanced stack traces
 
 ### Q1 2025
@@ -231,9 +240,97 @@ The following documents have been superseded by this roadmap:
 - Conference presentations and outreach
 - Commercial support and consulting
 
+### Advanced Behavior System (Future Enhancements)
+
+The behavior system will evolve to support increasingly sophisticated transformations and domain-specific logic:
+
+#### Custom Value Mappings
+```glang
+# User-defined conversion tables
+colors = []
+colors.add_mapping("red", 7)      # Direct value mapping
+colors.add_mapping("blue", 12)
+colors.add_mapping("green", 5)
+
+colors.append("red")              # Becomes 7
+colors.append("blue")             # Becomes 12
+
+# Unit conversions
+weights = []
+weights.add_mapping("kg", func(v) { return v * 2.204 })  # kg to lbs
+weights.add_mapping("g", func(v) { return v / 453.592 }) # grams to lbs
+
+weights.append({ "value": 70, "unit": "kg" })  # Becomes 154.28 lbs
+```
+
+#### Function-Based Behaviors
+```glang
+# Attach user functions as behaviors
+func normalize_temperature(temp) {
+    if temp < -273.15 { return -273.15 }  # Absolute zero
+    if temp > 1000 { return 1000 }       # Reasonable max
+    return temp
+}
+
+temperatures = []
+temperatures.add_rule(normalize_temperature)  # Use function directly
+
+# Or with parameters
+func validate_range_func(value, min, max) {
+    if value < min { return min }
+    if value > max { return max }
+    return value
+}
+
+scores.add_rule(validate_range_func, 0, 100)
+```
+
+#### Conditional Behaviors
+```glang
+# Apply behaviors based on context
+medical_data = []
+medical_data.add_rule_if("nil_to_zero", "sensor_data")    # Only for sensor readings
+medical_data.add_rule_if("uppercase", "patient_name")     # Only for names
+medical_data.add_rule_unless("positive", "temperature")   # Except temperatures
+
+# Context-aware processing
+patient_data.set_context("emergency", true)
+patient_data.append(reading)  # Different behaviors apply in emergency context
+```
+
+#### Behavior Inheritance
+```glang
+# Parent behaviors automatically inherited by children
+hospital_system = {}
+hospital_system.add_rule("nil_to_zero")
+hospital_system.add_rule("validate_medical_ranges")
+
+# Child inherits parent behaviors
+patient_records = hospital_system.create_child()
+patient_records.append(nil)      # Becomes 0 (inherited behavior)
+
+# Override or extend inherited behaviors
+patient_records.add_rule("encrypt_sensitive_data")  # Additional behavior
+```
+
+#### Domain-Specific Behavior Libraries
+```glang
+# Pre-built behavior sets for common domains
+import "behaviors/medical" as MedicalBehaviors
+import "behaviors/financial" as FinancialBehaviors
+import "behaviors/scientific" as ScientificBehaviors
+
+# Apply entire behavior suites
+lab_results = []
+lab_results.apply_behaviors(MedicalBehaviors.lab_standards)  # Multiple behaviors at once
+
+financial_data = []
+financial_data.apply_behaviors(FinancialBehaviors.currency_processing)
+```
+
 ### Specialized Libraries
 - Machine learning and data science bindings
-- Graphics and game development libraries  
+- Graphics and game development libraries
 - Cryptography and security libraries
 - Audio/video processing
 - Scientific computing modules
