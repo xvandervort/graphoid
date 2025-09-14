@@ -445,16 +445,222 @@ This system could make Glang uniquely powerful for:
 
 ---
 
-## 11. Conclusion
+## 11. Graph Layers & Traversal Constraints (Updated January 2025)
 
-This discussion has revealed a path toward making Glang not just a graph-theoretic language, but a platform for **living, self-aware computational systems**. The progression from simple function references to self-mutating graphs with governance systems opens up possibilities we're only beginning to understand.
+### Multi-Layer Graph Architecture
+Building on the control nodes concept, we've identified **five distinct graph layers** that work together:
 
-The concepts explored here - self-contained closures, self-aware graphs, control nodes, and distributed governance - could position Glang as uniquely suited for the next generation of adaptive, intelligent systems.
+1. **Data Layer (Relationship Edges)**
+   - Pure information storage and node-to-node relationships
+   - Traditional graph traversal operations
+   - Default target for traversal operations
 
-These ideas represent a significant evolution beyond traditional programming languages toward something more akin to **constitutional computing** - where code doesn't just process data, but governs its own evolution within defined rules and constraints.
+2. **Behavior Layer (Behavior Edges)**
+   - Computational capabilities attached to graphs
+   - Methods, analysis functions, and communication behaviors
+   - Cannot be mixed with relationship edges during traversal
 
-The implications for AI, smart contracts, simulations, and distributed systems are profound and deserve careful exploration as Glang continues to evolve.
+3. **Control Layer (Rule Enforcement)**
+   - Constitutional computing with `__control__` nodes
+   - Access control, protection zones, mutation limits
+   - Enforces rules like "no updating medical readings without doctor override"
+
+4. **Metadata Layer (Graph History & Context)**
+   - Version history and change tracking
+   - Serialization and incremental updates
+   - Audit trails and data provenance
+
+5. **System Boundary Layer (External Interfaces)**
+   - File handles as "portals" between system layers
+   - Network connections and database interfaces
+   - Capability-based security boundaries
+
+### Constrained Traversal
+**Critical insight**: Relationship edges and behavior edges must be traversed separately:
+
+```glang
+# Traverse data relationships only (default)
+connected_patients = patient_graph.traverse_relationships()
+  .from_node(patient_123)
+  .depth(2)
+  .collect()
+
+# Traverse available behaviors only
+available_analyses = patient_graph.traverse_behaviors()
+  .matching("survival_*")
+  .list()
+
+# INVALID - cannot mix edge types in single traversal
+# patient_graph.traverse_all()  # Error: ambiguous traversal
+
+# Combine results AFTER traversal, not during
+clusters = patient_graph.find_connected_components()
+for cluster in clusters {
+    cluster.apply_behavior("statistical_analysis")
+}
+```
+
+### Data Graphs as Statistical Structures
+**Data graphs** (Glang's answer to data frames) leverage this architecture:
+
+```glang
+# Medical data with enforced constraints
+medical_data = data_graph {
+    readings: {
+        "2025-01-01": {heart_rate: 72, bp: "120/80"},
+        "2025-01-02": {heart_rate: 85, bp: "125/82"}
+    },
+    
+    # Behavior layer - attached analysis capabilities
+    behaviors: {
+        correlation_analysis -> StatisticalMethods,
+        time_series_analysis -> TemporalMethods,
+        live_sync -> func() {
+            new_data = fetch_from_api()
+            # Control layer enforces append-only
+            this.append_reading(new_data)
+        }
+    },
+    
+    # Control layer - enforcement rules
+    __control__: {
+        immutable_keys: ["readings"],     # Can't delete history
+        append_only: ["readings"],        # Can't overwrite
+        doctor_override: required_for(["reading_corrections"]),
+        validate_reading: func(type, value) {
+            if type == "heart_rate" && value < 30 || value > 200 {
+                return require_review("Extreme value")
+            }
+        }
+    }
+}
+```
 
 ---
 
-*This document serves as a design exploration and should be revisited as implementation proceeds and new insights emerge.*
+## 12. Serialization & Security (Added January 2025)
+
+### Serialization Challenges
+Unlike Ruby's marshal (simple but inefficient), Glang needs thoughtful serialization:
+
+**Requirements:**
+- **Efficiency**: Compact representation, especially for large graphs
+- **Versioning**: Support incremental/delta serialization
+- **Security**: Encrypted or partially encrypted graphs
+- **Integrity**: Preserve all five layers during serialization
+
+**Proposed Formats:**
+
+```glang
+# Full serialization (all layers)
+graph.save("snapshot.glr")  # Glang Graph format
+
+# Delta serialization (changes only)
+graph.save_delta("changes_v23_to_v24.gld")
+
+# Selective layer serialization
+graph.save_layers("data_only.glr", layers: ["data"])
+graph.save_layers("public.glr", layers: ["data", "behavior"])
+graph.save_layers("complete.glr", layers: "all", encrypt: true)
+```
+
+### Security Considerations
+
+**Medical Data Example:**
+```glang
+secure_medical = data_graph {
+    # Encryption at rest
+    __security__: {
+        encryption: {
+            algorithm: "AES-256",
+            key_source: "hardware_security_module",
+            encrypt_layers: ["data", "metadata"],
+            plaintext_layers: ["control"]  # Rules visible for audit
+        },
+        
+        # Partial encryption for selective access
+        field_encryption: {
+            "patient_id": "tokenized",
+            "diagnosis": "encrypted",
+            "appointment_time": "plaintext"
+        }
+    }
+}
+
+# Serialization with security
+secure_medical.save("patient_data.glr", {
+    encrypt_fields: ["patient_id", "diagnosis"],
+    sign_with: doctor_certificate,
+    audit_log: true
+})
+```
+
+### Serialization Format Design Principles
+
+1. **Layered Structure**: Each layer serialized independently
+2. **Compression**: Use domain-specific compression (medical data patterns)
+3. **Streaming Support**: Handle graphs too large for memory
+4. **Forward Compatibility**: Extensible format for future layers
+5. **Human-Readable Headers**: Debugging without full deserialization
+
+```
+# Proposed .glr format structure
+GLANG_GRAPH_v1.0
+LAYERS: data,behavior,control,metadata
+ENCRYPTION: partial[data.patient_id,data.diagnosis]
+COMPRESSION: zstd
+---
+[Layer data follows...]
+```
+
+---
+
+## 13. Implementation Roadmap (January 2025)
+
+### Phase 1: Foundation (1-2 months)
+- Basic data graphs using current containers
+- Simple serialization to .glr files
+- Anonymous functions with `.call()`
+
+### Phase 2: Governance (3-4 months)
+- Control layer with `__control__` nodes
+- Basic rule enforcement
+- Append-only and immutable constraints
+
+### Phase 3: Persistence (4-6 months)
+- Full serialization with all layers
+- Delta/incremental updates
+- Version history tracking
+
+### Phase 4: Communication (6-8 months)
+- Self-updating graphs with API sync
+- Behavior attachment system
+- Constrained traversal implementation
+
+### Phase 5: Security (8-10 months)
+- Encrypted serialization
+- Partial field encryption
+- Audit trail system
+
+### Phase 6: Distribution (10-12 months)
+- Multi-node graph systems
+- Consensus mechanisms
+- Distributed traversal
+
+---
+
+## 14. Conclusion
+
+This expanded vision incorporates critical insights about:
+- **Layer separation** for clean architecture
+- **Constrained traversal** preventing nonsensical operations
+- **Serialization design** avoiding Ruby's marshal pitfalls
+- **Security-first design** for sensitive domains like healthcare
+
+The five-layer architecture (Data, Behavior, Control, Metadata, System Boundary) provides a clear conceptual model while allowing incremental implementation. Most graphs won't need all layers, but the architecture supports growth from simple data analysis to fully governed, self-aware, distributed systems.
+
+These ideas continue to position Glang as uniquely suited for **constitutional computing** - where data structures don't just store information but actively govern their own evolution within defined rules and constraints.
+
+---
+
+*This document was updated January 2025 to incorporate insights about graph layers, traversal constraints, serialization, and security from ongoing design discussions.*

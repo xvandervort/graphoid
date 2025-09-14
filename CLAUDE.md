@@ -296,6 +296,53 @@ func fibonacci(n) {
 }
 ```
 
+### Behavior System (NEW!)
+
+Glang provides a powerful **composable behavior system** for custom node types, allowing domain-specific transformations and validations without language complexity:
+
+```python
+# Currently available as Python API (future: native syntax)
+from glang.behaviors import BehaviorPipeline
+
+# Create pipeline for medical data
+temp_pipeline = BehaviorPipeline()
+temp_pipeline.add("nil_to_zero")           # Missing readings become 0
+temp_pipeline.add("validate_range", 95, 105)  # Normal body temp range
+temp_pipeline.add("round_to_int")          # Round for display
+
+# Apply to list of readings
+readings = ListValue([NumberValue(98.6), NoneValue(), NumberValue(110)])
+validated = temp_pipeline.apply_to_list(readings)
+# Result: [99, 95, 105]
+```
+
+#### Standard Behaviors
+- **nil_to_zero** - Convert nil/none to 0
+- **nil_to_empty** - Convert nil/none to empty string
+- **validate_range(min, max)** - Clamp numbers to range
+- **map_colors** - Map color names to numbers
+- **uppercase/lowercase** - String case conversion
+- **round_to_int** - Round numbers to integers
+- **positive** - Ensure numbers are positive
+
+#### Custom Behaviors
+```python
+# Create domain-specific behaviors
+blood_pressure_parser = create_behavior(
+    "parse_bp",
+    transform=lambda v: parse_bp_string(v) if is_string(v) else v
+)
+
+# Register and use
+registry.register("parse_bp", blood_pressure_parser)
+```
+
+This system enables:
+- **Type-safe transformations** without runtime errors
+- **Composable pipelines** for complex validations
+- **Domain-specific logic** (medical, financial, config)
+- **Future graph support** - behaviors will work with graph nodes
+
 ### Control Flow
 
 ```glang
@@ -505,7 +552,8 @@ Glang uses a clean, modern architecture:
 - ✅ Standard library foundation with math constants module (stdlib/math.gr)
 - ✅ **JSON module** with encode, decode, pretty printing, and validation (json.encode, json.decode, json.is_valid)
 - ✅ **Time module** with single Time type, UTC timestamps, and full type casting (Time.now, Time.from_components, time.to_num, string.to_time)
-- ✅ **Comprehensive test suite** (597+ tests, 64% coverage)
+- ✅ **Behavior system** for custom node types with composable transformations and validations (behaviors.py)
+- ✅ **Comprehensive test suite** (609+ tests, 64% coverage)
 
 ### Development Guidelines
 - **AST-first development** - All new features should extend the AST system
@@ -515,21 +563,26 @@ Glang uses a clean, modern architecture:
 
 ## Future Vision: The Path to Revolutionary Graph Computing
 
-### Near-Term Priorities (Q2 2025)
+### Near-Term Priorities (Q1-Q2 2025)
 **Make Glang Practical** - Standard libraries for real-world use:
 - **✅ I/O Library**: File operations, file handle I/O with auto-close semantics, user input, directory management
 - **✅ Time Library**: Single Time type with UTC timestamps and full type casting
+- **✅ Behavior System**: Composable transformations for custom node types (Python API complete)
 - **⏳ Network Library**: ✅ JSON support, HTTP client, email notifications 
 - **⏳ Database Connectivity**: SQLite, PostgreSQL, MySQL support
 - **⏳ System Library**: OS interaction, processes
+- **⏳ Native Behavior Syntax**: `value: type with [behaviors...]` language integration
 
-### Medium-Term Goals (Q3 2025)
+### Medium-Term Goals (Q2-Q3 2025)
 **Build True Graph Foundation** - Transform containers into real graphs:
+- **Native Behavior Integration**: `with [behaviors...]` syntax in AST/parser/execution
+- **Data Graphs for Statistics**: DataFrames as graph structures with attached behaviors
 - **Enhanced Binary Data Processing**: Hexadecimal literals, fixed-size lists, format detection, image processing
 - **Graph Architecture**: Nodes + edges with metadata, not just containers
 - **Node Awareness**: Nodes know their container and can access siblings
 - **Graph Traversal**: Real pathfinding, connectivity analysis
 - **Anonymous Functions**: Function references with `.call()` method
+- **Behavior-Aware Graphs**: True graphs with behaviors attached to specific nodes
 
 ### Long-Term Vision (Q4 2025 and Beyond)
 **Revolutionary Graph Features** - What makes Glang unique:
