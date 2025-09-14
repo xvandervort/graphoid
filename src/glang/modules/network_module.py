@@ -6,7 +6,7 @@ to provide HTTP functionality with better Glang integration.
 """
 
 from typing import Optional, Dict
-from ..execution.values import GlangValue, StringValue, BooleanValue, NumberValue, ListValue, HashValue, DataNodeValue
+from ..execution.values import GlangValue, StringValue, BooleanValue, NumberValue, ListValue, HashValue, DataValue
 from ..ast.nodes import SourcePosition
 from .network_interface import get_network_provider, NetworkResponse
 from .filesystem_interface import get_filesystem
@@ -96,7 +96,7 @@ class NetworkModule:
             if isinstance(headers, HashValue):
                 # Convert Glang hash to Python dict using Glang's own methods
                 for key, value_node in headers.pairs.items():
-                    if isinstance(value_node, DataNodeValue):
+                    if isinstance(value_node, DataValue):
                         header_value = value_node.value
                         if isinstance(header_value, StringValue):
                             request_headers[key] = header_value.value
@@ -113,17 +113,17 @@ class NetworkModule:
         
         # Build response hash using Glang's hash construction
         response_pairs = {}
-        response_pairs["status"] = DataNodeValue("status", NumberValue(response.status_code, position), position)
-        response_pairs["body"] = DataNodeValue("body", StringValue(response.body, position), position)
-        response_pairs["success"] = DataNodeValue("success", BooleanValue(200 <= response.status_code < 300, position), position)
+        response_pairs["status"] = DataValue("status", NumberValue(response.status_code, position), position)
+        response_pairs["body"] = DataValue("body", StringValue(response.body, position), position)
+        response_pairs["success"] = DataValue("success", BooleanValue(200 <= response.status_code < 300, position), position)
         
         # Add headers as nested hash
         if response.headers:
             header_pairs = {}
             for key, value in response.headers.items():
-                header_pairs[key] = DataNodeValue(key, StringValue(value, position), position)
+                header_pairs[key] = DataValue(key, StringValue(value, position), position)
             headers_hash = HashValue(header_pairs, position)
-            response_pairs["headers"] = DataNodeValue("headers", headers_hash, position)
+            response_pairs["headers"] = DataValue("headers", headers_hash, position)
         
         return HashValue(response_pairs, position)
     
@@ -190,10 +190,10 @@ class NetworkModule:
         
         # Build result hash using Glang construction
         result_pairs = {}
-        result_pairs["protocol"] = DataNodeValue("protocol", protocol, position)
-        result_pairs["host"] = DataNodeValue("host", host, position)
-        result_pairs["path"] = DataNodeValue("path", path, position)
-        result_pairs["url"] = DataNodeValue("url", url, position)
+        result_pairs["protocol"] = DataValue("protocol", protocol, position)
+        result_pairs["host"] = DataValue("host", host, position)
+        result_pairs["path"] = DataValue("path", path, position)
+        result_pairs["url"] = DataValue("url", url, position)
         
         return HashValue(result_pairs, position)
     

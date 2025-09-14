@@ -19,8 +19,8 @@ from typing import Optional, Any, Dict, List, Union
 from decimal import Decimal
 
 from ..execution.values import (
-    GlangValue, StringValue, BooleanValue, NumberValue, 
-    ListValue, DataValue, HashValue, NoneValue
+    GlangValue, StringValue, BooleanValue, NumberValue,
+    ListValue, DataValue, HashValue, NoneValue, TimeValue
 )
 from ..execution.errors import RuntimeError
 from ..execution.glang_number import PrecisionGlangNumber, create_glang_number, GlangNumber
