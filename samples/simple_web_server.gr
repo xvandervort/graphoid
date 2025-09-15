@@ -1,0 +1,181 @@
+# Simple Web Server in Glang - Basic Version
+# Testing what language features work for web server logic
+
+print("Glang Web Server Experiment")
+print("===========================")
+
+# Basic configuration
+host = "localhost"
+port = 8080
+
+# Simple response builder
+func create_http_response(status, content_type, body) {
+    status_line = "HTTP/1.1 " + status.to_string() + " OK\r\n"
+    headers = "Content-Type: " + content_type + "\r\n"
+    headers = headers + "Server: Glang/1.0\r\n"
+    headers = headers + "Content-Length: " + body.length().to_string() + "\r\n"
+
+    response = status_line + headers + "\r\n" + body
+    return response
+}
+
+# Simple request parser
+func parse_http_request(request_text) {
+    lines = request_text.split("\n")
+
+    if lines.size() == 0 {
+        return "INVALID"
+    }
+
+    # Get first line: "GET /path HTTP/1.1"
+    request_line = lines[0]
+    parts = request_line.split(" ")
+
+    if parts.size() < 2 {
+        return "INVALID"
+    }
+
+    method = parts[0]
+    path = parts[1]
+
+    return method + " " + path
+}
+
+# Route handlers
+func handle_home_page() {
+    html = "<html><head><title>Glang Server</title></head>"
+    html = html + "<body><h1>Welcome to Glang!</h1>"
+    html = html + "<p>This is a web server written in Glang.</p>"
+    html = html + "<ul><li><a href='/'>Home</a></li>"
+    html = html + "<li><a href='/about'>About</a></li></ul>"
+    html = html + "</body></html>"
+
+    return create_http_response(200, "text/html", html)
+}
+
+func handle_about_page() {
+    html = "<html><head><title>About - Glang Server</title></head>"
+    html = html + "<body><h1>About This Server</h1>"
+    html = html + "<p>This web server demonstrates Glang's capabilities:</p>"
+    html = html + "<ul>"
+    html = html + "<li>String manipulation and concatenation</li>"
+    html = html + "<li>Function definitions and calls</li>"
+    html = html + "<li>Control flow with if/else</li>"
+    html = html + "<li>List operations (split, indexing)</li>"
+    html = html + "</ul>"
+    html = html + "<a href='/'>Back to Home</a>"
+    html = html + "</body></html>"
+
+    return create_http_response(200, "text/html", html)
+}
+
+func handle_not_found(path) {
+    html = "<html><head><title>404 Not Found</title></head>"
+    html = html + "<body><h1>404 - Page Not Found</h1>"
+    html = html + "<p>The path '" + path + "' was not found.</p>"
+    html = html + "<a href='/'>Go Home</a>"
+    html = html + "</body></html>"
+
+    return create_http_response(404, "text/html", html)
+}
+
+# Simple router
+func route_request(method, path) {
+    if method != "GET" {
+        return "ERROR: Only GET method supported"
+    }
+
+    if path == "/" {
+        return handle_home_page()
+    }
+
+    if path == "/about" {
+        return handle_about_page()
+    }
+
+    return handle_not_found(path)
+}
+
+# Process a client request
+func process_request(request_text) {
+    parsed = parse_http_request(request_text)
+
+    if parsed == "INVALID" {
+        error_html = "<html><body><h1>400 Bad Request</h1></body></html>"
+        return create_http_response(400, "text/html", error_html)
+    }
+
+    # Extract method and path
+    parts = parsed.split(" ")
+    method = parts[0]
+    path = parts[1]
+
+    return route_request(method, path)
+}
+
+# Test the web server logic
+func test_web_server() {
+    print("Testing web server request handling...")
+    print("")
+
+    # Test 1: Home page
+    request1 = "GET / HTTP/1.1\r\nHost: localhost:8080\r\n\r\n"
+    response1 = process_request(request1)
+    print("Test 1 - GET /")
+    print("Response length: " + response1.length().to_string() + " characters")
+    print("Status: " + response1.split("\n")[0])
+    print("")
+
+    # Test 2: About page
+    request2 = "GET /about HTTP/1.1\r\nHost: localhost:8080\r\n\r\n"
+    response2 = process_request(request2)
+    print("Test 2 - GET /about")
+    print("Response length: " + response2.length().to_string() + " characters")
+    print("Status: " + response2.split("\n")[0])
+    print("")
+
+    # Test 3: 404 Not Found
+    request3 = "GET /nonexistent HTTP/1.1\r\nHost: localhost:8080\r\n\r\n"
+    response3 = process_request(request3)
+    print("Test 3 - GET /nonexistent")
+    print("Response length: " + response3.length().to_string() + " characters")
+    print("Status: " + response3.split("\n")[0])
+    print("")
+
+    # Test 4: Invalid request
+    request4 = "INVALID"
+    response4 = process_request(request4)
+    print("Test 4 - Invalid request")
+    print("Response length: " + response4.length().to_string() + " characters")
+    print("Status: " + response4.split("\n")[0])
+    print("")
+
+    print("All tests completed!")
+}
+
+# Main execution
+print("Server configuration:")
+print("Host: " + host)
+print("Port: " + port.to_string())
+print("")
+
+print("Missing features for real web server:")
+print("1. TCP socket creation and binding")
+print("2. Socket listening and accepting connections")
+print("3. Network I/O (reading/writing to sockets)")
+print("4. Concurrent connection handling")
+print("5. System time functions")
+print("6. Signal handling for graceful shutdown")
+print("")
+
+print("Features that DO work in Glang:")
+print("1. String manipulation and concatenation")
+print("2. Function definitions and calls")
+print("3. Control flow (if/else)")
+print("4. List operations (split, indexing, size)")
+print("5. Type conversion (to_string)")
+print("6. Request parsing logic")
+print("7. Response generation")
+print("")
+
+test_web_server()

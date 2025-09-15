@@ -1,0 +1,276 @@
+# HTML Templating Library for Glang
+# This module provides HTML template functionality for web applications
+
+# Template data structure
+func create_template(template_string) {
+    template = {}
+    template["content"] = template_string
+    template["variables"] = {}
+    return template
+}
+
+# Set template variables
+func set_variable(template, name, value) {
+    template["variables"][name] = value
+    return template
+}
+
+# Render template with variable substitution
+func render_template(template) {
+    content = template["content"]
+    variables = template["variables"]
+
+    # Simple variable substitution: {{variable_name}}
+    for key in variables.keys() {
+        placeholder = "{{" + key + "}}"
+        value = variables[key]
+
+        # Convert value to string if needed
+        if value.get_type() == "string" {
+            string_value = value
+        } else {
+            string_value = value.to_string()
+        }
+
+        # Replace all occurrences (simple approach)
+        content = replace_all(content, placeholder, string_value)
+    }
+
+    return content
+}
+
+# Simple string replacement function (since we might not have built-in replace)
+func replace_all(text, search, replacement) {
+    # Split on search term and rejoin with replacement
+    parts = text.split(search)
+
+    if parts.size() <= 1 {
+        return text
+    }
+
+    result = parts[0]
+    index = 1
+    while index < parts.size() {
+        result = result + replacement + parts[index]
+        index = index + 1
+    }
+
+    return result
+}
+
+# HTML helper functions
+func escape_html(text) {
+    # Basic HTML escaping
+    escaped = replace_all(text, "&", "&amp;")
+    escaped = replace_all(escaped, "<", "&lt;")
+    escaped = replace_all(escaped, ">", "&gt;")
+    escaped = replace_all(escaped, "\"", "&quot;")
+    escaped = replace_all(escaped, "'", "&#39;")
+    return escaped
+}
+
+func create_html_page(title, body) {
+    template_string = "<!DOCTYPE html>"
+    template_string = template_string + "<html><head>"
+    template_string = template_string + "<title>{{title}}</title>"
+    template_string = template_string + "<style>body { font-family: Arial, sans-serif; margin: 40px; }</style>"
+    template_string = template_string + "</head><body>"
+    template_string = template_string + "{{body}}"
+    template_string = template_string + "</body></html>"
+
+    template = create_template(template_string)
+    template = set_variable(template, "title", title)
+    template = set_variable(template, "body", body)
+
+    return render_template(template)
+}
+
+# Navigation helper
+func create_nav_link(url, text, current_path) {
+    if url == current_path {
+        return "<strong>" + text + "</strong>"
+    } else {
+        return "<a href=\"" + url + "\">" + text + "</a>"
+    }
+}
+
+func create_navigation(current_path) {
+    nav = "<nav style=\"border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 20px;\">"
+    nav = nav + create_nav_link("/", "Home", current_path) + " | "
+    nav = nav + create_nav_link("/about", "About", current_path) + " | "
+    nav = nav + create_nav_link("/demo", "Demo", current_path) + " | "
+    nav = nav + create_nav_link("/api/status", "API Status", current_path)
+    nav = nav + "</nav>"
+    return nav
+}
+
+# List helper
+func create_list(items, list_type) {
+    if list_type == "ordered" {
+        tag = "ol"
+    } else {
+        tag = "ul"
+    }
+
+    html = "<" + tag + ">"
+
+    for item in items {
+        html = html + "<li>" + escape_html(item.to_string()) + "</li>"
+    }
+
+    html = html + "</" + tag + ">"
+    return html
+}
+
+# Table helper
+func create_table(headers, rows) {
+    html = "<table style=\"border-collapse: collapse; width: 100%;\">"
+
+    # Headers
+    html = html + "<thead><tr>"
+    for header in headers {
+        html = html + "<th style=\"border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;\">"
+        html = html + escape_html(header.to_string()) + "</th>"
+    }
+    html = html + "</tr></thead>"
+
+    # Rows
+    html = html + "<tbody>"
+    for row in rows {
+        html = html + "<tr>"
+        for cell in row {
+            html = html + "<td style=\"border: 1px solid #ddd; padding: 8px;\">"
+            html = html + escape_html(cell.to_string()) + "</td>"
+        }
+        html = html + "</tr>"
+    }
+    html = html + "</tbody></table>"
+
+    return html
+}
+
+# Template with conditional sections
+func create_conditional_template(template_string) {
+    template = {}
+    template["content"] = template_string
+    template["variables"] = {}
+    template["conditions"] = {}
+    return template
+}
+
+func set_condition(template, condition_name, is_true) {
+    template["conditions"][condition_name] = is_true
+    return template
+}
+
+func render_conditional_template(template) {
+    content = template["content"]
+    variables = template["variables"]
+    conditions = template["conditions"]
+
+    # Process conditions first: {{#if condition_name}}content{{/if}}
+    for condition_name in conditions.keys() {
+        is_true = conditions[condition_name]
+
+        start_tag = "{{#if " + condition_name + "}}"
+        end_tag = "{{/if}}"
+
+        # Find conditional blocks and include/exclude based on condition
+        content = process_conditional_block(content, start_tag, end_tag, is_true)
+    }
+
+    # Then process variables
+    for key in variables.keys() {
+        placeholder = "{{" + key + "}}"
+        value = variables[key]
+
+        if value.get_type() == "string" {
+            string_value = value
+        } else {
+            string_value = value.to_string()
+        }
+
+        content = replace_all(content, placeholder, string_value)
+    }
+
+    return content
+}
+
+func process_conditional_block(content, start_tag, end_tag, include) {
+    # Simple implementation: find start and end tags
+    start_pos = content.find(start_tag)
+    if start_pos == -1 {
+        return content
+    }
+
+    end_pos = content.find(end_tag)
+    if end_pos == -1 {
+        return content
+    }
+
+    # Extract parts
+    before = content.substring(0, start_pos)
+    block_content = content.substring(start_pos + start_tag.length(), end_pos)
+    after = content.substring(end_pos + end_tag.length())
+
+    if include {
+        result = before + block_content + after
+    } else {
+        result = before + after
+    }
+
+    # Recursively process any remaining conditional blocks
+    return process_conditional_block(result, start_tag, end_tag, include)
+}
+
+# Test the templating system
+func test_templating() {
+    print("HTML Templating Library Test")
+    print("============================")
+
+    # Test 1: Basic template
+    print("Test 1: Basic template")
+    template1 = create_template("Hello {{name}}, you have {{count}} messages!")
+    template1 = set_variable(template1, "name", "Alice")
+    template1 = set_variable(template1, "count", 5)
+    result1 = render_template(template1)
+    print("Result: " + result1)
+    print("")
+
+    # Test 2: HTML page generation
+    print("Test 2: HTML page generation")
+    body_content = "<h1>Welcome!</h1><p>This is generated content.</p>"
+    page = create_html_page("Test Page", body_content)
+    print("Page length: " + page.length().to_string() + " characters")
+    print("")
+
+    # Test 3: Navigation
+    print("Test 3: Navigation")
+    nav_home = create_navigation("/")
+    print("Home nav length: " + nav_home.length().to_string())
+    nav_about = create_navigation("/about")
+    print("About nav length: " + nav_about.length().to_string())
+    print("")
+
+    # Test 4: List generation
+    print("Test 4: List generation")
+    items = ["Apple", "Banana", "Cherry"]
+    list_html = create_list(items, "unordered")
+    print("List HTML length: " + list_html.length().to_string())
+    print("")
+
+    # Test 5: Table generation
+    print("Test 5: Table generation")
+    headers = ["Name", "Age", "City"]
+    row1 = ["Alice", "25", "New York"]
+    row2 = ["Bob", "30", "San Francisco"]
+    rows = [row1, row2]
+    table_html = create_table(headers, rows)
+    print("Table HTML length: " + table_html.length().to_string())
+    print("")
+
+    print("All templating tests completed!")
+}
+
+# Main execution
+test_templating()

@@ -1,0 +1,88 @@
+# Hash Access Demo - Showing the Proposed Simpler Syntax
+# This demonstrates how the new hash access would work
+
+print("Hash Access Improvement Demo")
+print("============================")
+print("")
+
+# Create a configuration hash
+config = { "host": "localhost", "port": 8080, "debug": true }
+
+print("=== Current Painful Syntax ===")
+print("config[\"host\"].value() = " + config["host"].value())
+print("config[\"port\"].value() = " + config["port"].value().to_string())
+
+# Show how painful it is in real code
+if config["debug"].value() {
+    print("Debug is enabled (had to use .value())")
+}
+
+print("")
+print("=== Proposed Natural Syntax ===")
+print("# With the proposed change, this would work:")
+print("# host = config[\"host\"]          # \"localhost\"")
+print("# port = config[\"port\"]          # 8080")
+print("# if config[\"debug\"] { }         # true")
+print("")
+
+# Demonstrate why we don't need .key()
+print("=== Why .key() is Redundant ===")
+key = "host"
+print("If I'm accessing config[\"" + key + "\"], I already know the key is \"" + key + "\"")
+print("There's no reason to do config[\"" + key + "\"].key() to get \"" + key + "\" back")
+print("")
+
+# Show the clean API
+print("=== Proposed Clean API ===")
+print("config[\"host\"]        # Returns: \"localhost\" (the value)")
+print("config.data(\"host\")   # Returns: { \"host\": \"localhost\" } (the data node)")
+print("")
+
+# Real-world example showing the improvement
+print("=== Real-World Code Comparison ===")
+print("")
+print("BEFORE (current - verbose and unintuitive):")
+print("----------------------------------------")
+print("server_config = { \"host\": \"localhost\", \"port\": 8080 }")
+print("user_data = { \"name\": \"Alice\", \"age\": 30, \"active\": true }")
+print("")
+print("# Painful to write and read")
+print("host = server_config[\"host\"].value()")
+print("port = server_config[\"port\"].value()")
+print("name = user_data[\"name\"].value()")
+print("age = user_data[\"age\"].value()")
+print("if user_data[\"active\"].value() {")
+print("    print(\"User \" + name + \" is active\")")
+print("}")
+print("")
+
+print("AFTER (proposed - clean and natural):")
+print("------------------------------------")
+print("server_config = { \"host\": \"localhost\", \"port\": 8080 }")
+print("user_data = { \"name\": \"Alice\", \"age\": 30, \"active\": true }")
+print("")
+print("# Natural and intuitive")
+print("host = server_config[\"host\"]")
+print("port = server_config[\"port\"]")
+print("name = user_data[\"name\"]")
+print("age = user_data[\"age\"]")
+print("if user_data[\"active\"] {")
+print("    print(\"User \" + name + \" is active\")")
+print("}")
+print("")
+
+print("=== When You Need the Data Node (Rare) ===")
+print("# Only when doing graph operations:")
+print("node = config.data(\"host\")")
+print("# Now you can work with the node itself")
+print("# But 99% of the time, you just want the value")
+print("")
+
+print("=== Summary ===")
+print("✅ hash[key] returns the VALUE (intuitive)")
+print("✅ hash.data(key) returns the DATA NODE (explicit)")
+print("✅ No verbose get_/set_ prefixes")
+print("✅ No redundant .key() method")
+print("✅ Clean, minimal, elegant API")
+print("")
+print("This would make Glang MUCH more pleasant to use!")

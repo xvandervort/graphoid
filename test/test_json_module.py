@@ -123,11 +123,11 @@ class TestJSONModule:
         # Check individual values
         result = self.session.execute_statement('decoded_obj["name"]')
         assert result.success
-        assert result.value.value.value == "Alice"  # DataValue.value.value
-        
+        assert result.value.value == "Alice"  # Now returns value directly
+
         result = self.session.execute_statement('decoded_obj["age"]')
         assert result.success
-        assert result.value.value.value == 25
+        assert result.value.value == 25
     
     def test_roundtrip_encoding(self):
         """Test that encode->decode produces equivalent data."""
@@ -144,15 +144,15 @@ class TestJSONModule:
         # Check that decoded data has the same structure
         result = self.session.execute_statement('decoded["text"]')
         assert result.success
-        assert result.value.value.value == "hello"  # DataValue.value.value
+        assert result.value.value == "hello"  # Now returns value directly
         
         result = self.session.execute_statement('decoded["flag"]')
         assert result.success
-        assert result.value.value.value is True  # DataValue.value.value
+        assert result.value.value is True  # Now returns value directly
         
         result = self.session.execute_statement('decoded["numbers"]')
         assert result.success
-        numbers_list = result.value.value  # The actual list inside DataValue
+        numbers_list = result.value  # Now returns ListValue directly
         assert len(numbers_list.elements) == 3
     
     def test_is_valid(self):

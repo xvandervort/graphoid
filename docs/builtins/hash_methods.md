@@ -2,6 +2,15 @@
 
 Hash is a built-in collection type in Glang representing key-value mappings. Hashes store data nodes and provide efficient lookup by key.
 
+## ✨ Recent Changes
+
+**Hash Access Improvement**: Hash indexing now returns values directly for intuitive use:
+- **NEW**: `hash[key]` returns the value directly (e.g., `"localhost"`, `8080`)
+- **NEW**: `hash.node(key)` for explicit data node access when needed
+- **DEPRECATED**: `hash.get(key)` issues deprecation warnings - use the above instead
+
+This makes hash usage much more intuitive while preserving access to Glang's graph-theoretic features when explicitly needed.
+
 ## Type Information
 
 ### type()
@@ -42,11 +51,29 @@ settings.size()  # Returns 3
 
 ## Key-Value Operations
 
-### get(key)
+### get(key) ⚠️ DEPRECATED
+**DEPRECATED**: Use `hash[key]` for direct value access or `hash.node(key)` for data node access.
+
 Retrieves a data node by key.
 ```glang
 config = { "host": "localhost", "port": 8080 }
+# DEPRECATED - Issues deprecation warning
 host_node = config.get("host")  # Returns { "host": "localhost" }
+host_node.value()  # Returns "localhost"
+
+# PREFERRED - Direct value access
+host = config["host"]  # Returns "localhost" directly
+
+# PREFERRED - Explicit data node access when needed
+host_node = config.node("host")  # Returns { "host": "localhost" }
+```
+
+### node(key) ✅ NEW
+Explicitly retrieves a data node by key. Use this when you need access to the graph-theoretic data node structure.
+```glang
+config = { "host": "localhost", "port": 8080 }
+host_node = config.node("host")  # Returns { "host": "localhost" } (data node)
+host_node.key()    # Returns "host"
 host_node.value()  # Returns "localhost"
 ```
 
@@ -199,11 +226,15 @@ config.can_accept(frozen_value)  # Returns false (can't mix)
 
 Hashes support bracket notation for accessing and setting values:
 
-### Index Access
+### Index Access ✅ PREFERRED
 ```glang
 config = { "host": "localhost", "port": 8080 }
-config["host"]  # Returns { "host": "localhost" } (data node)
-config["host"].value()  # Returns "localhost"
+# NEW BEHAVIOR - Returns values directly (intuitive!)
+config["host"]  # Returns "localhost" directly
+config["port"]  # Returns 8080 directly
+
+# For explicit data node access when needed:
+config.node("host")  # Returns { "host": "localhost" } (data node)
 ```
 
 ### Index Assignment
@@ -232,8 +263,8 @@ app_config = {
 }
 
 # Access nested configuration
-db_config = app_config["database"].value()
-db_host = db_config["host"].value()
+db_config = app_config["database"]  # Direct value access
+db_host = db_config["host"]  # Direct value access
 print("Database host: " + db_host)
 
 # Update configuration
@@ -253,14 +284,14 @@ preferences = {
 
 # Check and update settings
 if preferences.has_key("theme") {
-    current_theme = preferences["theme"].value()
+    current_theme = preferences["theme"]  # Direct value access
     print("Current theme: " + current_theme)
 }
 
 # Get all setting names
 setting_names = preferences.keys()
 for name in setting_names {
-    value = preferences[name].value()
+    value = preferences[name]  # Direct value access
     print(name + ": " + value.to_string())
 }
 ```
@@ -291,7 +322,7 @@ print("Average score: " + average.to_string())
 max_score = 0
 best_subject = ""
 for subject in subjects {
-    score = scores[subject].value()
+    score = scores[subject]  # Direct value access
     if score > max_score {
         max_score = score
         best_subject = subject

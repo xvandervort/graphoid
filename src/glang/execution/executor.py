@@ -523,9 +523,8 @@ class ASTExecutor(BaseASTVisitor):
                     node.indices[0].position
                 )
             
-            # Return as data node, not raw value (this is the key change!)
-            from .values import DataValue
-            self.result = DataValue(key, value, target_value.constraint, node.position)
+            # Return the value directly (new intuitive behavior!)
+            self.result = value
         
         else:
             raise RuntimeError(
@@ -1895,20 +1894,46 @@ class ASTExecutor(BaseASTVisitor):
         """Handle hash method calls."""
         
         if method_name == "get":
+            # Issue deprecation warning
+            import warnings
+            warnings.warn(
+                "The hash.get() method is deprecated. Use hash[key] for direct value access or hash.node(key) for data node access.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+
             if len(args) != 1:
                 from .errors import ArgumentError
                 raise ArgumentError(f"get() takes 1 argument, got {len(args)}", position)
-            
+
             key_arg = args[0]
             if not isinstance(key_arg, StringValue):
                 from .errors import ArgumentError
                 raise ArgumentError(f"Hash key must be string, got {key_arg.get_type()}", position)
-            
+
             value = target.get(key_arg.value)
             if value is None:
                 return StringValue("", position)  # Return empty string for missing keys
-            
-            # Return as data node, not raw value - consistent with index access
+
+            # Return as data node (backward compatibility with old behavior)
+            from .values import DataValue
+            return DataValue(key_arg.value, value, target.constraint, position)
+
+        elif method_name == "node":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"node() takes 1 argument, got {len(args)}", position)
+
+            key_arg = args[0]
+            if not isinstance(key_arg, StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"Hash key must be string, got {key_arg.get_type()}", position)
+
+            value = target.get(key_arg.value)
+            if value is None:
+                raise RuntimeError(f"Key '{key_arg.value}' not found in hash", position)
+
+            # Return the data node explicitly
             from .values import DataValue
             return DataValue(key_arg.value, value, target.constraint, position)
         

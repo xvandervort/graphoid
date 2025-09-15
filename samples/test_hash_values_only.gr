@@ -1,0 +1,57 @@
+# Test Just Hash[key] Returns Values
+
+print("Testing hash[key] returns values")
+print("==================================")
+
+# Create a test hash
+config = { "host": "localhost", "port": 8080, "debug": true }
+
+print("")
+print("=== MAIN IMPROVEMENT: hash[key] returns VALUE ===")
+
+# Test accessing values directly
+host = config["host"]
+port = config["port"]
+debug = config["debug"]
+
+print("host = config[\"host\"] = " + host)
+print("Type of host: " + host.type())
+
+print("port = config[\"port\"] = " + port.to_string())
+print("Type of port: " + port.type())
+
+print("debug = config[\"debug\"]")
+print("Type of debug: " + debug.type())
+
+if debug {
+    print("✅ debug works in if statement! (returns boolean value)")
+} else {
+    print("❌ debug didn't work in if statement")
+}
+
+print("")
+print("=== COMPARISON ===")
+print("OLD painful way: config[\"host\"].value()")
+print("NEW clean way:   config[\"host\"]")
+
+print("")
+print("=== REAL-WORLD EXAMPLE ===")
+
+# Show how much cleaner real code is now
+if config["debug"] == true {
+    if config["port"] == 8080 {
+        print("✅ Server running on " + config["host"] + ":" + config["port"].to_string() + " (debug mode)")
+    }
+}
+
+print("")
+print("This would have been painful before:")
+print("if config[\"debug\"].value() && config[\"port\"].value() == 8080 {")
+print("    print(\"Server running on \" + config[\"host\"].value() + \":\" + config[\"port\"].value().to_string())")
+print("}")
+
+print("")
+print("✅ SUCCESS! Hash access is now intuitive!")
+print("✅ hash[key] returns the VALUE directly")
+print("✅ No more .value() everywhere!")
+print("✅ Code is clean and readable!")
