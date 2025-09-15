@@ -772,8 +772,20 @@ class ASTParser:
         """Parse logical OR operators: or, ||"""
         expr = self.parse_logical_and()
 
-        while self.check(TokenType.OR):
+        while True:
+            # Skip any newlines before checking for OR operators
+            while self.match(TokenType.NEWLINE):
+                pass
+
+            if not self.check(TokenType.OR):
+                break
+
             operator_token = self.advance()
+
+            # Skip any newlines after the OR operator
+            while self.match(TokenType.NEWLINE):
+                pass
+
             right = self.parse_logical_and()
             pos = SourcePosition(operator_token.line, operator_token.column)
 
@@ -787,8 +799,20 @@ class ASTParser:
         """Parse logical AND operators: and, &&"""
         expr = self.parse_comparison()
 
-        while self.check(TokenType.AND):
+        while True:
+            # Skip any newlines before checking for AND operators
+            while self.match(TokenType.NEWLINE):
+                pass
+
+            if not self.check(TokenType.AND):
+                break
+
             operator_token = self.advance()
+
+            # Skip any newlines after the AND operator
+            while self.match(TokenType.NEWLINE):
+                pass
+
             right = self.parse_comparison()
             pos = SourcePosition(operator_token.line, operator_token.column)
 

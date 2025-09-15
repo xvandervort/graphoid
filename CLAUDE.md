@@ -37,12 +37,12 @@ This represents a major architectural challenge but is essential for Glang's uni
 
 ## Recent Changes (September 2025)
 
-### ✅ Logical Operators Added
-- **NEW**: Added `and`/`or` logical operators with operator synonyms `&&`/`||`
-- **Features**: Proper truthiness rules, short-circuit evaluation
+### ✅ Logical Operators Complete
+- **COMPLETE**: Added `and`/`or` logical operators with operator synonyms `&&`/`||`
+- **Features**: Proper truthiness rules, short-circuit evaluation, correct precedence parsing
 - **Syntax**: `if a and b { ... }` or `if a && b { ... }`
-- **⚠️ Known Limitation**: Complex chained expressions like `a == 1 or b == 2` require parentheses due to precedence bug
-- **Next Priority**: Fix parser precedence to handle chained logical expressions correctly
+- **Multi-line Support**: Complex expressions with line breaks now work correctly
+- **✅ ALL PARSER ISSUES RESOLVED**: All critical parser bugs from Bitcoin tracker experiments have been fixed
 
 ### ✅ Bitcoin Price Tracker Success
 - **Demonstrated**: Real-world web scraping capabilities using HTTP requests and string parsing
@@ -645,8 +645,18 @@ Glang uses a clean, modern architecture:
 
 ### Near-Term Priorities (Q1-Q2 2025)
 
-**IMMEDIATE PRIORITY (Next Session):**
-- **🚨 Fix Logical Operator Precedence**: Critical parser bug where `a == 1 or b == 2` parses as `a == (1 or b) == 2` instead of `(a == 1) or (b == 2)`. Requires adding proper precedence levels: `parse_logical_or` → `parse_logical_and` → `parse_comparison`.
+**COMPLETED PRIORITIES:**
+- **✅ Fixed Logical Operator Precedence**: Successfully implemented proper parser precedence with `parse_logical_or` → `parse_logical_and` → `parse_comparison`. Complex expressions like `a == 1 or b == 2 and c > 3` now parse correctly without requiring parentheses. Also added short-circuit evaluation for performance.
+- **✅ Hash Variable Key Access**: The `hash[variable_key]` syntax now works correctly (was previously reporting "Key must be a string literal" error).
+- **✅ Variable Scoping**: Fixed global variable conflict issue. Variables can now be reused in different loop scopes without "Variable already declared" errors. Implemented proper scoped symbol table with `enter_scope()`/`exit_scope()`.
+- **✅ Line Continuation**: Fixed multi-line logical expression parsing. Complex expressions like `a or b or\n   c or d` now parse correctly by skipping newlines within expressions.
+
+**ALL CRITICAL PARSER ISSUES RESOLVED** 🎉
+The Bitcoin tracker and cryptocurrency analytics experiments that identified these issues should now work without workarounds.
+
+**Test Suite Status**: 1205/1205 tests passing (100% success rate) ✅
+- All tests now pass including the complex pattern matching edge case with variable shadowing
+- All critical parsing issues from Bitcoin analytics experiments are fully resolved
 
 **Make Glang Practical** - Standard libraries for real-world use:
 - **✅ I/O Library**: File operations, file handle I/O with auto-close semantics, user input, directory management

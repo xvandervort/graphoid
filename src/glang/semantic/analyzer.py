@@ -739,19 +739,20 @@ class SemanticAnalyzer(BaseASTVisitor):
         """Visit for-in statement node."""
         # Check iterable expression
         node.iterable.accept(self)
-        
-        # TODO: Add loop variable to symbol table in a new scope
-        # For now, we'll add it to current scope
-        # Create a symbol for the loop variable (infer type from iterable if possible)
-        loop_var_symbol = Symbol(node.variable, "any", position=node.position)
+
+        # Enter new scope for loop body and loop variable
+        self.symbol_table.enter_scope()
+
         try:
+            # Create a symbol for the loop variable in the new scope
+            loop_var_symbol = Symbol(node.variable, "any", position=node.position)
             self.symbol_table.declare_symbol(loop_var_symbol)
-        except ValueError:
-            # Variable already exists, that's fine for loop variables
-            pass
-        
-        # Visit body block
-        node.body.accept(self)
+
+            # Visit body block in the new scope
+            node.body.accept(self)
+        finally:
+            # Always exit scope, even if there's an error
+            self.symbol_table.exit_scope()
     
     def visit_precision_block(self, node) -> None:
         """Visit precision block node."""
@@ -873,26 +874,20 @@ class SemanticAnalyzer(BaseASTVisitor):
         # Analyze the expression being matched
         node.expr.accept(self)
 
-        # Analyze each match arm
+        # Analyze each match arm in its own scope
         for arm in node.arms:
-            # Track pattern variables and shadowed symbols for this arm
-            pattern_vars = []
-            shadowed_symbols = {}
+            # Enter new scope for this match arm
+            self.symbol_table.enter_scope()
 
             try:
-                # Analyze pattern and register pattern variables
-                pattern_vars, shadowed_symbols = self.analyze_pattern_bindings(arm.pattern)
+                # Analyze pattern and register pattern variables in the new scope
+                pattern_vars, _ = self.analyze_pattern_bindings(arm.pattern)
 
                 # Analyze result expression with pattern variables in scope
                 arm.result.accept(self)
             finally:
-                # Remove pattern variables and restore shadowed symbols after analyzing this arm
-                for var_name in pattern_vars:
-                    self.symbol_table.remove_symbol(var_name)
-
-                # Restore shadowed symbols
-                for var_name, symbol in shadowed_symbols.items():
-                    self.symbol_table.declare_symbol(symbol)
+                # Exit the scope, automatically cleaning up pattern variables
+                self.symbol_table.exit_scope()
 
     def visit_symbol_literal(self, node) -> None:
         """Analyze symbol literals (like :ok, :error)."""
@@ -921,14 +916,14 @@ class SemanticAnalyzer(BaseASTVisitor):
         Returns:
             Tuple of (pattern_vars, shadowed_symbols) where:
             - pattern_vars: List of variable names that were registered
-            - shadowed_symbols: Dict mapping variable names to their original Symbol objects
+            - shadowed_symbols: Dict mapping variable names to their original Symbol objects (unused with scoping)
         """
         from typing import List
         from ..ast.nodes import ListPattern, VariablePattern, LiteralPattern, WildcardPattern
         from .symbol_table import Symbol
 
         pattern_vars = []
-        shadowed_symbols = {}
+        shadowed_symbols = {}  # No longer used with scoping, but kept for API compatibility
 
         if isinstance(pattern, ListPattern):
             # Register bindings for each element pattern
@@ -940,14 +935,8 @@ class SemanticAnalyzer(BaseASTVisitor):
             # Register the pattern variable as a symbol with 'any' type
             # We use 'any' since we can't determine the exact type at semantic analysis time
 
-            # Check if variable already exists (shadowing case)
-            if self.symbol_table.symbol_exists(pattern.name):
-                existing_symbol = self.symbol_table.lookup_symbol(pattern.name)
-                shadowed_symbols[pattern.name] = existing_symbol
-                # Temporarily remove the existing symbol
-                self.symbol_table.remove_symbol(pattern.name)
-
-            # Add the pattern variable
+            # With scoping system, shadowing is handled automatically
+            # Just declare the symbol in the current scope
             symbol = Symbol(pattern.name, 'any', None, pattern.position)
             self.symbol_table.declare_symbol(symbol)
             pattern_vars.append(pattern.name)
