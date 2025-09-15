@@ -25,7 +25,45 @@ Transform Glang from a practical programming language into a revolutionary platf
 ### 📍 Phase 1: Production Readiness (Q1-Q2 2025) - CURRENT
 **Goal**: Make Glang practical for real-world applications
 
-#### 1.1 Standard Library Completion
+#### 🚨 1.0 CRITICAL PARSER FIXES (IMMEDIATE PRIORITY)
+**Status**: Blocking issues discovered in September 2025 cryptocurrency analytics experiment
+
+- [ ] **Logical Operator Precedence**: Fix parser so `a && b && c` and `a == 1 or b == 2` parse correctly
+  - Current: `a == 1 or b == 2` parses as `a == (1 or b) == 2`
+  - Required: Add `parse_logical_or` → `parse_logical_and` → `parse_comparison` precedence levels
+- [ ] **Hash Variable Key Access**: Enable `hash[variable_key]` syntax
+  - Current: "Key must be a string literal" error prevents dynamic key access
+  - Required: Allow variable expressions in hash key positions
+- [ ] **Variable Scoping**: Fix global scope conflicts
+  - Current: Variables declared in different scopes conflict globally
+  - Required: Proper lexical scoping to allow variable reuse
+
+**Validation**: Re-run cryptocurrency analytics experiment to confirm fixes
+
+#### 1.1 Data Analytics & Visualization Support
+**Status**: Foundational capabilities needed for real-world data processing
+
+- [ ] **CSV Module**: Native CSV parsing and generation
+  - `csv.read(filename)` → structured data
+  - `csv.write(data, filename)` → file output
+  - Support for headers, type inference, custom delimiters
+- [ ] **Statistics Module**: Essential statistical functions
+  - Descriptive statistics: `mean()`, `median()`, `std_dev()`, `variance()`
+  - Data aggregation: `sum()`, `count()`, `group_by()`, `aggregate()`
+  - Time series: `rolling_average()`, `trend_analysis()`
+- [ ] **Data Structures**: Higher-level data organization
+  - `DataFrame` type for structured data with column access
+  - Filtering and transformation operations
+  - Join and merge capabilities
+- [ ] **Visualization Library**: Essential for data analysis
+  - Basic charts: line plots, bar charts, histograms, scatter plots
+  - Export formats: PNG, SVG, ASCII art for terminal
+  - Integration with data structures for easy plotting
+  - Example: `data.plot("line", x="date", y="price").save("chart.png")`
+
+**Experiment**: Retry cryptocurrency analytics with new capabilities
+
+#### 1.2 Standard Library Completion
 - [x] Math module with constants
 - [x] JSON encoding/decoding
 - [x] Complete I/O operations (file, network, console)
@@ -33,8 +71,9 @@ Transform Glang from a practical programming language into a revolutionary platf
 - [x] Date/time handling (with precision integration and data node consistency)
 - [x] Regular expressions (comprehensive pattern matching and text processing)
 - [x] Random number generation (secure, deterministic, statistical distributions)
+- [ ] **HTML Parsing Library**: Web scraping and HTML processing (identified during Bitcoin tracker development)
 
-#### 1.2 Developer Experience
+#### 1.3 Developer Experience
 - [x] **Enhanced error messages with stack traces** (complements error-as-data pattern)
 - [ ] Debugger support
 - [ ] IDE integration (VS Code extension)
@@ -42,7 +81,7 @@ Transform Glang from a practical programming language into a revolutionary platf
 - [ ] Package manager implementation (glang-package command)
 - [ ] Documentation generator
 
-#### 1.3 Core Language Features
+#### 1.4 Core Language Features
 - [ ] **Pattern Matching**: `match` expressions for elegant control flow and data destructuring
 - [ ] **Status Symbols**: Limited symbols (`:ok`, `:error`) for result patterns
 - [ ] **Error-as-Data**: Result lists `[:ok, value]` / `[:error, message]` for clean error handling
@@ -51,7 +90,7 @@ Transform Glang from a practical programming language into a revolutionary platf
 - [ ] **None Literal**: Add `none` as a language keyword for null values
 - [ ] **Symbol Lexing/Parsing**: Support `:symbol` syntax for behavior names and status codes
 
-#### 1.4 Enhanced Behavior System
+#### 1.5 Enhanced Behavior System
 - [x] **Intrinsic Behaviors**: Behaviors attached directly to data structures (completed)
 - [ ] **Custom Value Mappings**: User-defined conversions (`"red" → 7`, `"kg" → "mass"`)
 - [ ] **Function-Based Behaviors**: Attach user-written functions as behaviors
@@ -62,7 +101,7 @@ Transform Glang from a practical programming language into a revolutionary platf
 - [ ] **Pattern-Based Transformations**: Rules that trigger on data patterns
 - [ ] **Domain-Specific Behavior Libraries**: Pre-built behavior sets for common domains
 
-#### 1.5 Performance & Stability
+#### 1.6 Performance & Stability
 - [ ] Performance benchmarking suite
 - [ ] Memory leak detection
 - [ ] Optimization pass on hot paths
