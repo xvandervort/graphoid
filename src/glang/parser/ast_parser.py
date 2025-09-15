@@ -766,30 +766,52 @@ class ASTParser:
     
     def parse_expression(self) -> Expression:
         """Parse an expression."""
-        return self.parse_comparison()
-    
+        return self.parse_logical_or()
+
+    def parse_logical_or(self) -> Expression:
+        """Parse logical OR operators: or, ||"""
+        expr = self.parse_logical_and()
+
+        while self.check(TokenType.OR):
+            operator_token = self.advance()
+            right = self.parse_logical_and()
+            pos = SourcePosition(operator_token.line, operator_token.column)
+
+            # Convert || to 'or' for consistent AST
+            operator_value = "or" if operator_token.value == "||" else operator_token.value
+            expr = BinaryOperation(expr, operator_value, right, pos)
+
+        return expr
+
+    def parse_logical_and(self) -> Expression:
+        """Parse logical AND operators: and, &&"""
+        expr = self.parse_comparison()
+
+        while self.check(TokenType.AND):
+            operator_token = self.advance()
+            right = self.parse_comparison()
+            pos = SourcePosition(operator_token.line, operator_token.column)
+
+            # Convert && to 'and' for consistent AST
+            operator_value = "and" if operator_token.value == "&&" else operator_token.value
+            expr = BinaryOperation(expr, operator_value, right, pos)
+
+        return expr
+
     def parse_comparison(self) -> Expression:
-        """Parse comparison and logical operators: >, <, >=, <=, ==, !=, !>, !<, and, or, &&, ||"""
+        """Parse comparison operators: >, <, >=, <=, ==, !=, !>, !<"""
         expr = self.parse_term()
 
         while self.check(TokenType.GREATER) or self.check(TokenType.LESS) or \
               self.check(TokenType.GREATER_EQUAL) or self.check(TokenType.LESS_EQUAL) or \
               self.check(TokenType.EQUAL) or self.check(TokenType.NOT_EQUAL) or \
-              self.check(TokenType.NOT_GREATER) or self.check(TokenType.NOT_LESS) or \
-              self.check(TokenType.AND) or self.check(TokenType.OR):
+              self.check(TokenType.NOT_GREATER) or self.check(TokenType.NOT_LESS):
 
             operator_token = self.advance()
             right = self.parse_term()
             pos = SourcePosition(operator_token.line, operator_token.column)
 
-            # Convert && and || to their word equivalents for consistent AST
-            operator_value = operator_token.value
-            if operator_value == "&&":
-                operator_value = "and"
-            elif operator_value == "||":
-                operator_value = "or"
-
-            expr = BinaryOperation(expr, operator_value, right, pos)
+            expr = BinaryOperation(expr, operator_token.value, right, pos)
 
         return expr
     

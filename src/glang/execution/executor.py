@@ -2419,15 +2419,46 @@ class ASTExecutor(BaseASTVisitor):
     
     def visit_binary_operation(self, node: BinaryOperation) -> None:
         """Execute binary operation (arithmetic, comparison)."""
+        # Special handling for logical operators to enable short-circuit evaluation
+        if node.operator in ("and", "or"):
+            left_value = self.execute(node.left)
+            if not isinstance(left_value, GlangValue):
+                left_value = python_to_glang_value(left_value)
+
+            # Short-circuit evaluation for logical operators
+            if node.operator == "and":
+                # If left is false, return false without evaluating right
+                if not self._to_boolean(left_value):
+                    self.result = BooleanValue(False)
+                    return
+                # Otherwise evaluate right and return its truthiness
+                right_value = self.execute(node.right)
+                if not isinstance(right_value, GlangValue):
+                    right_value = python_to_glang_value(right_value)
+                self.result = BooleanValue(self._to_boolean(right_value))
+                return
+            elif node.operator == "or":
+                # If left is true, return true without evaluating right
+                if self._to_boolean(left_value):
+                    self.result = BooleanValue(True)
+                    return
+                # Otherwise evaluate right and return its truthiness
+                right_value = self.execute(node.right)
+                if not isinstance(right_value, GlangValue):
+                    right_value = python_to_glang_value(right_value)
+                self.result = BooleanValue(self._to_boolean(right_value))
+                return
+
+        # For all other operators, evaluate both operands
         left_value = self.execute(node.left)
         right_value = self.execute(node.right)
-        
+
         # Convert to GlangValues if needed
         if not isinstance(left_value, GlangValue):
             left_value = python_to_glang_value(left_value)
         if not isinstance(right_value, GlangValue):
             right_value = python_to_glang_value(right_value)
-        
+
         # Perform the operation based on operator
         if node.operator == "+":
             self.result = self.perform_addition(left_value, right_value)
@@ -2455,10 +2486,6 @@ class ASTExecutor(BaseASTVisitor):
             self.result = self.perform_comparison(left_value, right_value, "less_equal")
         elif node.operator == "!<":  # Intuitive "not less than" = greater than or equal
             self.result = self.perform_comparison(left_value, right_value, "greater_equal")
-        elif node.operator == "and":
-            self.result = self.perform_logical_and(left_value, right_value)
-        elif node.operator == "or":
-            self.result = self.perform_logical_or(left_value, right_value)
         elif node.operator == "&":
             self.result = self.perform_intersection(left_value, right_value)
         elif node.operator == "+.":
