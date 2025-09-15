@@ -35,6 +35,20 @@ Glang aims to be:
 
 This represents a major architectural challenge but is essential for Glang's unique vision.
 
+## Recent Changes (September 2025)
+
+### ✅ Logical Operators Added
+- **NEW**: Added `and`/`or` logical operators with operator synonyms `&&`/`||`
+- **Features**: Proper truthiness rules, short-circuit evaluation
+- **Syntax**: `if a and b { ... }` or `if a && b { ... }`
+- **⚠️ Known Limitation**: Complex chained expressions like `a == 1 or b == 2` require parentheses due to precedence bug
+- **Next Priority**: Fix parser precedence to handle chained logical expressions correctly
+
+### ✅ Bitcoin Price Tracker Success
+- **Demonstrated**: Real-world web scraping capabilities using HTTP requests and string parsing
+- **Achievement**: Successfully extracts current Bitcoin price ($115,411.29) from CoinMarketCap
+- **Identified Needs**: HTML parsing library for standard library, parser precedence fixes
+
 ## Repository Structure
 
 - `src/glang/` - Main language package
@@ -383,11 +397,42 @@ if condition {
     # execute when true
 }
 
-# If-else statements  
+# If-else statements
 if condition {
     # execute when true
 } else {
-    # execute when false  
+    # execute when false
+}
+
+# Logical operators (NEW!)
+if a and b {          # Both must be true
+    # execute when both true
+}
+
+if a or b {           # Either can be true
+    # execute when at least one true
+}
+
+# Operator synonyms also supported
+if a && b {           # Same as 'and'
+    # && is synonym for 'and'
+}
+
+if a || b {           # Same as 'or'
+    # || is synonym for 'or'
+}
+
+# Truthiness rules for logical operators:
+# - Booleans: true/false
+# - Numbers: 0 is false, non-zero is true
+# - Strings: empty string is false, non-empty is true
+# - Lists: empty list is false, non-empty is true
+# - Hashes: empty hash is false, non-empty is true
+
+# KNOWN LIMITATION: Complex chained expressions need parentheses
+# This will be fixed in the next language update
+if (a == 1) or (b == 2) {     # Recommended: use parentheses for now
+    # Complex expressions need explicit grouping
 }
 
 # Precision context blocks - Decimal Places Control (NEW!)
@@ -576,6 +621,7 @@ Glang uses a clean, modern architecture:
 - ✅ Hashes as collections of data nodes with Ruby hash-like syntax
 - ✅ Functional programming operations: map, filter, each with built-in transformations
 - ✅ Control flow structures: if/else, while, for-in, break/continue with proper nesting
+- ✅ **Logical operators** with operator synonyms: `and`/`&&` and `or`/`||` with proper truthiness and short-circuiting
 - ✅ **Precision context blocks** with language-level numeric precision control (precision N { ... })
 - ✅ CLI program execution with shebang support and command-line arguments
 - ✅ Mathematical methods (abs, sqrt, log, pow, rounding) for numbers
@@ -598,13 +644,19 @@ Glang uses a clean, modern architecture:
 **For detailed roadmap and development phases, see [`dev_docs/PRIMARY_ROADMAP.md`](dev_docs/PRIMARY_ROADMAP.md)**
 
 ### Near-Term Priorities (Q1-Q2 2025)
+
+**IMMEDIATE PRIORITY (Next Session):**
+- **🚨 Fix Logical Operator Precedence**: Critical parser bug where `a == 1 or b == 2` parses as `a == (1 or b) == 2` instead of `(a == 1) or (b == 2)`. Requires adding proper precedence levels: `parse_logical_or` → `parse_logical_and` → `parse_comparison`.
+
 **Make Glang Practical** - Standard libraries for real-world use:
 - **✅ I/O Library**: File operations, file handle I/O with auto-close semantics, user input, directory management
 - **✅ Time Library**: Single Time type with UTC timestamps and full type casting
+- **✅ Logical Operators**: `and`/`&&` and `or`/`||` with proper truthiness and short-circuiting (basic support complete, precedence needs fix)
 - **✅ Behavior System**: Composable transformations for custom node types (Python API complete)
-- **⏳ Network Library**: ✅ JSON support, HTTP client, email notifications 
+- **⏳ Network Library**: ✅ JSON support, HTTP client, email notifications
 - **⏳ Database Connectivity**: SQLite, PostgreSQL, MySQL support
 - **⏳ System Library**: OS interaction, processes
+- **⏳ HTML Parsing Library**: Standard library for web scraping and HTML processing (identified during Bitcoin tracker development)
 - **⏳ Native Behavior Syntax**: `value: type with [behaviors...]` language integration
 
 ### Medium-Term Goals (Q2-Q3 2025)

@@ -16,6 +16,7 @@ class KeywordCategory(Enum):
     TYPE = "type"              # string, num, bool, list
     STATEMENT = "statement"    # import, module, alias, load
     LITERAL = "literal"        # true, false
+    OPERATOR = "operator"      # and, or (logical operators)
 
 
 @dataclass
@@ -243,6 +244,25 @@ class LanguageKeywordRegistry:
             parser_method="parse_boolean_literal",
             description="Boolean false value",
             syntax_example="bool flag = false"
+        ))
+
+        # Logical operators
+        self._register_keyword(KeywordDefinition(
+            keyword="and",
+            category=KeywordCategory.OPERATOR,
+            parser_method="parse_logical_operator",
+            description="Logical AND operator",
+            syntax_example="if a and b { ... }",
+            token_type_name="AND"
+        ))
+
+        self._register_keyword(KeywordDefinition(
+            keyword="or",
+            category=KeywordCategory.OPERATOR,
+            parser_method="parse_logical_operator",
+            description="Logical OR operator",
+            syntax_example="if a or b { ... }",
+            token_type_name="OR"
         ))
     
     def _register_keyword(self, definition: KeywordDefinition):

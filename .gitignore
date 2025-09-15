@@ -52,3 +52,6 @@ dmypy.json
 doc/*
 tmp/*
 .venv
+logs/
+bitcoin_prices.csv
+

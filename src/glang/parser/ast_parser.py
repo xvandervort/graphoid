@@ -769,19 +769,28 @@ class ASTParser:
         return self.parse_comparison()
     
     def parse_comparison(self) -> Expression:
-        """Parse comparison operators: >, <, >=, <=, ==, !=, !>, !<"""
+        """Parse comparison and logical operators: >, <, >=, <=, ==, !=, !>, !<, and, or, &&, ||"""
         expr = self.parse_term()
-        
+
         while self.check(TokenType.GREATER) or self.check(TokenType.LESS) or \
               self.check(TokenType.GREATER_EQUAL) or self.check(TokenType.LESS_EQUAL) or \
               self.check(TokenType.EQUAL) or self.check(TokenType.NOT_EQUAL) or \
-              self.check(TokenType.NOT_GREATER) or self.check(TokenType.NOT_LESS):
-            
+              self.check(TokenType.NOT_GREATER) or self.check(TokenType.NOT_LESS) or \
+              self.check(TokenType.AND) or self.check(TokenType.OR):
+
             operator_token = self.advance()
             right = self.parse_term()
             pos = SourcePosition(operator_token.line, operator_token.column)
-            expr = BinaryOperation(expr, operator_token.value, right, pos)
-        
+
+            # Convert && and || to their word equivalents for consistent AST
+            operator_value = operator_token.value
+            if operator_value == "&&":
+                operator_value = "and"
+            elif operator_value == "||":
+                operator_value = "or"
+
+            expr = BinaryOperation(expr, operator_value, right, pos)
+
         return expr
     
     def parse_term(self) -> Expression:

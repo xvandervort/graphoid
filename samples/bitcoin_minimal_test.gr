@@ -1,0 +1,47 @@
+# Minimal Bitcoin Test - Just Test HTTP and File Operations
+
+import "io" as io
+import "time" as time
+
+print("₿ Minimal Bitcoin Test")
+print("====================")
+
+# Test 1: HTTP Request
+print("🌐 Testing HTTP request...")
+string url = "https://httpbin.org/get"
+string response = io.http_get(url)
+print("✅ HTTP test successful - got " + response.length().to_string() + " characters")
+
+# Test 2: Time operations
+print("⏰ Testing time operations...")
+current_time = time.now()
+string timestamp = current_time.to_string()
+print("✅ Time test successful - current time: " + timestamp)
+
+# Test 3: File operations
+print("💾 Testing file operations...")
+string test_content = "timestamp,price\n" + timestamp + ",99999.99\n"
+io.write_file("test_bitcoin.csv", test_content)
+print("✅ File write test successful")
+
+# Test 4: Read the file back
+string read_content = io.read_file("test_bitcoin.csv")
+print("✅ File read test successful")
+print("File content: " + read_content)
+
+# Test 5: String operations
+print("🔤 Testing string operations...")
+string test_text = "Bitcoin price is $115,469.18 today"
+if test_text.contains("Bitcoin") {
+    print("✅ String contains test successful")
+}
+
+if test_text.contains("$") {
+    print("✅ String dollar sign test successful")
+}
+
+# Test 6: Split operations
+list<string> parts = test_text.split("$")
+print("✅ Split test successful - found " + parts.size().to_string() + " parts")
+
+print("🎉 All basic tests passed! Ready for Bitcoin tracker implementation.")

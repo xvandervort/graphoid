@@ -42,6 +42,8 @@ def _create_dynamic_token_type():
         "NOT_LESS": "NOT_LESS",          # !< (intuitive)
         "NOT": "NOT",                    # !
         "AMPERSAND": "AMPERSAND",        # &
+        "AND": "AND",                    # && (alias for 'and')
+        "OR": "OR",                      # || (alias for 'or')
         "LBRACKET": "LBRACKET",          # [
         "RBRACKET": "RBRACKET",          # ]
         "LPAREN": "LPAREN",              # (
@@ -156,6 +158,8 @@ class Tokenizer:
             (r'>', TokenType.GREATER),
             (r'<', TokenType.LESS),
             (r'!', TokenType.NOT),
+            (r'&&', TokenType.AND),          # && logical and (must come before single &)
+            (r'\|\|', TokenType.OR),         # || logical or
             (r'&', TokenType.AMPERSAND),
             (r'\.', TokenType.DOT),
             (r',', TokenType.COMMA),

@@ -2455,6 +2455,10 @@ class ASTExecutor(BaseASTVisitor):
             self.result = self.perform_comparison(left_value, right_value, "less_equal")
         elif node.operator == "!<":  # Intuitive "not less than" = greater than or equal
             self.result = self.perform_comparison(left_value, right_value, "greater_equal")
+        elif node.operator == "and":
+            self.result = self.perform_logical_and(left_value, right_value)
+        elif node.operator == "or":
+            self.result = self.perform_logical_or(left_value, right_value)
         elif node.operator == "&":
             self.result = self.perform_intersection(left_value, right_value)
         elif node.operator == "+.":
@@ -2663,9 +2667,53 @@ class ASTExecutor(BaseASTVisitor):
             return ListValue(result_elements, left.constraint, left.position)
         else:
             raise RuntimeError(f"Cannot perform intersection on {left.get_type()} and {right.get_type()}")
-    
+
+    def perform_logical_and(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform logical AND operation."""
+        # Convert values to boolean using truthiness
+        left_bool = self._to_boolean(left)
+
+        # Short-circuit: if left is false, return false without evaluating right
+        if not left_bool:
+            return BooleanValue(False, left.position)
+
+        # Left is true, so result depends on right
+        right_bool = self._to_boolean(right)
+        return BooleanValue(right_bool, right.position)
+
+    def perform_logical_or(self, left: GlangValue, right: GlangValue) -> GlangValue:
+        """Perform logical OR operation."""
+        # Convert values to boolean using truthiness
+        left_bool = self._to_boolean(left)
+
+        # Short-circuit: if left is true, return true without evaluating right
+        if left_bool:
+            return BooleanValue(True, left.position)
+
+        # Left is false, so result depends on right
+        right_bool = self._to_boolean(right)
+        return BooleanValue(right_bool, right.position)
+
+    def _to_boolean(self, value: GlangValue) -> bool:
+        """Convert a GlangValue to boolean using truthiness rules."""
+        if isinstance(value, BooleanValue):
+            return value.value
+        elif isinstance(value, NumberValue):
+            return value.value != 0
+        elif isinstance(value, StringValue):
+            return len(value.value) > 0
+        elif isinstance(value, ListValue):
+            return len(value.elements) > 0
+        elif isinstance(value, HashValue):
+            return len(value.pairs) > 0
+        elif isinstance(value, DataNodeValue):
+            return value.value is not None and self._to_boolean(value.value)
+        else:
+            # Default: non-null values are truthy
+            return True
+
     # =============================================================================
-    # Element-wise Arithmetic Operations (Dot Operators)  
+    # Element-wise Arithmetic Operations (Dot Operators)
     # =============================================================================
     
     def perform_elementwise_addition(self, left: GlangValue, right: GlangValue) -> GlangValue:

@@ -1,0 +1,152 @@
+# Working Bitcoin Price Tracker
+# Fetches Bitcoin price from CoinMarketCap and stores in CSV
+
+import "io" as io
+import "time" as time
+
+print("₿ Bitcoin Price Tracker")
+print("======================")
+
+# Configuration
+string url = "https://coinmarketcap.com/currencies/bitcoin/"
+string csv_file = "bitcoin_prices.csv"
+
+# Function to extract Bitcoin price from the specific Bitcoin page metadata
+func extract_bitcoin_price(text) {
+    print("💰 Extracting Bitcoin price from page metadata...")
+
+    # Look for the meta description which contains the current price
+    # Pattern: "The live Bitcoin price today is $115,410.77 USD"
+    if text.contains("The live Bitcoin price today is $") {
+        print("🎯 Found Bitcoin price description")
+
+        # Split to find the price segment
+        list<string> parts = text.split("The live Bitcoin price today is $")
+        if parts.size() > 1 {
+            string price_segment = parts[1]
+
+            # Extract price until we hit " USD"
+            list<string> usd_parts = price_segment.split(" USD")
+            if usd_parts.size() > 0 {
+                string price = usd_parts[0]
+                print("🎯 Extracted Bitcoin price: $" + price)
+                return price
+            }
+        }
+    }
+
+    print("❌ Could not find Bitcoin price in description metadata")
+    return "FAILED"
+}
+
+# Fetch Bitcoin price from CoinMarketCap
+func fetch_bitcoin_price() {
+    print("🌐 Fetching from " + url)
+
+    # Get the webpage
+    string content = io.http_get(url)
+    print("✅ Downloaded " + content.length().to_string() + " characters")
+
+    # Check if page contains Bitcoin info
+    if content.contains("Bitcoin") {
+        if content.contains("$") {
+            print("✅ Page contains Bitcoin and price data")
+
+            # Extract the Bitcoin price from metadata
+            string price = extract_bitcoin_price(content)
+            return price
+        } else {
+            print("❌ Page doesn't contain expected price data")
+            return "FAILED"
+        }
+    } else {
+        print("❌ Page doesn't contain expected Bitcoin data")
+        return "FAILED"
+    }
+}
+
+# Get current timestamp
+func get_timestamp() {
+    current = time.now()
+    return current.to_string()
+}
+
+# Save price to CSV file
+func save_to_csv(price, timestamp) {
+    print("💾 Saving to " + csv_file)
+
+    # Check if file exists
+    bool file_exists = io.exists(csv_file)
+
+    if !file_exists {
+        # Create file with headers
+        string headers = "timestamp,price_usd\n"
+        io.write_file(csv_file, headers)
+        print("📝 Created new CSV file")
+    }
+
+    # Append new data
+    string new_row = timestamp + "," + price + "\n"
+    io.append_file(csv_file, new_row)
+    print("✅ Saved: " + timestamp + " -> $" + price)
+}
+
+# Show recent entries
+func show_recent_prices() {
+    if io.exists(csv_file) {
+        print("\n📊 Recent Bitcoin prices:")
+        string content = io.read_file(csv_file)
+        list<string> lines = content.split("\n")
+
+        # Show last few lines (skip header)
+        num total_lines = lines.size()
+        num start = 1  # Skip header
+        if total_lines > 6 {
+            start = total_lines - 5  # Show last 5 data lines
+        }
+
+        num i = start
+        while i < total_lines {
+            if i < lines.size() {
+                string line = lines[i].trim()
+                if line.length() > 0 {
+                    list<string> parts = line.split(",")
+                    if parts.size() >= 2 {
+                        print("  " + parts[0] + " -> $" + parts[1])
+                    }
+                }
+            }
+            i = i + 1
+        }
+    }
+}
+
+# Main execution
+print("🚀 Starting Bitcoin price fetch...")
+
+string bitcoin_price = fetch_bitcoin_price()
+
+if bitcoin_price != "FAILED" {
+    print("\n⏰ Getting timestamp...")
+    string timestamp = get_timestamp()
+
+    print("💾 Saving data...")
+    save_to_csv(bitcoin_price, timestamp)
+
+    print("\n📋 Summary:")
+    print("  Bitcoin Price: $" + bitcoin_price)
+    print("  Timestamp: " + timestamp)
+    print("  File: " + csv_file)
+
+    show_recent_prices()
+
+    print("\n✨ Bitcoin price tracking completed successfully!")
+    print("💡 Run this script daily to build a price history for trend analysis.")
+
+} else {
+    print("\n❌ Failed to fetch Bitcoin price")
+    print("  Check internet connection and try again")
+}
+
+print("\n🔗 Data source: " + url)
+print("📁 Data file: " + csv_file)

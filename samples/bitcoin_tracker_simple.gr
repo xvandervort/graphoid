@@ -1,0 +1,69 @@
+# Simple Bitcoin Price Tracker - Test Version
+# Tests basic functionality without complex parsing
+
+import "io" as io
+import "time" as time
+
+print("₿ Simple Bitcoin Price Tracker Test")
+print("==================================")
+
+# Configuration
+string url = "https://coinmarketcap.com/"
+string csv_file = "bitcoin_prices_test.csv"
+
+# Simple function to test HTTP fetch
+func test_fetch() {
+    print("🌐 Testing HTTP fetch...")
+
+    string content = io.http_get(url)
+    print("✅ Fetched " + content.length().to_string() + " characters")
+
+    # Simple check for Bitcoin presence
+    if content.contains("Bitcoin") {
+        print("✅ Page contains Bitcoin")
+        return "TEST_SUCCESS"
+    } else {
+        print("❌ Page doesn't contain Bitcoin")
+        return "NO_BITCOIN"
+    }
+}
+
+# Simple timestamp function
+func get_simple_timestamp() {
+    current = time.now()
+    return current.to_string()
+}
+
+# Simple CSV write function
+func write_test_data(price, timestamp) {
+    print("💾 Writing test data to CSV...")
+
+    # Create CSV content
+    string csv_content = "timestamp,price_usd\n"
+    csv_content = csv_content + timestamp + "," + price + "\n"
+
+    # Write to file
+    io.write_file(csv_file, csv_content)
+    print("✅ Test data written to " + csv_file)
+}
+
+# Run the test
+print("🚀 Starting simple test...")
+
+string result = test_fetch()
+print("Fetch result: " + result)
+
+if result == "TEST_SUCCESS" {
+    string timestamp = get_simple_timestamp()
+    print("Timestamp: " + timestamp)
+
+    # Use a test price for now
+    string test_price = "115000.00"
+    write_test_data(test_price, timestamp)
+
+    print("✅ Simple test completed successfully!")
+} else {
+    print("❌ Test failed: " + result)
+}
+
+print("📊 Test Summary: Tested HTTP, time, and file operations")
