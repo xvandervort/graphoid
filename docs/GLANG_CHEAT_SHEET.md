@@ -1593,6 +1593,84 @@ func assign_test_group(user_id) {
 }
 ```
 
+## 🐛 Enhanced Error Handling & Debugging
+
+### Stack Traces with Full Context
+```glang
+# When errors occur, Glang provides detailed stack traces:
+
+func outer_function(z) {
+    return middle_function(z + 1)
+}
+
+func middle_function(y) {
+    return inner_function(y * 2)
+}
+
+func inner_function(x) {
+    return missing_variable + x    # Error: undefined variable
+}
+
+result = outer_function(5)
+
+# Output:
+# Traceback (most recent call last):
+#   in inner_function() at line 7, column 20
+#     return inner_function(y * 2)
+#     ~~~~~~~~~~~~~~~~~~~^
+#     Local variables: {'x': '12', 'y': '6'}
+#   in middle_function() at line 11, column 20
+#     return middle_function(z + 1)
+#     ~~~~~~~~~~~~~~~~~~~^
+#     Local variables: {'z': '5'}
+#   in outer_function() at line 14, column 18
+#     result = outer_function(5)
+#     ~~~~~~~~~~~~~~~~~^
+# VariableNotFoundError: Variable 'missing_variable' not found
+```
+
+### Error-as-Data Pattern
+```glang
+# Use result tuples for clean error handling
+func safe_divide(a, b) {
+    if b == 0 {
+        return [:error, "Division by zero"]
+    }
+    return [:ok, a / b]
+}
+
+# Pattern match on results
+result = safe_divide(10, 2)
+message = match result {
+    [:ok, value] => "Success: " + value.to_string(),
+    [:error, msg] => "Error: " + msg,
+    _ => "Unknown result"
+}
+
+# Handle multiple operations
+results = [
+    safe_divide(10, 2),    # [:ok, 5]
+    safe_divide(10, 0),    # [:error, "Division by zero"]
+    safe_divide(20, 4)     # [:ok, 5]
+]
+
+for result in results {
+    status = match result {
+        [:ok, val] => "✓ " + val.to_string(),
+        [:error, err] => "✗ " + err,
+        _ => "? Unknown"
+    }
+    print(status)
+}
+```
+
+### Error Information Features
+- **Full call chain** - See exactly where errors originated
+- **Source context** - View the failing line with visual pointer
+- **Local variables** - Inspect variable values at each stack level
+- **Pattern matching** - Use `:ok`/`:error` symbols for structured error handling
+- **Stack traces** - Professional debugging information like Python/Java
+
 ---
 
 *Happy coding with Glang! 🚀*

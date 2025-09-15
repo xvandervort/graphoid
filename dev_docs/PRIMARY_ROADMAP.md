@@ -35,7 +35,7 @@ Transform Glang from a practical programming language into a revolutionary platf
 - [x] Random number generation (secure, deterministic, statistical distributions)
 
 #### 1.2 Developer Experience
-- [ ] Enhanced error messages with stack traces (complements error-as-data pattern)
+- [x] **Enhanced error messages with stack traces** (complements error-as-data pattern)
 - [ ] Debugger support
 - [ ] IDE integration (VS Code extension)
 - [x] Package manager design (see PACKAGING_SYSTEM_DESIGN.md)
@@ -195,7 +195,8 @@ The following documents have been superseded by this roadmap:
 6. ✅ ~~Implement regular expression module~~
 7. ✅ ~~Create random number generation module~~
 8. ✅ ~~Add intrinsic behavior system for automatic value transformation~~
-9. Improve error handling with enhanced stack traces
+9. ✅ ~~Improve error handling with enhanced stack traces~~
+10. Implement package manager (glang-package command)
 
 ### Q1 2025
 1. Finish standard library modules
