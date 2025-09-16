@@ -87,11 +87,13 @@ Transform Glang from a practical programming language into a revolutionary platf
 - [ ] **Error-as-Data**: Result lists `[:ok, value]` / `[:error, message]` for clean error handling
 - [ ] **Implicit Success Wrapping**: Auto-wrap plain returns as `[:ok, value]`
 - [ ] **Module Scoping**: Functions can access module-level variables
-- [ ] **None Literal**: Add `none` as a language keyword for null values
+- [x] **None Literal**: Add `none` as a language keyword for null values (completed)
 - [ ] **Symbol Lexing/Parsing**: Support `:symbol` syntax for behavior names and status codes
 
 #### 1.5 Enhanced Behavior System
 - [x] **Intrinsic Behaviors**: Behaviors attached directly to data structures (completed)
+- [ ] **Scoped Behavior Configuration**: File/function/block-level behavior settings
+  - See [SCOPED_BEHAVIOR_CONFIGURATION.md](./SCOPED_BEHAVIOR_CONFIGURATION.md) for design
 - [ ] **Custom Value Mappings**: User-defined conversions (`"red" → 7`, `"kg" → "mass"`)
 - [ ] **Function-Based Behaviors**: Attach user-written functions as behaviors
 - [ ] **Conditional Behaviors**: Apply behaviors based on context or conditions

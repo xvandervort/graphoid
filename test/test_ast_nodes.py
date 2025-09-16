@@ -31,6 +31,7 @@ class TestASTNodes:
             def visit_string_literal(self, node): pass
             def visit_number_literal(self, node): pass
             def visit_boolean_literal(self, node): pass
+            def visit_none_literal(self, node): pass
             def visit_list_literal(self, node): pass
             def visit_data_node_literal(self, node): pass
             def visit_map_literal(self, node): pass

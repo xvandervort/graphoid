@@ -1037,6 +1037,9 @@ class ListValue(GlangValue, GraphContainer):
         self.constraint = constraint
         # Check if any elements are frozen
         self._update_frozen_flag()
+
+        # TODO: Add default none-handling behavior if none values are present
+        # self._add_default_none_behavior()
     
     def to_python(self) -> List[Any]:
         return [elem.to_python() for elem in self.elements]
@@ -1202,9 +1205,18 @@ class ListValue(GlangValue, GraphContainer):
     # Immutability-specific methods
     def _update_frozen_flag(self):
         """Update the contains_frozen flag based on elements."""
-        self.contains_frozen = any(elem.is_frozen_value() or elem.contains_frozen_data() 
+        self.contains_frozen = any(elem.is_frozen_value() or elem.contains_frozen_data()
                                  for elem in self.elements)
-    
+
+    def _add_default_none_behavior(self):
+        """Add default none-handling behavior if none values are present."""
+        # Check if any elements are none
+        has_none = any(isinstance(elem, NoneValue) for elem in self.elements)
+        if has_none:
+            # Add default behavior to skip none in calculations
+            behavior_name = StringValue("skip_none_in_calculations", self.position)
+            self.add_rule(behavior_name)
+
     def _deep_freeze(self):
         """Freeze all contained elements."""
         for element in self.elements:
@@ -1330,7 +1342,7 @@ class LambdaValue(GlangValue):
 
 
 class NoneValue(GlangValue):
-    """Runtime value representing absence of value (like null/None)."""
+    """Runtime value representing absence of value with safe propagation."""
 
     _type_name = "none"
 
@@ -1342,6 +1354,63 @@ class NoneValue(GlangValue):
 
     def to_display_string(self) -> str:
         return "none"
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, NoneValue)
+
+    def __hash__(self) -> int:
+        return hash("none")
+
+    # Safe propagation - none operations return none
+    def to_string(self) -> 'NoneValue':
+        """Convert none to string - returns none."""
+        return NoneValue(self.position)
+
+    def to_num(self) -> 'NoneValue':
+        """Convert none to number - returns none."""
+        return NoneValue(self.position)
+
+    def to_bool(self) -> 'BooleanValue':
+        """Convert none to boolean - returns false for truthiness."""
+        return BooleanValue(False, self.position)
+
+    # Arithmetic operations return none
+    def negate(self) -> 'NoneValue':
+        return NoneValue(self.position)
+
+    def add(self, other: GlangValue) -> 'NoneValue':
+        return NoneValue(self.position)
+
+    def subtract(self, other: GlangValue) -> 'NoneValue':
+        return NoneValue(self.position)
+
+    def multiply(self, other: GlangValue) -> 'NoneValue':
+        return NoneValue(self.position)
+
+    def divide(self, other: GlangValue) -> 'NoneValue':
+        return NoneValue(self.position)
+
+    # String operations return none
+    def to_upper(self) -> 'NoneValue':
+        return NoneValue(self.position)
+
+    def to_lower(self) -> 'NoneValue':
+        return NoneValue(self.position)
+
+    def trim(self) -> 'NoneValue':
+        return NoneValue(self.position)
+
+    def reverse(self) -> 'NoneValue':
+        return NoneValue(self.position)
+
+    # Detection methods
+    def is_none(self) -> 'BooleanValue':
+        """Check if value is none - returns true."""
+        return BooleanValue(True, self.position)
+
+    def is_some(self) -> 'BooleanValue':
+        """Check if value has content - returns false."""
+        return BooleanValue(False, self.position)
 
 
 class TimeValue(GlangValue):

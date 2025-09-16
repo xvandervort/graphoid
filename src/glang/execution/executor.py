@@ -433,6 +433,10 @@ class ASTExecutor(BaseASTVisitor):
         """Evaluate boolean literal."""
         self.result = BooleanValue(node.value, node.position)
 
+    def visit_none_literal(self, node: NoneLiteral) -> None:
+        """Evaluate none literal."""
+        self.result = NoneValue(node.position)
+
     def visit_symbol_literal(self, node: SymbolLiteral) -> None:
         """Evaluate symbol literal."""
         self.result = SymbolValue(node.name, node.position)

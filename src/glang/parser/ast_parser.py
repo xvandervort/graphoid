@@ -1000,6 +1000,11 @@ class ASTParser:
             token = self.previous()
             return BooleanLiteral(False, SourcePosition(token.line, token.column))
 
+        # None literal
+        if self.match(TokenType.NONE):
+            token = self.previous()
+            return NoneLiteral(SourcePosition(token.line, token.column))
+
         # Match expressions
         if self.check(TokenType.MATCH):
             return self.parse_match_expression()

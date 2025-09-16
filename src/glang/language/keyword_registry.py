@@ -246,6 +246,14 @@ class LanguageKeywordRegistry:
             syntax_example="bool flag = false"
         ))
 
+        self._register_keyword(KeywordDefinition(
+            keyword="none",
+            category=KeywordCategory.LITERAL,
+            parser_method="parse_none_literal",
+            description="None value representing absence of data",
+            syntax_example="value = none"
+        ))
+
         # Logical operators
         self._register_keyword(KeywordDefinition(
             keyword="and",

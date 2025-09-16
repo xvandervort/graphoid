@@ -69,6 +69,14 @@ class BooleanLiteral(Expression):
         return visitor.visit_boolean_literal(self)
 
 @dataclass
+class NoneLiteral(Expression):
+    """None literal representing absence of value"""
+    position: Optional[SourcePosition] = None
+
+    def accept(self, visitor):
+        return visitor.visit_none_literal(self)
+
+@dataclass
 class SymbolLiteral(Expression):
     """Symbol literal: :ok, :error, :pending, etc."""
     name: str  # The symbol name without the colon
@@ -450,11 +458,16 @@ class ASTVisitor(ABC):
         """Visit a number literal."""
         pass
     
-    @abstractmethod  
-    def visit_boolean_literal(self, node: BooleanLiteral): 
+    @abstractmethod
+    def visit_boolean_literal(self, node: BooleanLiteral):
         """Visit a boolean literal."""
         pass
-    
+
+    @abstractmethod
+    def visit_none_literal(self, node: NoneLiteral):
+        """Visit a none literal."""
+        pass
+
     @abstractmethod
     def visit_list_literal(self, node: ListLiteral): 
         """Visit a list literal."""
@@ -635,7 +648,10 @@ class BaseASTVisitor(ASTVisitor):
     
     def visit_boolean_literal(self, node: BooleanLiteral):
         return node
-    
+
+    def visit_none_literal(self, node: NoneLiteral):
+        return node
+
     def visit_list_literal(self, node: ListLiteral):
         for element in node.elements:
             element.accept(self)
