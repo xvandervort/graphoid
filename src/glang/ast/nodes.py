@@ -339,11 +339,21 @@ class PrecisionBlock(Statement):
     precision_value: Expression  # Expression that evaluates to precision (integer)
     body: Block
     position: Optional[SourcePosition] = None
-    
+
     def accept(self, visitor):
         return visitor.visit_precision_block(self)
 
-@dataclass 
+@dataclass
+class ConfigurationBlock(Statement):
+    """Configuration block: configure { key: value, ... } { body }"""
+    configurations: List[Tuple[str, Expression]]  # List of (key, value) pairs
+    body: Optional[Block]  # Body is optional for file-level configure
+    position: Optional[SourcePosition] = None
+
+    def accept(self, visitor):
+        return visitor.visit_configuration_block(self)
+
+@dataclass
 class IfStatement(Statement):
     """If statement: if condition { then_block } else { else_block }"""
     condition: Expression
@@ -563,7 +573,12 @@ class ASTVisitor(ABC):
     def visit_precision_block(self, node: PrecisionBlock):
         """Visit a precision block."""
         pass
-    
+
+    @abstractmethod
+    def visit_configuration_block(self, node: ConfigurationBlock):
+        """Visit a configuration block."""
+        pass
+
     @abstractmethod
     def visit_module_declaration(self, node: ModuleDeclaration):
         """Visit a module declaration."""
@@ -746,7 +761,16 @@ class BaseASTVisitor(ASTVisitor):
         node.precision_value.accept(self)
         node.body.accept(self)
         return node
-    
+
+    def visit_configuration_block(self, node: ConfigurationBlock):
+        # Visit configuration values
+        for key, value_expr in node.configurations:
+            value_expr.accept(self)
+        # Visit body if present
+        if node.body:
+            node.body.accept(self)
+        return node
+
     def visit_module_declaration(self, node: ModuleDeclaration):
         return node
     

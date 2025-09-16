@@ -386,15 +386,57 @@ class ASTParser:
         # Parse 'precision' keyword
         precision_token = self.consume(TokenType.PRECISION, "Expected 'precision'")
         pos = SourcePosition(precision_token.line, precision_token.column)
-        
+
         # Parse precision value expression (typically a number)
         precision_value = self.parse_expression()
-        
+
         # Parse body block
         body = self.parse_block()
-        
+
         return PrecisionBlock(precision_value=precision_value, body=body, position=pos)
-    
+
+    def parse_configuration_block(self) -> ConfigurationBlock:
+        """Parse configuration block: configure { key: value, ... } { statements }"""
+        # Parse 'configure' keyword
+        configure_token = self.consume(TokenType.CONFIGURE, "Expected 'configure'")
+        pos = SourcePosition(configure_token.line, configure_token.column)
+
+        # Parse configuration map { key: value, ... }
+        self.consume(TokenType.LBRACE, "Expected '{' after 'configure'")
+
+        configurations = []
+        while not self.check(TokenType.RBRACE) and not self.is_at_end():
+            # Parse key (identifier)
+            if not self.check(TokenType.IDENTIFIER):
+                raise ParseError("Expected configuration key (identifier)", self.peek())
+            key_token = self.advance()
+            key = key_token.value
+
+            # Parse colon
+            self.consume(TokenType.COLON, "Expected ':' after configuration key")
+
+            # Parse value expression
+            value = self.parse_expression()
+
+            configurations.append((key, value))
+
+            # Optional comma
+            if self.match(TokenType.COMMA):
+                continue
+            elif self.check(TokenType.RBRACE):
+                break
+            else:
+                raise ParseError("Expected ',' or '}' in configuration block", self.peek())
+
+        self.consume(TokenType.RBRACE, "Expected '}' to close configuration block")
+
+        # Parse optional body block
+        body = None
+        if self.check(TokenType.LBRACE):
+            body = self.parse_block()
+
+        return ConfigurationBlock(configurations=configurations, body=body, position=pos)
+
     def parse_for_statement(self) -> ForInStatement:
         """Parse for-in statement: for variable in iterable { statements }"""
         # Parse 'for' keyword

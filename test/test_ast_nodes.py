@@ -51,6 +51,7 @@ class TestASTNodes:
             def visit_print_statement(self, node): pass
             def visit_import_statement(self, node): pass
             def visit_precision_block(self, node): pass
+            def visit_configuration_block(self, node): pass
             def visit_module_declaration(self, node): pass
             def visit_alias_declaration(self, node): pass
             def visit_noop(self, node): pass

@@ -3165,7 +3165,16 @@ class ASTExecutor(BaseASTVisitor):
             getcontext().prec = old_precision
         
         self.result = None  # Precision blocks don't return values
-    
+
+    def visit_configuration_block(self, node) -> None:
+        """Execute configuration block with scoped behavior settings."""
+        # TODO: For now, just execute the body if present
+        # Full configuration system implementation will be added later
+        if node.body:
+            self.execute(node.body)
+
+        self.result = None  # Configuration blocks don't return values
+
     def visit_while_statement(self, node: WhileStatement) -> None:
         """Execute while loop."""
         while True:

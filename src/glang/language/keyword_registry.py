@@ -186,7 +186,15 @@ class LanguageKeywordRegistry:
             description="Precision context block",
             syntax_example="precision 14 { statements }"
         ))
-        
+
+        self._register_keyword(KeywordDefinition(
+            keyword="configure",
+            category=KeywordCategory.STATEMENT,
+            parser_method="parse_configuration_block",
+            description="Configuration block for scoped behaviors",
+            syntax_example="configure { skip_none: false } { statements }"
+        ))
+
         self._register_keyword(KeywordDefinition(
             keyword="break",
             category=KeywordCategory.STATEMENT,

@@ -13,6 +13,16 @@ Revolutionary language-level numeric precision control that allows you to specif
 - **Memory-efficient implementation**
 - **Financial and scientific calculation examples**
 
+### [Configuration Blocks](configuration_blocks.md) ✅ **NEW**
+Language-level behavior configuration system that provides explicit control over default behaviors and settings at different scope levels.
+
+- **Explicit behavior control** (no hidden magic)
+- **File-level and block-level scoping**
+- **None handling configuration** (skip, convert, or error)
+- **Type strictness control** (implicit conversions)
+- **Domain-specific configuration** (data science, finance, systems)
+- **Hierarchical inheritance** with clear override rules
+
 ## Planned Features
 
 Future language features will be documented here as they are implemented:

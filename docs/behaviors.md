@@ -4,6 +4,8 @@
 
 Glang's intrinsic behavior system allows you to attach transformation and validation rules directly to data structures (lists and hashes). Once attached, these behaviors automatically apply to all current and future values in the container.
 
+**Related**: See [Configuration Blocks](language_features/configuration_blocks.md) for language-level behavior control that applies to entire scopes rather than individual containers.
+
 ## Key Concepts
 
 ### Intrinsic vs External

@@ -458,12 +458,38 @@ precision 5 {
 # Nested precision contexts
 precision 3 {
     outer_value = 22.0 / 7.0     # Result: 3.143 (3 decimal places)
-    
+
     precision 1 {
         inner_value = 22.0 / 7.0 # Result: 3.1 (1 decimal place)
     }
-    
+
     back_value = 22.0 / 7.0      # Result: 3.143 (3 decimal places restored)
+}
+
+# Configuration blocks - Behavior Control (NEW!)
+# File-level configuration (applies to entire file)
+configure { skip_none: false, decimal_places: 2 }
+
+# Block-level configuration with explicit behavior control
+configure { skip_none: true } {
+    # All operations in this block skip none values
+    data = [1, 2, none, 4]
+    result = data.mean()         # Result: 2.33 (none skipped)
+}
+
+configure { strict_types: true } {
+    # No implicit type conversions allowed
+    # result = "5" + 3           # Error: cannot add string and number
+}
+
+# Multiple configuration settings
+configure {
+    skip_none: false,            # Error on none values
+    decimal_places: 2,           # Exactly 2 decimal places
+    strict_types: true           # No implicit conversions
+} {
+    # All operations use these explicit behaviors
+    financial_calculation = 19.99 * 0.085  # Result: 1.70 (exactly)
 }
 
 # While loops
@@ -623,6 +649,7 @@ Glang uses a clean, modern architecture:
 - ✅ Control flow structures: if/else, while, for-in, break/continue with proper nesting
 - ✅ **Logical operators** with operator synonyms: `and`/`&&` and `or`/`||` with proper truthiness and short-circuiting
 - ✅ **Precision context blocks** with language-level numeric precision control (precision N { ... })
+- ✅ **Configuration blocks** with explicit behavior control and scoped settings (configure { ... } { ... })
 - ✅ CLI program execution with shebang support and command-line arguments
 - ✅ Mathematical methods (abs, sqrt, log, pow, rounding) for numbers
 - ✅ Type casting system (to_string, to_num, to_bool) for all basic types
@@ -631,7 +658,7 @@ Glang uses a clean, modern architecture:
 - ✅ **JSON module** with encode, decode, pretty printing, and validation (json.encode, json.decode, json.is_valid)
 - ✅ **Time module** with single Time type, UTC timestamps, and full type casting (Time.now, Time.from_components, time.to_num, string.to_time)
 - ✅ **Intrinsic behavior system** where lists/hashes have built-in behaviors that auto-apply to all values (GraphContainer mixin)
-- ✅ **Comprehensive test suite** (609+ tests, 64% coverage)
+- ✅ **Comprehensive test suite** (1205+ tests, 67% coverage)
 
 ### Development Guidelines
 - **AST-first development** - All new features should extend the AST system

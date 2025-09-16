@@ -92,8 +92,11 @@ Transform Glang from a practical programming language into a revolutionary platf
 
 #### 1.5 Enhanced Behavior System
 - [x] **Intrinsic Behaviors**: Behaviors attached directly to data structures (completed)
-- [ ] **Scoped Behavior Configuration**: File/function/block-level behavior settings
+- [x] **Scoped Behavior Configuration**: File/function/block-level behavior settings (Phase 1 completed)
   - See [SCOPED_BEHAVIOR_CONFIGURATION.md](./SCOPED_BEHAVIOR_CONFIGURATION.md) for design
+  - ✅ Configuration syntax parsing and AST integration
+  - ✅ `configure { key: value } { body }` blocks with inheritance
+  - 🔄 Phase 2: Configuration context and behavior enforcement (planned)
 - [ ] **Custom Value Mappings**: User-defined conversions (`"red" → 7`, `"kg" → "mass"`)
 - [ ] **Function-Based Behaviors**: Attach user-written functions as behaviors
 - [ ] **Conditional Behaviors**: Apply behaviors based on context or conditions
