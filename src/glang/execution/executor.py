@@ -654,14 +654,17 @@ class ASTExecutor(BaseASTVisitor):
         # Universal methods available on all types
         universal_methods = ['type', 'methods', 'can', 'inspect', 'size', 'freeze', 'is_frozen', 'contains_frozen']
         
+        # Behavior management methods (available on list and hash types)
+        behavior_methods = ['add_rule', 'remove_rule', 'has_rule', 'get_rules', 'clear_rules']
+
         # Type-specific methods
         type_methods = {
-            'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort', 'to_string', 'to_bool', 'can_accept'],
+            'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort', 'map', 'filter', 'select', 'reject', 'each', 'clear', 'empty', 'pop', 'remove', 'constraint', 'types', 'type_summary', 'validate_constraint', 'coerce_to_constraint', 'to_string', 'to_bool', 'can_accept'] + behavior_methods,
             'string': ['length', 'contains', 'extract', 'count', 'count_chars', 'find_first', 'find_first_char', 'up', 'toUpper', 'down', 'toLower', 'split', 'split_on_any', 'trim', 'join', 'matches', 'replace', 'find_all', 'findAll', 'is_email', 'is_number', 'is_url', 'reverse', 'unique', 'chars', 'starts_with', 'ends_with', 'to_string', 'to_num', 'to_bool', 'to_time'],
             'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time'],
             'bool': ['flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'],
             'data': ['key', 'value', 'can_accept'],
-            'hash': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept'],
+            'hash': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept', 'to_string', 'to_bool'] + behavior_methods,
             'time': ['get_type', 'to_string', 'to_num']
         }
         
@@ -1022,10 +1025,41 @@ class ASTExecutor(BaseASTVisitor):
             else:
                 return StringValue(message, position)
         
+        # Behavior management methods (from GraphContainer mixin)
+        elif method_name == "add_rule":
+            if len(args) < 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"add_rule() takes at least 1 argument (behavior name), got {len(args)}", position)
+            return target.add_rule(*args)
+
+        elif method_name == "remove_rule":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"remove_rule() takes 1 argument, got {len(args)}", position)
+            return target.remove_rule(args[0])
+
+        elif method_name == "has_rule":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"has_rule() takes 1 argument, got {len(args)}", position)
+            return target.has_rule(args[0])
+
+        elif method_name == "get_rules":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_rules() takes no arguments, got {len(args)}", position)
+            return target.get_rules()
+
+        elif method_name == "clear_rules":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"clear_rules() takes no arguments, got {len(args)}", position)
+            return target.clear_rules()
+
         # Check if it's a universal method
         elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
             return self._dispatch_universal_method(target, method_name, args, position)
-        
+
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "list", position)
@@ -2091,7 +2125,60 @@ class ASTExecutor(BaseASTVisitor):
                 return BooleanValue(True, position)
             else:
                 return StringValue(message, position)
-        
+
+        # Type conversion methods
+        elif method_name == "to_string":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_string() takes no arguments, got {len(args)}", position)
+            # Convert hash to string representation
+            if len(target.pairs) == 0:
+                return StringValue("{}", position)
+            else:
+                items = []
+                for key in target.keys():
+                    value = target.pairs.get(key)
+                    items.append(f'"{key}": {value.to_display_string()}')
+                return StringValue(f"{{{', '.join(items)}}}", position)
+
+        elif method_name == "to_bool":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_bool() takes no arguments, got {len(args)}", position)
+            # Non-empty hash is true, empty is false
+            return BooleanValue(len(target.pairs) > 0, position)
+
+        # Behavior management methods (from GraphContainer mixin)
+        elif method_name == "add_rule":
+            if len(args) < 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"add_rule() takes at least 1 argument (behavior name), got {len(args)}", position)
+            return target.add_rule(*args)
+
+        elif method_name == "remove_rule":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"remove_rule() takes 1 argument, got {len(args)}", position)
+            return target.remove_rule(args[0])
+
+        elif method_name == "has_rule":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"has_rule() takes 1 argument, got {len(args)}", position)
+            return target.has_rule(args[0])
+
+        elif method_name == "get_rules":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_rules() takes no arguments, got {len(args)}", position)
+            return target.get_rules()
+
+        elif method_name == "clear_rules":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"clear_rules() takes no arguments, got {len(args)}", position)
+            return target.clear_rules()
+
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "hash", position)

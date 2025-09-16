@@ -1,0 +1,79 @@
+# Glang Standard Library: Behavior Functions
+# This module defines behavior transformation functions in pure Glang code.
+
+print("📦 Loading Glang Behavior Standard Library...")
+
+# Core behavior functions defined in Glang
+func nil_to_zero(value) {
+    if value == "nil" {
+        return 0
+    } else {
+        return value
+    }
+}
+
+func positive(value) {
+    if value.type() == "num" {
+        return value.abs()
+    } else {
+        return value
+    }
+}
+
+func round_to_int(value) {
+    if value.type() == "num" {
+        return value.rnd()
+    } else {
+        return value
+    }
+}
+
+func validate_range(value, min_val, max_val) {
+    if value.type() == "num" {
+        if value < min_val {
+            return min_val
+        } else if value > max_val {
+            return max_val
+        } else {
+            return value
+        }
+    } else {
+        return value
+    }
+}
+
+func map_colors(value) {
+    if value.type() == "string" {
+        color_lower = value.down()
+        if color_lower == "red" {
+            return 1
+        } else if color_lower == "green" {
+            return 2
+        } else if color_lower == "blue" {
+            return 3
+        } else {
+            return value
+        }
+    } else {
+        return value
+    }
+}
+
+func uppercase(value) {
+    if value.type() == "string" {
+        return value.up()
+    } else {
+        return value
+    }
+}
+
+func lowercase(value) {
+    if value.type() == "string" {
+        return value.down()
+    } else {
+        return value
+    }
+}
+
+print("✅ Behavior functions loaded successfully!")
+print("Available behaviors: nil_to_zero, positive, round_to_int, validate_range, map_colors, uppercase, lowercase")

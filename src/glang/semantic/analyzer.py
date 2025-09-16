@@ -672,7 +672,10 @@ class SemanticAnalyzer(BaseASTVisitor):
         # Define valid methods for each type
         # Universal reflection methods available on all types
         universal_methods = {'type', 'methods', 'can', 'inspect', 'size'}
-        
+
+        # Behavior management methods (available on list and hash types)
+        behavior_methods = {'add_rule', 'remove_rule', 'has_rule', 'get_rules', 'clear_rules'}
+
         valid_methods = {
             'list': {
                 'append', 'prepend', 'insert', 'remove', 'pop', 'clear', 'reverse',
@@ -680,7 +683,7 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'types', 'coerce_to_constraint', 'indexOf', 'count', 'min', 'max', 'sum', 'sort',
                 'map', 'filter', 'each', 'select', 'reject',
                 'to_string', 'to_bool'
-            } | universal_methods,
+            } | universal_methods | behavior_methods,
             'string': {
                 'size', 'empty', 'upper', 'lower', 'split', 'split_on_any', 'trim', 'join',
                 'matches', 'replace', 'find_all', 'findAll',
@@ -696,8 +699,9 @@ class SemanticAnalyzer(BaseASTVisitor):
             'bool': {'flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'} | universal_methods,
             'data': {'key', 'value'} | universal_methods,
             'hash': {
-                'get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop'
-            } | universal_methods,
+                'get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop',
+                'to_string', 'to_bool', 'can_accept'
+            } | universal_methods | behavior_methods,
             'time': {'get_type', 'to_string', 'to_num'} | universal_methods,
             'file': {'write', 'read', 'read_line', 'flush', 'close', 'kill', 'capability_type'} | universal_methods,
             'module': universal_methods.copy()  # Modules can have any method - validated at runtime
