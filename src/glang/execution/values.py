@@ -13,6 +13,7 @@ import os
 import uuid
 from .glang_number import GlangNumber, create_glang_number
 from ..graph_container import GraphContainer
+from .errors import RuntimeError
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
@@ -1071,14 +1072,12 @@ class ListValue(GlangValue, GraphContainer):
     def get_element(self, index: int) -> GlangValue:
         """Get element at index (with bounds checking)."""
         if not -len(self.elements) <= index < len(self.elements):
-            from .errors import RuntimeError
             raise RuntimeError(f"List index {index} out of range", self.position)
         return self.elements[index]
     
     def set_element(self, index: int, value: GlangValue) -> None:
         """Set element at index (with behavior application and constraint validation)."""
         if not -len(self.elements) <= index < len(self.elements):
-            from .errors import RuntimeError
             raise RuntimeError(f"List index {index} out of range", value.position)
 
         self._check_not_frozen("set element")

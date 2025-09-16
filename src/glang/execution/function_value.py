@@ -7,6 +7,7 @@ Provides value wrappers for functions and built-in operations.
 from typing import Callable, List, Optional, Any
 from .values import GlangValue, StringValue
 from ..ast.nodes import SourcePosition
+from .errors import RuntimeError
 
 
 class BuiltinFunctionValue(GlangValue):
@@ -59,9 +60,8 @@ class BuiltinFunctionValue(GlangValue):
                 return self.func(*args)
         except TypeError as e:
             # Handle argument count mismatch
-            from ..execution.errors import RuntimeError
             raise RuntimeError(
-                f"Error calling {self.name}: {str(e)}", 
+                f"Error calling {self.name}: {str(e)}",
                 position
             )
     

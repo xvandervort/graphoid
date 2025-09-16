@@ -10,6 +10,7 @@ from glang.execution.values import (
     StringValue, NumberValue, BooleanValue, ListValue, DataValue, HashValue
 )
 from glang.execution.executor import ASTExecutor, ExecutionContext
+from glang.execution.errors import RuntimeError as GlangRuntimeError
 from glang.semantic.analyzer import SemanticAnalyzer
 from glang.parser.ast_parser import ASTParser
 from glang.semantic.symbol_table import SymbolTable
@@ -83,7 +84,7 @@ class TestListFreezingAndContamination:
         lst = ListValue([StringValue("hello")])
         lst.freeze()
         
-        with pytest.raises(RuntimeError, match="Cannot append: value is frozen"):
+        with pytest.raises(GlangRuntimeError, match="Cannot append: value is frozen"):
             lst.append(StringValue("world"))
     
     def test_list_contamination_detection(self):
@@ -104,7 +105,7 @@ class TestListFreezingAndContamination:
         frozen_string = StringValue("frozen")
         frozen_string.freeze()
         
-        with pytest.raises(RuntimeError, match="cannot mix frozen and unfrozen data"):
+        with pytest.raises(GlangRuntimeError, match="cannot mix frozen and unfrozen data"):
             lst.append(frozen_string)
     
     def test_can_accept_element_method(self):
@@ -153,7 +154,7 @@ class TestDataNodeFreezingAndContamination:
         data = DataValue("name", StringValue("Alice"))
         data.freeze()
         
-        with pytest.raises(RuntimeError, match="Cannot set value: value is frozen"):
+        with pytest.raises(GlangRuntimeError, match="Cannot set value: value is frozen"):
             data.set_value(StringValue("Bob"))
     
     def test_data_node_contamination_prevents_mixing(self):
@@ -166,7 +167,7 @@ class TestDataNodeFreezingAndContamination:
         frozen_value = StringValue("frozen")
         frozen_value.freeze()
         
-        with pytest.raises(RuntimeError, match="cannot mix frozen and unfrozen data"):
+        with pytest.raises(GlangRuntimeError, match="cannot mix frozen and unfrozen data"):
             data.set_value(frozen_value)
     
     def test_can_accept_value_method(self):
@@ -219,10 +220,10 @@ class TestMapFreezingAndContamination:
         map_val = HashValue(pairs)
         map_val.freeze()
         
-        with pytest.raises(RuntimeError, match="Cannot set key: value is frozen"):
+        with pytest.raises(GlangRuntimeError, match="Cannot set key: value is frozen"):
             map_val.set("age", NumberValue(25))
         
-        with pytest.raises(RuntimeError, match="Cannot remove key: value is frozen"):
+        with pytest.raises(GlangRuntimeError, match="Cannot remove key: value is frozen"):
             map_val.remove("name")
     
     def test_map_contamination_prevents_mixing(self):
@@ -236,7 +237,7 @@ class TestMapFreezingAndContamination:
         frozen_value = StringValue("frozen")
         frozen_value.freeze()
         
-        with pytest.raises(RuntimeError, match="cannot mix frozen and unfrozen data"):
+        with pytest.raises(GlangRuntimeError, match="cannot mix frozen and unfrozen data"):
             map_val.set("frozen_key", frozen_value)
     
     def test_can_accept_value_method_for_maps(self):

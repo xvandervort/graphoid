@@ -776,7 +776,6 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"min() takes no arguments, got {len(args)}", position)
             
             if len(target.elements) == 0:
-                from .errors import RuntimeError
                 raise RuntimeError("Cannot find minimum of empty list", position)
             
             # Check that all elements are numbers
@@ -794,7 +793,6 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"max() takes no arguments, got {len(args)}", position)
             
             if len(target.elements) == 0:
-                from .errors import RuntimeError
                 raise RuntimeError("Cannot find maximum of empty list", position)
             
             # Check that all elements are numbers
@@ -889,9 +887,8 @@ class ASTExecutor(BaseASTVisitor):
                     transformed = transform_func(element)
                     result_elements.append(transformed)
                 except ValueError as e:
-                    from .errors import RuntimeError
                     raise RuntimeError(
-                        f"Transformation '{transform_name}' failed: {e}", 
+                        f"Transformation '{transform_name}' failed: {e}",
                         position
                     )
             
@@ -935,9 +932,8 @@ class ASTExecutor(BaseASTVisitor):
                     if predicate_func(element):
                         result_elements.append(element)
                 except Exception as e:
-                    from .errors import RuntimeError
                     raise RuntimeError(
-                        f"Predicate '{predicate_name}' failed: {e}", 
+                        f"Predicate '{predicate_name}' failed: {e}",
                         position
                     )
             
@@ -1006,9 +1002,8 @@ class ASTExecutor(BaseASTVisitor):
                     if not predicate_func(element):  # Note the NOT
                         result_elements.append(element)
                 except Exception as e:
-                    from .errors import RuntimeError
                     raise RuntimeError(
-                        f"Predicate '{predicate_name}' failed: {e}", 
+                        f"Predicate '{predicate_name}' failed: {e}",
                         position
                     )
             
@@ -1057,7 +1052,6 @@ class ASTExecutor(BaseASTVisitor):
                 else:
                     return NumberValue(int(target.value), position)
             except ValueError:
-                from .errors import RuntimeError
                 raise RuntimeError(f"Cannot convert '{target.value}' to number", position)
         
         elif method_name == "to_bool":
@@ -1584,10 +1578,8 @@ class ASTExecutor(BaseASTVisitor):
                 from .values import TimeValue
                 return TimeValue(timestamp, position)
             except ValueError:
-                from .errors import RuntimeError
                 raise RuntimeError(f"Invalid time format: {time_str_val}. Expected ISO format like '2025-01-15T14:30:00'", position)
             except Exception as e:
-                from .errors import RuntimeError
                 raise RuntimeError(f"Failed to parse time string: {str(e)}", position)
         
         # Starts with and ends with methods
@@ -1686,7 +1678,6 @@ class ASTExecutor(BaseASTVisitor):
             try:
                 return target.sqrt()
             except ValueError as e:
-                from .errors import RuntimeError
                 raise RuntimeError(str(e), position)
         
         elif method_name == "log":
@@ -1694,7 +1685,6 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"log() takes 0 or 1 arguments, got {len(args)}", position)
             if target.value <= 0:
-                from .errors import RuntimeError
                 raise RuntimeError("Cannot take logarithm of non-positive number", position)
             
             if len(args) == 0:
@@ -1707,7 +1697,6 @@ class ASTExecutor(BaseASTVisitor):
                     raise ArgumentError(f"log() base must be number, got {args[0].get_type()}", position)
                 base = args[0].value
                 if base <= 0 or base == 1:
-                    from .errors import RuntimeError
                     raise RuntimeError("Logarithm base must be positive and not equal to 1", position)
                 return NumberValue(math.log(target.value, base), position)
         
@@ -1724,7 +1713,6 @@ class ASTExecutor(BaseASTVisitor):
                 result = pow(target.value, exponent)
                 return NumberValue(result, position)
             except (ValueError, ZeroDivisionError) as e:
-                from .errors import RuntimeError
                 raise RuntimeError(f"Power operation failed: {e}", position)
         
         # Rounding methods
@@ -3190,14 +3178,12 @@ class ASTExecutor(BaseASTVisitor):
             raise VariableNotFoundError(f"Function '{node.name}' not found", node.position, stack_trace)
         
         if not isinstance(func_value, (FunctionValue, LambdaValue, BuiltinFunctionValue)):
-            from .errors import RuntimeError
             raise RuntimeError(f"'{node.name}' is not a function", node.position)
-        
+
         # Check arity
         if len(node.arguments) != func_value.arity():
-            from .errors import RuntimeError
             raise RuntimeError(
-                f"Function '{node.name}' expects {func_value.arity()} arguments but got {len(node.arguments)}", 
+                f"Function '{node.name}' expects {func_value.arity()} arguments but got {len(node.arguments)}",
                 node.position
             )
         
