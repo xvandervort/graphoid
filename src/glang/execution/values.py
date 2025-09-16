@@ -24,27 +24,46 @@ from glang.ast.nodes import SourcePosition
 
 
 class GlangValue(ABC):
-    """Base class for all glang runtime values."""
-    
+    """Base class for all glang runtime values.
+
+    Provides default implementations for common methods to reduce boilerplate.
+    Subclasses can override these defaults when needed.
+    """
+
+    # Class attribute to define the type name (overridden in subclasses)
+    _type_name: Optional[str] = None
+
     def __init__(self, position: Optional[SourcePosition] = None):
         self.position = position
         self.is_frozen = False
         self.contains_frozen = False
-    
+
     @abstractmethod
     def to_python(self) -> Any:
         """Convert to Python equivalent."""
         pass
-    
-    @abstractmethod  
+
     def get_type(self) -> str:
-        """Get glang type name."""
-        pass
-    
-    @abstractmethod
+        """Get glang type name.
+
+        Default implementation returns the class-level _type_name.
+        Override this method for dynamic type names.
+        """
+        if self._type_name is not None:
+            return self._type_name
+        # Fallback: derive from class name (remove 'Value' suffix)
+        class_name = self.__class__.__name__
+        if class_name.endswith('Value'):
+            return class_name[:-5].lower()
+        return class_name.lower()
+
     def to_display_string(self) -> str:
-        """String for display to user."""
-        pass
+        """String for display to user.
+
+        Default implementation uses to_python() for simple types.
+        Override for custom display formatting.
+        """
+        return str(self.to_python())
     
     def __str__(self) -> str:
         return self.to_display_string()
@@ -143,20 +162,16 @@ class GlangValue(ABC):
 
 class CharNode(GlangValue):
     """Runtime character node for graph-based string operations."""
-    
+
+    _type_name = "char"
+
     def __init__(self, value: str, position: Optional[SourcePosition] = None):
         super().__init__(position)
         if len(value) != 1:
             raise ValueError("CharNode must contain exactly one character")
         self.value = value
-    
+
     def to_python(self) -> str:
-        return self.value
-    
-    def get_type(self) -> str:
-        return "char"
-    
-    def to_display_string(self) -> str:
         return self.value
     
     def __eq__(self, other) -> bool:
@@ -210,19 +225,15 @@ class CharNode(GlangValue):
 
 class StringValue(GlangValue):
     """Runtime string value with graph operation support."""
-    
+
+    _type_name = "string"
+
     def __init__(self, value: str, position: Optional[SourcePosition] = None):
         super().__init__(position)
         self.value = value
         self._char_nodes = None  # Lazy conversion cache
-    
+
     def to_python(self) -> str:
-        return self.value
-    
-    def get_type(self) -> str:
-        return "string"
-    
-    def to_display_string(self) -> str:
         return self.value
     
     def __eq__(self, other) -> bool:
@@ -467,8 +478,7 @@ class SymbolValue(GlangValue):
         """Return the symbol name without the colon."""
         return self.name
 
-    def get_type(self) -> str:
-        return "symbol"
+    _type_name = "symbol"
 
     def to_display_string(self) -> str:
         """Display symbols with leading colon."""
@@ -641,16 +651,15 @@ class NumberValue(GlangValue):
 class BooleanValue(GlangValue):
     """Runtime boolean value."""
 
+    _type_name = "bool"
+
     def __init__(self, value: bool, position: Optional[SourcePosition] = None):
         super().__init__(position)
         self.value = value
-        
+
     def to_python(self) -> bool:
         return self.value
-    
-    def get_type(self) -> str:
-        return "bool"
-    
+
     def to_display_string(self) -> str:
         return str(self.value).lower()  # true/false instead of True/False
     
@@ -1323,15 +1332,14 @@ class LambdaValue(GlangValue):
 class NoneValue(GlangValue):
     """Runtime value representing absence of value (like null/None)."""
 
+    _type_name = "none"
+
     def __init__(self, position: Optional[SourcePosition] = None):
         super().__init__(position)
-        
+
     def to_python(self) -> None:
         return None
-    
-    def get_type(self) -> str:
-        return "none"
-    
+
     def to_display_string(self) -> str:
         return "none"
 
@@ -1348,8 +1356,7 @@ class TimeValue(GlangValue):
         else:
             self.timestamp = create_glang_number(float(timestamp))
     
-    def get_type(self) -> str:
-        return "time"
+    _type_name = "time"
     
     def to_python(self) -> float:
         """Return the timestamp as a float."""

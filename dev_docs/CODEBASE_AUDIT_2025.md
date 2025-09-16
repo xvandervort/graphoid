@@ -165,9 +165,9 @@ This audit examined the Glang codebase for opportunities to become more self-hos
 ## 5. Recommendations by Priority
 
 ### IMMEDIATE (Next Sprint)
-1. **Fix Runtime Error Imports**: Move all imports to file top (~2 hour fix)
-2. **Extract Module Builder**: Reduce boilerplate in module creation (~4 hours)
-3. **Consolidate Value Type Methods**: Extract base class patterns (~6 hours)
+1. **✅ Fix Runtime Error Imports**: Move all imports to file top (~2 hour fix) **[COMPLETED]**
+2. **✅ Extract Module Builder**: Reduce boilerplate in module creation (~4 hours) **[COMPLETED]**
+3. **✅ Consolidate Value Type Methods**: Extract base class patterns (~6 hours) **[COMPLETED]**
 
 ### SHORT TERM (Next Month)
 1. **Implement Math Library in Glang**: Move mathematical functions to `stdlib/math.gr`
