@@ -1,0 +1,362 @@
+# Simplified JSON Parser Demo in Glang
+print("=== JSON Parser Demo - Core Functionality ===")
+print("")
+
+# ============================================================================
+# CHARACTER UTILITY FUNCTIONS
+# ============================================================================
+
+func is_digit_char(char) {
+    return char == "0" or char == "1" or char == "2" or char == "3" or char == "4" or
+           char == "5" or char == "6" or char == "7" or char == "8" or char == "9"
+}
+
+func is_whitespace(char) {
+    return char == " " or char == "\t" or char == "\n" or char == "\r"
+}
+
+# ============================================================================
+# SIMPLE JSON VALUE PARSER
+# ============================================================================
+
+func parse_json_string(text) {
+    # Simple string parser - expects "text" format
+    if text.length() < 2 {
+        return nil
+    }
+
+    if text[0] != "\"" or text[text.length() - 1] != "\"" {
+        return nil
+    }
+
+    # Extract content between quotes
+    result = ""
+    i = 1
+    while i < text.length() - 1 {
+        result = result + text[i]
+        i = i + 1
+    }
+    return result
+}
+
+func parse_json_number(text) {
+    # Simple number parser
+    if text == "" {
+        return nil
+    }
+
+    # Check if it's a valid number format
+    has_digit = false
+    has_decimal = false
+    i = 0
+
+    # Skip leading minus
+    if text[0] == "-" {
+        i = 1
+    }
+
+    while i < text.length() {
+        char = text[i]
+        if is_digit_char(char) {
+            has_digit = true
+        } else if char == "." and not has_decimal {
+            has_decimal = true
+        } else {
+            return nil  # Invalid character
+        }
+        i = i + 1
+    }
+
+    if has_digit {
+        return text.to_num()
+    }
+    return nil
+}
+
+func parse_json_boolean(text) {
+    if text == "true" {
+        return true
+    } else if text == "false" {
+        return false
+    }
+    return nil
+}
+
+func parse_json_null(text) {
+    if text == "null" {
+        return "NULL_VALUE"  # Use string to represent null since we can't return actual nil
+    }
+    return nil
+}
+
+# ============================================================================
+# JSON ARRAY PARSER
+# ============================================================================
+
+func parse_json_array(text) {
+    # Simple array parser for format [item1, item2, ...]
+    if text.length() < 2 {
+        return nil
+    }
+
+    if text[0] != "[" or text[text.length() - 1] != "]" {
+        return nil
+    }
+
+    # Handle empty array
+    if text == "[]" {
+        return []
+    }
+
+    # Extract content between brackets
+    content = ""
+    i = 1
+    while i < text.length() - 1 {
+        content = content + text[i]
+        i = i + 1
+    }
+
+    # Split by comma (simple split)
+    items = []
+    current_item = ""
+    depth = 0
+    in_string = false
+
+    i = 0
+    while i < content.length() {
+        char = content[i]
+
+        if char == "\"" {
+            in_string = not in_string
+        }
+
+        if not in_string {
+            if char == "[" or char == "{" {
+                depth = depth + 1
+            } else if char == "]" or char == "}" {
+                depth = depth - 1
+            }
+        }
+
+        if char == "," and depth == 0 and not in_string {
+            # Found separator at top level
+            trimmed = trim_whitespace(current_item)
+            if trimmed != "" {
+                parsed = parse_json_value(trimmed)
+                if parsed != nil {
+                    items.append(parsed)
+                }
+            }
+            current_item = ""
+        } else {
+            current_item = current_item + char
+        }
+
+        i = i + 1
+    }
+
+    # Don't forget the last item
+    trimmed = trim_whitespace(current_item)
+    if trimmed != "" {
+        parsed = parse_json_value(trimmed)
+        if parsed != nil {
+            items.append(parsed)
+        }
+    }
+
+    return items
+}
+
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
+
+func trim_whitespace(text) {
+    if text == "" {
+        return ""
+    }
+
+    # Find start
+    start = 0
+    while start < text.length() and is_whitespace(text[start]) {
+        start = start + 1
+    }
+
+    # Find end
+    end = text.length() - 1
+    while end >= start and is_whitespace(text[end]) {
+        end = end - 1
+    }
+
+    # Extract substring
+    result = ""
+    i = start
+    while i <= end {
+        result = result + text[i]
+        i = i + 1
+    }
+
+    return result
+}
+
+func parse_json_value(text) {
+    trimmed = trim_whitespace(text)
+
+    if trimmed == "" {
+        return nil
+    }
+
+    # Try string
+    if trimmed[0] == "\"" {
+        return parse_json_string(trimmed)
+    }
+
+    # Try array
+    if trimmed[0] == "[" {
+        return parse_json_array(trimmed)
+    }
+
+    # Try boolean
+    if trimmed == "true" or trimmed == "false" {
+        return parse_json_boolean(trimmed)
+    }
+
+    # Try null
+    if trimmed == "null" {
+        return parse_json_null(trimmed)
+    }
+
+    # Try number
+    return parse_json_number(trimmed)
+}
+
+# ============================================================================
+# JSON ENCODER
+# ============================================================================
+
+func json_encode_string(value) {
+    result = "\""
+    i = 0
+    while i < value.length() {
+        char = value[i]
+        if char == "\"" {
+            result = result + "\\\""
+        } else if char == "\\" {
+            result = result + "\\\\"
+        } else {
+            result = result + char
+        }
+        i = i + 1
+    }
+    result = result + "\""
+    return result
+}
+
+func json_encode_array(arr) {
+    result = "["
+    i = 0
+    while i < arr.size() {
+        if i > 0 {
+            result = result + ", "
+        }
+        result = result + json_encode_value(arr[i])
+        i = i + 1
+    }
+    result = result + "]"
+    return result
+}
+
+func json_encode_value(value) {
+    if value == nil {
+        return "null"
+    }
+
+    value_type = value.get_type()
+    if value_type == "string" {
+        return json_encode_string(value)
+    } else if value_type == "num" {
+        return value.to_string()
+    } else if value_type == "bool" {
+        if value {
+            return "true"
+        } else {
+            return "false"
+        }
+    } else if value_type == "list" {
+        return json_encode_array(value)
+    } else {
+        # Convert unknown types to string
+        return json_encode_string(value.to_string())
+    }
+}
+
+# ============================================================================
+# VALIDATION FUNCTION
+# ============================================================================
+
+func json_is_valid(text) {
+    result = parse_json_value(text)
+    return result != nil
+}
+
+# ============================================================================
+# DEMONSTRATION AND TESTING
+# ============================================================================
+
+print("Testing JSON Parser Core Features...")
+print("")
+
+# Test 1: Simple Values
+print("1. Simple Values:")
+string_result = parse_json_value("\"hello world\"")
+print("  String: " + string_result)
+
+number_result = parse_json_value("123.45")
+print("  Number: " + number_result.to_string())
+
+bool_result = parse_json_value("true")
+print("  Boolean: " + bool_result.to_string())
+
+null_result = parse_json_value("null")
+print("  Null: " + null_result)
+print("")
+
+# Test 2: Arrays
+print("2. Arrays:")
+simple_array = parse_json_value("[1, 2, 3]")
+print("  Simple array size: " + simple_array.size().to_string())
+print("  First element: " + simple_array[0].to_string())
+
+mixed_array = parse_json_value("[\"hello\", 42, true]")
+print("  Mixed array size: " + mixed_array.size().to_string())
+print("  Elements: " + mixed_array[0] + ", " + mixed_array[1].to_string() + ", " + mixed_array[2].to_string())
+print("")
+
+# Test 3: Validation
+print("3. Validation:")
+print("  Valid '123': " + json_is_valid("123").to_string())
+print("  Valid 'true': " + json_is_valid("true").to_string())
+print("  Valid '[1,2,3]': " + json_is_valid("[1,2,3]").to_string())
+print("  Invalid 'hello': " + json_is_valid("hello").to_string())
+print("  Invalid '[': " + json_is_valid("[").to_string())
+print("")
+
+# Test 4: Encoding
+print("4. Encoding:")
+print("  Encode string: " + json_encode_value("hello"))
+print("  Encode number: " + json_encode_value(42))
+print("  Encode boolean: " + json_encode_value(true))
+print("  Encode array: " + json_encode_value([1, 2, 3]))
+print("")
+
+print("=== JSON Core Functionality Working in Glang! ===")
+print("")
+print("✅ JSON string parsing")
+print("✅ JSON number parsing")
+print("✅ JSON boolean parsing")
+print("✅ JSON array parsing")
+print("✅ JSON validation")
+print("✅ JSON encoding")
+print("")
+print("This demonstrates that JSON processing can be implemented")
+print("in pure Glang without Python dependencies!")

@@ -1,0 +1,11 @@
+print("Testing function definition")
+
+func test_char(c) {
+    if c == "a" {
+        return true
+    }
+    return false
+}
+
+result = test_char("a")
+print("Result: " + result.to_string())

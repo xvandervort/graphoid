@@ -1,0 +1,12 @@
+print("Starting test")
+
+func test_func(value) {
+    if value {
+        return "yes"
+    } else {
+        return "no"
+    }
+}
+
+result = test_func(true)
+print("Result: " + result)
