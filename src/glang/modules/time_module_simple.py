@@ -98,21 +98,14 @@ class TimeModule:
 
 def create_time_module_namespace():
     """Create the namespace for the built-in Time module."""
-    
-    namespace = ModuleNamespace("time")
-    
-    # Register time functions
-    time_functions = {
-        'now': TimeModule.now,
-        'today': TimeModule.today,
-        'from_components': TimeModule.from_components,
-        'from_string': TimeModule.from_string,
-    }
-    
-    # Wrap functions as callable values
-    from ..execution.function_value import BuiltinFunctionValue
-    
-    for name, func in time_functions.items():
-        namespace.set_symbol(name, BuiltinFunctionValue(name, func))
-    
-    return namespace
+    from .module_builder import create_module
+
+    return create_module(
+        "time",
+        functions={
+            'now': TimeModule.now,
+            'today': TimeModule.today,
+            'from_components': TimeModule.from_components,
+            'from_string': TimeModule.from_string,
+        }
+    )

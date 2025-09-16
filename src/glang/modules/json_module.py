@@ -165,22 +165,14 @@ class JSONModule:
 
 def create_json_module_namespace():
     """Create the namespace for the built-in JSON module."""
-    from ..modules.module_manager import ModuleNamespace
-    
-    namespace = ModuleNamespace("json")
-    
-    # Register all JSON functions
-    json_functions = {
-        'encode': JSONModule.encode,
-        'encode_pretty': JSONModule.encode_pretty,
-        'decode': JSONModule.decode,
-        'is_valid': JSONModule.is_valid,
-    }
-    
-    # Wrap functions as callable values
-    from ..execution.function_value import BuiltinFunctionValue
-    
-    for name, func in json_functions.items():
-        namespace.set_symbol(name, BuiltinFunctionValue(name, func))
-    
-    return namespace
+    from .module_builder import create_module
+
+    return create_module(
+        "json",
+        functions={
+            'encode': JSONModule.encode,
+            'encode_pretty': JSONModule.encode_pretty,
+            'decode': JSONModule.decode,
+            'is_valid': JSONModule.is_valid,
+        }
+    )

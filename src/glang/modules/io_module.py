@@ -892,57 +892,49 @@ class IOModule:
 
 def create_io_module_namespace():
     """Create the namespace for the built-in IO module."""
-    from ..modules.module_manager import ModuleNamespace
-    
-    namespace = ModuleNamespace("io")
-    
-    # Register all IO functions
-    io_functions = {
-        # Console operations
-        'print': IOModule.print_output,  # Use 'print' as the public name
-        'input': IOModule.input,
-        
-        # File operations
-        'read_file': IOModule.read_file,
-        'write_file': IOModule.write_file,
-        'append_file': IOModule.append_file,
-        'open': IOModule.open,  # File handle support
-        'read_binary': IOModule.read_binary,
-        'write_binary': IOModule.write_binary,
-        'read_lines': IOModule.read_lines,
-        'write_lines': IOModule.write_lines,
-        
-        # File system operations
-        'exists': IOModule.exists,
-        'is_file': IOModule.is_file,
-        'is_dir': IOModule.is_dir,
-        'list_dir': IOModule.list_dir,
-        'make_dir': IOModule.make_dir,
-        'remove_file': IOModule.remove_file,
-        'remove_dir': IOModule.remove_dir,
-        'get_cwd': IOModule.get_cwd,
-        'set_cwd': IOModule.set_cwd,
-        'file_size': IOModule.file_size,
-        
-        # Path operations
-        'join_path': IOModule.join_path,
-        'split_path': IOModule.split_path,
-        'get_basename': IOModule.get_basename,
-        'get_dirname': IOModule.get_dirname,
-        'get_extension': IOModule.get_extension,
-        'resolve_path': IOModule.resolve_path,
-        
-        # Network operations
-        'http_get': IOModule.http_get,
-        'http_post': IOModule.http_post,
-        'download_file': IOModule.download_file,
-        'send_email': IOModule.send_email,
-    }
-    
-    # Wrap functions as callable values
-    from ..execution.function_value import BuiltinFunctionValue
-    
-    for name, func in io_functions.items():
-        namespace.set_symbol(name, BuiltinFunctionValue(name, func))
-    
-    return namespace
+    from .module_builder import create_module
+
+    return create_module(
+        "io",
+        functions={
+            # Console operations
+            'print': IOModule.print_output,  # Use 'print' as the public name
+            'input': IOModule.input,
+
+            # File operations
+            'read_file': IOModule.read_file,
+            'write_file': IOModule.write_file,
+            'append_file': IOModule.append_file,
+            'open': IOModule.open,  # File handle support
+            'read_binary': IOModule.read_binary,
+            'write_binary': IOModule.write_binary,
+            'read_lines': IOModule.read_lines,
+            'write_lines': IOModule.write_lines,
+
+            # File system operations
+            'exists': IOModule.exists,
+            'is_file': IOModule.is_file,
+            'is_dir': IOModule.is_dir,
+            'list_dir': IOModule.list_dir,
+            'make_dir': IOModule.make_dir,
+            'remove_file': IOModule.remove_file,
+            'remove_dir': IOModule.remove_dir,
+            'get_cwd': IOModule.get_cwd,
+            'set_cwd': IOModule.set_cwd,
+            'file_size': IOModule.file_size,
+
+            # Path operations
+            'join_path': IOModule.join_path,
+            'split_path': IOModule.split_path,
+            'get_basename': IOModule.get_basename,
+            'get_dirname': IOModule.get_dirname,
+            'get_extension': IOModule.get_extension,
+            'resolve_path': IOModule.resolve_path,
+
+            # Network operations
+            'http_get': IOModule.http_get,
+            'http_post': IOModule.http_post,
+            'download_file': IOModule.download_file,
+            'send_email': IOModule.send_email,
+        }
+    )

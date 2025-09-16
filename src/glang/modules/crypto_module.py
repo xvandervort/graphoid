@@ -798,13 +798,6 @@ CRYPTO_FUNCTIONS = {
 
 def create_crypto_module_namespace():
     """Create the crypto module namespace."""
-    from .module_manager import ModuleNamespace
-    from ..execution.function_value import BuiltinFunctionValue
-    
-    namespace = ModuleNamespace("crypto")
-    
-    # Wrap functions as callable values
-    for name, func in CRYPTO_FUNCTIONS.items():
-        namespace.set_symbol(name, BuiltinFunctionValue(name, func))
-    
-    return namespace
+    from .module_builder import create_module
+
+    return create_module("crypto", functions=CRYPTO_FUNCTIONS)

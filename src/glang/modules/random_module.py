@@ -421,47 +421,40 @@ class RandomModule:
 
 def create_random_module_namespace():
     """Create the namespace for the built-in Random module."""
-    from .module_manager import ModuleNamespace
-    
-    namespace = ModuleNamespace("random")
+    from .module_builder import create_module
+
     module = RandomModule()
-    
-    # Register random functions
-    random_functions = {
-        # Core random functions
-        'random': module.random,
-        'randint': module.randint,
-        'uniform': module.uniform,
-        
-        # Statistical distributions
-        'normal': module.normal,
-        'exponential': module.exponential,
-        'gamma': module.gamma,
-        
-        # Seeding and state
-        'seed': module.seed,
-        'get_state': module.get_state,
-        'reset': module.reset,
-        
-        # Random selection
-        'choice': module.choice,
-        'sample': module.sample,
-        'shuffle': module.shuffle,
-        
-        # Secure random
-        'secure_random': module.secure_random,
-        'secure_randint': module.secure_randint,
-        'secure_token': module.secure_token,
-        
-        # UUID generation
-        'uuid4': module.uuid4,
-        'uuid1': module.uuid1,
-    }
-    
-    # Wrap functions as callable values
-    from ..execution.function_value import BuiltinFunctionValue
-    
-    for name, func in random_functions.items():
-        namespace.set_symbol(name, BuiltinFunctionValue(name, func))
-    
-    return namespace
+
+    return create_module(
+        "random",
+        functions={
+            # Core random functions
+            'random': module.random,
+            'randint': module.randint,
+            'uniform': module.uniform,
+
+            # Statistical distributions
+            'normal': module.normal,
+            'exponential': module.exponential,
+            'gamma': module.gamma,
+
+            # Seeding and state
+            'seed': module.seed,
+            'get_state': module.get_state,
+            'reset': module.reset,
+
+            # Random selection
+            'choice': module.choice,
+            'sample': module.sample,
+            'shuffle': module.shuffle,
+
+            # Secure random
+            'secure_random': module.secure_random,
+            'secure_randint': module.secure_randint,
+            'secure_token': module.secure_token,
+
+            # UUID generation
+            'uuid4': module.uuid4,
+            'uuid1': module.uuid1,
+        }
+    )

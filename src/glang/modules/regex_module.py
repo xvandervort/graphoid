@@ -311,27 +311,20 @@ class RegexModule:
 
 def create_regex_module_namespace():
     """Create the namespace for the built-in Regex module."""
-    from .module_manager import ModuleNamespace
-    
-    namespace = ModuleNamespace("regex")
+    from .module_builder import create_module
+
     module = RegexModule()
-    
-    # Register regex functions
-    regex_functions = {
-        'match': module.match,
-        'search': module.search,
-        'find_all': module.find_all,
-        'find_groups': module.find_groups,
-        'replace': module.replace,
-        'split': module.split,
-        'validate': module.validate,
-        'escape': module.escape,
-    }
-    
-    # Wrap functions as callable values
-    from ..execution.function_value import BuiltinFunctionValue
-    
-    for name, func in regex_functions.items():
-        namespace.set_symbol(name, BuiltinFunctionValue(name, func))
-    
-    return namespace
+
+    return create_module(
+        "regex",
+        functions={
+            'match': module.match,
+            'search': module.search,
+            'find_all': module.find_all,
+            'find_groups': module.find_groups,
+            'replace': module.replace,
+            'split': module.split,
+            'validate': module.validate,
+            'escape': module.escape,
+        }
+    )

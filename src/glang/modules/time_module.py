@@ -527,34 +527,27 @@ class TimeModule:
 
 def create_time_module_namespace():
     """Create the namespace for the built-in Time module."""
-    
-    namespace = ModuleNamespace("time")
-    
-    # Register all time functions
-    time_functions = {
-        # Creation functions
-        'now': TimeModule.now,
-        'today': TimeModule.today,
-        'tomorrow': TimeModule.tomorrow, 
-        'yesterday': TimeModule.yesterday,
-        'from_components': TimeModule.from_components,
-        'from_string': TimeModule.from_string,
-        'from_timestamp': TimeModule.from_timestamp,
-        
-        # Duration helpers
-        'seconds': TimeModule.seconds,
-        'minutes': TimeModule.minutes,
-        'hours': TimeModule.hours,
-        'days': TimeModule.days,
-        'weeks': TimeModule.weeks,
-        'months': TimeModule.months,
-        'years': TimeModule.years,
-    }
-    
-    # Wrap functions as callable values
-    from ..execution.function_value import BuiltinFunctionValue
-    
-    for name, func in time_functions.items():
-        namespace.set_symbol(name, BuiltinFunctionValue(name, func))
-    
-    return namespace
+    from .module_builder import create_module
+
+    return create_module(
+        "time",
+        functions={
+            # Creation functions
+            'now': TimeModule.now,
+            'today': TimeModule.today,
+            'tomorrow': TimeModule.tomorrow,
+            'yesterday': TimeModule.yesterday,
+            'from_components': TimeModule.from_components,
+            'from_string': TimeModule.from_string,
+            'from_timestamp': TimeModule.from_timestamp,
+
+            # Duration helpers
+            'seconds': TimeModule.seconds,
+            'minutes': TimeModule.minutes,
+            'hours': TimeModule.hours,
+            'days': TimeModule.days,
+            'weeks': TimeModule.weeks,
+            'months': TimeModule.months,
+            'years': TimeModule.years,
+        }
+    )
