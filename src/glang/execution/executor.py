@@ -2501,11 +2501,14 @@ class ASTExecutor(BaseASTVisitor):
                 self.result = NumberValue(-operand_value.value)
             else:
                 raise RuntimeError(f"Cannot negate non-numeric value: {operand_value.get_type()}", node.position)
-        elif node.operator == "!":
+        elif node.operator == "!" or node.operator == "not":
+            # Support both ! and not for logical negation
             if isinstance(operand_value, BooleanValue):
                 self.result = BooleanValue(not operand_value.value)
             else:
-                raise RuntimeError(f"Cannot negate non-boolean value: {operand_value.get_type()}", node.position)
+                # Try to convert to boolean using truthiness rules
+                truthiness = self._to_boolean(operand_value)
+                self.result = BooleanValue(not truthiness)
         else:
             raise RuntimeError(f"Unknown unary operator: {node.operator}", node.position)
     

@@ -264,6 +264,15 @@ class LanguageKeywordRegistry:
             syntax_example="if a or b { ... }",
             token_type_name="OR"
         ))
+
+        self._register_keyword(KeywordDefinition(
+            keyword="not",
+            category=KeywordCategory.OPERATOR,
+            parser_method="parse_unary_operator",
+            description="Logical NOT operator",
+            syntax_example="if not condition { ... }",
+            token_type_name="NOT"
+        ))
     
     def _register_keyword(self, definition: KeywordDefinition):
         """Register a keyword definition."""

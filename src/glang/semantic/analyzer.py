@@ -661,9 +661,14 @@ class SemanticAnalyzer(BaseASTVisitor):
     
     # Helper methods
     
-    def _validate_method_call(self, method_name: str, target_type: str, 
+    def _validate_method_call(self, method_name: str, target_type: str,
                             position: Optional[SourcePosition]) -> None:
         """Validate that a method call is valid for the target type."""
+        # Special handling for 'any' type - skip validation, allow runtime to handle it
+        if target_type == 'any':
+            # Type 'any' can call any method - will be validated at runtime
+            return
+
         # Define valid methods for each type
         # Universal reflection methods available on all types
         universal_methods = {'type', 'methods', 'can', 'inspect', 'size'}

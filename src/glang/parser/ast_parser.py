@@ -351,12 +351,20 @@ class ASTParser:
         # Parse then block
         then_block = self.parse_block()
         
-        # Optional else block
+        # Optional else/else if block
         else_block = None
         if self.check(TokenType.ELSE):
             self.advance()  # consume 'else'
-            else_block = self.parse_block()
-        
+
+            # Check for else if
+            if self.check(TokenType.IF):
+                # Parse else if as nested if statement
+                from ..ast.nodes import Block
+                else_block = Block([self.parse_if_statement()], pos)
+            else:
+                # Parse regular else block
+                else_block = self.parse_block()
+
         return IfStatement(condition=condition, then_block=then_block, else_block=else_block, position=pos)
     
     def parse_while_statement(self) -> WhileStatement:
