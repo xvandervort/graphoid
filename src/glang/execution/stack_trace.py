@@ -54,7 +54,7 @@ class EnhancedStackTrace:
 
                 # Add pointer if we have column info
                 if frame.source_position.column > 0:
-                    pointer = "    " + "~" * (frame.source_position.column - 1) + "^"
+                    pointer = f"    {'~' * (frame.source_position.column - 1)}^"
                     lines.append(pointer)
 
             # Add local variables if any (limit to important ones)

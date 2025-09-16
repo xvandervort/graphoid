@@ -871,8 +871,8 @@ class TestMapEdgeCases:
         methods_list = result.value
         assert methods_list.get_type() == "list"
         
-        # Should have 20 methods total (8 universal + 12 hash-specific)
-        assert len(methods_list.elements) == 20  # Updated count with immutability methods
+        # Should have 27 methods total (8 universal + 12 hash-specific + 5 behavior + 2 conversion)
+        assert len(methods_list.elements) == 27  # Updated count with behavior and conversion methods
         
         # Check that all expected methods are present
         method_names = [elem.value for elem in methods_list.elements]
@@ -881,6 +881,14 @@ class TestMapEdgeCases:
         for method in ['type', 'methods', 'can', 'inspect', 'size', 'freeze', 'is_frozen', 'contains_frozen']:
             assert method in method_names, f"Missing universal method: {method}"
             
-        # Map-specific methods  
+        # Map-specific methods
         for method in ['get', 'set', 'has_key', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'count_values', 'can_accept']:
             assert method in method_names, f"Missing hash method: {method}"
+
+        # Behavior management methods
+        for method in ['add_rule', 'remove_rule', 'has_rule', 'get_rules', 'clear_rules']:
+            assert method in method_names, f"Missing behavior method: {method}"
+
+        # Type conversion methods
+        for method in ['to_bool', 'to_string']:
+            assert method in method_names, f"Missing conversion method: {method}"

@@ -125,7 +125,7 @@ class ASTExecutor(BaseASTVisitor):
             initializer_value = python_to_glang_value(initializer_value, node.position)
         
         # For list declarations, set constraint if specified
-        if node.var_type == "list" and isinstance(initializer_value, ListValue):
+        if node.var_type == "list" and initializer_value.get_type() == "list":
             if node.type_constraint:
                 initializer_value.constraint = node.type_constraint
                 # Validate existing elements against constraint
@@ -135,9 +135,9 @@ class ASTExecutor(BaseASTVisitor):
                             f"Element {elem.to_display_string()} violates list<{node.type_constraint}> constraint",
                             elem.position or node.position
                         )
-        
+
         # For data declarations, set constraint if specified
-        elif node.var_type == "data" and isinstance(initializer_value, DataValue):
+        elif node.var_type == "data" and initializer_value.get_type() == "data":
             if node.type_constraint:
                 initializer_value.constraint = node.type_constraint
                 # Validate existing value against constraint
@@ -149,16 +149,17 @@ class ASTExecutor(BaseASTVisitor):
         
         # For hash declarations, handle both HashValue and DataValue (single pair) initializers
         elif node.var_type == "hash":
-            if isinstance(initializer_value, DataValue):
+            init_type = initializer_value.get_type()
+            if init_type == "data":
                 # Convert single DataValue to HashValue for hash declarations
                 pairs = [(initializer_value.key, initializer_value.value)]
                 initializer_value = HashValue(pairs, node.type_constraint, initializer_value.position)
-            elif isinstance(initializer_value, HashValue):
+            elif init_type == "hash":
                 if node.type_constraint:
                     initializer_value.constraint = node.type_constraint
-            
+
             # Validate constraint if specified
-            if node.type_constraint and isinstance(initializer_value, HashValue):
+            if node.type_constraint and initializer_value.get_type() == "hash":
                 for key, value in initializer_value.pairs.items():
                     if not initializer_value.validate_constraint(value):
                         raise TypeConstraintError(
@@ -169,12 +170,13 @@ class ASTExecutor(BaseASTVisitor):
         # Apply behaviors if present
         if node.behaviors:
             behavior_pipeline = self._build_behavior_pipeline(node.behaviors)
-            if isinstance(initializer_value, ListValue):
+            value_type = initializer_value.get_type()
+            if value_type == "list":
                 initializer_value = behavior_pipeline.apply_to_list(initializer_value)
-            elif isinstance(initializer_value, HashValue):
+            elif value_type == "hash":
                 # For hashes, we'd need to apply to specific keys
                 # For now, just apply to the hash as a whole (limited functionality)
-                pass  
+                pass
             else:
                 initializer_value = behavior_pipeline.apply(initializer_value)
         
@@ -207,7 +209,7 @@ class ASTExecutor(BaseASTVisitor):
             else:
                 # Variable exists - check constraints and assign
                 existing_var = self.context.get_variable(var_name)
-                if isinstance(existing_var, ListValue) and existing_var.constraint:
+                if existing_var.get_type() == "list" and hasattr(existing_var, 'constraint') and existing_var.constraint:
                     if not existing_var.validate_constraint(value):
                         raise TypeConstraintError(
                             f"Cannot assign {value.get_type()} to {existing_var.get_type()}<{existing_var.constraint}>",

@@ -68,7 +68,7 @@ class ErrorFormatter:
         
         # Create pointer line (adjust for 2-space indent)
         if column_num > 0:
-            pointer = "  " + "~" * (column_num - 1) + "^"
+            pointer = f"  {'~' * (column_num - 1)}^"
             result.append(pointer)
         
         result.append(f"{message}")

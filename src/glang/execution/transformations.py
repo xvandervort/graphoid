@@ -18,86 +18,112 @@ class TransformationRegistry:
     
     def _register_builtin_transformations(self):
         """Register built-in transformation functions."""
-        
-        # Numeric transformations
+
+        # Polymorphic transformations using try-catch instead of isinstance
         def double(value: GlangValue) -> GlangValue:
-            if isinstance(value, NumberValue):
+            try:
                 two = NumberValue(2, value.position)
                 return value.multiply(two)
-            raise ValueError(f"Cannot double {value.get_type()}")
-        
+            except AttributeError:
+                raise ValueError(f"Cannot double {value.get_type()}")
+
         def square(value: GlangValue) -> GlangValue:
-            if isinstance(value, NumberValue):
+            try:
                 two = NumberValue(2, value.position)
                 return value.power(two)
-            raise ValueError(f"Cannot square {value.get_type()}")
-        
+            except AttributeError:
+                raise ValueError(f"Cannot square {value.get_type()}")
+
         def negate(value: GlangValue) -> GlangValue:
-            if isinstance(value, NumberValue):
+            try:
                 return value.negate()
-            raise ValueError(f"Cannot negate {value.get_type()}")
-        
+            except AttributeError:
+                raise ValueError(f"Cannot negate {value.get_type()}")
+
         def increment(value: GlangValue) -> GlangValue:
-            if isinstance(value, NumberValue):
+            try:
                 one = NumberValue(1, value.position)
                 return value.add(one)
-            raise ValueError(f"Cannot increment {value.get_type()}")
-        
+            except AttributeError:
+                raise ValueError(f"Cannot increment {value.get_type()}")
+
         def decrement(value: GlangValue) -> GlangValue:
-            if isinstance(value, NumberValue):
+            try:
                 one = NumberValue(1, value.position)
                 return value.subtract(one)
-            raise ValueError(f"Cannot decrement {value.get_type()}")
-        
-        # String transformations
+            except AttributeError:
+                raise ValueError(f"Cannot decrement {value.get_type()}")
+
+        # String transformations using polymorphic dispatch
         def upper(value: GlangValue) -> GlangValue:
-            if isinstance(value, StringValue):
+            try:
                 return value.to_upper()
-            raise ValueError(f"Cannot uppercase {value.get_type()}")
-        
+            except AttributeError:
+                raise ValueError(f"Cannot uppercase {value.get_type()}")
+
         def lower(value: GlangValue) -> GlangValue:
-            if isinstance(value, StringValue):
+            try:
                 return value.to_lower()
-            raise ValueError(f"Cannot lowercase {value.get_type()}")
-        
+            except AttributeError:
+                raise ValueError(f"Cannot lowercase {value.get_type()}")
+
         def trim(value: GlangValue) -> GlangValue:
-            if isinstance(value, StringValue):
+            try:
                 return value.trim()
-            raise ValueError(f"Cannot trim {value.get_type()}")
-        
+            except AttributeError:
+                raise ValueError(f"Cannot trim {value.get_type()}")
+
         def reverse(value: GlangValue) -> GlangValue:
-            if isinstance(value, StringValue):
+            try:
                 return value.reverse()
-            raise ValueError(f"Cannot reverse {value.get_type()}")
+            except AttributeError:
+                raise ValueError(f"Cannot reverse {value.get_type()}")
         
         # Type conversions
         def to_string(value: GlangValue) -> GlangValue:
             return StringValue(value.to_display_string(), value.position)
         
         def to_num(value: GlangValue) -> GlangValue:
-            if isinstance(value, StringValue):
+            # Try polymorphic to_num() method first
+            try:
+                return value.to_num()
+            except AttributeError:
+                pass
+
+            # Fallback to type-specific logic
+            type_name = value.get_type()
+            if type_name == "string":
                 try:
+                    str_val = value.to_python()
                     # Try int first, then float
-                    if '.' in value.value:
-                        return NumberValue(float(value.value), value.position)
+                    if '.' in str_val:
+                        return NumberValue(float(str_val), value.position)
                     else:
-                        return NumberValue(int(value.value), value.position)
+                        return NumberValue(int(str_val), value.position)
                 except ValueError:
-                    raise ValueError(f"Cannot convert '{value.value}' to number")
-            elif isinstance(value, BooleanValue):
-                return NumberValue(1 if value.value else 0, value.position)
-            elif isinstance(value, NumberValue):
+                    raise ValueError(f"Cannot convert '{str_val}' to number")
+            elif type_name == "bool":
+                return NumberValue(1 if value.to_python() else 0, value.position)
+            elif type_name == "num":
                 return value  # Already a number
-            raise ValueError(f"Cannot convert {value.get_type()} to number")
-        
+            raise ValueError(f"Cannot convert {type_name} to number")
+
         def to_bool(value: GlangValue) -> GlangValue:
-            if isinstance(value, NumberValue):
-                return BooleanValue(value.value != 0, value.position)
-            elif isinstance(value, StringValue):
-                return BooleanValue(len(value.value) > 0, value.position)
-            elif isinstance(value, BooleanValue):
+            # Try polymorphic to_bool() method first
+            try:
+                return value.to_bool()
+            except AttributeError:
+                pass
+
+            # Fallback to type-specific logic
+            type_name = value.get_type()
+            if type_name == "num":
+                return BooleanValue(value.to_python() != 0, value.position)
+            elif type_name == "string":
+                return BooleanValue(len(value.to_python()) > 0, value.position)
+            elif type_name == "bool":
                 return value  # Already a boolean
-            elif isinstance(value, ListValue):
+            elif type_name == "list":
                 return BooleanValue(len(value.elements) > 0, value.position)
             raise ValueError(f"Cannot convert {value.get_type()} to boolean")
         
@@ -132,86 +158,88 @@ class TransformationRegistry:
     def _register_builtin_predicates(self):
         """Register built-in predicate functions."""
         
-        # Numeric predicates
+        # Numeric predicates using polymorphic dispatch
         def positive(value: GlangValue) -> bool:
-            if isinstance(value, NumberValue):
-                return value.value > 0
+            if value.get_type() == "num":
+                return value.to_python() > 0
             return False
-        
+
         def negative(value: GlangValue) -> bool:
-            if isinstance(value, NumberValue):
-                return value.value < 0
+            if value.get_type() == "num":
+                return value.to_python() < 0
             return False
-        
+
         def zero(value: GlangValue) -> bool:
-            if isinstance(value, NumberValue):
-                return value.value == 0
+            if value.get_type() == "num":
+                return value.to_python() == 0
             return False
         
         def even(value: GlangValue) -> bool:
-            if isinstance(value, NumberValue):
-                return int(value.value) % 2 == 0
+            if value.get_type() == "num":
+                return int(value.to_python()) % 2 == 0
             return False
-        
+
         def odd(value: GlangValue) -> bool:
-            if isinstance(value, NumberValue):
-                return int(value.value) % 2 != 0
+            if value.get_type() == "num":
+                return int(value.to_python()) % 2 != 0
             return False
         
-        # String predicates
+        # String and collection predicates using polymorphic dispatch
         def empty(value: GlangValue) -> bool:
-            if isinstance(value, StringValue):
-                return len(value.value) == 0
-            elif isinstance(value, ListValue):
+            type_name = value.get_type()
+            if type_name == "string":
+                return len(value.to_python()) == 0
+            elif type_name == "list":
                 return len(value.elements) == 0
             return False
-        
+
         def non_empty(value: GlangValue) -> bool:
             return not empty(value)
-        
+
         def uppercase(value: GlangValue) -> bool:
-            if isinstance(value, StringValue):
-                return value.value.isupper()
+            if value.get_type() == "string":
+                return value.to_python().isupper()
             return False
-        
+
         def lowercase(value: GlangValue) -> bool:
-            if isinstance(value, StringValue):
-                return value.value.islower()
+            if value.get_type() == "string":
+                return value.to_python().islower()
             return False
-        
+
         def alphabetic(value: GlangValue) -> bool:
-            if isinstance(value, StringValue):
-                return value.value.isalpha()
+            if value.get_type() == "string":
+                return value.to_python().isalpha()
             return False
-        
+
         def numeric(value: GlangValue) -> bool:
-            if isinstance(value, StringValue):
-                return value.value.isdigit()
+            if value.get_type() == "string":
+                return value.to_python().isdigit()
             return False
-        
-        # Type predicates
+
+        # Type predicates using get_type() instead of isinstance
         def is_string(value: GlangValue) -> bool:
-            return isinstance(value, StringValue)
-        
+            return value.get_type() == "string"
+
         def is_number(value: GlangValue) -> bool:
-            return isinstance(value, NumberValue)
-        
+            return value.get_type() == "num"
+
         def is_bool(value: GlangValue) -> bool:
-            return isinstance(value, BooleanValue)
-        
+            return value.get_type() == "bool"
+
         def is_list(value: GlangValue) -> bool:
-            return isinstance(value, ListValue)
+            return value.get_type() == "list"
         
         # General predicates
         def truthy(value: GlangValue) -> bool:
             """Check if value is truthy according to Glang rules."""
-            if isinstance(value, BooleanValue):
-                return value.value
-            elif isinstance(value, NumberValue):
-                return value.value != 0
-            elif isinstance(value, StringValue):
-                return len(value.value) > 0
-            elif isinstance(value, ListValue):
+            type_name = value.get_type()
+            if type_name == "bool":
+                return value.to_python()
+            elif type_name == "num":
+                return value.to_python() != 0
+            elif type_name == "string":
+                return len(value.to_python()) > 0
+            elif type_name == "list":
                 return len(value.elements) > 0
             return False
         

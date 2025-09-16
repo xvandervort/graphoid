@@ -900,7 +900,7 @@ class HashValue(GlangValue, GraphContainer):
         pair_strs = []
         for key, value in self.pairs.items():
             pair_strs.append(f'"{key}": {value.to_display_string()}')
-        return "{ " + ", ".join(pair_strs) + " }"
+        return f"{{ {', '.join(pair_strs)} }}"
     
     def validate_constraint(self, value: GlangValue) -> bool:
         """Check if value matches map constraint."""
