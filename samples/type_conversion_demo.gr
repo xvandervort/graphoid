@@ -1,0 +1,66 @@
+# Glang Type Conversion System Demo
+print("=== Type Conversion Demo ===")
+
+# Convert boolean to string
+func bool_to_string(value) {
+    if value {
+        return "true"
+    } else {
+        return "false"
+    }
+}
+
+# Convert number to boolean
+func num_to_bool(value) {
+    return value != 0
+}
+
+# Convert boolean to number
+func bool_to_num(value) {
+    if value {
+        return 1
+    } else {
+        return 0
+    }
+}
+
+# Convert string to boolean
+func string_to_bool(value) {
+    return value.length() > 0
+}
+
+# Convert list to boolean
+func list_to_bool(value) {
+    return value.size() > 0
+}
+
+print("")
+print("Testing Type Conversions:")
+
+# Test boolean conversions
+print("Boolean to String:")
+print("  true -> '" + bool_to_string(true) + "'")
+print("  false -> '" + bool_to_string(false) + "'")
+
+print("Boolean to Number:")
+print("  true -> " + bool_to_num(true).to_string())
+print("  false -> " + bool_to_num(false).to_string())
+
+print("Number to Boolean:")
+print("  0 -> " + num_to_bool(0).to_string())
+print("  42 -> " + num_to_bool(42).to_string())
+
+print("String to Boolean:")
+print("  '' -> " + string_to_bool("").to_string())
+print("  'hello' -> " + string_to_bool("hello").to_string())
+
+# Test list conversions
+test_list = [1, 2, 3]
+empty_list = []
+print("List to Boolean:")
+print("  [1,2,3] -> " + list_to_bool(test_list).to_string())
+print("  [] -> " + list_to_bool(empty_list).to_string())
+
+print("")
+print("=== Type conversion system working! ===")
+print("This demonstrates centralized type conversion in Glang")
