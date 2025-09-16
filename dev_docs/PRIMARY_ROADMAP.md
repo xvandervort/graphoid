@@ -114,13 +114,26 @@ Transform Glang from a practical programming language into a revolutionary platf
 
 > **See**: [ABSTRACTION_LAYER_ROADMAP.md](./ABSTRACTION_LAYER_ROADMAP.md) for detailed design
 
-#### Key Features
+#### 2.1 Behavior-Oriented Test Framework
+**Priority**: Essential for quality assurance and ecosystem growth
+> **See**: [GLANG_TEST_FRAMEWORK_PLAN.md](./GLANG_TEST_FRAMEWORK_PLAN.md) for detailed design
+
+- [ ] **Test Isolation**: `let` syntax with lazy evaluation and memoization
+- [ ] **Factory System**: Object creation with traits, sequences, and realistic data
+- [ ] **Shared Examples**: DRY testing patterns for common behaviors
+- [ ] **RSpec-Style Testing**: Natural language test descriptions (`describe`, `context`, `it`)
+- [ ] **Expectation System**: Chainable matchers (`expect(value).to_equal(42)`)
+- [ ] **CLI Test Runner**: `glang test` command with discovery and reporting
+
+**Benefits**: Quality assurance, executable documentation, ecosystem enablement
+
+#### 2.2 Core Graph Features
 - Edge implementation with metadata
 - Node awareness (knows container and siblings)
 - Graph traversal algorithms
 - Path finding and connectivity analysis
 
-**Deliverables**: v1.0 release with graph primitives
+**Deliverables**: v1.0 release with graph primitives and test framework
 
 ### 🔮 Phase 3: Self-Aware Systems (2026)
 **Goal**: Enable self-understanding and self-modification
