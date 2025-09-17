@@ -18,6 +18,7 @@ from glang.semantic.symbol_table import SymbolTable
 from .values import *
 from .errors import RuntimeError, VariableNotFoundError, TypeConstraintError
 from .stack_trace import get_stack_collector, create_enhanced_error_trace, push_execution_frame, pop_execution_frame, update_frame_variables
+from .configuration_context import ConfigurationContext
 
 
 class BreakException(Exception):
@@ -44,6 +45,7 @@ class ExecutionContext:
         self.symbol_table = symbol_table
         self.variables: Dict[str, GlangValue] = {}
         self.module_manager = module_manager  # Will be set by execution pipeline
+        self.config = ConfigurationContext()  # Configuration stack
     
     def get_variable(self, name: str) -> Optional[GlangValue]:
         """Get variable value by name.
@@ -783,51 +785,97 @@ class ASTExecutor(BaseASTVisitor):
             if len(args) != 0:
                 from .errors import ArgumentError
                 raise ArgumentError(f"min() takes no arguments, got {len(args)}", position)
-            
+
             if len(target.elements) == 0:
                 raise RuntimeError("Cannot find minimum of empty list", position)
-            
-            # Check that all elements are numbers
+
+            # Check configuration for skip_none behavior
+            skip_none = self.context.config.should_skip_none()
+
+            # Filter elements based on configuration
+            valid_elements = []
             for element in target.elements:
-                if not isinstance(element, NumberValue):
+                if isinstance(element, NoneValue):
+                    if not skip_none:
+                        from .errors import ArgumentError
+                        raise ArgumentError(f"min() requires all elements to be numbers, found none", position)
+                    # Skip none values when skip_none is True
+                    continue
+                elif not isinstance(element, NumberValue):
                     from .errors import ArgumentError
                     raise ArgumentError(f"min() requires all elements to be numbers, found {element.get_type()}", position)
-            
-            min_element = min(target.elements, key=lambda x: x.value)
+                else:
+                    valid_elements.append(element)
+
+            if not valid_elements:
+                raise RuntimeError("Cannot find minimum of empty list after filtering", position)
+
+            min_element = min(valid_elements, key=lambda x: x.value)
             return NumberValue(min_element.value, position)
         
         elif method_name == "max":
             if len(args) != 0:
                 from .errors import ArgumentError
                 raise ArgumentError(f"max() takes no arguments, got {len(args)}", position)
-            
+
             if len(target.elements) == 0:
                 raise RuntimeError("Cannot find maximum of empty list", position)
-            
-            # Check that all elements are numbers
+
+            # Check configuration for skip_none behavior
+            skip_none = self.context.config.should_skip_none()
+
+            # Filter elements based on configuration
+            valid_elements = []
             for element in target.elements:
-                if not isinstance(element, NumberValue):
+                if isinstance(element, NoneValue):
+                    if not skip_none:
+                        from .errors import ArgumentError
+                        raise ArgumentError(f"max() requires all elements to be numbers, found none", position)
+                    # Skip none values when skip_none is True
+                    continue
+                elif not isinstance(element, NumberValue):
                     from .errors import ArgumentError
                     raise ArgumentError(f"max() requires all elements to be numbers, found {element.get_type()}", position)
-            
-            max_element = max(target.elements, key=lambda x: x.value)
+                else:
+                    valid_elements.append(element)
+
+            if not valid_elements:
+                raise RuntimeError("Cannot find maximum of empty list after filtering", position)
+
+            max_element = max(valid_elements, key=lambda x: x.value)
             return NumberValue(max_element.value, position)
         
         elif method_name == "sum":
             if len(args) != 0:
                 from .errors import ArgumentError
                 raise ArgumentError(f"sum() takes no arguments, got {len(args)}", position)
-            
+
             if len(target.elements) == 0:
                 return NumberValue(0, position)  # Sum of empty list is 0
-            
-            # Check that all elements are numbers
+
+            # Check configuration for skip_none behavior
+            skip_none = self.context.config.should_skip_none()
+
+            # Filter elements based on configuration
+            elements_to_sum = []
             for element in target.elements:
-                if not isinstance(element, NumberValue):
+                if isinstance(element, NoneValue):
+                    if not skip_none:
+                        from .errors import ArgumentError
+                        raise ArgumentError(f"sum() requires all elements to be numbers, found none", position)
+                    # Skip none values when skip_none is True
+                    continue
+                elif not isinstance(element, NumberValue):
                     from .errors import ArgumentError
                     raise ArgumentError(f"sum() requires all elements to be numbers, found {element.get_type()}", position)
-            
-            total = sum(element.value for element in target.elements)
+                else:
+                    elements_to_sum.append(element)
+
+            # Calculate sum
+            if not elements_to_sum:
+                return NumberValue(0, position)  # Sum of empty list after filtering is 0
+
+            total = sum(element.value for element in elements_to_sum)
             return NumberValue(total, position)
         
         # List transformation methods
@@ -2709,7 +2757,13 @@ class ASTExecutor(BaseASTVisitor):
     def perform_addition(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform addition operation."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
-            return left.add(right)
+            result = left.add(right)
+            # Apply decimal_places configuration if set
+            decimal_places = self.context.config.get_decimal_places()
+            if decimal_places is not None and isinstance(result, NumberValue):
+                rounded_value = round(result.value, decimal_places)
+                return NumberValue(rounded_value, result.position)
+            return result
         elif isinstance(left, StringValue) and isinstance(right, StringValue):
             return left.concatenate(right)
         elif isinstance(left, ListValue) and isinstance(right, ListValue):
@@ -2725,7 +2779,13 @@ class ASTExecutor(BaseASTVisitor):
     def perform_subtraction(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform subtraction operation."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
-            return left.subtract(right)
+            result = left.subtract(right)
+            # Apply decimal_places configuration if set
+            decimal_places = self.context.config.get_decimal_places()
+            if decimal_places is not None and isinstance(result, NumberValue):
+                rounded_value = round(result.value, decimal_places)
+                return NumberValue(rounded_value, result.position)
+            return result
         elif isinstance(left, ListValue) and isinstance(right, ListValue):
             # List set difference - remove elements from left that are in right
             result_elements = []
@@ -2740,7 +2800,13 @@ class ASTExecutor(BaseASTVisitor):
     def perform_multiplication(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform multiplication operation (numbers only - use *. for element-wise)."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
-            return left.multiply(right)
+            result = left.multiply(right)
+            # Apply decimal_places configuration if set
+            decimal_places = self.context.config.get_decimal_places()
+            if decimal_places is not None and isinstance(result, NumberValue):
+                rounded_value = round(result.value, decimal_places)
+                return NumberValue(rounded_value, result.position)
+            return result
         else:
             raise RuntimeError(f"Cannot multiply {left.get_type()} and {right.get_type()} - use *. for element-wise operations")
     
@@ -2748,7 +2814,13 @@ class ASTExecutor(BaseASTVisitor):
         """Perform division operation (numbers only - use /. for element-wise)."""
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
             try:
-                return left.divide(right)
+                result = left.divide(right)
+                # Apply decimal_places configuration if set
+                decimal_places = self.context.config.get_decimal_places()
+                if decimal_places is not None and isinstance(result, NumberValue):
+                    rounded_value = round(result.value, decimal_places)
+                    return NumberValue(rounded_value, result.position)
+                return result
             except ValueError as e:
                 raise RuntimeError(str(e))
         else:
@@ -3168,10 +3240,37 @@ class ASTExecutor(BaseASTVisitor):
 
     def visit_configuration_block(self, node) -> None:
         """Execute configuration block with scoped behavior settings."""
-        # TODO: For now, just execute the body if present
-        # Full configuration system implementation will be added later
-        if node.body:
-            self.execute(node.body)
+        # Parse configuration values from AST
+        config_dict = {}
+        for key, value_expr in node.configurations:
+            # Execute the value expression to get its runtime value
+            value = self.execute(value_expr)
+
+            # Convert GlangValue to Python value for configuration
+            if isinstance(value, BooleanValue):
+                config_dict[key] = value.value
+            elif isinstance(value, NumberValue):
+                config_dict[key] = int(value.value)  # Configuration numbers should be integers
+            elif isinstance(value, StringValue):
+                config_dict[key] = value.value
+            elif isinstance(value, NoneValue):
+                config_dict[key] = None
+            else:
+                raise RuntimeError(
+                    f"Configuration value for '{key}' must be a boolean, number, string, or none",
+                    node.position
+                )
+
+        # Push configuration onto stack
+        self.context.config.push_configuration(config_dict, scope_name="block")
+
+        try:
+            # Execute the body with the new configuration
+            if node.body:
+                self.execute(node.body)
+        finally:
+            # Always restore previous configuration
+            self.context.config.pop_configuration()
 
         self.result = None  # Configuration blocks don't return values
 

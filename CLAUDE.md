@@ -37,12 +37,15 @@ This represents a major architectural challenge but is essential for Glang's uni
 
 ## Recent Changes (September 2025)
 
-### ✅ Logical Operators Complete
+### ✅ Logical Operators & Parser Issues Complete
 - **COMPLETE**: Added `and`/`or` logical operators with operator synonyms `&&`/`||`
 - **Features**: Proper truthiness rules, short-circuit evaluation, correct precedence parsing
 - **Syntax**: `if a and b { ... }` or `if a && b { ... }`
 - **Multi-line Support**: Complex expressions with line breaks now work correctly
-- **✅ ALL PARSER ISSUES RESOLVED**: All critical parser bugs from Bitcoin tracker experiments have been fixed
+- **✅ ALL CRITICAL PARSER ISSUES RESOLVED (September 2025)**:
+  - **Logical Operator Precedence**: Fixed - expressions like `a == 1 or b == 2` now parse correctly
+  - **Hash Variable Key Access**: Fixed - `hash[variable_key]` syntax now works
+  - **Variable Scoping**: Fixed - proper lexical scoping allows variable reuse in different scopes
 
 ### ✅ Bitcoin Price Tracker Success
 - **Demonstrated**: Real-world web scraping capabilities using HTTP requests and string parsing
