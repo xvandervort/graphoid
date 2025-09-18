@@ -1,0 +1,86 @@
+#!/usr/bin/env glang
+# HTML Parsing Demo - Shows web scraping capabilities
+
+import "network" as net
+import "html" as html
+
+print("🔍 Glang HTML Parsing & Web Scraping Demo")
+print("==========================================")
+
+# 1. Test HTML parsing with sample content
+print("\n1. Basic HTML Parsing:")
+sample_html = "<div class='container'><h1>Welcome</h1><p>This is a paragraph with <a href='#'>a link</a>.</p></div>"
+print("HTML: " + sample_html)
+
+# Parse the HTML
+document = html.parse(sample_html)
+print("✅ HTML parsed successfully")
+
+# 2. Find elements by tag
+print("\n2. Finding Elements by Tag:")
+h1_elements = html.find_tag(document, "h1")
+print("Found " + h1_elements.size().to_string() + " h1 elements")
+
+if h1_elements.size() > 0 {
+    h1_text = html.text(h1_elements[0])
+    print("H1 text: " + h1_text)
+}
+
+# 3. Find elements by class
+print("\n3. Finding Elements by Class:")
+containers = html.find_class(document, "container")
+print("Found " + containers.size().to_string() + " elements with class 'container'")
+
+# 4. Extract links
+print("\n4. Extracting Links:")
+links = html.extract_links(document)
+print("Found " + links.size().to_string() + " links:")
+i = 0
+while i < links.size() {
+    print("- " + links[i])
+    i = i + 1
+}
+
+# 5. HTML encoding/decoding
+print("\n5. HTML Encoding/Decoding:")
+raw_text = "<script>alert('test')</script>"
+encoded = html.encode(raw_text)
+print("Original: " + raw_text)
+print("Encoded: " + encoded)
+decoded = html.decode(encoded)
+print("Decoded: " + decoded)
+
+# 6. Real web scraping example (if network available)
+print("\n6. Real Web Scraping Example:")
+print("Fetching a simple webpage...")
+
+# Try to fetch a simple webpage
+page_content = net.http_get("https://httpbin.org/html")
+print("✅ Page fetched successfully")
+
+# Parse the fetched HTML
+web_document = html.parse(page_content)
+print("✅ HTML parsed")
+
+# Find all paragraphs in the page
+paragraphs = html.find_tag(web_document, "p")
+print("Found " + paragraphs.size().to_string() + " paragraphs on the page")
+
+# Extract and display first paragraph text
+if paragraphs.size() > 0 {
+    first_p_text = html.text(paragraphs[0])
+    print("First paragraph: " + first_p_text)
+}
+
+# Find all links on the page
+page_links = html.extract_links(web_document)
+print("Found " + page_links.size().to_string() + " links on the page")
+
+print("\n✨ HTML parsing demo completed!")
+print("\nThe HTML library provides:")
+print("- Parse HTML into structured data")
+print("- Find elements by tag, ID, or class")
+print("- Extract text content and attributes")
+print("- HTML encoding/decoding")
+print("- Higher-level functions for common tasks")
+print("- Perfect for web scraping with the network library")

@@ -1,0 +1,80 @@
+#!/usr/bin/env glang
+# Demo of Enhanced Network Library with Pure Glang Implementation
+
+import "network" as net
+
+print("🚀 Enhanced Network Library: Pure Glang vs Python")
+print("===================================================")
+
+print("\n1. URL Parsing (100% Pure Glang):")
+test_url = "https://api.github.com:443/v1/repos?sort=updated&order=desc"
+parsed = net.parse_url(test_url)
+
+print("URL: " + test_url)
+print("Protocol: " + parsed["protocol"])
+print("Host: " + parsed["host"])
+print("Path: " + parsed["path"])
+
+print("\n2. URL Encoding/Decoding (100% Pure Glang):")
+test_text = "Hello World & More!"
+encoded = net.encode_url(test_text)
+decoded = net.decode_url(encoded)
+
+print("Original: " + test_text)
+print("Encoded:  " + encoded)
+print("Decoded:  " + decoded)
+
+print("\n3. Domain Extraction (100% Pure Glang):")
+urls = [
+    "https://www.example.com/path/to/page",
+    "http://subdomain.test.org:8080/api/v1",
+    "https://simple.dev"
+]
+
+i = 0
+while i < urls.size() {
+    url = urls[i]
+    domain = net.extract_domain(url)
+    print(url + " -> " + domain)
+    i = i + 1
+}
+
+print("\n4. URL Validation (100% Pure Glang):")
+test_urls = [
+    "https://valid.example.com",
+    "http://also-valid.org",
+    "invalid-no-protocol.com",
+    "ftp://uncommon-protocol.com"
+]
+
+i = 0
+while i < test_urls.size() {
+    url = test_urls[i]
+    is_valid = net.is_valid_url(url)
+    status = "Valid"
+    if is_valid == false {
+        status = "Invalid"
+    }
+    print(url + " -> " + status)
+    i = i + 1
+}
+
+print("\n===================================================")
+print("📊 Implementation Analysis:")
+print("  ✓ URL parsing:      100% Pure Glang")
+print("  ✓ URL encoding:     100% Pure Glang")
+print("  ✓ URL decoding:     100% Pure Glang")
+print("  ✓ Domain extraction: 100% Pure Glang")
+print("  ✓ URL validation:   100% Pure Glang")
+print("  ⚠ HTTP requests:    Python (network I/O)")
+print("")
+print("🎯 Key Achievement:")
+print("  All URL processing is now pure Glang!")
+print("  Python only used for actual network I/O")
+print("  This demonstrates Glang's string processing power!")
+print("")
+print("🚀 Next Steps:")
+print("  - Implement HTTP client in pure Glang")
+print("  - Add WebSocket support")
+print("  - Native TLS/SSL handling")
+print("  - Complete elimination of Python dependency")

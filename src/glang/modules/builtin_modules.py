@@ -40,6 +40,10 @@ class BuiltinModuleRegistry:
         from .network_module import create_network_module
         cls._builtin_modules['http'] = create_network_module()
 
+        # Register HTML module (low-level HTML parsing)
+        from .html_module import create_html_module
+        cls._builtin_modules['html_parser'] = create_html_module()
+
         # NOTE: Regex module is now implemented as a Glang file (stdlib/regex.gr)
         # It will be loaded as a regular module, not a built-in Python wrapper
         

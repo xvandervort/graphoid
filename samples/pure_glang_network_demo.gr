@@ -1,0 +1,99 @@
+#!/usr/bin/env glang
+# Demonstration of Enhanced Network Library (More Pure Glang)
+
+import "network" as net
+
+print("🚀 Enhanced Network Library Demo")
+print("Pure Glang implementation with minimal Python dependency")
+print("=" * 50)
+
+print("\n1. URL Parsing (Pure Glang):")
+test_url = "https://api.example.com:8080/v1/users?page=2&limit=10"
+parsed = net.parse_url(test_url)
+
+if parsed.has_key("error") {
+    print("Error: " + parsed["error"].value())
+} else {
+    print("Original URL: " + test_url)
+    print("Protocol: " + parsed["protocol"].value())
+    print("Host: " + parsed["host"].value())
+    print("Path: " + parsed["path"].value())
+}
+
+print("\n2. URL Encoding/Decoding (Pure Glang):")
+original_text = "Hello World & Special Characters!"
+encoded = net.encode_url(original_text)
+decoded = net.decode_url(encoded)
+
+print("Original: " + original_text)
+print("Encoded:  " + encoded)
+print("Decoded:  " + decoded)
+
+print("\n3. Domain Extraction (Pure Glang):")
+test_urls = [
+    "https://www.example.com/path",
+    "http://subdomain.test.org:8080/api",
+    "https://simple.dev",
+    "invalid-url"
+]
+
+i = 0
+while i < test_urls.size() {
+    url = test_urls[i]
+    domain = net.extract_domain(url)
+    print("URL: " + url + " -> Domain: " + domain)
+    i = i + 1
+}
+
+print("\n4. Query String Processing (Pure Glang):")
+params = {
+    "search": "glang programming",
+    "page": "1",
+    "sort": "date"
+}
+
+query_string = net.build_query_string(params)
+print("Parameters hash converted to query string:")
+print(query_string)
+
+print("\nParsing query string back to hash:")
+parsed_params = net.parse_query_string(query_string)
+keys = parsed_params.keys()
+i = 0
+while i < keys.size() {
+    key = keys[i]
+    value = parsed_params[key].value()
+    print("  " + key + " = " + value)
+    i = i + 1
+}
+
+print("\n5. URL Validation (Pure Glang):")
+test_validation_urls = [
+    "https://valid.example.com",
+    "http://also-valid.org",
+    "invalid-url-no-protocol",
+    "ftp://old-protocol.com"
+]
+
+i = 0
+while i < test_validation_urls.size() {
+    url = test_validation_urls[i]
+    is_valid = net.is_valid_url(url)
+    status = "Valid"
+    if is_valid == false {
+        status = "Invalid"
+    }
+    print("  " + url + " -> " + status)
+    i = i + 1
+}
+
+print("\n" + "=" * 50)
+print("✨ Network Library Analysis:")
+print("  ✓ URL parsing: 100% Pure Glang")
+print("  ✓ URL encoding/decoding: 100% Pure Glang")
+print("  ✓ Query string processing: 100% Pure Glang")
+print("  ✓ Domain extraction: 100% Pure Glang")
+print("  ✓ URL validation: 100% Pure Glang")
+print("  ⚠ HTTP requests: Python (for now)")
+print("\nPython dependency: Only for actual network I/O")
+print("Everything else is native Glang! 🎉")

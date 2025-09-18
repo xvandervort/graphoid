@@ -1,0 +1,170 @@
+# Enhanced HTML Library for Glang
+# Maximizes pure Glang processing, minimizes Python dependency
+
+module html
+
+# Import only for core HTML parsing
+import "html_parser" as html_core
+
+# Parse HTML content into a document structure
+func parse(html_content) {
+    return html_core.parse(html_content)
+}
+
+# Find elements by tag name
+func find_tag(document, tag_name) {
+    return html_core.find_by_tag(document, tag_name)
+}
+
+# Find element by ID
+func find_id(document, element_id) {
+    return html_core.find_by_id(document, element_id)
+}
+
+# Find elements by CSS class
+func find_class(document, class_name) {
+    return html_core.find_by_class(document, class_name)
+}
+
+# Extract text content from element
+func text(element) {
+    return html_core.get_text(element)
+}
+
+# Get attribute value from element
+func attr(element, attribute_name) {
+    return html_core.get_attribute(element, attribute_name)
+}
+
+# ==========================================
+# Pure Glang HTML Processing Functions
+# ==========================================
+
+# HTML entity encoding - pure Glang implementation
+func encode(text) {
+    result = text
+    result = result.replace("&", "&amp;")
+    result = result.replace("<", "&lt;")
+    result = result.replace(">", "&gt;")
+    result = result.replace('"', "&quot;")
+    result = result.replace("'", "&#39;")
+    return result
+}
+
+# HTML entity decoding - pure Glang implementation
+func decode(text) {
+    result = text
+    result = result.replace("&lt;", "<")
+    result = result.replace("&gt;", ">")
+    result = result.replace("&quot;", '"')
+    result = result.replace("&#39;", "'")
+    result = result.replace("&nbsp;", " ")
+    result = result.replace("&amp;", "&")
+    return result
+}
+
+# Strip all HTML tags from text - pure Glang
+func strip_tags(html_text) {
+    result = html_text
+
+    # Simple tag removal
+    while result.contains("<") and result.contains(">") {
+        before_tag = result.split("<")[0]
+        after_tag_parts = result.split(">")
+        if after_tag_parts.size() > 1 {
+            after_content = ""
+            i = 1
+            while i < after_tag_parts.size() {
+                if i > 1 {
+                    after_content = after_content + ">"
+                }
+                after_content = after_content + after_tag_parts[i]
+                i = i + 1
+            }
+            result = before_tag + after_content
+        } else {
+            break
+        }
+    }
+
+    # Clean up whitespace
+    result = result.replace("\n", " ")
+    result = result.replace("\t", " ")
+    while result.contains("  ") {
+        result = result.replace("  ", " ")
+    }
+
+    return result.trim()
+}
+
+# Extract all URLs from HTML content - pure Glang
+func extract_all_urls(html_content) {
+    urls = []
+
+    # Find href attributes
+    if html_content.contains('href="') {
+        parts = html_content.split('href="')
+        i = 1
+        while i < parts.size() {
+            part = parts[i]
+            url = part.split('"')[0]
+            if url != "" and url != "#" {
+                urls.append(url)
+            }
+            i = i + 1
+        }
+    }
+
+    # Find src attributes
+    if html_content.contains('src="') {
+        parts = html_content.split('src="')
+        i = 1
+        while i < parts.size() {
+            part = parts[i]
+            url = part.split('"')[0]
+            if url != "" {
+                urls.append(url)
+            }
+            i = i + 1
+        }
+    }
+
+    return urls
+}
+
+# Extract page title - pure Glang
+func extract_title(html_content) {
+    if html_content.contains("<title>") and html_content.contains("</title>") {
+        title_start = html_content.split("<title>")
+        if title_start.size() > 1 {
+            title_part = title_start[1]
+            title_end = title_part.split("</title>")
+            if title_end.size() > 0 {
+                return decode(title_end[0])
+            }
+        }
+    }
+    return ""
+}
+
+# Check if HTML contains specific content - pure Glang
+func contains_text(html_content, search_text) {
+    clean_text = strip_tags(html_content)
+    return clean_text.contains(search_text)
+}
+
+# Extract all links from a document - combines Python and Glang
+func extract_links(document) {
+    links = find_tag(document, "a")
+    urls = []
+    i = 0
+    while i < links.size() {
+        link = links[i]
+        href = attr(link, "href")
+        if href != "" {
+            urls.append(href)
+        }
+        i = i + 1
+    }
+    return urls
+}
