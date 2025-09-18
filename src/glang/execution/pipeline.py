@@ -163,9 +163,20 @@ class ExecutionSession:
                 "<input>"
             )
         
-        # Now execute the AST
+        # Phase 3 Implementation: AST as temporary subgraph
+        # Create temporary subgraph from AST function declarations
+        ast_subgraph = self.execution_context.call_graph.create_ast_subgraph(
+            analysis_result.ast,
+            self.execution_context.current_module or "global"
+        )
+
+        # Merge subgraph into permanent call graph (load-time merging)
+        if len(ast_subgraph) > 0:
+            self.execution_context.call_graph.merge_subgraph(ast_subgraph)
+
+        # Now execute the AST with pure graph traversal
         executor = ASTExecutor(self.execution_context, self.file_manager)
-        
+
         try:
             result = executor.execute(analysis_result.ast)
             return ExecutionResult(result, self.execution_context, True)
@@ -235,11 +246,16 @@ class ExecutionSession:
                 
                 # Save current file context before loading module
                 current_context = self.module_manager.current_file_context
-                
+
+                # Phase 3: Set module context for AST subgraph creation
+                old_module = self.execution_context.current_module
+                self.execution_context.current_module = module.declared_name or module.name
+
                 # Load the module file using the resolved filename and execute it in the current context
                 load_result = self.file_manager.load_file(module.filename, self)
-                
-                # Restore file context after loading module
+
+                # Restore module context and file context after loading module
+                self.execution_context.current_module = old_module
                 if current_context:
                     self.module_manager.set_current_file_context(current_context)
                 else:

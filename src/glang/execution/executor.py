@@ -3511,12 +3511,23 @@ class ASTExecutor(BaseASTVisitor):
             position=node.position
         )
         
-        # Store function in context (backward compatibility)
-        self.context.set_variable(node.name, func_value)
+        # Phase 3: Functions are now handled via AST subgraph merging
+        # No variable storage - pure graph-based function discovery only
+        # Functions were already added to call graph during subgraph merge phase
 
-        # Add function to CALL GRAPH (true graph-based storage)
+        # Note: Individual function declarations during REPL will still need direct addition
+        # Check if this function was already added via subgraph (from file loading)
         current_scope = self.context.current_module or "global"
-        self.context.call_graph.add_function(node.name, func_value, current_scope)
+        existing_func = self.context.call_graph.find_function(node.name, current_scope)
+
+        if existing_func is None:
+            # REPL or individual declaration - add directly to call graph
+            self.context.call_graph.add_function(node.name, func_value, current_scope)
+
+        # Phase 3: Also add to variables if in module context for module namespace transfer
+        if self.context.current_module is not None:
+            # In module context - add to variables so module loading can transfer to namespace
+            self.context.set_variable(node.name, func_value)
 
         # Store result
         self.result = func_value
@@ -3534,12 +3545,16 @@ class ASTExecutor(BaseASTVisitor):
         from .values import FunctionValue, LambdaValue
         from .function_value import BuiltinFunctionValue
         
-        # Look up function using TRUE GRAPH TRAVERSAL (not variable lookup)
+        # Phase 3: PURE GRAPH TRAVERSAL for function discovery
         func_value = self.context.call_graph.find_function(node.name, self.context.current_module)
 
-        # Fallback to variable lookup for backward compatibility (lambdas, builtin functions)
+        # Limited fallback ONLY for lambdas and builtin functions (not regular functions)
         if func_value is None:
-            func_value = self.context.get_variable(node.name)
+            candidate = self.context.get_variable(node.name)
+            # Only allow LambdaValue and BuiltinFunctionValue (not regular FunctionValue)
+            if isinstance(candidate, (LambdaValue, BuiltinFunctionValue)):
+                func_value = candidate
+            # Regular FunctionValue should NEVER be found via variable lookup in Phase 3
 
         if func_value is None:
             from .errors import VariableNotFoundError

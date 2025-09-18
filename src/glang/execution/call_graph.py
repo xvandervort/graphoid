@@ -428,3 +428,116 @@ class CallGraph(GraphStructure):
                             break
 
         return None
+
+    def create_ast_subgraph(self, ast_node, scope: str = "global") -> 'CallGraphSubgraph':
+        """Create a temporary subgraph from AST function declarations.
+
+        This is Phase 3 of the call graph architecture: AST as temporary subgraph.
+        During parsing, we extract function declarations and create a subgraph
+        that can be merged into the permanent call graph during load-time.
+
+        Args:
+            ast_node: Root AST node to scan for function declarations
+            scope: Scope name for the functions (module name or 'global')
+
+        Returns:
+            CallGraphSubgraph containing all functions from the AST
+        """
+        return CallGraphSubgraph.from_ast(ast_node, scope)
+
+    def merge_subgraph(self, subgraph: 'CallGraphSubgraph'):
+        """Merge a temporary subgraph into the permanent call graph.
+
+        This completes the AST integration: functions discovered during parsing
+        are now permanently integrated into the call graph for execution.
+
+        Args:
+            subgraph: Temporary subgraph to merge
+        """
+        subgraph.merge_into(self)
+
+
+class CallGraphSubgraph:
+    """Temporary subgraph representing function declarations from AST.
+
+    This implements Phase 3 of the call graph architecture where AST parsing
+    creates temporary subgraphs that are merged into the permanent call graph
+    during load-time.
+    """
+
+    def __init__(self, scope: str):
+        """Initialize subgraph for a specific scope."""
+        self.scope = scope
+        self.function_declarations = {}  # name -> AST FunctionDeclaration
+        self.function_connections = set()  # Set of function names that should be connected
+
+    @classmethod
+    def from_ast(cls, ast_node, scope: str = "global") -> 'CallGraphSubgraph':
+        """Extract function declarations from AST and create subgraph.
+
+        Scans the AST for function declarations and creates a temporary
+        subgraph representing their structure and connections.
+
+        Args:
+            ast_node: Root AST node to scan
+            scope: Scope name for the functions
+
+        Returns:
+            CallGraphSubgraph with all discovered functions
+        """
+        subgraph = cls(scope)
+        subgraph._extract_functions_from_ast(ast_node)
+        return subgraph
+
+    def _extract_functions_from_ast(self, node):
+        """Recursively extract function declarations from AST."""
+        from glang.ast.nodes import FunctionDeclaration, Block
+
+        if isinstance(node, FunctionDeclaration):
+            # Found a function declaration - add to subgraph
+            self.function_declarations[node.name] = node
+            self.function_connections.add(node.name)
+
+        # Recursively search child nodes
+        if hasattr(node, '__dict__'):
+            for attr_name, attr_value in node.__dict__.items():
+                if isinstance(attr_value, list):
+                    for item in attr_value:
+                        if hasattr(item, 'accept'):  # AST node
+                            self._extract_functions_from_ast(item)
+                elif hasattr(attr_value, 'accept'):  # AST node
+                    self._extract_functions_from_ast(attr_value)
+
+    def merge_into(self, call_graph: CallGraph):
+        """Merge this subgraph into the permanent call graph.
+
+        Creates FunctionValue objects from AST declarations and adds them
+        to the call graph with proper connections.
+
+        Args:
+            call_graph: Target call graph to merge into
+        """
+        from glang.execution.values import FunctionValue
+
+        # Create FunctionValue objects for all declarations
+        function_values = {}
+        for func_name, func_decl in self.function_declarations.items():
+            func_value = FunctionValue(
+                name=func_decl.name,
+                parameters=func_decl.parameters,
+                body=func_decl.body,
+                position=func_decl.position
+            )
+            function_values[func_name] = func_value
+
+        # Add all functions to call graph using existing connect_module_functions
+        # This ensures proper connectivity within the scope
+        call_graph.connect_module_functions(self.scope, function_values)
+
+    def get_function_names(self) -> List[str]:
+        """Get list of all function names in this subgraph."""
+        return list(self.function_declarations.keys())
+
+    def __len__(self) -> int:
+        """Return number of functions in subgraph."""
+        return len(self.function_declarations)
