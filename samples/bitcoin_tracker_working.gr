@@ -9,7 +9,7 @@ print("======================")
 
 # Configuration
 string url = "https://coinmarketcap.com/currencies/bitcoin/"
-string csv_file = "bitcoin_prices.csv"
+string csv_file = "data/bitcoin_prices.csv"
 
 # Function to extract Bitcoin price from the specific Bitcoin page metadata
 func extract_bitcoin_price(text) {

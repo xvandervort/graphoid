@@ -48,6 +48,9 @@ class BuiltinModuleRegistry:
         from .call_graph_module import create_call_graph_module_namespace
         cls._builtin_modules['call_graph'] = create_call_graph_module_namespace()
 
+        # NOTE: CSV module is now implemented as a Glang file (stdlib/csv_simple.gr)
+        # It will be loaded as a regular module, not a built-in Python wrapper
+
         # NOTE: Regex module is now implemented as a Glang file (stdlib/regex.gr)
         # It will be loaded as a regular module, not a built-in Python wrapper
         

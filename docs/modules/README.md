@@ -31,6 +31,17 @@ content = io.read_file("data.txt")
 user_name = io.input("Enter name: ")
 ```
 
+### Data Processing Modules
+
+#### [CSV Module](csv.md) ⭐ NEW
+Basic CSV parsing and generation with pure Glang implementation.
+```glang
+import "csv" as csv
+data = [["Alice", "25"], ["Bob", "30"]]
+csv_output = csv.generate(data, ["name", "age"], ",")
+parsed = csv.parse(csv_output, true, ",")
+```
+
 ### Text Processing Modules
 
 #### [Regex Module](regex.md) ⭐ NEW
@@ -113,6 +124,7 @@ io.write_file("events.json", json_data)
 | **time** | ✅ Complete | UTC timestamps, type casting, component parsing | [Full docs](time.md) |
 | **json** | ✅ Complete | Encode/decode, validation, pretty printing | [Full docs](json.md) |
 | **io** | ✅ Complete | File I/O, console, network, file system | [Full docs](io.md) |
+| **csv** | 🚧 Basic | Parse/generate CSV, pure Glang implementation | [Full docs](csv.md) |
 | **regex** | ✅ Complete | Pattern matching, extraction, validation | [Full docs](regex.md) |
 | **random** | ✅ Complete | RNG, distributions, sampling, security | [Full docs](random.md) |
 | **crypto** | ✅ Complete | Hashing, encryption, secure operations | [Full docs](crypto.md) |

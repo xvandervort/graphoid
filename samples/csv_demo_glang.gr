@@ -1,0 +1,45 @@
+#!/usr/bin/env glang
+
+# CSV Module Demo - Pure Glang Implementation
+# This demonstrates the pure Glang CSV module
+
+import "csv" as csv
+
+print("=== Pure Glang CSV Module Demo ===")
+
+# Example 1: Basic CSV Parsing
+print("\\n1. Basic CSV Parsing")
+employee_data = "Alice,Engineering,75000"
+employees = csv.parse(employee_data, false, ",")
+print("Parsed " + employees.size().to_string() + " employee records")
+
+# Show first employee
+first_employee = employees[0]
+print("First employee: " + first_employee[0] + " from " + first_employee[1])
+
+# Example 2: CSV Generation
+print("\\n2. CSV Generation")
+test_data = [
+    ["Alice", "Engineering", "75000"],
+    ["Bob", "Marketing", "65000"],
+    ["Charlie", "Sales", "70000"]
+]
+
+headers = ["name", "department", "salary"]
+generated_csv = csv.generate(test_data, headers, ",")
+print("Generated CSV:")
+print(generated_csv)
+
+# Example 3: Processing the generated CSV
+print("\\n3. Round-trip Processing")
+result = csv.parse(generated_csv, true, ",")
+print("Parsed back " + result.size().to_string() + " records")
+
+# Access first record (skipping header since we said true for has_headers)
+if result.size() > 0 {
+    first_record = result[0]
+    print("First record: " + first_record[0] + ", " + first_record[1] + ", " + first_record[2])
+}
+
+print("\\n=== Pure Glang CSV Demo Complete ===")
+print("Note: This is a simplified implementation in pure Glang!")
