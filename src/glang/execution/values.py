@@ -915,13 +915,14 @@ def infer_type_from_value(value: GlangValue) -> str:
 
 class FunctionValue(GlangValue):
     """Runtime function value representing a user-defined function."""
-    
-    def __init__(self, name: str, parameters: List[str], body: 'Block', closure_context: Optional['ExecutionContext'] = None, position: Optional[SourcePosition] = None):
+
+    def __init__(self, name: str, parameters: List[str], body: 'Block', closure_context: Optional['ExecutionContext'] = None, module_context: Optional[Dict[str, 'GlangValue']] = None, position: Optional[SourcePosition] = None):
         super().__init__(position)
         self.name = name
         self.parameters = parameters
         self.body = body
         self.closure_context = closure_context  # For closures (later enhancement)
+        self.module_context = module_context    # For module function scoping
         
     def to_python(self) -> str:
         return f"<function {self.name}>"

@@ -48,6 +48,8 @@ class ExecutionContext:
         self.variables: Dict[str, GlangValue] = {}
         self.module_manager = module_manager  # Will be set by execution pipeline
         self.config = ConfigurationContext()  # Configuration stack
+        self.loading_module = False  # Track if we're currently loading a module
+        self.module_functions = {}   # Functions created during module loading
     
     def get_variable(self, name: str) -> Optional[GlangValue]:
         """Get variable value by name.
@@ -3566,11 +3568,16 @@ class ASTExecutor(BaseASTVisitor):
             push_execution_frame(func_value.name, position, func_args)
 
             # Create new execution context for function scope
-            # For now, we'll use a simple approach without proper scoping
             # Save current variable state
             old_vars = self.context.variables.copy()
 
             try:
+                # If this function has module context, add module functions to scope
+                if func_value.module_context:
+                    # Add all module functions and variables to current scope
+                    for name, value in func_value.module_context.items():
+                        self.context.set_variable(name, value)
+
                 # Bind parameters to arguments
                 for param_name, arg_value in zip(func_value.parameters, arguments):
                     self.context.set_variable(param_name, arg_value)

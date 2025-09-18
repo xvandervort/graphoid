@@ -9,7 +9,11 @@ Transform Glang from a practical programming language into a revolutionary platf
 - **Test Coverage**: 67% (1239 tests passing)
 - **Core Features**: Complete function system, type inference, collections, file loading
 - **Architecture**: Container-based (lists, hashes, data nodes)
-- **Production Readiness**: Approaching - network/HTML libraries complete
+- **🚨 CRITICAL ARCHITECTURE ISSUE**: **Functions use variable lookup instead of graph traversal**
+  - **Glang is not truly graph-based** - it's simulating graph features
+  - **Foundational bug** prevents basic module function composition
+  - **Highest priority fix required** before any other development
+- **Production Readiness**: BLOCKED until graph foundation is implemented
 - **🎯 Self-Hosting Progress**: 80% reduction in Python dependency achieved!
   - Network/HTML processing now 80% pure Glang (major breakthrough)
   - Only network I/O and complex DOM parsing still require Python
@@ -26,8 +30,34 @@ Transform Glang from a practical programming language into a revolutionary platf
 - REPL environment
 - 70% test coverage
 
-### 📍 Phase 1: Production Readiness (Q1-Q2 2025) - CURRENT
-**Goal**: Make Glang practical for real-world applications
+### 🔥 FOUNDATIONAL PRIORITY #1: True Graph Architecture (IMMEDIATE)
+**Goal**: Transform Glang from simulated graph language to TRUE graph language
+
+**CRITICAL INSIGHT**: Without graph-based function discovery, Glang isn't Glang - it's just pretending to be graph-based.
+
+#### 🚨 FOUNDATIONAL ARCHITECTURE BUG (BLOCKS EVERYTHING)
+**Current Problem**: Functions use variable-based lookup instead of graph traversal
+- ❌ Functions stored as "variables" in flat dictionaries
+- ❌ Function calls do `get_variable(name)` lookups
+- ❌ No graph structure for function discovery
+- ❌ **Glang is theoretically broken** - not actually graph-based
+
+**Required Fix**: **Graph-based function discovery system**
+- ✅ Functions as graph nodes with connectivity
+- ✅ Function calls traverse graph edges
+- ✅ Module functions connected through graph structure
+- ✅ AST as temporary subgraph that merges into permanent call graph
+
+**Implementation Priority**: **ABSOLUTE HIGHEST** - No other features until this is fixed
+**Timeline**: 2 weeks (Phase 1: Foundation, Phase 2: AST Integration)
+**Impact**: Transforms Glang from fake graph language to revolutionary true graph language
+
+See: [`dev_docs/FOUNDATIONAL_PRIORITY_CALL_GRAPH.md`](./FOUNDATIONAL_PRIORITY_CALL_GRAPH.md)
+
+---
+
+### 📍 Phase 1: Production Readiness (Q1-Q2 2025) - BLOCKED UNTIL GRAPH FOUNDATION
+**Goal**: Make Glang practical for real-world applications (AFTER graph foundation is complete)
 
 #### ✅ 1.0 CRITICAL PARSER FIXES (COMPLETED September 2025)
 **Status**: All blocking issues from cryptocurrency analytics experiment have been resolved

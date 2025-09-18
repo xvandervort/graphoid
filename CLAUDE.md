@@ -37,6 +37,25 @@ This represents a major architectural challenge but is essential for Glang's uni
 
 ## Recent Changes (September 2025)
 
+### 🔥 CRITICAL DISCOVERY: Foundational Architecture Issue (September 2025)
+**THE MOST IMPORTANT DISCOVERY IN GLANG'S DEVELOPMENT**
+
+- **🚨 CRITICAL BUG IDENTIFIED**: Glang uses variable-based function lookup instead of graph traversal
+- **DEVASTATING IMPACT**: **Glang is not truly graph-based** - it's simulating graph features, not implementing them
+- **SPECIFIC SYMPTOM**: Functions cannot call other functions within the same module (discovered during conversions library development)
+- **ROOT CAUSE**: Functions stored as "variables" in flat dictionaries, not as graph nodes with connectivity
+- **THEORETICAL IMPLICATIONS**: Without graph-based function discovery, Glang isn't Glang - it's just pretending to be graph-based
+- **PRIORITY**: **🔥 ABSOLUTE HIGHEST PRIORITY** - blocks all other development until fixed
+- **SOLUTION**: Implement true graph-based function discovery system using existing `GraphStructure` infrastructure
+- **TRANSFORMATION**: Will change Glang from "fake graph language" to "revolutionary true graph language"
+
+**📋 COMPLETE IMPLEMENTATION PLAN**: See [`dev_docs/FOUNDATIONAL_PRIORITY_CALL_GRAPH.md`](dev_docs/FOUNDATIONAL_PRIORITY_CALL_GRAPH.md)
+**📊 ROADMAP IMPACT**: See updated [`dev_docs/PRIMARY_ROADMAP.md`](dev_docs/PRIMARY_ROADMAP.md) - all features blocked until this is complete
+
+**This discovery fundamentally changes Glang's development priorities and reveals that the current implementation doesn't match the graph-theoretic vision.**
+
+---
+
 ### ✅ Logical Operators & Parser Issues Complete
 - **COMPLETE**: Added `and`/`or` logical operators with operator synonyms `&&`/`||`
 - **Features**: Proper truthiness rules, short-circuit evaluation, correct precedence parsing
