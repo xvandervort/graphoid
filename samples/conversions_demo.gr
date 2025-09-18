@@ -1,0 +1,219 @@
+#!/usr/bin/env glang
+# Unit Conversions Demo - Pure Glang Mathematics
+
+import "conversions" as conv
+
+print("🌍 Glang Unit Conversions Library")
+print("=================================")
+print("100% Pure Glang - No Python dependencies!")
+
+# ==========================================
+# Length Conversions
+# ==========================================
+
+print("\n📏 LENGTH CONVERSIONS:")
+print("----------------------")
+
+# American to Metric
+print("American to Metric:")
+feet = 100.0
+meters = conv.feet_to_meters(feet)
+print("  " + feet.to_string() + " feet = " + meters.to_string() + " meters")
+
+miles = 62.14
+km = conv.miles_to_kilometers(miles)
+print("  " + miles.to_string() + " miles = " + km.to_string() + " km")
+
+inches = 12.0
+cm = conv.inches_to_centimeters(inches)
+print("  " + inches.to_string() + " inches = " + cm.to_string() + " cm")
+
+# Metric to American
+print("\nMetric to American:")
+meters_val = 1000.0
+feet_val = conv.meters_to_feet(meters_val)
+print("  " + meters_val.to_string() + " meters = " + feet_val.to_string() + " feet")
+
+km_val = 100.0
+miles_val = conv.kilometers_to_miles(km_val)
+print("  " + km_val.to_string() + " km = " + miles_val.to_string() + " miles")
+
+# Nautical conversions
+print("\n⚓ Nautical Conversions:")
+nm = 100.0
+statute_miles = conv.nautical_miles_to_statute_miles(nm)
+nm_km = conv.nautical_miles_to_kilometers(nm)
+print("  " + nm.to_string() + " nautical miles = " + statute_miles.to_string() + " statute miles")
+print("  " + nm.to_string() + " nautical miles = " + nm_km.to_string() + " kilometers")
+
+# ==========================================
+# Astronomical Conversions
+# ==========================================
+
+print("\n🚀 ASTRONOMICAL CONVERSIONS:")
+print("----------------------------")
+
+au = 1.0
+au_miles = conv.astronomical_units_to_miles(au)
+print("1 AU (Earth-Sun) = " + au_miles.to_string() + " miles")
+
+ly = 4.37
+ly_miles = conv.light_years_to_miles(ly)
+print("Proxima Centauri (" + ly.to_string() + " ly) = " + ly_miles.to_string() + " miles")
+
+ly_km = conv.light_years_to_kilometers(ly)
+print("Proxima Centauri (" + ly.to_string() + " ly) = " + ly_km.to_string() + " km")
+
+pc = 1.0
+pc_ly = conv.parsecs_to_light_years(pc)
+print("1 parsec = " + pc_ly.to_string() + " light years")
+
+# ==========================================
+# Weight Conversions
+# ==========================================
+
+print("\n⚖️ WEIGHT CONVERSIONS:")
+print("----------------------")
+
+# American to Metric
+print("American to Metric:")
+lbs = 220.0
+kg = conv.pounds_to_kilograms(lbs)
+print("  " + lbs.to_string() + " pounds = " + kg.to_string() + " kg")
+
+oz = 16.0
+grams = conv.ounces_to_grams(oz)
+print("  " + oz.to_string() + " ounces = " + grams.to_string() + " grams")
+
+# Metric to American
+print("\nMetric to American:")
+kg_val = 75.0
+lbs_val = conv.kilograms_to_pounds(kg_val)
+print("  " + kg_val.to_string() + " kg = " + lbs_val.to_string() + " pounds")
+
+# American to American
+print("\nAmerican to American:")
+stones = 10.0
+stone_lbs = conv.stones_to_pounds(stones)
+print("  " + stones.to_string() + " stones = " + stone_lbs.to_string() + " pounds")
+
+lbs_for_oz = 2.0
+total_oz = conv.pounds_to_ounces(lbs_for_oz)
+print("  " + lbs_for_oz.to_string() + " pounds = " + total_oz.to_string() + " ounces")
+
+tons = 1.0
+ton_lbs = conv.tons_to_pounds(tons)
+print("  " + tons.to_string() + " ton = " + ton_lbs.to_string() + " pounds")
+
+# ==========================================
+# Temperature Conversions
+# ==========================================
+
+print("\n🌡️ TEMPERATURE CONVERSIONS:")
+print("---------------------------")
+
+# Water freezing
+celsius_freeze = 0.0
+fahr_freeze = conv.celsius_to_fahrenheit(celsius_freeze)
+kelv_freeze = conv.celsius_to_kelvin(celsius_freeze)
+print("Water freezing: " + celsius_freeze.to_string() + "°C = " + fahr_freeze.to_string() + "°F = " + kelv_freeze.to_string() + "K")
+
+# Water boiling
+celsius_boil = 100.0
+fahr_boil = conv.celsius_to_fahrenheit(celsius_boil)
+kelv_boil = conv.celsius_to_kelvin(celsius_boil)
+print("Water boiling: " + celsius_boil.to_string() + "°C = " + fahr_boil.to_string() + "°F = " + kelv_boil.to_string() + "K")
+
+# Room temperature
+fahr_room = 72.0
+celsius_room = conv.fahrenheit_to_celsius(fahr_room)
+print("Room temp: " + fahr_room.to_string() + "°F = " + celsius_room.to_string() + "°C")
+
+# ==========================================
+# Volume Conversions
+# ==========================================
+
+print("\n🥤 VOLUME CONVERSIONS:")
+print("----------------------")
+
+# American to Metric
+gallons = 5.0
+liters = conv.gallons_to_liters(gallons)
+print("American to Metric: " + gallons.to_string() + " gallons = " + liters.to_string() + " liters")
+
+# American volume relationships
+gal = 1.0
+quarts = conv.gallons_to_quarts(gal)
+pints_from_quarts = conv.quarts_to_pints(quarts)
+cups_from_pints = conv.pints_to_cups(pints_from_quarts)
+print("Volume breakdown: " + gal.to_string() + " gal = " + quarts.to_string() + " qt = " + pints_from_quarts.to_string() + " pt = " + cups_from_pints.to_string() + " cups")
+
+# ==========================================
+# Speed Conversions
+# ==========================================
+
+print("\n🚗 SPEED CONVERSIONS:")
+print("---------------------")
+
+# Highway speeds
+mph = 65.0
+kmh = conv.mph_to_kmh(mph)
+print("Highway: " + mph.to_string() + " mph = " + kmh.to_string() + " km/h")
+
+# Aviation
+knots = 500.0
+knot_mph = conv.knots_to_mph(knots)
+knot_kmh = conv.knots_to_kmh(knots)
+print("Aviation: " + knots.to_string() + " knots = " + knot_mph.to_string() + " mph = " + knot_kmh.to_string() + " km/h")
+
+# ==========================================
+# Energy & Other Conversions
+# ==========================================
+
+print("\n⚡ ENERGY CONVERSIONS:")
+print("---------------------")
+
+calories = 2000.0
+joules = conv.calories_to_joules(calories)
+print("Daily food: " + calories.to_string() + " calories = " + joules.to_string() + " joules")
+
+kwh = 30.0
+kwh_joules = conv.kwh_to_joules(kwh)
+print("Home energy: " + kwh.to_string() + " kWh = " + kwh_joules.to_string() + " joules")
+
+print("\n🏠 AREA CONVERSIONS:")
+print("--------------------")
+
+sq_ft = 1000.0
+sq_m = conv.square_feet_to_square_meters(sq_ft)
+print("House size: " + sq_ft.to_string() + " sq ft = " + sq_m.to_string() + " sq m")
+
+acres = 5.0
+acre_sq_m = conv.acres_to_square_meters(acres)
+print("Land area: " + acres.to_string() + " acres = " + acre_sq_m.to_string() + " sq m")
+
+print("\n💨 PRESSURE CONVERSIONS:")
+print("------------------------")
+
+psi = 32.0
+kpa = conv.psi_to_kilopascals(psi)
+print("Tire pressure: " + psi.to_string() + " PSI = " + kpa.to_string() + " kPa")
+
+atm = 1.0
+atm_psi = conv.atmospheres_to_psi(atm)
+print("Atmospheric: " + atm.to_string() + " atm = " + atm_psi.to_string() + " PSI")
+
+print("\n=================================")
+print("✨ Pure Glang Conversions Complete!")
+print("\n📊 Categories Demonstrated:")
+print("  📏 Length: ft↔m, mi↔km, in↔cm, nautical")
+print("  🚀 Astronomical: AU, light-years, parsecs")
+print("  ⚖️ Weight: lb↔kg, oz↔g, stones, tons")
+print("  🌡️ Temperature: °F↔°C↔K")
+print("  🥤 Volume: gal↔L, qt↔pt↔cup")
+print("  🚗 Speed: mph↔km/h, knots")
+print("  ⚡ Energy: calories↔joules, kWh, BTU")
+print("  🏠 Area: sq ft↔sq m, acres")
+print("  💨 Pressure: PSI↔kPa, atmospheres")
+print("\n🎯 This demonstrates Glang's mathematical")
+print("   capabilities for real-world applications!")
