@@ -35,7 +35,11 @@ class BuiltinModuleRegistry:
         # Register Time module
         from .time_module_simple import create_time_module_namespace
         cls._builtin_modules['time'] = create_time_module_namespace()
-        
+
+        # Register Network module (low-level HTTP operations)
+        from .network_module import create_network_module
+        cls._builtin_modules['http'] = create_network_module()
+
         # NOTE: Regex module is now implemented as a Glang file (stdlib/regex.gr)
         # It will be loaded as a regular module, not a built-in Python wrapper
         

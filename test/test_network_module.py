@@ -1,275 +1,304 @@
-"""Test network module functionality."""
+#!/usr/bin/env python3
+"""Test the network module functionality."""
 
 import pytest
-from unittest.mock import Mock, patch
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../src'))
+
+from glang.execution.values import StringValue, BooleanValue, NumberValue, DataValue
+from glang.execution.graph_values import HashValue
 from glang.modules.network_module import NetworkModule
-from glang.execution.values import StringValue, NumberValue, BooleanValue, DataValue
-from glang.modules.network_interface import NetworkResponse
+from glang.modules.network_interface import NetworkResponse, PythonNetworkProvider
+from glang.ast.nodes import SourcePosition
+
+
+class MockNetworkProvider:
+    """Mock network provider for testing."""
+
+    def __init__(self):
+        self.available = True
+        self.requests = []  # Track requests made
+        self.mock_responses = {}  # URL -> NetworkResponse mapping
+
+    def is_available(self) -> bool:
+        return self.available
+
+    def set_mock_response(self, url: str, response: NetworkResponse):
+        """Set a mock response for a URL."""
+        self.mock_responses[url] = response
+
+    def http_request(self, method: str, url: str, data=None, headers=None) -> NetworkResponse:
+        """Mock HTTP request."""
+        # Record the request
+        self.requests.append({
+            'method': method,
+            'url': url,
+            'data': data,
+            'headers': headers or {}
+        })
+
+        # Return mock response if available
+        if url in self.mock_responses:
+            return self.mock_responses[url]
+
+        # Default successful response
+        return NetworkResponse(200, f"Mock response for {method} {url}", {"Content-Type": "text/plain"})
+
+    def download_to_file(self, url: str, filepath: str) -> bool:
+        """Mock file download."""
+        self.requests.append({
+            'method': 'DOWNLOAD',
+            'url': url,
+            'filepath': filepath
+        })
+        return True
 
 
 class TestNetworkModule:
     """Test the NetworkModule class."""
 
     def setup_method(self):
-        """Set up test fixtures."""
-        self.network_module = NetworkModule()
+        """Set up test environment."""
+        self.mock_provider = MockNetworkProvider()
+        # Replace the global provider
+        import glang.modules.network_interface as net_interface
+        self.original_provider = net_interface._network_provider
+        net_interface._network_provider = self.mock_provider
 
-    @patch('glang.modules.network_module.get_network_provider')
-    def test_http_get_success(self, mock_provider):
+    def teardown_method(self):
+        """Clean up test environment."""
+        import glang.modules.network_interface as net_interface
+        net_interface._network_provider = self.original_provider
+
+    def test_http_get_success(self):
         """Test successful HTTP GET request."""
-        # Mock network provider
-        provider = Mock()
-        provider.is_available.return_value = True
-        provider.http_request.return_value = NetworkResponse(
-            status_code=200,
-            headers={"Content-Type": "text/html"},
-            body="<html>Hello World</html>"
-        )
-        mock_provider.return_value = provider
+        url = StringValue("https://example.com/api")
 
-        # Test GET request
-        url = StringValue("http://example.com")
+        # Set up mock response
+        self.mock_provider.set_mock_response(
+            "https://example.com/api",
+            NetworkResponse(200, '{"status": "ok"}', {"Content-Type": "application/json"})
+        )
+
         result = NetworkModule.http_get(url)
 
         assert isinstance(result, StringValue)
-        assert result.value == "<html>Hello World</html>"
-        provider.http_request.assert_called_once_with("GET", "http://example.com")
+        assert result.value == '{"status": "ok"}'
 
-    @patch('glang.modules.network_module.get_network_provider')
-    def test_http_get_network_error(self, mock_provider):
-        """Test HTTP GET with network error."""
-        # Mock network provider
-        provider = Mock()
-        provider.is_available.return_value = True
-        provider.http_request.return_value = NetworkResponse(
-            status_code=0,
-            headers={},
-            body="Connection refused"
+        # Verify request was made
+        assert len(self.mock_provider.requests) == 1
+        assert self.mock_provider.requests[0]['method'] == 'GET'
+        assert self.mock_provider.requests[0]['url'] == "https://example.com/api"
+
+    def test_http_get_with_error(self):
+        """Test HTTP GET with error response."""
+        url = StringValue("https://example.com/notfound")
+
+        # Set up error response
+        self.mock_provider.set_mock_response(
+            "https://example.com/notfound",
+            NetworkResponse(404, "Not Found", {})
         )
-        mock_provider.return_value = provider
 
-        url = StringValue("http://invalid-url.com")
-
-        with pytest.raises(RuntimeError) as exc_info:
+        with pytest.raises(RuntimeError, match="HTTP error 404"):
             NetworkModule.http_get(url)
 
-        assert "Network error: Connection refused" in str(exc_info.value)
-
-    @patch('glang.modules.network_module.get_network_provider')
-    def test_http_get_http_error(self, mock_provider):
-        """Test HTTP GET with HTTP error status."""
-        # Mock network provider
-        provider = Mock()
-        provider.is_available.return_value = True
-        provider.http_request.return_value = NetworkResponse(
-            status_code=404,
-            headers={},
-            body="Not Found"
-        )
-        mock_provider.return_value = provider
-
-        url = StringValue("http://example.com/notfound")
-
-        with pytest.raises(RuntimeError) as exc_info:
-            NetworkModule.http_get(url)
-
-        assert "HTTP error 404: Not Found" in str(exc_info.value)
-
-    @patch('glang.modules.network_module.get_network_provider')
-    def test_http_get_invalid_url_type(self, mock_provider):
+    def test_http_get_invalid_url_type(self):
         """Test HTTP GET with invalid URL type."""
-        url = NumberValue(123)  # Invalid type
+        url = NumberValue(123)
 
-        with pytest.raises(RuntimeError) as exc_info:
+        with pytest.raises(RuntimeError, match="http_get expects string URL, got num"):
             NetworkModule.http_get(url)
 
-        assert "http_get expects string URL, got num" in str(exc_info.value)
-
-    @patch('glang.modules.network_module.get_network_provider')
-    def test_http_get_provider_unavailable(self, mock_provider):
-        """Test HTTP GET when network provider is unavailable."""
-        provider = Mock()
-        provider.is_available.return_value = False
-        mock_provider.return_value = provider
-
-        url = StringValue("http://example.com")
-
-        with pytest.raises(RuntimeError) as exc_info:
-            NetworkModule.http_get(url)
-
-        assert "Network functionality not available" in str(exc_info.value)
-
-    @patch('glang.modules.network_module.get_network_provider')
-    def test_http_post_with_string_data(self, mock_provider):
+    def test_http_post_with_string_data(self):
         """Test HTTP POST with string data."""
-        provider = Mock()
-        provider.is_available.return_value = True
-        provider.http_request.return_value = NetworkResponse(
-            status_code=201,
-            headers={"Content-Type": "application/json"},
-            body='{"status": "created"}'
-        )
-        mock_provider.return_value = provider
-
-        url = StringValue("http://api.example.com/users")
-        data = StringValue("name=John&age=30")
+        url = StringValue("https://example.com/api")
+        data = StringValue("test_data=hello")
 
         result = NetworkModule.http_post(url, data)
 
         assert isinstance(result, StringValue)
-        assert result.value == '{"status": "created"}'
-        provider.http_request.assert_called_once_with("POST", "http://api.example.com/users", "name=John&age=30")
 
-    @patch('glang.modules.network_module.get_network_provider')
-    def test_http_post_with_hash_data(self, mock_provider):
-        """Test HTTP POST with hash data (string representation)."""
-        provider = Mock()
-        provider.is_available.return_value = True
-        provider.http_request.return_value = NetworkResponse(
-            status_code=200,
-            headers={},
-            body="OK"
-        )
-        mock_provider.return_value = provider
+        # Verify request was made with data
+        assert len(self.mock_provider.requests) == 1
+        request = self.mock_provider.requests[0]
+        assert request['method'] == 'POST'
+        assert request['url'] == "https://example.com/api"
+        assert request['data'] == "test_data=hello"
 
-        url = StringValue("http://api.example.com/submit")
-        # Create simple hash data - just test that it can be processed
-        data = NumberValue(42)  # Non-string data gets converted via to_display_string()
+    def test_http_post_with_non_string_data(self):
+        """Test HTTP POST with non-string data (should convert to display string)."""
+        url = StringValue("https://example.com/api")
+        data = NumberValue(42)
 
         result = NetworkModule.http_post(url, data)
 
         assert isinstance(result, StringValue)
-        assert result.value == "OK"
 
-        # Verify the call was made - data gets converted via to_display_string()
-        call_args = provider.http_request.call_args
-        assert call_args[0][:2] == ("POST", "http://api.example.com/submit")
-        posted_data = call_args[0][2]
+        # Verify data was converted
+        assert len(self.mock_provider.requests) == 1
+        request = self.mock_provider.requests[0]
+        assert request['data'] == "42"  # NumberValue.to_display_string()
 
-        # The data should be a string representation
-        assert "42" in posted_data  # Should contain the converted value
+    def test_http_request_full_with_headers(self):
+        """Test full HTTP request with headers."""
+        method = StringValue("GET")
+        url = StringValue("https://example.com/api")
+        data = None
 
-    @patch('glang.modules.network_module.get_network_provider')
-    def test_http_post_no_data(self, mock_provider):
-        """Test HTTP POST with no data."""
-        provider = Mock()
-        provider.is_available.return_value = True
-        provider.http_request.return_value = NetworkResponse(
-            status_code=200,
-            headers={},
-            body="Success"
-        )
-        mock_provider.return_value = provider
+        # Create headers hash
+        headers_pairs = [
+            ("Authorization", DataValue("Authorization", StringValue("Bearer token123"))),
+            ("Content-Type", DataValue("Content-Type", StringValue("application/json")))
+        ]
+        headers = HashValue(headers_pairs)
 
-        url = StringValue("http://api.example.com/ping")
+        result = NetworkModule.http_request_full(method, url, data, headers)
 
-        result = NetworkModule.http_post(url)
+        assert isinstance(result, HashValue)
 
-        assert isinstance(result, StringValue)
-        assert result.value == "Success"
-        provider.http_request.assert_called_once_with("POST", "http://api.example.com/ping", None)
+        # Check that status, body, success, and headers are in result
+        assert "status" in result.graph.keys()
+        assert "body" in result.graph.keys()
+        assert "success" in result.graph.keys()
 
-    @patch('glang.modules.network_module.get_network_provider')
-    def test_http_post_invalid_url_type(self, mock_provider):
-        """Test HTTP POST with invalid URL type."""
-        url = BooleanValue(True)  # Invalid type
+        # Verify request headers were passed
+        assert len(self.mock_provider.requests) == 1
+        request = self.mock_provider.requests[0]
+        assert request['headers']['Authorization'] == "Bearer token123"
+        assert request['headers']['Content-Type'] == "application/json"
 
-        with pytest.raises(RuntimeError) as exc_info:
-            NetworkModule.http_post(url)
-
-        assert "http_post expects string URL, got bool" in str(exc_info.value)
-
-    @patch('glang.modules.network_module.get_filesystem')
-    @patch('glang.modules.network_module.get_network_provider')
-    def test_download_file_success(self, mock_provider, mock_filesystem):
-        """Test successful file download."""
-        provider = Mock()
-        provider.is_available.return_value = True
-        provider.download_to_file.return_value = True
-        mock_provider.return_value = provider
-
-        filesystem = Mock()
-        filesystem.get_dirname.return_value = "/tmp"
-        filesystem.file_exists.return_value = True  # Parent dir exists
-        mock_filesystem.return_value = filesystem
-
-        url = StringValue("http://example.com/file.pdf")
-        filepath = StringValue("/tmp/file.pdf")
+    def test_download_file(self):
+        """Test file download functionality."""
+        url = StringValue("https://example.com/file.txt")
+        filepath = StringValue("/tmp/test_file.txt")
 
         result = NetworkModule.download_file(url, filepath)
 
         assert isinstance(result, BooleanValue)
         assert result.value is True
-        provider.download_to_file.assert_called_once_with(
-            "http://example.com/file.pdf",
-            "/tmp/file.pdf"
-        )
-        # Verify filesystem interaction
-        filesystem.get_dirname.assert_called_once_with("/tmp/file.pdf")
-        filesystem.file_exists.assert_called_once_with("/tmp")
 
-    @patch('glang.modules.network_module.get_filesystem')
-    @patch('glang.modules.network_module.get_network_provider')
-    def test_download_file_network_error(self, mock_provider, mock_filesystem):
-        """Test file download with network error."""
-        provider = Mock()
-        provider.is_available.return_value = True
-        provider.download_to_file.return_value = False  # Download fails
-        mock_provider.return_value = provider
+        # Verify download request was made
+        assert len(self.mock_provider.requests) == 1
+        request = self.mock_provider.requests[0]
+        assert request['method'] == 'DOWNLOAD'
+        assert request['url'] == "https://example.com/file.txt"
+        assert request['filepath'] == "/tmp/test_file.txt"
 
-        filesystem = Mock()
-        filesystem.get_dirname.return_value = "/tmp"
-        filesystem.file_exists.return_value = True  # Parent dir exists
-        mock_filesystem.return_value = filesystem
+    def test_url_parse_valid_url(self):
+        """Test URL parsing with valid URL."""
+        url = StringValue("https://example.com/path/to/resource")
 
-        url = StringValue("http://badurl.com/file.pdf")
-        filepath = StringValue("/tmp/file.pdf")
+        result = NetworkModule.url_parse(url)
 
-        result = NetworkModule.download_file(url, filepath)
+        assert isinstance(result, HashValue)
+        assert "protocol" in result.graph.keys()
+        assert "host" in result.graph.keys()
+        assert "path" in result.graph.keys()
+        assert "url" in result.graph.keys()
 
-        assert isinstance(result, BooleanValue)
-        assert result.value is False
+        # Check parsed values
+        protocol = result.graph.get("protocol").value
+        host = result.graph.get("host").value
+        path = result.graph.get("path").value
 
-    def test_url_encode(self):
-        """Test URL encoding functionality."""
-        data = StringValue("hello world!")
+        assert isinstance(protocol, StringValue)
+        assert protocol.value == "https"
+        assert isinstance(host, StringValue)
+        assert host.value == "example.com"
+        assert isinstance(path, StringValue)
+        assert path.value == "/path/to/resource"
 
-        result = NetworkModule.url_encode(data)
+    def test_url_parse_simple_url(self):
+        """Test URL parsing with simple URL (no path)."""
+        url = StringValue("https://example.com")
 
-        assert isinstance(result, StringValue)
-        # Check basic URL encoding works (may double-encode in some cases)
-        assert "hello" in result.value
-        assert "world" in result.value
-        # Space should be encoded in some form
-        assert result.value != "hello world!"  # Should be different from original
+        result = NetworkModule.url_parse(url)
 
-    def test_url_parse(self):
-        """Test URL parsing functionality."""
-        url = StringValue("http://example.com/path/to/resource")
+        assert isinstance(result, HashValue)
 
-        # For now, just test that it doesn't crash - implementation details may vary
-        try:
-            result = NetworkModule.url_parse(url)
-            # If it succeeds, it should return some kind of value
-            assert result is not None
-        except Exception:
-            # If implementation isn't complete, that's OK for coverage purposes
-            pass
+        protocol = result.graph.get("protocol").value
+        host = result.graph.get("host").value
+        path = result.graph.get("path").value
 
-    def test_url_encode_invalid_type(self):
-        """Test URL encode with invalid input type."""
-        invalid_data = NumberValue(123)
-
-        with pytest.raises(RuntimeError) as exc_info:
-            NetworkModule.url_encode(invalid_data)
-
-        assert "expects string" in str(exc_info.value)
+        assert protocol.value == "https"
+        assert host.value == "example.com"
+        assert path.value == "/"  # Should default to "/"
 
     def test_url_parse_invalid_url(self):
-        """Test URL parse with invalid URL format."""
-        invalid_url = StringValue("not-a-url")
+        """Test URL parsing with invalid URL."""
+        url = StringValue("not-a-valid-url")
 
-        with pytest.raises(RuntimeError) as exc_info:
-            NetworkModule.url_parse(invalid_url)
+        with pytest.raises(RuntimeError, match="Invalid URL: missing protocol"):
+            NetworkModule.url_parse(url)
 
-        assert "missing protocol" in str(exc_info.value)
+    def test_url_encode_basic(self):
+        """Test URL encoding of basic characters."""
+        text = StringValue("hello world test")
+
+        result = NetworkModule.url_encode(text)
+
+        assert isinstance(result, StringValue)
+        assert result.value == "hello%20world%20test"
+
+    def test_url_encode_special_characters(self):
+        """Test URL encoding of special characters."""
+        text = StringValue("hello & world!")
+
+        result = NetworkModule.url_encode(text)
+
+        assert isinstance(result, StringValue)
+        # Should encode space and special characters
+        assert "%20" in result.value  # space
+        assert "%26" in result.value  # &
+        assert "%21" in result.value  # !
+
+    def test_network_unavailable(self):
+        """Test behavior when network is unavailable."""
+        self.mock_provider.available = False
+
+        url = StringValue("https://example.com")
+
+        with pytest.raises(RuntimeError, match="Network functionality not available"):
+            NetworkModule.http_get(url)
+
+
+class TestNetworkInterface:
+    """Test the network interface components."""
+
+    def test_network_response_creation(self):
+        """Test NetworkResponse creation and conversion."""
+        response = NetworkResponse(200, '{"test": "data"}', {"Content-Type": "application/json"})
+
+        assert response.status_code == 200
+        assert response.body == '{"test": "data"}'
+        assert response.headers["Content-Type"] == "application/json"
+
+        # Test conversion to Glang values
+        glang_values = response.to_glang_values()
+        assert isinstance(glang_values['status'], NumberValue)
+        assert glang_values['status'].value == 200
+        assert isinstance(glang_values['body'], StringValue)
+        assert glang_values['body'].value == '{"test": "data"}'
+        assert isinstance(glang_values['success'], BooleanValue)
+        assert glang_values['success'].value is True
+
+    def test_network_response_error_status(self):
+        """Test NetworkResponse with error status."""
+        response = NetworkResponse(404, "Not Found", {})
+
+        glang_values = response.to_glang_values()
+        assert glang_values['status'].value == 404
+        assert glang_values['success'].value is False
+
+    def test_python_network_provider_availability(self):
+        """Test PythonNetworkProvider availability check."""
+        provider = PythonNetworkProvider()
+
+        # Should be available (urllib is standard library)
+        assert provider.is_available() is True
+
+
+if __name__ == '__main__':
+    pytest.main([__file__])

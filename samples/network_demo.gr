@@ -1,31 +1,63 @@
-# Demonstrate network I/O operations in Glang
+#!/usr/bin/env glang
+# Network Library Demo - Shows HTTP client capabilities and URL utilities
 
+import "network" as net
 import "io"
 
-print("🌐 Network I/O Demo")
-print("==================")
+print("🌐 Glang Network Library Demo")
+print("=============================")
 
-# Test HTTP GET (using a simple service that echoes back)
-print("Testing HTTP GET...")
-string response = io.http_get("https://httpbin.org/get")
+# 1. Test URL parsing
+print("\n1. URL Parsing:")
+url = "https://httpbin.org/headers"
+parsed = net.parse_url(url)
+print("URL: " + url)
+print("Protocol: " + parsed["protocol"])
+print("Host: " + parsed["host"])
+print("Path: " + parsed["path"])
+
+# 2. Test URL encoding
+print("\n2. URL Encoding:")
+query = "hello world"
+encoded = net.encode_url(query)
+print("Original: " + query)
+print("Encoded: " + encoded)
+
+# 3. Test HTTP GET request
+print("\n3. HTTP GET Request:")
+print("Fetching IP address...")
+ip_response = net.http_get("https://httpbin.org/ip")
 print("✅ HTTP GET successful")
-print("Response length: " + response.length().to_string() + " chars")
+print("Response:")
+print(ip_response)
 
-# Test file download  
-print("\nTesting file download...")
-io.download_file("https://httpbin.org/robots.txt", "downloaded_robots.txt")
-if io.exists("downloaded_robots.txt") {
-    string content = io.read_file("downloaded_robots.txt")
-    print("✅ File downloaded successfully")
-    print("Content preview: " + content)
-    io.remove_file("downloaded_robots.txt")
-    print("✅ Cleanup completed")
+# 4. Test HTTP GET with user agent
+print("\n4. HTTP GET - User Agent:")
+print("Fetching user agent info...")
+agent_response = net.http_get("https://httpbin.org/user-agent")
+print("✅ User agent request successful")
+print("Response:")
+print(agent_response)
+
+# 5. Test file download (if available)
+print("\n5. File Download:")
+print("Downloading robots.txt...")
+download_success = net.download_file("https://httpbin.org/robots.txt", "downloaded_robots.txt")
+if download_success {
+    if io.exists("downloaded_robots.txt") {
+        content = io.read_file("downloaded_robots.txt")
+        print("✅ File downloaded successfully")
+        print("Content preview: " + content)
+        io.remove_file("downloaded_robots.txt")
+        print("✅ Cleanup completed")
+    }
+} else {
+    print("⚠️  File download not available or failed")
 }
 
-# Test HTTP POST (with simple data)
-print("\nTesting HTTP POST...")
-string post_response = io.http_post("https://httpbin.org/post", "test_data=hello_from_glang")
-print("✅ HTTP POST successful")
-print("Response length: " + post_response.length().to_string() + " chars")
-
-print("\n✨ Network I/O demo completed!")
+print("\n✨ Network library demo completed!")
+print("\nThe network library provides:")
+print("- HTTP GET/POST requests")
+print("- URL parsing and encoding")
+print("- File download capabilities")
+print("- Full HTTP request control with headers")

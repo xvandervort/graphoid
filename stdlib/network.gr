@@ -1,0 +1,77 @@
+# Network Library for Glang
+# Provides HTTP client functionality and URL utilities
+
+module network
+
+# URL parsing function
+func parse_url(url) {
+    # Check for protocol
+    if url.contains("://") == false {
+        return { "error": "Invalid URL: missing protocol" }
+    }
+
+    # Split protocol and rest
+    protocol_parts = url.split("://")
+    if protocol_parts.size() != 2 {
+        return { "error": "Invalid URL format" }
+    }
+
+    protocol = protocol_parts[0]
+    rest = protocol_parts[1]
+
+    # Split host and path
+    path_parts = rest.split("/")
+    host = path_parts[0]
+
+    # Reconstruct path
+    path = "/"
+    if path_parts.size() > 1 {
+        path_segments = []
+        i = 1
+        while i < path_parts.size() {
+            path_segments.append(path_parts[i])
+            i = i + 1
+        }
+        if path_segments.size() > 0 {
+            path = "/" + "/".join(path_segments)
+        }
+    }
+
+    return {
+        "protocol": protocol,
+        "host": host,
+        "path": path,
+        "url": url
+    }
+}
+
+# URL encoding function
+func encode_url(text) {
+    # Basic URL encoding - just spaces for now
+    result = text.replace(" ", "%20")
+    return result
+}
+
+# For now, HTTP functionality will use Python module
+# until we implement native HTTP client
+import "http" as http_python
+
+# HTTP GET wrapper
+func http_get(url) {
+    return http_python.http_get(url)
+}
+
+# HTTP POST wrapper
+func http_post(url, post_data) {
+    return http_python.http_post(url, post_data)
+}
+
+# Full HTTP request wrapper
+func http_request(method, url, post_data, request_headers) {
+    return http_python.http_request(method, url, post_data, request_headers)
+}
+
+# Download file wrapper
+func download_file(url, filepath) {
+    return http_python.download_file(url, filepath)
+}

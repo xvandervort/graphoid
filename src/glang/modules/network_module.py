@@ -113,19 +113,20 @@ class NetworkModule:
         response = provider.http_request(method.value.upper(), url.value, post_data, request_headers)
         
         # Build response hash using Glang's hash construction
-        response_pairs = {}
-        response_pairs["status"] = DataValue("status", NumberValue(response.status_code, position), position)
-        response_pairs["body"] = DataValue("body", StringValue(response.body, position), position)
-        response_pairs["success"] = DataValue("success", BooleanValue(200 <= response.status_code < 300, position), position)
-        
+        response_pairs = [
+            ("status", DataValue("status", NumberValue(response.status_code, position), position)),
+            ("body", DataValue("body", StringValue(response.body, position), position)),
+            ("success", DataValue("success", BooleanValue(200 <= response.status_code < 300, position), position))
+        ]
+
         # Add headers as nested hash
         if response.headers:
-            header_pairs = {}
+            header_pairs = []
             for key, value in response.headers.items():
-                header_pairs[key] = DataValue(key, StringValue(value, position), position)
+                header_pairs.append((key, DataValue(key, StringValue(value, position), position)))
             headers_hash = HashValue(header_pairs, position)
-            response_pairs["headers"] = DataValue("headers", headers_hash, position)
-        
+            response_pairs.append(("headers", DataValue("headers", headers_hash, position)))
+
         return HashValue(response_pairs, position)
     
     @staticmethod
@@ -190,12 +191,13 @@ class NetworkModule:
             path = StringValue("/", position)
         
         # Build result hash using Glang construction
-        result_pairs = {}
-        result_pairs["protocol"] = DataValue("protocol", protocol, position)
-        result_pairs["host"] = DataValue("host", host, position)
-        result_pairs["path"] = DataValue("path", path, position)
-        result_pairs["url"] = DataValue("url", url, position)
-        
+        result_pairs = [
+            ("protocol", DataValue("protocol", protocol, position)),
+            ("host", DataValue("host", host, position)),
+            ("path", DataValue("path", path, position)),
+            ("url", DataValue("url", url, position))
+        ]
+
         return HashValue(result_pairs, position)
     
     @staticmethod
@@ -209,13 +211,14 @@ class NetworkModule:
         text = data.value
         
         # Replace common characters that need encoding
+        # IMPORTANT: % must be replaced first to avoid double-encoding
         replacements = [
+            ("%", "%25"),
             (" ", "%20"),
             ("!", "%21"),
             ("\"", "%22"),
             ("#", "%23"),
             ("$", "%24"),
-            ("%", "%25"),
             ("&", "%26"),
             ("'", "%27"),
             ("(", "%28"),
@@ -247,27 +250,27 @@ def create_network_module() -> 'ModuleNamespace':
     """Create the network module namespace with all functions."""
     from ..modules.module_manager import ModuleNamespace
     from ..execution.function_value import BuiltinFunctionValue
-    
+
     namespace = ModuleNamespace("network")
-    
+
     # Network functions organized by category
     network_functions = {
         # Basic HTTP operations
         'http_get': NetworkModule.http_get,
         'http_post': NetworkModule.http_post,
         'http_request': NetworkModule.http_request_full,
-        
+
         # File operations
         'download_file': NetworkModule.download_file,
-        
+
         # URL utilities (more Glang-native)
         'url_parse': NetworkModule.url_parse,
         'url_encode': NetworkModule.url_encode,
     }
-    
+
     # Wrap functions as callable values
     for name, func in network_functions.items():
         wrapped_func = BuiltinFunctionValue(name, func)
-        namespace.define(name, wrapped_func)
-    
+        namespace.set_symbol(name, wrapped_func, export=True)
+
     return namespace
