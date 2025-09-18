@@ -5,8 +5,9 @@ from unittest.mock import patch, Mock
 
 from glang.modules.crypto_module import CryptoModule
 from glang.execution.values import (
-    StringValue, NumberValue, BooleanValue, NoneValue, ListValue, HashValue, DataValue
+    StringValue, NumberValue, BooleanValue, NoneValue, DataValue
 )
+from glang.execution.graph_values import ListValue, HashValue
 from glang.modules.errors import ModuleError
 
 

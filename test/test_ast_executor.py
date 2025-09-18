@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../src'))
 
 from glang.execution.executor import ASTExecutor, ExecutionContext
 from glang.execution.values import *
+from glang.execution.graph_values import ListValue, HashValue
 from glang.execution.errors import *
 from glang.semantic.symbol_table import SymbolTable, Symbol
 from glang.ast.nodes import *
@@ -88,6 +89,7 @@ class TestASTExecutor:
         list_node = ListLiteral(elements, SourcePosition(1, 1))
         result = self.executor.execute(list_node)
         
+        # Using graph-based ListValue implementation
         assert isinstance(result, ListValue)
         assert len(result) == 3
         assert result.elements[0].value == 1
@@ -142,6 +144,7 @@ class TestASTExecutor:
         
         # Check that constraint was set
         stored_value = self.context.get_variable("numbers")
+        # Using graph-based ListValue implementation
         assert isinstance(stored_value, ListValue)
         assert stored_value.constraint == "num"
         assert len(stored_value) == 3
@@ -277,6 +280,7 @@ class TestASTExecutor:
         
         assert result == "Declared list variable 'items' (inferred)"
         created_value = self.context.get_variable("items")
+        # Using graph-based ListValue implementation
         assert isinstance(created_value, ListValue)
         assert len(created_value.elements) == 2
         assert created_value.get_type() == "list"

@@ -10,7 +10,8 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 from pathlib import Path
 
-from ..execution.values import GlangValue, StringValue, BooleanValue, NumberValue, ListValue
+from ..execution.values import GlangValue, StringValue, BooleanValue, NumberValue
+from ..execution.graph_values import ListValue
 from ..ast.nodes import SourcePosition
 
 

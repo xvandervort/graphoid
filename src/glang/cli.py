@@ -102,7 +102,8 @@ def execute_file(file_path: str, program_args: list, verbose: bool, check_syntax
         session = ExecutionSession(file_manager)
         
         # Set up program arguments (make them available as 'args' variable)
-        from glang.execution.values import ListValue, StringValue
+        from glang.execution.values import StringValue
+        from glang.execution.graph_values import ListValue
         args_list = ListValue([StringValue(arg, None) for arg in program_args], None, None)
         session.execution_context.set_variable('args', args_list)
         

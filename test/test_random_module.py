@@ -2,7 +2,8 @@
 
 import pytest
 from glang.modules.random_module import RandomModule, create_random_module_namespace
-from glang.execution.values import StringValue, NumberValue, ListValue, NoneValue
+from glang.execution.values import StringValue, NumberValue, NoneValue
+from glang.execution.graph_values import ListValue, HashValue
 from glang.ast.nodes import SourcePosition
 
 

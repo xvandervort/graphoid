@@ -5,7 +5,8 @@ attached to lists, hashes, and eventually graph nodes.
 """
 
 from typing import Any, Dict, List, Optional, Callable, Union
-from .execution.values import GlangValue, ListValue, HashValue, NumberValue, StringValue, BooleanValue, NoneValue
+from .execution.values import GlangValue, NumberValue, StringValue, BooleanValue, NoneValue
+from .execution.graph_values import ListValue, HashValue
 
 
 class Behavior:
@@ -173,12 +174,12 @@ class BehaviorPipeline:
     
     def apply_to_hash_value(self, hash_val: HashValue, key: str) -> GlangValue:
         """Apply behaviors to a specific hash value."""
-        current_value = hash_val.pairs.get(key)
+        current_value = hash_val.get(key)
         if current_value is not None:
             # Apply behaviors to the value
             new_value = self.apply(current_value)
             # Update the hash with the new value
-            hash_val.pairs.set(key, new_value)
+            hash_val[key] = new_value
             return new_value
         return NoneValue()
 

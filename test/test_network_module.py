@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import Mock, patch
 from glang.modules.network_module import NetworkModule
-from glang.execution.values import StringValue, HashValue, ListValue, NumberValue, BooleanValue, DataValue
+from glang.execution.values import StringValue, NumberValue, BooleanValue, DataValue
 from glang.modules.network_interface import NetworkResponse
 
 

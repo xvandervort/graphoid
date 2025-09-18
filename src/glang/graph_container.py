@@ -111,7 +111,8 @@ class GraphContainer:
 
     def get_rules(self) -> 'ListValue':
         """Get list of all behavior rules as strings."""
-        from .execution.values import StringValue, ListValue
+        from .execution.values import StringValue
+        from .execution.graph_values import ListValue
         rule_names = [StringValue(name) for name in sorted(self._behavior_names)]
         return ListValue(rule_names, "string")
 

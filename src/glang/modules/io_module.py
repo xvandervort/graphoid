@@ -10,9 +10,10 @@ from typing import Optional, List
 from .network_interface import get_network_provider
 
 from ..execution.values import (
-    GlangValue, StringValue, BooleanValue, NumberValue, 
-    ListValue, DataValue, HashValue, FileHandleValue
+    GlangValue, StringValue, BooleanValue, NumberValue,
+    DataValue, FileHandleValue
 )
+from ..execution.graph_values import ListValue, HashValue
 from ..execution.errors import RuntimeError
 from ..ast.nodes import SourcePosition
 from .filesystem_interface import get_filesystem

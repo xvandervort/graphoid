@@ -8,7 +8,8 @@ for different backends and maintains Glang's language independence.
 
 from abc import ABC, abstractmethod
 from typing import Dict, Optional, List, Tuple
-from ..execution.values import GlangValue, StringValue, BooleanValue, NumberValue, ListValue
+from ..execution.values import GlangValue, StringValue, BooleanValue, NumberValue
+from ..execution.graph_values import ListValue
 from ..ast.nodes import SourcePosition
 
 

@@ -2,9 +2,10 @@
 
 import pytest
 from glang.execution.values import (
-    ListValue, HashValue, NumberValue, StringValue,
+    NumberValue, StringValue,
     BooleanValue, NoneValue, SymbolValue
 )
+from glang.execution.graph_values import ListValue, HashValue
 from glang.behaviors import registry
 
 

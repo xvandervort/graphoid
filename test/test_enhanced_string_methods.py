@@ -1,7 +1,8 @@
 """Test enhanced string methods functionality."""
 
 import pytest
-from glang.execution.values import StringValue, BooleanValue, ListValue
+from glang.execution.values import StringValue, BooleanValue
+from glang.execution.graph_values import ListValue, HashValue
 from glang.execution.executor import ASTExecutor, ExecutionContext
 from glang.semantic.analyzer import SemanticAnalyzer
 from glang.semantic.symbol_table import SymbolTable

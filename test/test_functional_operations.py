@@ -2,7 +2,8 @@
 
 import pytest
 from glang.execution.pipeline import ExecutionSession
-from glang.execution.values import ListValue, NumberValue, StringValue, BooleanValue
+from glang.execution.values import NumberValue, StringValue, BooleanValue
+from glang.execution.graph_values import ListValue, HashValue
 
 
 class TestListMapMethod:

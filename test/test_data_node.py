@@ -10,7 +10,8 @@ from glang.parser.ast_parser import ASTParser
 from glang.ast.nodes import DataNodeLiteral, StringLiteral, NumberLiteral
 from glang.semantic.analyzer import SemanticAnalyzer
 from glang.execution.executor import ExecutionContext, ASTExecutor
-from glang.execution.values import DataValue, StringValue, NumberValue, ListValue
+from glang.execution.values import DataValue, StringValue, NumberValue
+from glang.execution.graph_values import ListValue, HashValue
 from glang.semantic.symbol_table import SymbolTable
 
 

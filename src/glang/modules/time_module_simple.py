@@ -12,9 +12,10 @@ from typing import Optional, Any, Dict, List, Union
 from decimal import Decimal
 
 from ..execution.values import (
-    GlangValue, StringValue, BooleanValue, NumberValue, 
-    ListValue, DataValue, HashValue, NoneValue, TimeValue
+    GlangValue, StringValue, BooleanValue, NumberValue,
+    DataValue, NoneValue, TimeValue
 )
+from ..execution.graph_values import ListValue, HashValue
 from ..execution.errors import RuntimeError
 from ..execution.glang_number import PrecisionGlangNumber, create_glang_number, GlangNumber
 from ..ast.nodes import SourcePosition

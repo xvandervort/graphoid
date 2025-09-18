@@ -7,8 +7,9 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../src'))
 
 from glang.execution.values import (
-    StringValue, NumberValue, BooleanValue, ListValue, DataValue, HashValue
+    StringValue, NumberValue, BooleanValue, DataValue
 )
+from glang.execution.graph_values import ListValue, HashValue
 from glang.execution.executor import ASTExecutor, ExecutionContext
 from glang.execution.errors import RuntimeError as GlangRuntimeError
 from glang.semantic.analyzer import SemanticAnalyzer
@@ -202,7 +203,7 @@ class TestMapFreezingAndContamination:
         assert map_val.contains_frozen_data()
         
         # All values should be frozen (deep freeze)
-        for value in map_val.pairs.values():
+        for value in map_val.values():
             assert value.is_frozen_value()
     
     def test_map_contamination_from_values(self):
@@ -220,10 +221,10 @@ class TestMapFreezingAndContamination:
         map_val = HashValue(pairs)
         map_val.freeze()
         
-        with pytest.raises(GlangRuntimeError, match="Cannot set key: value is frozen"):
+        with pytest.raises(GlangRuntimeError, match="Cannot set: value is frozen"):
             map_val.set("age", NumberValue(25))
-        
-        with pytest.raises(GlangRuntimeError, match="Cannot remove key: value is frozen"):
+
+        with pytest.raises(GlangRuntimeError, match="Cannot remove: value is frozen"):
             map_val.remove("name")
     
     def test_map_contamination_prevents_mixing(self):
@@ -246,14 +247,14 @@ class TestMapFreezingAndContamination:
         map_val = HashValue(pairs)
         
         # Should accept unfrozen value
-        can_accept, msg = map_val.can_accept_value(StringValue("Bob"))
+        can_accept, msg = map_val.can_accept_element(StringValue("Bob"))
         assert can_accept
         assert msg == ""
-        
+
         # Should reject frozen value due to contamination
         frozen_value = StringValue("frozen")
         frozen_value.freeze()
-        can_accept, msg = map_val.can_accept_value(frozen_value)
+        can_accept, msg = map_val.can_accept_element(frozen_value)
         assert not can_accept
         assert "cannot mix frozen and unfrozen data" in msg.lower()
 

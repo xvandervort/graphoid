@@ -9,9 +9,10 @@ from typing import Optional, Any, Dict, List, Union
 from pathlib import Path
 
 from ..execution.values import (
-    GlangValue, StringValue, BooleanValue, NumberValue, 
-    ListValue, DataValue, HashValue, NoneValue
+    GlangValue, StringValue, BooleanValue, NumberValue,
+    DataValue, NoneValue
 )
+from ..execution.graph_values import ListValue, HashValue
 from ..execution.errors import RuntimeError
 from ..ast.nodes import SourcePosition
 
@@ -96,12 +97,19 @@ class JSONModule:
             return value.value
         elif isinstance(value, NoneValue):
             return None
-        elif isinstance(value, ListValue):
+        elif isinstance(value, (ListValue, ListValue)):
             return [JSONModule._glang_to_python(item, position) for item in value.elements]
         elif isinstance(value, HashValue):
             # Convert hash/map to dictionary
             result = {}
             for key, glang_value in value.pairs.items():
+                json_value = JSONModule._glang_to_python(glang_value, position)
+                result[key] = json_value
+            return result
+        elif isinstance(value, HashValue):
+            # Convert graph hash to dictionary
+            result = {}
+            for key, glang_value in value.items():
                 json_value = JSONModule._glang_to_python(glang_value, position)
                 result[key] = json_value
             return result

@@ -18,6 +18,8 @@ from glang.semantic.symbol_table import SymbolTable
 from .values import *
 from .errors import RuntimeError, VariableNotFoundError, TypeConstraintError
 from .stack_trace import get_stack_collector, create_enhanced_error_trace, push_execution_frame, pop_execution_frame, update_frame_variables
+# Graph-based ListValue and HashValue are now the primary implementations
+from .graph_values import ListValue, HashValue
 from .configuration_context import ConfigurationContext
 
 
@@ -245,7 +247,7 @@ class ASTExecutor(BaseASTVisitor):
                     node.target.indices[0].position
                 )
             
-            target_value.set_element(index_value.value, value)
+            target_value[index_value.value] = value
             self.result = f"Set {node.target.target.name}[{index_value.value}] = {value.to_display_string()}"
         
         elif isinstance(node.target, (MethodCall, MethodCallExpression)):
@@ -490,14 +492,23 @@ class ASTExecutor(BaseASTVisitor):
         
         index_value = self.execute(node.indices[0])
         
-        # Handle list indexing
-        if isinstance(target_value, ListValue):
+        # Handle list indexing (both old and new implementations)
+        # Using already imported ListValue, HashValue
+        if isinstance(target_value, (ListValue, ListValue)):
             if not isinstance(index_value, NumberValue) or not isinstance(index_value.value, int):
                 raise RuntimeError(
                     f"List index must be integer, got {index_value.get_type()}",
                     node.indices[0].position
                 )
-            self.result = target_value.get_element(index_value.value)
+            # Use the appropriate method based on the implementation
+            if hasattr(target_value, 'get_element'):
+                self.result = target_value.get_element(index_value.value)
+            else:
+                # ListValue uses get_at_index
+                result = target_value.get_at_index(index_value.value)
+                if result is None:
+                    raise RuntimeError(f"Index {index_value.value} out of range", node.indices[0].position)
+                self.result = result
         
         # Handle string indexing
         elif isinstance(target_value, StringValue):
@@ -514,8 +525,8 @@ class ASTExecutor(BaseASTVisitor):
             except IndexError as e:
                 raise RuntimeError(str(e), node.indices[0].position)
         
-        # Handle hash indexing - returns data node, not raw value
-        elif isinstance(target_value, HashValue):
+        # Handle hash indexing - returns data node, not raw value (both old and new implementations)
+        elif isinstance(target_value, (HashValue, HashValue)):
             if not isinstance(index_value, StringValue):
                 raise RuntimeError(
                     f"Hash index must be string, got {index_value.get_type()}",
@@ -667,12 +678,12 @@ class ASTExecutor(BaseASTVisitor):
 
         # Type-specific methods
         type_methods = {
-            'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort', 'map', 'filter', 'select', 'reject', 'each', 'clear', 'empty', 'pop', 'remove', 'constraint', 'types', 'type_summary', 'validate_constraint', 'coerce_to_constraint', 'to_string', 'to_bool', 'can_accept'] + behavior_methods,
+            'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort', 'map', 'filter', 'select', 'reject', 'each', 'clear', 'empty', 'pop', 'remove', 'constraint', 'types', 'type_summary', 'validate_constraint', 'coerce_to_constraint', 'to_string', 'to_bool', 'can_accept', 'add_edge', 'get_connected_to', 'to_graph'] + behavior_methods,
             'string': ['length', 'contains', 'extract', 'count', 'count_chars', 'find_first', 'find_first_char', 'up', 'toUpper', 'down', 'toLower', 'split', 'split_on_any', 'trim', 'join', 'matches', 'replace', 'find_all', 'findAll', 'is_email', 'is_number', 'is_url', 'reverse', 'unique', 'chars', 'starts_with', 'ends_with', 'to_string', 'to_num', 'to_bool', 'to_time'],
             'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time'],
             'bool': ['flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'],
             'data': ['key', 'value', 'can_accept'],
-            'hash': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept', 'to_string', 'to_bool'] + behavior_methods,
+            'hash': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept', 'to_string', 'to_bool', 'add_value_edge', 'get_connected_keys'] + behavior_methods,
             'time': ['get_type', 'to_string', 'to_num']
         }
         
@@ -1078,7 +1089,59 @@ class ASTExecutor(BaseASTVisitor):
                 return BooleanValue(True, position)
             else:
                 return StringValue(message, position)
-        
+
+        # Graph-specific methods (for ListValue)
+        elif method_name == "add_edge":
+            if len(args) < 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"add_edge() takes at least 2 arguments (from_index, to_index), got {len(args)}", position)
+
+            from_index = args[0]
+            to_index = args[1]
+            relationship = args[2] if len(args) > 2 else StringValue("related")
+
+            # Validate arguments
+            if not isinstance(from_index, NumberValue) or not isinstance(to_index, NumberValue):
+                raise RuntimeError("add_edge() requires numeric indices", position)
+            if not isinstance(relationship, StringValue):
+                raise RuntimeError("add_edge() relationship must be a string", position)
+
+            # Call the graph method
+            success = target.add_edge(int(from_index.value), int(to_index.value), relationship.value)
+            return BooleanValue(success, position)
+
+        elif method_name == "get_connected_to":
+            if len(args) < 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_connected_to() takes at least 1 argument (index), got {len(args)}", position)
+
+            index = args[0]
+            relationship = args[1] if len(args) > 1 else StringValue("related")
+
+            # Validate arguments
+            if not isinstance(index, NumberValue):
+                raise RuntimeError("get_connected_to() requires a numeric index", position)
+            if not isinstance(relationship, StringValue):
+                raise RuntimeError("get_connected_to() relationship must be a string", position)
+
+            # Call the graph method and return indices as a list
+            connected_indices = target.get_connected_to(int(index.value), relationship.value)
+            index_values = [NumberValue(idx) for idx in connected_indices]
+            return ListValue(index_values, "num", position)
+
+        elif method_name == "to_graph":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_graph() takes exactly 1 argument (pattern), got {len(args)}", position)
+
+            pattern = args[0]
+            if not isinstance(pattern, StringValue):
+                raise RuntimeError("to_graph() pattern must be a string", position)
+
+            # Call the graph method
+            result_graph = target.to_graph(pattern.value)
+            return result_graph
+
         # Behavior management methods (from GraphContainer mixin)
         elif method_name == "add_rule":
             if len(args) < 1:
@@ -1317,7 +1380,8 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"join() takes 1 argument, got {len(args)}", position)
             
-            if not isinstance(args[0], ListValue):
+            # Using already imported ListValue
+            if not isinstance(args[0], (ListValue, ListValue)):
                 from .errors import ArgumentError
                 raise ArgumentError(f"join() argument must be list, got {args[0].get_type()}", position)
             
@@ -2094,7 +2158,8 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"merge() takes 1 argument, got {len(args)}", position)
             
             other_map = args[0]
-            if not isinstance(other_map, HashValue):
+            # Using already imported HashValue
+            if not isinstance(other_map, (HashValue, HashValue)):
                 from .errors import ArgumentError
                 raise ArgumentError(f"merge() requires a hash argument, got {other_map.get_type()}", position)
             
@@ -2201,6 +2266,45 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"to_bool() takes no arguments, got {len(args)}", position)
             # Non-empty hash is true, empty is false
             return BooleanValue(len(target.pairs) > 0, position)
+
+        # Graph-specific methods (for HashValue)
+        elif method_name == "add_value_edge":
+            if len(args) < 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"add_value_edge() takes at least 2 arguments (from_key, to_key), got {len(args)}", position)
+
+            from_key = args[0]
+            to_key = args[1]
+            relationship = args[2] if len(args) > 2 else StringValue("related")
+
+            # Validate arguments
+            if not isinstance(from_key, StringValue) or not isinstance(to_key, StringValue):
+                raise RuntimeError("add_value_edge() requires string keys", position)
+            if not isinstance(relationship, StringValue):
+                raise RuntimeError("add_value_edge() relationship must be a string", position)
+
+            # Call the graph method
+            success = target.add_value_edge(from_key.value, to_key.value, relationship.value)
+            return BooleanValue(success, position)
+
+        elif method_name == "get_connected_keys":
+            if len(args) < 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_connected_keys() takes at least 1 argument (key), got {len(args)}", position)
+
+            key = args[0]
+            relationship = args[1] if len(args) > 1 else StringValue("related")
+
+            # Validate arguments
+            if not isinstance(key, StringValue):
+                raise RuntimeError("get_connected_keys() requires a string key", position)
+            if not isinstance(relationship, StringValue):
+                raise RuntimeError("get_connected_keys() relationship must be a string", position)
+
+            # Call the graph method and return keys as a list
+            connected_keys = target.get_connected_keys(key.value, relationship.value)
+            key_values = [StringValue(k) for k in connected_keys]
+            return ListValue(key_values, "string", position)
 
         # Behavior management methods (from GraphContainer mixin)
         elif method_name == "add_rule":
@@ -2450,35 +2554,42 @@ class ASTExecutor(BaseASTVisitor):
     
     def visit_index_assignment(self, node) -> None:
         """Visit an index assignment - delegate to assignment logic."""
+        # Import graph values for isinstance checks
+        # Using already imported ListValue, HashValue
+
         # Use the same logic as assignment but for index targets
         value = self.execute(node.value)
-        
+
         if not isinstance(value, GlangValue):
             value = python_to_glang_value(value, node.position)
-        
+
         target_value = self.execute(node.target.target)
-        
+
         if len(node.target.indices) != 1:
             raise RuntimeError(
-                f"Multi-dimensional indexing not yet supported", 
+                f"Multi-dimensional indexing not yet supported",
                 node.target.position
             )
-        
+
         index_value = self.execute(node.target.indices[0])
-        
-        # Handle list index assignment
-        if isinstance(target_value, ListValue):
+
+        # Handle list index assignment (both old and new implementations)
+        if isinstance(target_value, (ListValue, ListValue)):
             if not isinstance(index_value, NumberValue) or not isinstance(index_value.value, int):
                 raise RuntimeError(
                     f"List index must be integer, got {index_value.get_type()}",
                     node.target.indices[0].position
                 )
-            
-            target_value.set_element(index_value.value, value)
+
+            # Use graph-based ListValue implementation
+            try:
+                target_value[index_value.value] = value
+            except (IndexError, TypeError) as e:
+                raise RuntimeError(f"Index {index_value.value} out of range", node.target.indices[0].position)
             self.result = f"Set {node.target.target.name}[{index_value.value}] = {value.to_display_string()}"
-        
-        # Handle hash index assignment - creates/updates data node
-        elif isinstance(target_value, HashValue):
+
+        # Handle hash index assignment - creates/updates data node (both old and new implementations)
+        elif isinstance(target_value, (HashValue, HashValue)):
             if not isinstance(index_value, StringValue):
                 raise RuntimeError(
                     f"Hash index must be string, got {index_value.get_type()}",
@@ -2529,8 +2640,8 @@ class ASTExecutor(BaseASTVisitor):
             sliced = string_val[start_val:stop_val:step_val]
             self.result = StringValue(sliced, node.position)
         
-        # Handle list slicing
-        elif isinstance(target_value, ListValue):
+        # Handle list slicing (both old and new implementations)
+        elif isinstance(target_value, (ListValue, ListValue)):
             elements = target_value.elements
             sliced_elements = elements[start_val:stop_val:step_val]
             self.result = ListValue(sliced_elements, target_value.constraint, node.position)
@@ -2756,6 +2867,9 @@ class ASTExecutor(BaseASTVisitor):
     
     def perform_addition(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform addition operation."""
+        # Import graph values for isinstance checks
+        from .graph_values import ListValue
+
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
             result = left.add(right)
             # Apply decimal_places configuration if set
@@ -2766,7 +2880,7 @@ class ASTExecutor(BaseASTVisitor):
             return result
         elif isinstance(left, StringValue) and isinstance(right, StringValue):
             return left.concatenate(right)
-        elif isinstance(left, ListValue) and isinstance(right, ListValue):
+        elif isinstance(left, (ListValue, ListValue)) and isinstance(right, (ListValue, ListValue)):
             # List concatenation/union - combine all elements
             combined_elements = left.elements + right.elements
             # Use the constraint from the left list (or None if both have different constraints)
@@ -2778,6 +2892,9 @@ class ASTExecutor(BaseASTVisitor):
     
     def perform_subtraction(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform subtraction operation."""
+        # Import graph values for isinstance checks
+        from .graph_values import ListValue
+
         if isinstance(left, NumberValue) and isinstance(right, NumberValue):
             result = left.subtract(right)
             # Apply decimal_places configuration if set
@@ -2786,7 +2903,7 @@ class ASTExecutor(BaseASTVisitor):
                 rounded_value = round(result.value, decimal_places)
                 return NumberValue(rounded_value, result.position)
             return result
-        elif isinstance(left, ListValue) and isinstance(right, ListValue):
+        elif isinstance(left, (ListValue, ListValue)) and isinstance(right, (ListValue, ListValue)):
             # List set difference - remove elements from left that are in right
             result_elements = []
             for element in left.elements:
@@ -2838,15 +2955,16 @@ class ASTExecutor(BaseASTVisitor):
     
     def perform_intersection(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform intersection operation."""
-        if isinstance(left, ListValue) and isinstance(right, ListValue):
+        from .graph_values import ListValue
+        if isinstance(left, (ListValue, ListValue)) and isinstance(right, (ListValue, ListValue)):
             # List intersection - keep elements that appear in both lists
             result_elements = []
-            # Create a temporary ListValue to check for duplicates in result
+            # Create a temporary list to check for duplicates in result
             result_list = ListValue([], left.constraint, left.position)
             for element in left.elements:
                 if right.contains(element) and not result_list.contains(element):
                     result_elements.append(element)
-                    result_list.elements.append(element)
+                    result_list.append(element)  # Use append method for both types
             return ListValue(result_elements, left.constraint, left.position)
         else:
             raise RuntimeError(f"Cannot perform intersection on {left.get_type()} and {right.get_type()}")
@@ -2901,7 +3019,10 @@ class ASTExecutor(BaseASTVisitor):
     
     def perform_elementwise_addition(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform element-wise addition using +. operator."""
-        if isinstance(left, ListValue) and isinstance(right, ListValue):
+        # Import graph values for isinstance checks
+        from .graph_values import ListValue
+
+        if isinstance(left, (ListValue, ListValue)) and isinstance(right, (ListValue, ListValue)):
             if not self._is_numeric_list(left) or not self._is_numeric_list(right):
                 raise RuntimeError("Element-wise addition requires numeric lists")
             if len(left.elements) != len(right.elements):
@@ -2916,7 +3037,7 @@ class ASTExecutor(BaseASTVisitor):
                 else:
                     raise RuntimeError("Element-wise addition requires all elements to be numbers")
             return ListValue(result_elements, "num", left.position)
-        elif isinstance(left, ListValue) and isinstance(right, NumberValue):
+        elif isinstance(left, (ListValue, ListValue)) and isinstance(right, NumberValue):
             # List-scalar element-wise addition
             if not self._is_numeric_list(left):
                 raise RuntimeError(f"Cannot perform element-wise addition on list of {left.constraint or 'mixed types'}")
@@ -2928,7 +3049,7 @@ class ASTExecutor(BaseASTVisitor):
                 else:
                     raise RuntimeError("Cannot add number to non-numeric list element")
             return ListValue(result_elements, "num", left.position)
-        elif isinstance(left, NumberValue) and isinstance(right, ListValue):
+        elif isinstance(left, NumberValue) and isinstance(right, (ListValue, ListValue)):
             # Scalar-list element-wise addition
             if not self._is_numeric_list(right):
                 raise RuntimeError(f"Cannot perform element-wise addition on list of {right.constraint or 'mixed types'}")
@@ -2945,7 +3066,10 @@ class ASTExecutor(BaseASTVisitor):
     
     def perform_elementwise_subtraction(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform element-wise subtraction using -. operator."""
-        if isinstance(left, ListValue) and isinstance(right, ListValue):
+        # Import graph values for isinstance checks
+        from .graph_values import ListValue
+
+        if isinstance(left, (ListValue, ListValue)) and isinstance(right, (ListValue, ListValue)):
             if not self._is_numeric_list(left) or not self._is_numeric_list(right):
                 raise RuntimeError("Element-wise subtraction requires numeric lists")
             if len(left.elements) != len(right.elements):
@@ -2960,7 +3084,7 @@ class ASTExecutor(BaseASTVisitor):
                 else:
                     raise RuntimeError("Element-wise subtraction requires all elements to be numbers")
             return ListValue(result_elements, "num", left.position)
-        elif isinstance(left, ListValue) and isinstance(right, NumberValue):
+        elif isinstance(left, (ListValue, ListValue)) and isinstance(right, NumberValue):
             # List-scalar element-wise subtraction
             if not self._is_numeric_list(left):
                 raise RuntimeError(f"Cannot perform element-wise subtraction on list of {left.constraint or 'mixed types'}")
@@ -2972,7 +3096,7 @@ class ASTExecutor(BaseASTVisitor):
                 else:
                     raise RuntimeError("Cannot subtract number from non-numeric list element")
             return ListValue(result_elements, "num", left.position)
-        elif isinstance(left, NumberValue) and isinstance(right, ListValue):
+        elif isinstance(left, NumberValue) and isinstance(right, (ListValue, ListValue)):
             # Scalar-list element-wise subtraction
             if not self._is_numeric_list(right):
                 raise RuntimeError(f"Cannot perform element-wise subtraction on list of {right.constraint or 'mixed types'}")
@@ -2989,7 +3113,10 @@ class ASTExecutor(BaseASTVisitor):
     
     def perform_elementwise_multiplication(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform element-wise multiplication using *. operator."""
-        if isinstance(left, ListValue) and isinstance(right, ListValue):
+        # Import graph values for isinstance checks
+        from .graph_values import ListValue
+
+        if isinstance(left, (ListValue, ListValue)) and isinstance(right, (ListValue, ListValue)):
             if not self._is_numeric_list(left) or not self._is_numeric_list(right):
                 raise RuntimeError("Element-wise multiplication requires numeric lists")
             if len(left.elements) != len(right.elements):
@@ -3004,7 +3131,7 @@ class ASTExecutor(BaseASTVisitor):
                 else:
                     raise RuntimeError("Element-wise multiplication requires all elements to be numbers")
             return ListValue(result_elements, "num", left.position)
-        elif isinstance(left, ListValue) and isinstance(right, NumberValue):
+        elif isinstance(left, (ListValue, ListValue)) and isinstance(right, NumberValue):
             # List-scalar element-wise multiplication
             if not self._is_numeric_list(left):
                 raise RuntimeError(f"Cannot perform element-wise multiplication on list of {left.constraint or 'mixed types'}")
@@ -3016,7 +3143,7 @@ class ASTExecutor(BaseASTVisitor):
                 else:
                     raise RuntimeError("Cannot multiply non-numeric list element with number")
             return ListValue(result_elements, "num", left.position)
-        elif isinstance(left, NumberValue) and isinstance(right, ListValue):
+        elif isinstance(left, NumberValue) and isinstance(right, (ListValue, ListValue)):
             # Scalar-list element-wise multiplication
             if not self._is_numeric_list(right):
                 raise RuntimeError(f"Cannot perform element-wise multiplication on list of {right.constraint or 'mixed types'}")
@@ -3033,7 +3160,10 @@ class ASTExecutor(BaseASTVisitor):
     
     def perform_elementwise_division(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform element-wise division using /. operator."""
-        if isinstance(left, ListValue) and isinstance(right, ListValue):
+        # Import graph values for isinstance checks
+        from .graph_values import ListValue
+
+        if isinstance(left, (ListValue, ListValue)) and isinstance(right, (ListValue, ListValue)):
             if not self._is_numeric_list(left) or not self._is_numeric_list(right):
                 raise RuntimeError("Element-wise division requires numeric lists")
             if len(left.elements) != len(right.elements):
@@ -3050,7 +3180,7 @@ class ASTExecutor(BaseASTVisitor):
                 else:
                     raise RuntimeError("Element-wise division requires all elements to be numbers")
             return ListValue(result_elements, "num", left.position)
-        elif isinstance(left, ListValue) and isinstance(right, NumberValue):
+        elif isinstance(left, (ListValue, ListValue)) and isinstance(right, NumberValue):
             # List-scalar element-wise division
             if not self._is_numeric_list(left):
                 raise RuntimeError(f"Cannot perform element-wise division on list of {left.constraint or 'mixed types'}")
@@ -3064,7 +3194,7 @@ class ASTExecutor(BaseASTVisitor):
                 else:
                     raise RuntimeError("Cannot divide non-numeric list element by number")
             return ListValue(result_elements, "num", left.position)
-        elif isinstance(left, NumberValue) and isinstance(right, ListValue):
+        elif isinstance(left, NumberValue) and isinstance(right, (ListValue, ListValue)):
             # Scalar-list element-wise division
             if not self._is_numeric_list(right):
                 raise RuntimeError(f"Cannot perform element-wise division on list of {right.constraint or 'mixed types'}")
@@ -3083,7 +3213,10 @@ class ASTExecutor(BaseASTVisitor):
     
     def perform_elementwise_modulo(self, left: GlangValue, right: GlangValue) -> GlangValue:
         """Perform element-wise modulo using %. operator."""
-        if isinstance(left, ListValue) and isinstance(right, ListValue):
+        # Import graph values for isinstance checks
+        from .graph_values import ListValue
+
+        if isinstance(left, (ListValue, ListValue)) and isinstance(right, (ListValue, ListValue)):
             if not self._is_numeric_list(left) or not self._is_numeric_list(right):
                 raise RuntimeError("Element-wise modulo requires numeric lists")
             if len(left.elements) != len(right.elements):
@@ -3100,7 +3233,7 @@ class ASTExecutor(BaseASTVisitor):
                 else:
                     raise RuntimeError("Element-wise modulo requires all elements to be numbers")
             return ListValue(result_elements, "num", left.position)
-        elif isinstance(left, ListValue) and isinstance(right, NumberValue):
+        elif isinstance(left, (ListValue, ListValue)) and isinstance(right, NumberValue):
             # List-scalar element-wise modulo
             if not self._is_numeric_list(left):
                 raise RuntimeError(f"Cannot perform element-wise modulo on list of {left.constraint or 'mixed types'}")
@@ -3114,7 +3247,7 @@ class ASTExecutor(BaseASTVisitor):
                 else:
                     raise RuntimeError("Cannot perform modulo on non-numeric list element with number")
             return ListValue(result_elements, "num", left.position)
-        elif isinstance(left, NumberValue) and isinstance(right, ListValue):
+        elif isinstance(left, NumberValue) and isinstance(right, (ListValue, ListValue)):
             # Scalar-list element-wise modulo
             if not self._is_numeric_list(right):
                 raise RuntimeError(f"Cannot perform element-wise modulo on list of {right.constraint or 'mixed types'}")
@@ -3135,10 +3268,10 @@ class ASTExecutor(BaseASTVisitor):
         """Perform comparison operations."""
         # For equality operations, use Glang's equality semantics
         if operation == "equal":
-            from .values import ListValue
+            from .graph_values import ListValue
             return BooleanValue(ListValue._glang_equals(left, right))
         elif operation == "not_equal":
-            from .values import ListValue
+            from .graph_values import ListValue
             return BooleanValue(not ListValue._glang_equals(left, right))
         
         # For ordering operations, only support compatible types
@@ -3306,19 +3439,28 @@ class ASTExecutor(BaseASTVisitor):
     
     def visit_for_in_statement(self, node: ForInStatement) -> None:
         """Execute for-in loop."""
+        # Import graph values for isinstance checks
+        # Using already imported ListValue, HashValue
+
         # Evaluate iterable
         iterable_value = self.execute(node.iterable)
-        
-        # Ensure it's iterable
-        if isinstance(iterable_value, ListValue):
+
+        # Ensure it's iterable (both old and new implementations)
+        if isinstance(iterable_value, (ListValue, ListValue)):
             elements = iterable_value.elements
         elif isinstance(iterable_value, StringValue):
             # String is iterable by character
             elements = [StringValue(char, iterable_value.position) for char in iterable_value.value]
-        elif isinstance(iterable_value, HashValue):
+        elif isinstance(iterable_value, (HashValue, HashValue)):
             # Hash is iterable by keys (as data nodes)
-            elements = [DataNodeValue(key, value, iterable_value.position) 
-                       for key, value in iterable_value.pairs.items()]
+            if hasattr(iterable_value, 'pairs'):
+                # Old HashValue
+                elements = [DataNodeValue(key, value, iterable_value.position)
+                           for key, value in iterable_value.pairs.items()]
+            else:
+                # New HashValue
+                elements = [DataNodeValue(key, value, iterable_value.position)
+                           for key, value in iterable_value.items()]
         else:
             raise RuntimeError(f"Cannot iterate over {iterable_value.get_type()}")
         
@@ -3565,7 +3707,8 @@ class ASTExecutor(BaseASTVisitor):
         Try to match a pattern against a value.
         Returns dict of variable bindings if match succeeds, None if it fails.
         """
-        from .values import ListValue, SymbolValue
+        from .values import SymbolValue
+        from .graph_values import ListValue
 
         if type(pattern).__name__ == 'WildcardPattern':
             # Wildcard matches anything, no bindings
@@ -3592,8 +3735,9 @@ class ASTExecutor(BaseASTVisitor):
                 return None
 
         elif type(pattern).__name__ == 'ListPattern':
-            # List pattern must match ListValue
-            if not isinstance(value, ListValue):
+            # List pattern must match ListValue or ListValue
+            # Using already imported ListValue
+            if not isinstance(value, (ListValue, ListValue)):
                 return None
 
             # Handle rest variable (...rest syntax)
@@ -3614,7 +3758,7 @@ class ASTExecutor(BaseASTVisitor):
 
                 # Bind rest elements
                 rest_elements = value.elements[required_elements:]
-                rest_list = ListValue(rest_elements, value.position)
+                rest_list = ListValue(rest_elements, getattr(value, 'constraint', None), value.position)
                 bindings[pattern.rest_variable] = rest_list
 
                 return bindings

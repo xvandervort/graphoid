@@ -1,7 +1,8 @@
 """Built-in transformations and predicates for functional operations."""
 
 from typing import Callable, Dict, Optional
-from .values import GlangValue, NumberValue, StringValue, BooleanValue, ListValue
+from .values import GlangValue, NumberValue, StringValue, BooleanValue
+from .graph_values import ListValue
 
 
 class TransformationRegistry:

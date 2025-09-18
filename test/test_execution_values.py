@@ -6,6 +6,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../src'))
 
 from glang.execution.values import *
+from glang.execution.graph_values import ListValue, HashValue
 from glang.ast.nodes import SourcePosition
 
 
@@ -82,12 +83,12 @@ class TestGlangValues:
         assert len(list_val) == 3
         
         # Test element access
-        assert list_val.get_element(0) == NumberValue(1)
-        assert list_val.get_element(-1) == NumberValue(3)
-        
+        assert list_val[0] == NumberValue(1)
+        assert list_val[-1] == NumberValue(3)
+
         # Test bounds checking
-        with pytest.raises(Exception):  # Should be RuntimeError
-            list_val.get_element(5)
+        with pytest.raises(IndexError):
+            list_val[5]
     
     def test_list_value_constraints(self):
         """Test ListValue type constraints."""
@@ -104,7 +105,8 @@ class TestGlangValues:
         assert len(constrained_list) == 3
         
         # Try to append wrong type (should raise error)
-        with pytest.raises(Exception):  # Should be TypeConstraintError
+        from glang.execution.errors import TypeConstraintError
+        with pytest.raises(TypeConstraintError):
             constrained_list.append(StringValue("invalid"))
     
     def test_list_value_modification(self):
@@ -115,15 +117,15 @@ class TestGlangValues:
         # Test append
         list_val.append(StringValue("c"))
         assert len(list_val) == 3
-        assert list_val.get_element(2) == StringValue("c")
-        
-        # Test set_element
-        list_val.set_element(1, StringValue("modified"))
-        assert list_val.get_element(1) == StringValue("modified")
-        
-        # Test bounds checking for set_element
-        with pytest.raises(Exception):  # Should be RuntimeError
-            list_val.set_element(10, StringValue("out_of_bounds"))
+        assert list_val[2] == StringValue("c")
+
+        # Test element assignment
+        list_val[1] = StringValue("modified")
+        assert list_val[1] == StringValue("modified")
+
+        # Test bounds checking for assignment
+        with pytest.raises(IndexError):
+            list_val[10] = StringValue("out_of_bounds")
 
 
 class TestValueConversion:
@@ -151,8 +153,9 @@ class TestValueConversion:
         assert isinstance(glang_bool, BooleanValue)
         assert glang_bool.value is True
         
-        # List
+        # List (using graph-based implementation)
         glang_list = python_to_glang_value([1, "hello", True])
+        # Using graph-based implementation
         assert isinstance(glang_list, ListValue)
         assert len(glang_list) == 3
         assert isinstance(glang_list.elements[0], NumberValue)
@@ -291,6 +294,7 @@ class TestTypeInferenceHelpers:
         
         # List
         glang_list = python_to_glang_value(["a", "b", "c"])
+        # Using graph-based implementation
         assert isinstance(glang_list, ListValue)
         assert infer_type_from_value(glang_list) == "list"
 

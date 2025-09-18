@@ -2,7 +2,7 @@
 
 import pytest
 from glang.execution.executor import ASTExecutor, ExecutionContext
-from glang.execution.values import NumberValue, BooleanValue, StringValue, ListValue
+from glang.execution.values import NumberValue, BooleanValue, StringValue
 from glang.semantic.symbol_table import SymbolTable
 from glang.parser.ast_parser import ASTParser
 from glang.semantic.analyzer import SemanticAnalyzer

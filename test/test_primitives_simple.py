@@ -7,8 +7,9 @@ from unittest.mock import patch, Mock
 
 from glang.modules.primitives import PrimitiveModule
 from glang.execution.values import (
-    StringValue, NumberValue, BooleanValue, NoneValue, ListValue
+    StringValue, NumberValue, BooleanValue, NoneValue
 )
+from glang.execution.graph_values import ListValue, HashValue
 
 
 class TestPrimitiveModule:

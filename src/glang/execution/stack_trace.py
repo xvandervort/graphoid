@@ -211,7 +211,8 @@ def create_error_result_tuple(error_message: str, include_stack_trace: bool = Tr
         A list containing [:error, enhanced_message] where enhanced_message includes
         stack trace information if requested.
     """
-    from .values import ListValue, SymbolValue, StringValue
+    from .values import SymbolValue, StringValue
+    from .graph_values import ListValue
 
     if include_stack_trace:
         stack_trace = _stack_collector.create_enhanced_trace(error_message, "RuntimeError")
@@ -236,7 +237,8 @@ def create_success_result_tuple(value):
     Returns:
         A list containing [:ok, value]
     """
-    from .values import ListValue, SymbolValue
+    from .values import SymbolValue
+    from .graph_values import ListValue
 
     success_symbol = SymbolValue("ok")
     return ListValue([success_symbol, value])

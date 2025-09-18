@@ -12,7 +12,8 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption, PublicFormat
 from cryptography.hazmat.backends import default_backend
 
-from glang.execution.values import GlangValue, StringValue, ListValue, NumberValue, HashValue, DataValue
+from glang.execution.values import GlangValue, StringValue, NumberValue, DataValue
+from glang.execution.graph_values import ListValue, HashValue
 from glang.ast.nodes import SourcePosition
 from glang.modules.errors import ModuleError
 

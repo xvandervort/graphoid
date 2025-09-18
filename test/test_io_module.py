@@ -8,7 +8,8 @@ import pytest
 from pathlib import Path
 
 from glang.execution.pipeline import ExecutionSession
-from glang.execution.values import StringValue, BooleanValue, NumberValue, ListValue
+from glang.execution.values import StringValue, BooleanValue, NumberValue
+from glang.execution.graph_values import ListValue, HashValue
 
 
 class TestIOModule:

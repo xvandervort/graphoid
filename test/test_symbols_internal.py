@@ -12,7 +12,8 @@ from glang.parser.ast_parser import ASTParser, ParseError
 from glang.ast.nodes import SymbolLiteral, ListLiteral
 from glang.semantic.analyzer import SemanticAnalyzer
 from glang.execution.executor import ASTExecutor, ExecutionContext
-from glang.execution.values import SymbolValue, BooleanValue, ListValue
+from glang.execution.values import SymbolValue, BooleanValue
+from glang.execution.graph_values import ListValue, HashValue
 from glang.semantic.symbol_table import SymbolTable
 
 

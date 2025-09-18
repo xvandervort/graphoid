@@ -56,7 +56,8 @@ class TestBehaviorIntegration:
     def test_list_behavior_processing(self):
         """Test behavior processing on list values."""
         from glang.behaviors import BehaviorPipeline
-        from glang.execution.values import ListValue, NumberValue, NoneValue
+        from glang.execution.values import NumberValue, NoneValue
+        from glang.execution.graph_values import ListValue
         
         # Create a list with mixed values
         elements = [

@@ -3,8 +3,9 @@
 import pytest
 from glang.behaviors import Behavior, BehaviorRegistry, BehaviorPipeline, create_behavior
 from glang.execution.values import (
-    NumberValue, StringValue, BooleanValue, NoneValue, ListValue, HashValue, DataValue
+    NumberValue, StringValue, BooleanValue, NoneValue, DataValue
 )
+from glang.execution.graph_values import ListValue, HashValue
 
 
 class TestBasicBehaviors:
@@ -152,9 +153,9 @@ class TestBehaviorPipeline:
         pipeline.apply_to_hash_value(hash_val, "timeout")   # nil -> 0 -> 1024
         pipeline.apply_to_hash_value(hash_val, "max_port")  # 70000 -> 65535
         
-        assert hash_val.pairs.get("port").value == 8080
-        assert hash_val.pairs.get("timeout").value == 1024
-        assert hash_val.pairs.get("max_port").value == 65535
+        assert hash_val["port"].value == 8080
+        assert hash_val["timeout"].value == 1024
+        assert hash_val["max_port"].value == 65535
 
 
 class TestCustomBehaviors:

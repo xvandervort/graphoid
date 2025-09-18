@@ -6,7 +6,8 @@ to provide HTTP functionality with better Glang integration.
 """
 
 from typing import Optional, Dict
-from ..execution.values import GlangValue, StringValue, BooleanValue, NumberValue, ListValue, HashValue, DataValue
+from ..execution.values import GlangValue, StringValue, BooleanValue, NumberValue, DataValue
+from ..execution.graph_values import ListValue, HashValue
 from ..ast.nodes import SourcePosition
 from .network_interface import get_network_provider, NetworkResponse
 from .filesystem_interface import get_filesystem

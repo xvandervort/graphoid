@@ -682,7 +682,8 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'size', 'empty', 'constraint', 'validate_constraint', 'type_summary',
                 'types', 'coerce_to_constraint', 'indexOf', 'count', 'min', 'max', 'sum', 'sort',
                 'map', 'filter', 'each', 'select', 'reject',
-                'to_string', 'to_bool'
+                'to_string', 'to_bool',
+                'add_edge', 'get_connected_to', 'to_graph'
             } | universal_methods | behavior_methods,
             'string': {
                 'size', 'empty', 'upper', 'lower', 'split', 'split_on_any', 'trim', 'join',
@@ -700,7 +701,8 @@ class SemanticAnalyzer(BaseASTVisitor):
             'data': {'key', 'value'} | universal_methods,
             'hash': {
                 'get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop',
-                'to_string', 'to_bool', 'can_accept'
+                'to_string', 'to_bool', 'can_accept',
+                'add_value_edge', 'get_connected_keys'
             } | universal_methods | behavior_methods,
             'time': {'get_type', 'to_string', 'to_num'} | universal_methods,
             'file': {'write', 'read', 'read_line', 'flush', 'close', 'kill', 'capability_type'} | universal_methods,

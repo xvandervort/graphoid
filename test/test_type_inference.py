@@ -2,7 +2,8 @@
 
 import pytest
 from glang.execution import ExecutionSession
-from glang.execution.values import StringValue, NumberValue, BooleanValue, ListValue
+from glang.execution.values import StringValue, NumberValue, BooleanValue
+from glang.execution.graph_values import ListValue, HashValue
 
 
 class TestTypeInference:

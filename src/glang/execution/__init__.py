@@ -13,13 +13,14 @@ Components:
 - pipeline: Complete execution pipeline
 """
 
-from .values import GlangValue, StringValue, NumberValue, BooleanValue, ListValue
+from .values import GlangValue, StringValue, NumberValue, BooleanValue
+from .graph_values import ListValue, HashValue
 from .executor import ASTExecutor, ExecutionContext
 from .errors import RuntimeError, VariableNotFoundError, TypeConstraintError
 from .pipeline import ExecutionPipeline, ExecutionSession, ExecutionResult
 
 __all__ = [
-    'GlangValue', 'StringValue', 'NumberValue', 'BooleanValue', 'ListValue',
+    'GlangValue', 'StringValue', 'NumberValue', 'BooleanValue', 'ListValue', 'HashValue',
     'ASTExecutor', 'ExecutionContext',
     'RuntimeError', 'VariableNotFoundError', 'TypeConstraintError',
     'ExecutionPipeline', 'ExecutionSession', 'ExecutionResult'

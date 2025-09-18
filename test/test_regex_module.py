@@ -2,7 +2,8 @@
 
 import pytest
 from glang.modules.regex_module import RegexModule, create_regex_module_namespace
-from glang.execution.values import StringValue, BooleanValue, ListValue, NumberValue
+from glang.execution.values import StringValue, BooleanValue, NumberValue
+from glang.execution.graph_values import ListValue, HashValue
 from glang.ast.nodes import SourcePosition
 
 

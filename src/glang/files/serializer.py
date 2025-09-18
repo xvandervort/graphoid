@@ -3,7 +3,8 @@
 from typing import Dict, List, TYPE_CHECKING
 from datetime import datetime
 
-from ..execution.values import GlangValue, StringValue, NumberValue, BooleanValue, ListValue
+from ..execution.values import GlangValue, StringValue, NumberValue, BooleanValue
+from ..execution.graph_values import ListValue, HashValue
 
 if TYPE_CHECKING:
     from ..execution import ExecutionSession
@@ -69,13 +70,13 @@ class NamespaceSerializer:
             bool_str = "true" if value.value else "false"
             return f'bool {name} = {bool_str}'
         
-        elif isinstance(value, ListValue):
-            # Handle list serialization
+        elif isinstance(value, (ListValue, ListValue)):
+            # Handle list serialization (both old and new graph-based lists)
             if value.constraint:
                 list_type = f"list<{value.constraint}>"
             else:
                 list_type = "list"
-            
+
             elements = []
             for element in value.elements:
                 if isinstance(element, StringValue):
@@ -87,9 +88,31 @@ class NamespaceSerializer:
                 else:
                     # For complex nested structures, use string representation
                     elements.append(f'"{element.to_display_string()}"')
-            
+
             elements_str = ", ".join(elements)
             return f'{list_type} {name} = [{elements_str}]'
+
+        elif isinstance(value, HashValue):
+            # Handle hash serialization
+            if value.constraint:
+                hash_type = f"hash<{value.constraint}>"
+            else:
+                hash_type = "hash"
+
+            pairs = []
+            for key, val in value.items():
+                if isinstance(val, StringValue):
+                    pairs.append(f'"{key}": "{val.value}"')
+                elif isinstance(val, NumberValue):
+                    pairs.append(f'"{key}": {val.value}')
+                elif isinstance(val, BooleanValue):
+                    pairs.append(f'"{key}": {"true" if val.value else "false"}')
+                else:
+                    # For complex nested structures, use string representation
+                    pairs.append(f'"{key}": "{val.to_display_string()}"')
+
+            pairs_str = ", ".join(pairs)
+            return f'{hash_type} {name} = {{{pairs_str}}}'
         
         else:
             # Fallback for unknown types

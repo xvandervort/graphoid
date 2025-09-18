@@ -12,7 +12,7 @@ import os
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from glang.execution.values import NumberValue, StringValue, BooleanValue, ListValue
+from glang.execution.values import NumberValue, StringValue, BooleanValue
 from glang.execution.pipeline import ExecutionSession
 from glang.ast.nodes import SourcePosition
 

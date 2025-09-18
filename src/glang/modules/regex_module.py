@@ -21,9 +21,10 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
 
 from glang.execution.values import (
-    GlangValue, StringValue, BooleanValue, ListValue, 
-    HashValue, DataValue, NumberValue, NoneValue
+    GlangValue, StringValue, BooleanValue,
+    DataValue, NumberValue, NoneValue
 )
+from glang.execution.graph_values import ListValue, HashValue
 from glang.ast.nodes import SourcePosition
 
 

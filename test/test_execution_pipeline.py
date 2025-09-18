@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../src'))
 from glang.execution.pipeline import ExecutionPipeline, ExecutionSession, ExecutionResult
 from glang.execution.executor import ExecutionContext
 from glang.execution.values import *
+from glang.execution.graph_values import ListValue, HashValue
 from glang.semantic.symbol_table import SymbolTable
 
 

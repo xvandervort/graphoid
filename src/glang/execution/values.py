@@ -366,20 +366,26 @@ class StringValue(GlangValue):
         reversed_chars = char_nodes[::-1]
         return self.from_char_nodes(reversed_chars)
     
-    def split(self, delimiter: 'StringValue') -> 'ListValue':
+    def split(self, delimiter: 'StringValue') -> 'GlangValue':
         """Split string by delimiter using character node operations."""
+        # Import locally to avoid circular imports
+        from .graph_values import ListValue
+
         if not isinstance(delimiter, StringValue):
             raise ValueError(f"Split delimiter must be string, got {delimiter.get_type()}")
-        
+
         # For now, use Python split but convert results to proper StringValues
         # TODO: Implement full character node-based splitting algorithm
         parts = self.value.split(delimiter.value)
         string_values = [StringValue(part, self.position) for part in parts]
-        
+
         return ListValue(string_values, "string", self.position)
     
-    def join(self, string_list: 'ListValue') -> 'StringValue':
+    def join(self, string_list: 'GlangValue') -> 'StringValue':
         """Join list of strings with this string as delimiter using character node operations."""
+        # Import locally to avoid circular imports
+        from .graph_values import ListValue
+
         if not isinstance(string_list, ListValue):
             raise ValueError(f"Join target must be list, got {string_list.get_type()}")
         
@@ -872,386 +878,6 @@ class GlangHashTable:
                 self.set(key, value)
 
 
-class HashValue(GlangValue, GraphContainer):
-    """Runtime hash value - collection of data nodes (key-value pairs) with behavior support."""
-
-    def __init__(self, pairs: List[Tuple[str, GlangValue]], constraint: Optional[str] = None,
-                 position: Optional[SourcePosition] = None):
-        GlangValue.__init__(self, position)
-        GraphContainer.__init__(self)
-        # Use Glang hash table instead of Python dict
-        self.pairs = GlangHashTable()
-        for key, value in pairs:
-            self.pairs.set(key, value)
-        self.constraint = constraint  # Optional type constraint for all values
-        # Check if any values are frozen
-        self._update_frozen_flag()
-    
-    def to_python(self) -> dict:
-        return {key: value.to_python() for key, value in self.pairs.items()}
-    
-    def get_type(self) -> str:
-        return "hash"
-    
-    def to_display_string(self) -> str:
-        if not self.pairs:
-            return "{}"
-        
-        pair_strs = []
-        for key, value in self.pairs.items():
-            pair_strs.append(f'"{key}": {value.to_display_string()}')
-        return f"{{ {', '.join(pair_strs)} }}"
-    
-    def validate_constraint(self, value: GlangValue) -> bool:
-        """Check if value matches map constraint."""
-        if not self.constraint:
-            return True
-        return value.get_type() == self.constraint
-    
-    def get(self, key: str) -> Optional[GlangValue]:
-        """Get value by key."""
-        return self.pairs.get(key)
-    
-    def set(self, key: str, value: GlangValue) -> None:
-        """Set value for key (with behavior application and constraint validation)."""
-        self._check_not_frozen("set key")
-        self._check_contamination_compatibility(value, "set key")
-
-        # Apply behaviors if any
-        if self._has_behaviors():
-            value = self._apply_behaviors(value)
-
-        if not self.validate_constraint(value):
-            from .errors import TypeConstraintError
-            raise TypeConstraintError(
-                f"Cannot assign {value.get_type()} to hash<{self.constraint}>",
-                value.position
-            )
-
-        self.pairs.set(key, value)
-        self._update_frozen_flag()
-
-    def _apply_behaviors_to_existing(self):
-        """Apply behaviors to all existing values in the hash."""
-        for key in self.pairs.keys():
-            current_value = self.pairs.get(key)
-            if current_value:
-                processed_value = self._apply_behaviors(current_value)
-                self.pairs.set(key, processed_value)
-    
-    def has_key(self, key: str) -> bool:
-        """Check if key exists in map."""
-        return self.pairs.has_key(key)
-    
-    def keys(self) -> List[str]:
-        """Get all keys."""
-        return self.pairs.keys()
-    
-    def values(self) -> List[GlangValue]:
-        """Get all values."""
-        return self.pairs.values()
-    
-    def remove(self, key: str) -> bool:
-        """Remove key-value pair. Returns True if key existed."""
-        self._check_not_frozen("remove key")
-        
-        if self.pairs.remove(key):
-            self._update_frozen_flag()
-            return True
-        return False
-    
-    def __eq__(self, other) -> bool:
-        return self.equals(other) if isinstance(other, HashValue) else False
-    
-    def equals(self, other: 'HashValue') -> bool:
-        """Compare two hashes using Glang equality semantics."""
-        if not isinstance(other, HashValue):
-            return False
-        
-        if len(self.pairs) != len(other.pairs):
-            return False
-        
-        if self.constraint != other.constraint:
-            return False
-        
-        # Check that all keys exist and values are equal
-        for key, value in self.pairs.items():
-            if key not in other.pairs:
-                return False
-            # Import ListValue's _glang_equals for comparison
-            from .values import ListValue
-            if not ListValue._glang_equals(value, other.pairs[key]):
-                return False
-        
-        return True
-    
-    # Override universal methods for map-specific behavior
-    def universal_size(self) -> 'NumberValue':
-        """For maps: size is the number of key-value pairs."""
-        return NumberValue(len(self.pairs), self.position)
-    
-    def universal_inspect(self) -> 'StringValue':
-        """Map-specific inspection showing constraint and size."""
-        constraint_info = f"<{self.constraint}>" if self.constraint else ""
-        info = f'hash{constraint_info} ({len(self.pairs)} pairs)'
-        return StringValue(info, self.position)
-    
-    # Immutability-specific methods
-    def _update_frozen_flag(self):
-        """Update the contains_frozen flag based on values."""
-        self.contains_frozen = any(value.is_frozen_value() or value.contains_frozen_data() 
-                                 for value in self.pairs.values())
-    
-    def _deep_freeze(self):
-        """Freeze all contained values."""
-        for value in self.pairs.values():
-            value.freeze()
-    
-    def can_accept_value(self, value: GlangValue) -> Tuple[bool, str]:
-        """Check if this map can accept the given value."""
-        # Check constraint first
-        if not self.validate_constraint(value):
-            return False, f"Value type {value.get_type()} does not match constraint {self.constraint}"
-        
-        # Check contamination rules
-        if self.is_frozen:
-            return False, "Cannot modify frozen map"
-        
-        if value.is_frozen_value() and not self.contains_frozen:
-            return False, "Cannot mix frozen and unfrozen data in same collection"
-        
-        if not value.is_frozen_value() and self.contains_frozen:
-            return False, "Cannot mix frozen and unfrozen data in same collection"
-        
-        return True, ""
-
-
-class ListValue(GlangValue, GraphContainer):
-    """Runtime list value with optional type constraints and behavior support."""
-
-    def __init__(self, elements: List[GlangValue], constraint: Optional[str] = None,
-                 position: Optional[SourcePosition] = None):
-        GlangValue.__init__(self, position)
-        GraphContainer.__init__(self)
-        self.elements = elements
-        self.constraint = constraint
-        # Check if any elements are frozen
-        self._update_frozen_flag()
-
-        # TODO: Add default none-handling behavior if none values are present
-        # self._add_default_none_behavior()
-    
-    def to_python(self) -> List[Any]:
-        return [elem.to_python() for elem in self.elements]
-    
-    def get_type(self) -> str:
-        return "list"
-    
-    def to_display_string(self) -> str:
-        element_strs = [elem.to_display_string() for elem in self.elements]
-        return f"[{', '.join(element_strs)}]"
-    
-    def validate_constraint(self, value: GlangValue) -> bool:
-        """Check if value matches list constraint."""
-        if not self.constraint:
-            return True
-        return value.get_type() == self.constraint
-    
-    def append(self, value: GlangValue) -> None:
-        """Append value to list (with behavior application and constraint validation)."""
-        self._check_not_frozen("append")
-        self._check_contamination_compatibility(value, "append")
-
-        # Apply behaviors if any
-        if self._has_behaviors():
-            value = self._apply_behaviors(value)
-
-        if not self.validate_constraint(value):
-            from .errors import TypeConstraintError
-            raise TypeConstraintError(
-                f"Cannot append {value.get_type()} to list<{self.constraint}>",
-                value.position
-            )
-
-        self.elements.append(value)
-        self._update_frozen_flag()
-
-    def _apply_behaviors_to_existing(self):
-        """Apply behaviors to all existing elements in the list."""
-        for i in range(len(self.elements)):
-            self.elements[i] = self._apply_behaviors(self.elements[i])
-    
-    def get_element(self, index: int) -> GlangValue:
-        """Get element at index (with bounds checking)."""
-        if not -len(self.elements) <= index < len(self.elements):
-            raise RuntimeError(f"List index {index} out of range", self.position)
-        return self.elements[index]
-    
-    def set_element(self, index: int, value: GlangValue) -> None:
-        """Set element at index (with behavior application and constraint validation)."""
-        if not -len(self.elements) <= index < len(self.elements):
-            raise RuntimeError(f"List index {index} out of range", value.position)
-
-        self._check_not_frozen("set element")
-        self._check_contamination_compatibility(value, "set element")
-
-        # Apply behaviors if any
-        if self._has_behaviors():
-            value = self._apply_behaviors(value)
-
-        if not self.validate_constraint(value):
-            from .errors import TypeConstraintError
-            raise TypeConstraintError(
-                f"Cannot assign {value.get_type()} to list<{self.constraint}>",
-                value.position
-            )
-
-        self.elements[index] = value
-        self._update_frozen_flag()
-    
-    def __len__(self) -> int:
-        return len(self.elements)
-    
-    def __eq__(self, other) -> bool:
-        return self.equals(other) if isinstance(other, ListValue) else False
-    
-    def contains(self, value: GlangValue) -> bool:
-        """Check if this list contains the given value using Glang equality semantics."""
-        for element in self.elements:
-            if self._glang_equals(element, value):
-                return True
-        return False
-    
-    def equals(self, other: 'ListValue') -> bool:
-        """Compare two lists element-by-element using Glang equality semantics."""
-        if not isinstance(other, ListValue):
-            return False
-        
-        if len(self.elements) != len(other.elements):
-            return False
-        
-        if self.constraint != other.constraint:
-            return False
-        
-        for i in range(len(self.elements)):
-            if not self._glang_equals(self.elements[i], other.elements[i]):
-                return False
-        
-        return True
-    
-    @staticmethod
-    def _glang_equals(left: GlangValue, right: GlangValue) -> bool:
-        """Compare two Glang values using Glang's equality semantics."""
-        # Different types are never equal
-        if left.get_type() != right.get_type():
-            return False
-        
-        # Use type-specific comparison
-        if isinstance(left, NumberValue) and isinstance(right, NumberValue):
-            return left.value == right.value
-        elif isinstance(left, StringValue) and isinstance(right, StringValue):
-            return left.value == right.value
-        elif isinstance(left, BooleanValue) and isinstance(right, BooleanValue):
-            return left.value == right.value
-        elif isinstance(left, ListValue) and isinstance(right, ListValue):
-            return left.equals(right)
-        elif isinstance(left, DataValue) and isinstance(right, DataValue):
-            return left.key == right.key and ListValue._glang_equals(left.value, right.value)
-        elif isinstance(left, HashValue) and isinstance(right, HashValue):
-            return left.equals(right)
-        elif isinstance(left, NoneValue) and isinstance(right, NoneValue):
-            return True
-        elif isinstance(left, SymbolValue) and isinstance(right, SymbolValue):
-            return left.name == right.name
-        else:
-            # For any unknown types, fall back to Python equality
-            # This should not happen in practice
-            return left == right
-    
-    @staticmethod
-    def _glang_compare(left: GlangValue, right: GlangValue) -> int:
-        """Compare two Glang values using Glang's comparison semantics.
-        
-        Returns:
-            -1 if left < right
-             0 if left == right
-             1 if left > right
-        """
-        # Different types cannot be compared (except for special cases)
-        if left.get_type() != right.get_type():
-            raise ValueError(f"Cannot compare {left.get_type()} with {right.get_type()}")
-        
-        # Use type-specific comparison
-        if isinstance(left, NumberValue) and isinstance(right, NumberValue):
-            return left.glang_number.compare_to(right.glang_number)
-        elif isinstance(left, StringValue) and isinstance(right, StringValue):
-            if left.value < right.value:
-                return -1
-            elif left.value > right.value:
-                return 1
-            else:
-                return 0
-        elif isinstance(left, BooleanValue) and isinstance(right, BooleanValue):
-            # False < True in Glang
-            if left.value < right.value:
-                return -1
-            elif left.value > right.value:
-                return 1
-            else:
-                return 0
-        else:
-            raise ValueError(f"Comparison not supported for {left.get_type()}")
-    
-    # Immutability-specific methods
-    def _update_frozen_flag(self):
-        """Update the contains_frozen flag based on elements."""
-        self.contains_frozen = any(elem.is_frozen_value() or elem.contains_frozen_data()
-                                 for elem in self.elements)
-
-    def _add_default_none_behavior(self):
-        """Add default none-handling behavior if none values are present."""
-        # Check if any elements are none
-        has_none = any(isinstance(elem, NoneValue) for elem in self.elements)
-        if has_none:
-            # Add default behavior to skip none in calculations
-            behavior_name = StringValue("skip_none_in_calculations", self.position)
-            self.add_rule(behavior_name)
-
-    def _deep_freeze(self):
-        """Freeze all contained elements."""
-        for element in self.elements:
-            element.freeze()
-    
-    def can_accept_element(self, element: GlangValue) -> Tuple[bool, str]:
-        """Check if this list can accept the given element."""
-        # Check constraint first
-        if not self.validate_constraint(element):
-            return False, f"Element type {element.get_type()} does not match constraint {self.constraint}"
-        
-        # Check contamination rules
-        if self.is_frozen:
-            return False, "Cannot add to frozen list"
-        
-        if element.is_frozen_value() and not self.contains_frozen:
-            return False, "Cannot mix frozen and unfrozen data in same collection"
-        
-        if not element.is_frozen_value() and self.contains_frozen:
-            return False, "Cannot mix frozen and unfrozen data in same collection"
-        
-        return True, ""
-    
-    # Override universal methods for list-specific behavior
-    def universal_size(self) -> 'NumberValue':
-        """For lists: size is the number of element nodes."""
-        return NumberValue(len(self.elements), self.position)
-    
-    def universal_inspect(self) -> 'StringValue':
-        """List-specific inspection showing constraint and element count."""
-        constraint_info = f"<{self.constraint}>" if self.constraint else ""
-        info = f"list{constraint_info} with {len(self.elements)} elements"
-        return StringValue(info, self.position)
-
-
 def python_to_glang_value(python_value: Any, position: Optional[SourcePosition] = None) -> GlangValue:
     """Convert Python value to appropriate GlangValue."""
     if isinstance(python_value, str):
@@ -1575,3 +1201,46 @@ class FileHandleValue(GlangValue):
         
         # Mark as permanently destroyed
         self._is_killed = True
+
+
+# Graph-based value factory functions
+# These provide a migration path from old containers to graph structures
+
+def python_to_glang_value(value: Any, position=None) -> GlangValue:
+    """Convert Python value to appropriate Glang value."""
+    # Import here to avoid circular imports
+    from .graph_values import ListValue, HashValue
+
+    if value is None:
+        return NoneValue(position)
+    elif isinstance(value, bool):
+        return BooleanValue(value, position)
+    elif isinstance(value, (int, float)):
+        return NumberValue(value, position)
+    elif isinstance(value, str):
+        return StringValue(value, position)
+    elif isinstance(value, list):
+        # Convert list elements recursively
+        elements = [python_to_glang_value(item, position) for item in value]
+        return ListValue(elements, position=position)
+    elif isinstance(value, dict):
+        # Convert dict to hash
+        pairs = [(str(k), python_to_glang_value(v, position)) for k, v in value.items()]
+        return HashValue(pairs, position=position)
+    else:
+        # For unknown types, try to convert to string
+        return StringValue(str(value), position)
+
+
+def create_glang_list(elements: List[GlangValue], constraint: str = None,
+                     position=None):
+    """Create a list value using graph-based implementation."""
+    from .graph_values import ListValue
+    return ListValue(elements, constraint, position)
+
+
+def create_glang_hash(pairs: List[Tuple[str, GlangValue]], constraint: str = None,
+                     position=None):
+    """Create a hash value using graph-based implementation."""
+    from .graph_values import HashValue
+    return HashValue(pairs, constraint, position)

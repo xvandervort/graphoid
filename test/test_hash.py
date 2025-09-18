@@ -5,7 +5,8 @@ import warnings
 from glang.parser.ast_parser import ASTParser
 from glang.execution.pipeline import ExecutionSession
 from glang.ast.nodes import MapLiteral, VariableDeclaration, Assignment
-from glang.execution.values import HashValue, StringValue, NumberValue, BooleanValue
+from glang.execution.values import StringValue, NumberValue, BooleanValue
+from glang.execution.graph_values import ListValue, HashValue
 from glang.semantic.analyzer import SemanticAnalyzer
 from glang.execution.executor import ASTExecutor, ExecutionContext
 from glang.semantic.symbol_table import SymbolTable
@@ -74,7 +75,11 @@ class TestMapExecution:
         
         assert result.success
         assert isinstance(result.value, HashValue)
-        assert len(result.value.pairs) == 0
+        # Check length differently for each type
+        if hasattr(result.value, 'pairs'):
+            assert len(result.value.pairs) == 0
+        else:
+            assert len(result.value.graph) == 0
         assert str(result.value) == "{}"
     
     def test_hash_literal_execution(self):
@@ -84,7 +89,11 @@ class TestMapExecution:
         
         assert result.success
         assert isinstance(result.value, HashValue)
-        assert len(result.value.pairs) == 2
+        # Check length differently for each type
+        if hasattr(result.value, 'pairs'):
+            assert len(result.value.pairs) == 2
+        else:
+            assert len(result.value.graph) == 2
         assert result.value.get("host").value == "localhost"
         assert result.value.get("port").value == 8080
     
@@ -871,8 +880,8 @@ class TestMapEdgeCases:
         methods_list = result.value
         assert methods_list.get_type() == "list"
         
-        # Should have 27 methods total (8 universal + 12 hash-specific + 5 behavior + 2 conversion)
-        assert len(methods_list.elements) == 27  # Updated count with behavior and conversion methods
+        # Should have 29 methods total (8 universal + 12 hash-specific + 5 behavior + 2 conversion + 2 graph)
+        assert len(methods_list.elements) == 29  # Updated count with behavior, conversion, and graph methods
         
         # Check that all expected methods are present
         method_names = [elem.value for elem in methods_list.elements]

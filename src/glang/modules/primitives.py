@@ -194,7 +194,7 @@ class PrimitiveModule:
     
     def builtin_regex_findall(self, cache_key: StringValue, text: StringValue) -> 'ListValue':
         """Find all non-overlapping matches."""
-        from glang.execution.values import ListValue
+        from glang.execution.graph_values import ListValue
         
         key = cache_key.value
         text_str = text.value
@@ -211,7 +211,7 @@ class PrimitiveModule:
     
     def builtin_regex_findgroups(self, cache_key: StringValue, text: StringValue) -> 'ListValue':
         """Find all matches with capture groups."""
-        from glang.execution.values import ListValue
+        from glang.execution.graph_values import ListValue
         
         key = cache_key.value
         text_str = text.value
@@ -246,7 +246,7 @@ class PrimitiveModule:
     
     def builtin_regex_split(self, cache_key: StringValue, text: StringValue) -> 'ListValue':
         """Split text using regex pattern as delimiter."""
-        from glang.execution.values import ListValue
+        from glang.execution.graph_values import ListValue
         
         key = cache_key.value
         text_str = text.value

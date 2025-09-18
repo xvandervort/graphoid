@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 from glang.execution.pipeline import ExecutionSession
-from glang.execution.values import StringValue, BooleanValue, NumberValue, ListValue
+from glang.execution.values import StringValue, BooleanValue, NumberValue
 
 
 class TestFileHandles:
