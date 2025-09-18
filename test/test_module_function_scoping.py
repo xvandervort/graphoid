@@ -62,7 +62,7 @@ func main() {
         result_cmd = 'result'
         result_check = self.session.execute_statement(result_cmd)
         assert result_check.success
-        assert result_check.result.value == 42
+        assert result_check.value.value == 42
 
     def test_recursive_function_within_module(self):
         """Test recursive function calls within module."""
@@ -97,7 +97,7 @@ func factorial(n) {
         result_cmd = 'result'
         result_check = self.session.execute_statement(result_cmd)
         assert result_check.success
-        assert result_check.result.value == 120
+        assert result_check.value.value == 120
 
     def test_complex_function_interdependence(self):
         """Test complex function interdependence within module."""
@@ -137,7 +137,7 @@ func c() {
         result_cmd = 'result'
         result_check = self.session.execute_statement(result_cmd)
         assert result_check.success
-        assert result_check.result.value == 21
+        assert result_check.value.value == 21
 
     def test_function_calling_works_outside_modules(self):
         """Verify that function calling works fine outside modules (control test)."""
@@ -152,7 +152,7 @@ func c() {
         # Check result
         check = self.session.execute_statement('result')
         assert check.success
-        assert check.result.value == 42
+        assert check.value.value == 42
 
 
 if __name__ == '__main__':

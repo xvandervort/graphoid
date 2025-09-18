@@ -21,6 +21,7 @@ from .stack_trace import get_stack_collector, create_enhanced_error_trace, push_
 # Graph-based ListValue and HashValue are now the primary implementations
 from .graph_values import ListValue, HashValue
 from .configuration_context import ConfigurationContext
+from .call_graph import CallGraph
 
 
 class BreakException(Exception):
@@ -50,6 +51,8 @@ class ExecutionContext:
         self.config = ConfigurationContext()  # Configuration stack
         self.loading_module = False  # Track if we're currently loading a module
         self.module_functions = {}   # Functions created during module loading
+        self.call_graph = CallGraph()  # True graph-based function discovery
+        self.current_module = None   # Track current module for scoping
     
     def get_variable(self, name: str) -> Optional[GlangValue]:
         """Get variable value by name.
@@ -2841,6 +2844,11 @@ class ASTExecutor(BaseASTVisitor):
         # Store the declared module name
         if not hasattr(self.context, '_module_name'):
             self.context._module_name = node.name
+
+        # Set current module in call graph for proper scoping
+        self.context.current_module = node.name
+        self.context.call_graph.enter_scope(node.name)
+
         return None
     
     def visit_alias_declaration(self, node: AliasDeclaration) -> None:
@@ -3499,9 +3507,13 @@ class ASTExecutor(BaseASTVisitor):
             position=node.position
         )
         
-        # Store function in context
+        # Store function in context (backward compatibility)
         self.context.set_variable(node.name, func_value)
-        
+
+        # Add function to CALL GRAPH (true graph-based storage)
+        current_scope = self.context.current_module or "global"
+        self.context.call_graph.add_function(node.name, func_value, current_scope)
+
         # Store result
         self.result = func_value
     
@@ -3518,8 +3530,13 @@ class ASTExecutor(BaseASTVisitor):
         from .values import FunctionValue, LambdaValue
         from .function_value import BuiltinFunctionValue
         
-        # Look up function
-        func_value = self.context.get_variable(node.name)
+        # Look up function using TRUE GRAPH TRAVERSAL (not variable lookup)
+        func_value = self.context.call_graph.find_function(node.name, self.context.current_module)
+
+        # Fallback to variable lookup for backward compatibility (lambdas, builtin functions)
+        if func_value is None:
+            func_value = self.context.get_variable(node.name)
+
         if func_value is None:
             from .errors import VariableNotFoundError
             stack_trace = create_enhanced_error_trace(f"Function '{node.name}' not found", "VariableNotFoundError")
