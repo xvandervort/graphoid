@@ -109,7 +109,11 @@ class ASTExecutor(BaseASTVisitor):
         self.context = context
         self.file_manager = file_manager
         self.result = None
-        
+
+        # Setup call graph module with executor reference
+        from glang.modules.call_graph_module import setup_call_graph_module
+        setup_call_graph_module(self)
+
         # Set default precision if not already set
         from decimal import getcontext
         if getcontext().prec == 0 or getcontext().prec == 28:

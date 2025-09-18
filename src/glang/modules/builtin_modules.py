@@ -44,6 +44,10 @@ class BuiltinModuleRegistry:
         from .html_module import create_html_module
         cls._builtin_modules['html_parser'] = create_html_module()
 
+        # Register Call Graph module (graph introspection)
+        from .call_graph_module import create_call_graph_module_namespace
+        cls._builtin_modules['call_graph'] = create_call_graph_module_namespace()
+
         # NOTE: Regex module is now implemented as a Glang file (stdlib/regex.gr)
         # It will be loaded as a regular module, not a built-in Python wrapper
         

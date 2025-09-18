@@ -265,3 +265,166 @@ class CallGraph(GraphStructure):
             }
 
         return None
+
+    def visualize_graph(self, format: str = "text") -> str:
+        """Generate complete call graph visualization.
+
+        Args:
+            format: Output format ('text', 'dot', 'mermaid')
+
+        Returns:
+            String representation in requested format
+        """
+        if format == "dot":
+            return self._generate_dot_format()
+        elif format == "mermaid":
+            return self._generate_mermaid_format()
+        else:
+            return self._generate_text_format()
+
+    def _generate_text_format(self) -> str:
+        """Generate text-based graph visualization."""
+        result = ["=" * 50]
+        result.append("COMPLETE CALL GRAPH")
+        result.append("=" * 50)
+
+        # Group by scope
+        for scope in sorted(self.scope_connections.keys()):
+            result.append(f"\n[{scope}]")
+            for qualified_name in sorted(self.scope_connections[scope]):
+                bare_name = qualified_name.split("::")[-1]
+                func_node = self.function_nodes[qualified_name]
+                result.append(f"  {bare_name}")
+
+                # Show edges
+                neighbors = func_node.get_neighbors()
+                if neighbors:
+                    for neighbor_node in neighbors:
+                        for qname, qnode in self.function_nodes.items():
+                            if qnode == neighbor_node:
+                                target_scope = qname.split("::")[0] if "::" in qname else "global"
+                                target_name = qname.split("::")[-1]
+                                if target_scope == scope:
+                                    result.append(f"    → {target_name}")
+                                else:
+                                    result.append(f"    → {target_scope}::{target_name}")
+                                break
+
+        return "\n".join(result)
+
+    def _generate_dot_format(self) -> str:
+        """Generate Graphviz DOT format visualization."""
+        dot = ["digraph CallGraph {"]
+        dot.append("  rankdir=LR;")
+        dot.append("  node [shape=box];")
+
+        # Group by scope using subgraphs
+        for scope in sorted(self.scope_connections.keys()):
+            dot.append(f"  subgraph cluster_{scope.replace('.', '_')} {{")
+            dot.append(f"    label=\"{scope}\";")
+            dot.append("    style=filled;")
+            dot.append("    color=lightgrey;")
+
+            for qualified_name in sorted(self.scope_connections[scope]):
+                bare_name = qualified_name.split("::")[-1]
+                node_id = qualified_name.replace("::", "_").replace(".", "_")
+                dot.append(f"    {node_id} [label=\"{bare_name}\"];")
+
+            dot.append("  }")
+
+        # Add edges
+        for qualified_name, func_node in self.function_nodes.items():
+            source_id = qualified_name.replace("::", "_").replace(".", "_")
+            neighbors = func_node.get_neighbors()
+
+            for neighbor_node in neighbors:
+                for qname, qnode in self.function_nodes.items():
+                    if qnode == neighbor_node:
+                        target_id = qname.replace("::", "_").replace(".", "_")
+                        dot.append(f"  {source_id} -> {target_id};")
+                        break
+
+        dot.append("}")
+        return "\n".join(dot)
+
+    def _generate_mermaid_format(self) -> str:
+        """Generate Mermaid diagram format visualization."""
+        mermaid = ["graph LR"]
+
+        # Add nodes grouped by scope
+        for scope in sorted(self.scope_connections.keys()):
+            for qualified_name in sorted(self.scope_connections[scope]):
+                bare_name = qualified_name.split("::")[-1]
+                node_id = qualified_name.replace("::", "_").replace(".", "_").replace("-", "_")
+                display_name = f"{scope}::{bare_name}" if scope != "global" else bare_name
+                mermaid.append(f"    {node_id}[{display_name}]")
+
+        # Add edges
+        for qualified_name, func_node in self.function_nodes.items():
+            source_id = qualified_name.replace("::", "_").replace(".", "_").replace("-", "_")
+            neighbors = func_node.get_neighbors()
+
+            for neighbor_node in neighbors:
+                for qname, qnode in self.function_nodes.items():
+                    if qnode == neighbor_node:
+                        target_id = qname.replace("::", "_").replace(".", "_").replace("-", "_")
+                        mermaid.append(f"    {source_id} --> {target_id}")
+                        break
+
+        return "\n".join(mermaid)
+
+    def find_path(self, from_function: str, to_function: str, scope: str = None) -> Optional[List[str]]:
+        """Find path between two functions using graph traversal.
+
+        Args:
+            from_function: Starting function name
+            to_function: Target function name
+            scope: Current scope for resolving names
+
+        Returns:
+            List of function names forming path, or None if no path exists
+        """
+        if scope is None:
+            scope = self.current_scope
+
+        # Resolve qualified names
+        from_qualified = None
+        to_qualified = None
+
+        # Search for functions in scope
+        for s in [scope, self.global_scope]:
+            for qualified_name in self.scope_connections.get(s, []):
+                bare_name = qualified_name.split("::")[-1]
+                if bare_name == from_function and from_qualified is None:
+                    from_qualified = qualified_name
+                if bare_name == to_function and to_qualified is None:
+                    to_qualified = qualified_name
+
+        if not from_qualified or not to_qualified:
+            return None
+
+        # BFS to find shortest path
+        from collections import deque
+
+        queue = deque([(from_qualified, [from_function])])
+        visited = {from_qualified}
+
+        while queue:
+            current_qualified, path = queue.popleft()
+
+            if current_qualified == to_qualified:
+                return path
+
+            if current_qualified in self.function_nodes:
+                func_node = self.function_nodes[current_qualified]
+
+                for neighbor_node in func_node.get_neighbors():
+                    # Find qualified name for neighbor
+                    for qname, qnode in self.function_nodes.items():
+                        if qnode == neighbor_node and qname not in visited:
+                            visited.add(qname)
+                            bare_name = qname.split("::")[-1]
+                            queue.append((qname, path + [bare_name]))
+                            break
+
+        return None

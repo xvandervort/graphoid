@@ -630,6 +630,73 @@ while true {
 output.close()
 ```
 
+### Call Graph Debugging and Introspection
+
+Glang provides powerful call graph introspection that lets you visualize and debug function relationships in real-time:
+
+```glang
+# Import the call graph module
+import "call_graph" as cg
+
+# Basic information
+scope = cg.current_scope()               # Current scope name
+count = cg.count_functions()             # Total functions
+scopes = cg.list_scopes()                # All available scopes
+funcs = cg.get_reachable_functions()     # Functions you can call
+
+# Detailed function information
+info = cg.get_function_info("my_func")
+print("Parameters: " + info["parameters"].to_string())
+print("Connected to: " + info["connected_functions"].to_string())
+
+# Path finding between functions
+path = cg.find_path("main", "helper")
+if path != none {
+    print("Path: " + path.to_string())   # Shows function connectivity
+}
+
+# Visualization in multiple formats
+text_viz = cg.visualize("text")          # Human-readable text
+dot_viz = cg.visualize("dot")            # Graphviz DOT format
+mermaid_viz = cg.visualize("mermaid")    # Mermaid diagram syntax
+
+# Focus on specific scope
+module_viz = cg.visualize_scope("MyModule")
+```
+
+**REPL Debugging Example:**
+```glang
+glang> func main() { process() }
+glang> func process() { validate() }
+glang> func validate() { return true }
+
+glang> import "call_graph" as cg
+glang> cg.get_reachable_functions()
+[main, process, validate]
+
+glang> path = cg.find_path("main", "validate")
+glang> path.to_string()
+[main, validate]
+
+glang> cg.visualize()
+==================================================
+COMPLETE CALL GRAPH
+==================================================
+
+[global]
+  main
+    → process
+    → validate
+  process
+    → main
+    → validate
+  validate
+    → main
+    → process
+```
+
+The call graph system gives you unprecedented visibility into your program's structure, making debugging complex function relationships much easier. See [Call Graph Debugging Guide](docs/call_graph_debugging.md) for complete documentation.
+
 ## Architecture Notes
 
 ### Modern AST-Based Design
