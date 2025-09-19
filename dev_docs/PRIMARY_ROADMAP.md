@@ -151,6 +151,32 @@ See: [`dev_docs/FOUNDATIONAL_PRIORITY_CALL_GRAPH.md`](./FOUNDATIONAL_PRIORITY_CA
 - [ ] Documentation generator
 
 #### 1.4 Core Language Features
+
+##### 🚨 1.4.1 CRITICAL: String Parsing Enhancements (IMMEDIATE PRIORITY)
+**Status**: Essential for full Glang self-hosting capability
+**Discovered**: During HTML module conversion - major limitations prevent pure Glang implementations
+
+- [ ] **Quote Character Handling**: Fix lexer to properly handle `"\""` escaped quotes in string literals
+  - **Current Issue**: `"\""` becomes empty string instead of quote character
+  - **Impact**: Cannot properly decode HTML entities like `&quot;` or parse quoted attributes
+  - **Blocker for**: Full Glang HTML/XML/JSON parsing, configuration file processing
+- [ ] **Essential String Methods**: Add missing string manipulation primitives
+  - `string.char_at(index)` - Get character at specific position
+  - `string.index_of(substring)` - Find position of substring (-1 if not found)
+  - `string.substring(start, end)` - Extract substring by position range
+  - `string.last_index_of(substring)` - Find last occurrence of substring
+- [ ] **Pattern Matching Support**: Enable complex text processing
+  - Basic regex support OR enhanced string patterns
+  - Pattern-based replacement operations
+  - Multi-character delimiter splitting
+- [ ] **Unicode Support**: Proper handling of international characters
+  - UTF-8 string operations
+  - Character classification (letter, digit, whitespace)
+  - Case conversion for international text
+
+**Validation Test**: Reimplement HTML DOM parsing in 100% pure Glang after these fixes
+
+##### 1.4.2 Other Core Features
 - [ ] **Pattern Matching**: `match` expressions for elegant control flow and data destructuring
 - [ ] **Status Symbols**: Limited symbols (`:ok`, `:error`) for result patterns
 - [ ] **Error-as-Data**: Result lists `[:ok, value]` / `[:error, message]` for clean error handling
