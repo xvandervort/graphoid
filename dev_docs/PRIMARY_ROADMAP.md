@@ -213,12 +213,60 @@ See: [`dev_docs/FOUNDATIONAL_PRIORITY_CALL_GRAPH.md`](./FOUNDATIONAL_PRIORITY_CA
 
 **Deliverables**: v0.9 release with standard library and modern error handling
 
-### 🎯 Phase 2: Graph Foundation (Q3-Q4 2025)
+### 🎯 Phase 2: Graph Foundation (Q2-Q3 2025) - **MOVED UP DUE TO CRITICAL NEED**
 **Goal**: Transform containers into true graph structures
+**Priority**: **ELEVATED** - HTML module conversion revealed fundamental limitations
 
 > **See**: [ABSTRACTION_LAYER_ROADMAP.md](./ABSTRACTION_LAYER_ROADMAP.md) for detailed design
 
-#### 2.1 Behavior-Oriented Test Framework
+#### 🚨 2.1 PRIORITY: True Graph/Tree Data Structures (IMMEDIATE AFTER STRING FIXES)
+**Status**: Critical limitation discovered during HTML module development
+**Problem**: Current collections are containers, not true graphs - preventing complex data processing
+
+##### 2.1.1 Tree Structure Implementation
+- [ ] **Parent-Child Relationships**: Native tree node types with bidirectional links
+  - `TreeNode` type with `parent`, `children`, `value` properties
+  - Automatic parent/child consistency maintenance
+  - Tree navigation: `node.parent()`, `node.children()`, `node.siblings()`
+- [ ] **Tree Traversal Methods**: Essential for DOM/XML/JSON processing
+  - `tree.depth_first()` - Full tree traversal
+  - `tree.breadth_first()` - Level-order traversal
+  - `tree.find_by_value(predicate)` - Search for matching nodes
+  - `tree.find_path_to(target)` - Path finding between nodes
+- [ ] **Tree Construction**: Easy tree building syntax
+  - Nested hash syntax: `{ "root": { "child1": "value", "child2": { "nested": "data" } } }`
+  - Programmatic building: `tree.add_child(value)`, `tree.insert_at(path, value)`
+  - Tree from lists: Convert nested lists to tree structures
+
+##### 2.1.2 Graph Structure Enhancement
+- [ ] **Edge Implementation**: First-class edges with metadata and directionality
+  - `Edge` type with `from`, `to`, `weight`, `properties`
+  - Multiple edge types: `directed`, `undirected`, `weighted`
+  - Edge queries: `node.incoming_edges()`, `node.outgoing_edges()`
+- [ ] **Node Awareness**: Nodes understand their graph context
+  - `node.graph()` - Reference to containing graph
+  - `node.neighbors()` - Direct connections
+  - `node.distance_to(other)` - Shortest path calculation
+- [ ] **Graph Traversal Algorithms**: Essential graph operations
+  - Depth-first search (DFS) and breadth-first search (BFS)
+  - Shortest path finding (Dijkstra's algorithm)
+  - Connectivity analysis and component detection
+  - Cycle detection and topological sorting
+
+##### 2.1.3 DOM/Tree Processing Applications
+**Validation**: Reimplement HTML DOM operations using native tree structures
+- [ ] **HTML DOM Representation**: Parse HTML into native tree structures
+- [ ] **CSS Selector Engine**: Tree traversal with selector patterns
+- [ ] **XML Processing**: Generic tree manipulation for any XML-like data
+- [ ] **JSON Tree Operations**: Navigate complex JSON as tree structures
+
+**Impact**: Enables 100% pure Glang implementation of:
+- Complete HTML/XML parsing and manipulation
+- Configuration file processing (YAML, TOML, JSON)
+- Data structure navigation and transformation
+- Document processing and template engines
+
+#### 2.2 Behavior-Oriented Test Framework
 **Priority**: Essential for quality assurance and ecosystem growth
 > **See**: [GLANG_TEST_FRAMEWORK_PLAN.md](./GLANG_TEST_FRAMEWORK_PLAN.md) for detailed design
 
@@ -231,13 +279,7 @@ See: [`dev_docs/FOUNDATIONAL_PRIORITY_CALL_GRAPH.md`](./FOUNDATIONAL_PRIORITY_CA
 
 **Benefits**: Quality assurance, executable documentation, ecosystem enablement
 
-#### 2.2 Core Graph Features
-- Edge implementation with metadata
-- Node awareness (knows container and siblings)
-- Graph traversal algorithms
-- Path finding and connectivity analysis
-
-**Deliverables**: v1.0 release with graph primitives and test framework
+**Deliverables**: v1.0 release with true graph/tree primitives and test framework
 
 ### 🔮 Phase 3: Self-Aware Systems (2026)
 **Goal**: Enable self-understanding and self-modification
@@ -342,7 +384,7 @@ The following documents have been superseded by this roadmap:
 
 ## Next Actions
 
-### Immediate (This Month)
+### Immediate (This Month) - **UPDATED PRIORITIES**
 1. ✅ ~~Complete I/O module implementation~~
 2. ✅ ~~Add string manipulation functions~~
 3. ✅ ~~Write v0.9 release notes~~
@@ -352,7 +394,11 @@ The following documents have been superseded by this roadmap:
 7. ✅ ~~Create random number generation module~~
 8. ✅ ~~Add intrinsic behavior system for automatic value transformation~~
 9. ✅ ~~Improve error handling with enhanced stack traces~~
-10. Implement package manager (glang-package command)
+10. ✅ ~~HTML module conversion to hybrid pure Glang implementation~~
+11. **🚨 NEW PRIORITY: Fix quote character handling in lexer** (enables full Glang parsing)
+12. **🚨 NEW PRIORITY: Add essential string methods** (`char_at`, `index_of`, `substring`)
+13. **🚨 NEW PRIORITY: Design tree/graph data structures** (enables true DOM processing)
+14. Implement package manager (glang-package command)
 
 ### Q1 2025
 1. Finish standard library modules

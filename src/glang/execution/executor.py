@@ -435,7 +435,10 @@ class ASTExecutor(BaseASTVisitor):
         if (cleaned_value.startswith('"') and cleaned_value.endswith('"')) or \
            (cleaned_value.startswith("'") and cleaned_value.endswith("'")):
             cleaned_value = cleaned_value[1:-1]
-        
+
+        # Process escape sequences
+        cleaned_value = self._process_escape_sequences(cleaned_value)
+
         self.result = StringValue(cleaned_value, node.position)
     
     def visit_number_literal(self, node: NumberLiteral) -> None:
@@ -599,6 +602,40 @@ class ASTExecutor(BaseASTVisitor):
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, target_type, position)
     
+    def _process_escape_sequences(self, text: str) -> str:
+        """Process escape sequences in string literals."""
+        if not text:
+            return text
+
+        result = []
+        i = 0
+        while i < len(text):
+            if text[i] == '\\' and i + 1 < len(text):
+                # Found escape sequence
+                next_char = text[i + 1]
+                if next_char == 'n':
+                    result.append('\n')
+                elif next_char == 't':
+                    result.append('\t')
+                elif next_char == 'r':
+                    result.append('\r')
+                elif next_char == '\\':
+                    result.append('\\')
+                elif next_char == '"':
+                    result.append('"')
+                elif next_char == "'":
+                    result.append("'")
+                else:
+                    # Unknown escape sequence - keep as is
+                    result.append('\\')
+                    result.append(next_char)
+                i += 2  # Skip both characters
+            else:
+                result.append(text[i])
+                i += 1
+
+        return ''.join(result)
+
     def _dispatch_universal_method(self, target: GlangValue, method_name: str,
                                   args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle universal methods that all nodes inherit."""

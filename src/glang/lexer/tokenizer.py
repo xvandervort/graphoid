@@ -117,9 +117,9 @@ class Tokenizer:
             # Comments (skip entirely)
             (r'#.*', None),
             
-            # String literals (quoted strings)
-            (r'"([^"\\]|\\.)*"', TokenType.STRING_LITERAL),
-            (r"'([^'\\]|\\.)*'", TokenType.STRING_LITERAL),
+            # String literals (quoted strings) - improved escape handling
+            (r'"(?:[^"\\]|\\.)*"', TokenType.STRING_LITERAL),
+            (r"'(?:[^'\\]|\\.)*'", TokenType.STRING_LITERAL),
             
             # Number literals (floats before integers to catch decimals)
             # Include negative numbers
