@@ -46,6 +46,50 @@ class EdgeMetadata:
             return f"{self.edge_type.value}"
 
 
+class MetadataLayer:
+    """Universal metadata layer for all graph structures.
+
+    Always present on every graph, provides extensible key-value metadata storage.
+    Handles element names, units, source info, timestamps, etc.
+    """
+
+    def __init__(self):
+        self.properties: Dict[str, Any] = {}
+
+    def set(self, key: str, value: Any) -> None:
+        """Set a metadata property."""
+        self.properties[key] = value
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a metadata property with graceful fallback."""
+        return self.properties.get(key, default)
+
+    def has(self, key: str) -> bool:
+        """Check if a metadata property exists."""
+        return key in self.properties
+
+    def remove(self, key: str) -> bool:
+        """Remove a metadata property. Returns True if it existed."""
+        if key in self.properties:
+            del self.properties[key]
+            return True
+        return False
+
+    def clear(self) -> None:
+        """Clear all metadata."""
+        self.properties.clear()
+
+    def keys(self) -> List[str]:
+        """Get all metadata keys."""
+        return list(self.properties.keys())
+
+    def copy(self) -> 'MetadataLayer':
+        """Create a copy of this metadata layer."""
+        new_layer = MetadataLayer()
+        new_layer.properties = self.properties.copy()
+        return new_layer
+
+
 class GraphNode:
     """A node in the graph that can hold a value and connect to other nodes."""
 
@@ -146,6 +190,8 @@ class GraphStructure:
     def __init__(self, root_node: Optional[GraphNode] = None):
         self.nodes: Dict[str, GraphNode] = {}
         self.root_node = root_node
+        # Universal metadata layer - always present
+        self.metadata = MetadataLayer()
 
         if root_node:
             self.add_node(root_node)
@@ -327,6 +373,56 @@ class SequentialGraph(GraphStructure):
     def __len__(self) -> int:
         return len(self.sequence_order)
 
+    # Element naming methods (using metadata layer)
+    def set_names(self, names: List[Optional[str]]) -> None:
+        """Set names for all elements (None for unnamed elements)."""
+        if len(names) != len(self.sequence_order):
+            raise ValueError(f"Names list length ({len(names)}) doesn't match sequence length ({len(self.sequence_order)})")
+
+        self.metadata.set("element_names", names)
+
+    def get_names(self) -> List[Optional[str]]:
+        """Get names for all elements (None for unnamed elements)."""
+        default_names = [None] * len(self.sequence_order)
+        return self.metadata.get("element_names", default_names)
+
+    def get_name(self, index: int) -> Optional[str]:
+        """Get the name of an element at given index."""
+        names = self.get_names()
+        if 0 <= index < len(names):
+            return names[index]
+        return None
+
+    def set_name(self, index: int, name: Optional[str]) -> bool:
+        """Set the name for a single element."""
+        if not (0 <= index < len(self.sequence_order)):
+            return False
+
+        names = self.get_names()
+        names[index] = name
+        self.metadata.set("element_names", names)
+        return True
+
+    def get_index_by_name(self, name: str) -> Optional[int]:
+        """Get the index of the first element with the given name."""
+        names = self.get_names()
+        try:
+            return names.index(name)
+        except ValueError:
+            return None
+
+    def get_value_by_name(self, name: str) -> Optional['GlangValue']:
+        """Get the value of an element by its name."""
+        index = self.get_index_by_name(name)
+        if index is not None:
+            return self.get_at_index(index)
+        return None
+
+    def has_names(self) -> bool:
+        """Check if any elements have names."""
+        names = self.get_names()
+        return any(name is not None for name in names)
+
 
 class KeyedGraph(GraphStructure):
     """A graph structure that uses string keys to access values (like a hash)."""
@@ -404,3 +500,63 @@ class KeyedGraph(GraphStructure):
 
     def __len__(self) -> int:
         return len(self.key_to_node)
+
+    # Element naming methods (using metadata layer) - for hash elements by insertion order
+    def set_names(self, names: List[Optional[str]]) -> None:
+        """Set names for all hash elements by insertion order (None for unnamed elements)."""
+        if len(names) != len(self.key_to_node):
+            raise ValueError(f"Names list length ({len(names)}) doesn't match hash size ({len(self.key_to_node)})")
+
+        self.metadata.set("element_names", names)
+
+    def get_names(self) -> List[Optional[str]]:
+        """Get names for all hash elements by insertion order (None for unnamed elements)."""
+        default_names = [None] * len(self.key_to_node)
+        return self.metadata.get("element_names", default_names)
+
+    def get_name(self, index: int) -> Optional[str]:
+        """Get the name of a hash element at given insertion order index."""
+        names = self.get_names()
+        if 0 <= index < len(names):
+            return names[index]
+        return None
+
+    def set_name(self, index: int, name: Optional[str]) -> bool:
+        """Set the name for a single hash element by insertion order index."""
+        if not (0 <= index < len(self.key_to_node)):
+            return False
+
+        names = self.get_names()
+        names[index] = name
+        self.metadata.set("element_names", names)
+        return True
+
+    def has_names(self) -> bool:
+        """Check if any hash elements have names."""
+        names = self.get_names()
+        return any(name is not None for name in names)
+
+    def get_key_by_name(self, name: str) -> Optional[str]:
+        """Get the actual key for a given name."""
+        names = self.get_names()
+        keys = list(self.key_to_node.keys())
+
+        for i, element_name in enumerate(names):
+            if element_name == name and i < len(keys):
+                return keys[i]
+        return None
+
+    def get_value_by_name(self, name: str) -> Optional['GlangValue']:
+        """Get value by name (returns None if name not found)."""
+        key = self.get_key_by_name(name)
+        if key:
+            return self.get(key)
+        return None
+
+    def set_value_by_name(self, name: str, value: 'GlangValue') -> bool:
+        """Set value by name (returns False if name not found)."""
+        key = self.get_key_by_name(name)
+        if key:
+            self.set(key, value)
+            return True
+        return False

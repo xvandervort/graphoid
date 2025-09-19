@@ -1,0 +1,310 @@
+#!/usr/bin/env glang
+
+# ASCII Visualization Demo for Glang
+# Shows how to create basic charts using text characters
+
+print("=== Glang ASCII Visualization Demo ===")
+print("")
+
+# Simple bar chart function
+func bar_chart(values, labels, max_width) {
+    # Find max value for scaling
+    max_val = 0
+    for val in values {
+        if val > max_val {
+            max_val = val
+        }
+    }
+
+    # Create the chart
+    print("Bar Chart:")
+    # Print separator line
+    separator = ""
+    j = 0
+    while j < max_width + 15 {
+        separator = separator + "-"
+        j = j + 1
+    }
+    print(separator)
+
+    i = 0
+    while i < values.size() {
+        if i < labels.size() {
+            label = labels[i]
+            value = values[i]
+
+            # Calculate bar length
+            bar_length = (value * max_width) / max_val
+            bar_length = bar_length.rnd()
+
+            # Create bar string
+            bar = ""
+            j = 0
+            while j < bar_length {
+                bar = bar + "█"
+                j = j + 1
+            }
+
+            # Format output with padding
+            label_padded = label
+            while label_padded.size() < 10 {
+                label_padded = label_padded + " "
+            }
+
+            print(label_padded + " | " + bar + " " + value.to_string())
+        }
+        i = i + 1
+    }
+    # Print separator line
+    separator = ""
+    j = 0
+    while j < max_width + 15 {
+        separator = separator + "-"
+        j = j + 1
+    }
+    print(separator)
+}
+
+# Line chart using ASCII
+func line_chart(values, height, width) {
+    print("Line Chart:")
+    # Print separator
+    sep = ""
+    k = 0
+    while k < width {
+        sep = sep + "-"
+        k = k + 1
+    }
+    print(sep)
+
+    # Find min and max for scaling
+    min_val = values[0]
+    max_val = values[0]
+    for val in values {
+        if val < min_val {
+            min_val = val
+        }
+        if val > max_val {
+            max_val = val
+        }
+    }
+
+    range_val = max_val - min_val
+    if range_val == 0 {
+        range_val = 1
+    }
+
+    # Create the chart grid
+    row = height - 1
+    while row >= 0 {
+        line = ""
+        col = 0
+        while col < values.size() and col < width {
+            # Calculate if this point should be plotted
+            val = values[col]
+            scaled = ((val - min_val) * height) / range_val
+            scaled = scaled.rnd()
+
+            if scaled == row {
+                line = line + "*"
+            } else if row == 0 {
+                line = line + "_"
+            } else {
+                line = line + " "
+            }
+            col = col + 1
+        }
+
+        # Add axis label
+        if row == height - 1 {
+            print(max_val.to_string() + " |" + line)
+        } else if row == 0 {
+            print(min_val.to_string() + " |" + line)
+        } else {
+            print("     |" + line)
+        }
+
+        row = row - 1
+    }
+    # Print separator
+    sep = ""
+    k = 0
+    while k < width {
+        sep = sep + "-"
+        k = k + 1
+    }
+    print(sep)
+}
+
+# Histogram with bins
+func histogram(values, num_bins) {
+    print("Histogram:")
+
+    # Find min and max
+    min_val = values[0]
+    max_val = values[0]
+    for val in values {
+        if val < min_val {
+            min_val = val
+        }
+        if val > max_val {
+            max_val = val
+        }
+    }
+
+    bin_width = (max_val - min_val) / num_bins
+    if bin_width == 0 {
+        bin_width = 1
+    }
+
+    # Count values in each bin
+    bins = []
+    i = 0
+    while i < num_bins {
+        bins.append(0)
+        i = i + 1
+    }
+
+    for val in values {
+        bin_index = ((val - min_val) / bin_width).rnd()
+        if bin_index >= num_bins {
+            bin_index = num_bins - 1
+        }
+        if bin_index < 0 {
+            bin_index = 0
+        }
+        bins[bin_index] = bins[bin_index] + 1
+    }
+
+    # Draw histogram
+    i = 0
+    while i < num_bins {
+        bin_start = min_val + (i * bin_width)
+        bin_end = bin_start + bin_width
+
+        # Create bar
+        bar = ""
+        j = 0
+        while j < bins[i] {
+            bar = bar + "█"
+            j = j + 1
+        }
+
+        print("[" + bin_start.rnd().to_string() + "-" + bin_end.rnd().to_string() + "] " + bar + " (" + bins[i].to_string() + ")")
+        i = i + 1
+    }
+}
+
+# Scatter plot approximation
+func scatter_plot(x_values, y_values, width, height) {
+    print("Scatter Plot:")
+    # Print separator
+    sep = ""
+    k = 0
+    while k < width {
+        sep = sep + "-"
+        k = k + 1
+    }
+    print(sep)
+
+    # Find ranges
+    min_x = x_values[0]
+    max_x = x_values[0]
+    min_y = y_values[0]
+    max_y = y_values[0]
+
+    for x in x_values {
+        if x < min_x { min_x = x }
+        if x > max_x { max_x = x }
+    }
+
+    for y in y_values {
+        if y < min_y { min_y = y }
+        if y > max_y { max_y = y }
+    }
+
+    # Create grid
+    grid = []
+    row = 0
+    while row < height {
+        grid_row = []
+        col = 0
+        while col < width {
+            grid_row.append(" ")
+            col = col + 1
+        }
+        grid.append(grid_row)
+        row = row + 1
+    }
+
+    # Plot points
+    i = 0
+    while i < x_values.size() and i < y_values.size() {
+        x = x_values[i]
+        y = y_values[i]
+
+        # Scale to grid
+        x_pos = ((x - min_x) * (width - 1)) / (max_x - min_x)
+        y_pos = ((y - min_y) * (height - 1)) / (max_y - min_y)
+
+        x_pos = x_pos.rnd()
+        y_pos = (height - 1) - y_pos.rnd()  # Invert Y axis
+
+        if x_pos >= 0 and x_pos < width and y_pos >= 0 and y_pos < height {
+            grid[y_pos][x_pos] = "*"
+        }
+
+        i = i + 1
+    }
+
+    # Display grid
+    for grid_row in grid {
+        line = "|"
+        for cell in grid_row {
+            line = line + cell
+        }
+        print(line)
+    }
+    # Print separator
+    sep = ""
+    k = 0
+    while k < width {
+        sep = sep + "-"
+        k = k + 1
+    }
+    print(sep)
+}
+
+# Demo 1: Sales Bar Chart
+print("1. Monthly Sales Bar Chart")
+sales = [120, 150, 180, 140, 200, 220, 190]
+months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"]
+bar_chart(sales, months, 40)
+print("")
+
+# Demo 2: Temperature Line Chart
+print("2. Temperature Trend Line Chart")
+temperatures = [20, 22, 25, 24, 28, 30, 32, 31, 29, 27, 24, 22]
+line_chart(temperatures, 10, 50)
+print("")
+
+# Demo 3: Grade Distribution Histogram
+print("3. Student Grade Distribution")
+grades = [65, 72, 78, 85, 88, 90, 92, 75, 80, 82, 87, 91, 68, 73, 79, 84, 86, 89, 93, 76]
+histogram(grades, 5)
+print("")
+
+# Demo 4: Height vs Weight Scatter Plot
+print("4. Height vs Weight Correlation")
+heights = [150, 160, 165, 170, 175, 180, 185, 155, 162, 172]
+weights = [50, 60, 62, 70, 75, 80, 85, 55, 63, 72]
+scatter_plot(heights, weights, 40, 10)
+print("")
+
+print("=== Visualization Demo Complete ===")
+print("ASCII charts provide basic data visualization in the terminal!")
+print("Future enhancements could include:")
+print("- Export to SVG/PNG formats")
+print("- Color support for terminal output")
+print("- Interactive chart exploration")
+print("- Integration with statistics module")

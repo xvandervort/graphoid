@@ -306,15 +306,6 @@ class ListValue(GlangValue, GraphContainer):
     def __iter__(self) -> Iterator[GlangValue]:
         return iter(self.elements)
 
-    def __getitem__(self, index: int) -> GlangValue:
-        value = self.get_at_index(index)
-        if value is None:
-            raise IndexError(f"Index {index} out of range")
-        return value
-
-    def __setitem__(self, index: int, value: GlangValue) -> None:
-        if not self.set_at_index(index, value):
-            raise IndexError(f"Index {index} out of range")
 
     def universal_inspect(self) -> 'StringValue':
         """List-specific inspection showing constraint and element count."""
@@ -400,6 +391,78 @@ class ListValue(GlangValue, GraphContainer):
                     return 1
                 else:
                     return 0
+
+    # Metadata layer methods - expose graph metadata functionality
+    @property
+    def metadata(self):
+        """Access the graph's metadata layer."""
+        return self.graph.metadata
+
+    # Element naming methods (R vector style)
+    def set_names(self, names: List[Optional[str]]) -> 'ListValue':
+        """Set names for all elements (None for unnamed elements)."""
+        self.graph.set_names(names)
+        return self
+
+    def get_names(self) -> List[Optional[str]]:
+        """Get names for all elements (None for unnamed elements)."""
+        return self.graph.get_names()
+
+    def get_name(self, index: int) -> Optional[str]:
+        """Get the name of an element at given index."""
+        return self.graph.get_name(index)
+
+    def set_name(self, index: int, name: Optional[str]) -> 'NoneValue':
+        """Set the name for a single element."""
+        from .values import NoneValue
+        self.graph.set_name(index, name)
+        return NoneValue()
+
+    def has_names(self) -> bool:
+        """Check if any elements have names."""
+        return self.graph.has_names()
+
+    def get_by_name(self, name: str) -> Optional[GlangValue]:
+        """Get an element by its name."""
+        return self.graph.get_value_by_name(name)
+
+    # Enhanced indexing to support name-based access
+    def __getitem__(self, key):
+        """Enhanced indexing that supports both numeric and name-based access."""
+        if isinstance(key, int):
+            # Standard numeric indexing with proper bounds checking
+            value = self.get_at_index(key)
+            if value is None:
+                raise IndexError(f"Index {key} out of range")
+            return value
+        elif isinstance(key, str):
+            # Name-based access (new)
+            value = self.get_by_name(key)
+            if value is not None:
+                return value
+            else:
+                # Graceful degradation - return None instead of error
+                return None
+        else:
+            raise TypeError(f"List indices must be integers or strings, not {type(key)}")
+
+    def __setitem__(self, key, value):
+        """Enhanced assignment that supports both numeric and name-based access."""
+        if isinstance(key, int):
+            # Standard numeric assignment with proper bounds checking
+            if not self.set_at_index(key, value):
+                raise IndexError(f"Index {key} out of range")
+        elif isinstance(key, str):
+            # Name-based assignment (new)
+            index = self.graph.get_index_by_name(key)
+            if index is not None:
+                self.set_at_index(index, value)
+            else:
+                # Graceful degradation - could add as new element or ignore
+                # For now, do nothing (like R when accessing non-existent named element)
+                pass
+        else:
+            raise TypeError(f"List indices must be integers or strings, not {type(key)}")
 
 
 class HashValue(GlangValue, GraphContainer):
@@ -625,13 +688,53 @@ class HashValue(GlangValue, GraphContainer):
         return self.has_key(key)
 
     def __getitem__(self, key: str) -> GlangValue:
+        # First try as a regular key
         value = self.get(key)
-        if value is None:
-            raise KeyError(f"Key '{key}' not found")
-        return value
+        if value is not None:
+            return value
+
+        # If not found, try as a name
+        value = self.graph.get_value_by_name(key)
+        if value is not None:
+            return value
+
+        raise KeyError(f"Key '{key}' not found")
 
     def __setitem__(self, key: str, value: GlangValue) -> None:
-        self.set(key, value)
+        # First check if it's an existing key
+        if self.has_key(key):
+            self.set(key, value)
+        # Otherwise, check if it's a name
+        elif self.graph.set_value_by_name(key, value):
+            # Successfully set by name
+            pass
+        else:
+            # Neither a key nor a name - create new key
+            self.set(key, value)
+
+    # Element naming methods (R vector style) - same as lists for consistency
+    def set_names(self, names: List[Optional[str]]) -> 'HashValue':
+        """Set names for all hash elements (None for unnamed elements)."""
+        self.graph.set_names(names)
+        return self
+
+    def get_names(self) -> List[Optional[str]]:
+        """Get names for all hash elements (None for unnamed elements)."""
+        return self.graph.get_names()
+
+    def get_name(self, index: int) -> Optional[str]:
+        """Get the name of a hash element at given index."""
+        return self.graph.get_name(index)
+
+    def set_name(self, index: int, name: Optional[str]) -> 'NoneValue':
+        """Set the name for a single hash element."""
+        from .values import NoneValue
+        self.graph.set_name(index, name)
+        return NoneValue()
+
+    def has_names(self) -> bool:
+        """Check if any hash elements have names."""
+        return self.graph.has_names()
 
     def _deep_freeze(self):
         """Freeze all values in the hash (deep freeze)."""

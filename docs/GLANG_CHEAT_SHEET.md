@@ -36,6 +36,13 @@ numbers[0]                 # Get: 1
 numbers[0] = 99           # Set
 numbers.append(6)         # Add to end
 numbers.size()            # Get length: 6
+
+# Element naming (R vector style)
+heights = [165, 180, 175].set_names(["alice", "bob", "charlie"])
+heights["alice"]           # Get by name: 165 (same as heights[0])
+heights[0]                 # Get by index: 165 (same as heights["alice"])
+heights.get_names()        # Get all names: ["alice", "bob", "charlie"]
+heights.has_names()        # Check if named: true
 ```
 
 ### Data Nodes (Key-Value Pairs)
@@ -63,6 +70,13 @@ settings.get("theme")     # Get data node
 settings.has_key("debug") # Check existence: true
 settings.keys()           # Get all keys as list
 settings.values()         # Get all values as list
+
+# Element naming (for additional metadata)
+config = { "host": "localhost", "port": 8080 }.set_names(["server", "connection"])
+config["host"]            # Access by key: { "host": "localhost" }
+config["server"]          # Access by name: { "host": "localhost" } (same element)
+config.get_names()        # Get all names: ["server", "connection"]
+config.has_names()        # Check if named: true
 ```
 
 ## 🔄 Control Flow

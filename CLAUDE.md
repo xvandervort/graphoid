@@ -786,6 +786,7 @@ The Bitcoin tracker and cryptocurrency analytics experiments that identified the
 - **⏳ System Library**: OS interaction, processes
 - **⏳ HTML Parsing Library**: Standard library for web scraping and HTML processing (identified during Bitcoin tracker development)
 - **⏳ Native Behavior Syntax**: `value: type with [behaviors...]` language integration
+- **⏳ R-Style Named Initialization**: `[red = 1, green = 2, blue = 3]` syntax for inline element naming (cleaner than method chaining)
 
 ### Medium-Term Goals (Q2-Q3 2025)
 **Build True Graph Foundation** - Transform containers into real graphs:

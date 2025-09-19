@@ -250,14 +250,23 @@ class ASTExecutor(BaseASTVisitor):
                     node.target.position
                 )
             
-            if not isinstance(index_value, NumberValue) or not isinstance(index_value.value, int):
+            # Support both integer and string indices for enhanced indexing
+            if isinstance(index_value, NumberValue) and isinstance(index_value.value, int):
+                # Integer indexing
+                index_key = index_value.value
+            elif isinstance(index_value, StringValue):
+                # String-based name indexing
+                index_key = index_value.value
+            else:
                 raise RuntimeError(
-                    f"List index must be integer, got {index_value.get_type()}",
+                    f"List index must be integer or string, got {index_value.get_type()}",
                     node.target.indices[0].position
                 )
-            
-            target_value[index_value.value] = value
-            self.result = f"Set {node.target.target.name}[{index_value.value}] = {value.to_display_string()}"
+
+            target_value[index_key] = value
+            # Get target name safely - could be VariableRef or nested IndexAccess
+            target_name = getattr(node.target.target, 'name', 'target')
+            self.result = f"Set {target_name}[{index_key}] = {value.to_display_string()}"
         
         elif isinstance(node.target, (MethodCall, MethodCallExpression)):
             # Method call assignment - provide specific error messages
@@ -507,20 +516,25 @@ class ASTExecutor(BaseASTVisitor):
         # Handle list indexing (both old and new implementations)
         # Using already imported ListValue, HashValue
         if isinstance(target_value, (ListValue, ListValue)):
-            if not isinstance(index_value, NumberValue) or not isinstance(index_value.value, int):
+            # Support both integer and string indices for enhanced indexing
+            if isinstance(index_value, NumberValue) and isinstance(index_value.value, int):
+                # Integer indexing
+                index_key = index_value.value
+            elif isinstance(index_value, StringValue):
+                # String-based name indexing
+                index_key = index_value.value
+            else:
                 raise RuntimeError(
-                    f"List index must be integer, got {index_value.get_type()}",
+                    f"List index must be integer or string, got {index_value.get_type()}",
                     node.indices[0].position
                 )
+
             # Use the appropriate method based on the implementation
             if hasattr(target_value, 'get_element'):
-                self.result = target_value.get_element(index_value.value)
+                self.result = target_value.get_element(index_key)
             else:
-                # ListValue uses get_at_index
-                result = target_value.get_at_index(index_value.value)
-                if result is None:
-                    raise RuntimeError(f"Index {index_value.value} out of range", node.indices[0].position)
-                self.result = result
+                # Use graph-based ListValue implementation with enhanced indexing
+                self.result = target_value[index_key]
         
         # Handle string indexing
         elif isinstance(target_value, StringValue):
@@ -544,18 +558,17 @@ class ASTExecutor(BaseASTVisitor):
                     f"Hash index must be string, got {index_value.get_type()}",
                     node.indices[0].position
                 )
-            
+
             key = index_value.value
-            value = target_value.get(key)
-            
-            if value is None:
+
+            # Use HashValue's enhanced __getitem__ which handles both keys and names
+            try:
+                self.result = target_value[key]
+            except KeyError:
                 raise RuntimeError(
                     f"Key '{key}' not found in map",
                     node.indices[0].position
                 )
-            
-            # Return the value directly (new intuitive behavior!)
-            self.result = value
         
         else:
             raise RuntimeError(
@@ -724,7 +737,7 @@ class ASTExecutor(BaseASTVisitor):
 
         # Type-specific methods
         type_methods = {
-            'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort', 'map', 'filter', 'select', 'reject', 'each', 'clear', 'empty', 'pop', 'remove', 'constraint', 'types', 'type_summary', 'validate_constraint', 'coerce_to_constraint', 'to_string', 'to_bool', 'can_accept', 'add_edge', 'get_connected_to', 'to_graph'] + behavior_methods,
+            'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort', 'map', 'filter', 'select', 'reject', 'each', 'clear', 'empty', 'pop', 'remove', 'constraint', 'types', 'type_summary', 'validate_constraint', 'coerce_to_constraint', 'to_string', 'to_bool', 'can_accept', 'add_edge', 'get_connected_to', 'to_graph', 'set_names', 'get_names', 'has_names', 'get_name', 'set_name'] + behavior_methods,
             'string': ['length', 'contains', 'extract', 'count', 'count_chars', 'find_first', 'find_first_char', 'up', 'toUpper', 'down', 'toLower', 'split', 'split_on_any', 'trim', 'join', 'matches', 'replace', 'find_all', 'findAll', 'is_email', 'is_number', 'is_url', 'reverse', 'unique', 'chars', 'starts_with', 'ends_with', 'to_string', 'to_num', 'to_bool', 'to_time'],
             'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time'],
             'bool': ['flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'],
@@ -1218,6 +1231,98 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"clear_rules() takes no arguments, got {len(args)}", position)
             return target.clear_rules()
+
+        # Metadata layer methods
+        elif method_name == "set_names":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"set_names() takes 1 argument, got {len(args)}", position)
+
+            # Convert Glang list to Python list of optional strings
+            names_list = args[0]
+            if not isinstance(names_list, ListValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"set_names() expects a list, got {names_list.get_type()}", position)
+
+            python_names = []
+            for elem in names_list.elements:
+                if isinstance(elem, StringValue):
+                    python_names.append(elem.value)
+                elif isinstance(elem, NoneValue):
+                    python_names.append(None)
+                else:
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"Names must be strings or nil, got {elem.get_type()}", position)
+
+            return target.set_names(python_names)
+
+        elif method_name == "get_names":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_names() takes no arguments, got {len(args)}", position)
+
+            # Convert Python list back to Glang list
+            python_names = target.get_names()
+            glang_names = []
+            for name in python_names:
+                if name is None:
+                    glang_names.append(NoneValue(position))
+                else:
+                    glang_names.append(StringValue(name, position))
+
+            return ListValue(glang_names, None, position)
+
+        elif method_name == "has_names":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"has_names() takes no arguments, got {len(args)}", position)
+
+            return BooleanValue(target.has_names(), position)
+
+        elif method_name == "get_name":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_name() takes 1 argument, got {len(args)}", position)
+
+            index_arg = args[0]
+            if not isinstance(index_arg, NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_name() expects integer index, got {index_arg.get_type()}", position)
+
+            name = target.get_name(int(index_arg.value))
+            if name is None:
+                return NoneValue(position)
+            else:
+                    return StringValue(name, position)
+
+        elif method_name == "set_name":
+            if len(args) != 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"set_name() takes 2 arguments, got {len(args)}", position)
+
+            index_arg, name_arg = args
+            if not isinstance(index_arg, NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"set_name() expects integer index, got {index_arg.get_type()}", position)
+
+            if isinstance(name_arg, StringValue):
+                name = name_arg.value
+            elif isinstance(name_arg, NoneValue):
+                name = None
+            else:
+                from .errors import ArgumentError
+                raise ArgumentError(f"set_name() expects string or nil, got {name_arg.get_type()}", position)
+
+            return target.set_name(int(index_arg.value), name)
+
+        elif method_name == "metadata":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"metadata property takes no arguments, got {len(args)}", position)
+
+            # Return the metadata layer as a special metadata value that can be used for get/set operations
+            # For now, return a placeholder since we need to implement a MetadataValue type
+            return StringValue("metadata_access_placeholder", position)
 
         # Check if it's a universal method
         elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
@@ -2383,6 +2488,100 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"clear_rules() takes no arguments, got {len(args)}", position)
             return target.clear_rules()
 
+        # Metadata layer methods
+        elif method_name == "set_names":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"set_names() takes 1 argument, got {len(args)}", position)
+
+            # Convert Glang list to Python list of optional strings
+            names_list = args[0]
+            if not isinstance(names_list, ListValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"set_names() expects a list, got {names_list.get_type()}", position)
+
+            python_names = []
+            for elem in names_list.elements:
+                if isinstance(elem, StringValue):
+                    python_names.append(elem.value)
+                elif isinstance(elem, NoneValue):
+                    python_names.append(None)
+                else:
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"Names must be strings or nil, got {elem.get_type()}", position)
+
+            return target.set_names(python_names)
+
+        elif method_name == "get_names":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_names() takes no arguments, got {len(args)}", position)
+
+            # Convert Python list back to Glang list
+            python_names = target.get_names()
+            glang_names = []
+            for name in python_names:
+                if name is None:
+                    glang_names.append(NoneValue(position))
+                else:
+                    glang_names.append(StringValue(name, position))
+
+            return ListValue(glang_names, None, position)
+
+        elif method_name == "has_names":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"has_names() takes no arguments, got {len(args)}", position)
+
+            return BooleanValue(target.has_names(), position)
+
+        elif method_name == "get_name":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_name() takes 1 argument, got {len(args)}", position)
+
+            index_arg = args[0]
+            if not isinstance(index_arg, NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_name() expects integer index, got {index_arg.get_type()}", position)
+
+            name = target.get_name(int(index_arg.value))
+            if name is None:
+                return NoneValue(position)
+            else:
+                    return StringValue(name, position)
+
+        elif method_name == "set_name":
+            if len(args) != 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"set_name() takes 2 arguments, got {len(args)}", position)
+
+            index_arg = args[0]
+            name_arg = args[1]
+
+            if not isinstance(index_arg, NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"set_name() expects integer index, got {index_arg.get_type()}", position)
+
+            if isinstance(name_arg, StringValue):
+                name = name_arg.value
+            elif isinstance(name_arg, NoneValue):
+                name = None
+            else:
+                from .errors import ArgumentError
+                raise ArgumentError(f"set_name() expects string or nil, got {name_arg.get_type()}", position)
+
+            return target.set_name(int(index_arg.value), name)
+
+        elif method_name == "metadata":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"metadata property takes no arguments, got {len(args)}", position)
+
+            # Return the metadata layer as a special metadata value that can be used for get/set operations
+            # For now, return a placeholder since we need to implement a MetadataValue type
+            return StringValue("metadata_access_placeholder", position)
+
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "hash", position)
@@ -2621,18 +2820,27 @@ class ASTExecutor(BaseASTVisitor):
 
         # Handle list index assignment (both old and new implementations)
         if isinstance(target_value, (ListValue, ListValue)):
-            if not isinstance(index_value, NumberValue) or not isinstance(index_value.value, int):
+            # Support both integer and string indices for enhanced indexing
+            if isinstance(index_value, NumberValue) and isinstance(index_value.value, int):
+                # Integer indexing
+                index_key = index_value.value
+            elif isinstance(index_value, StringValue):
+                # String-based name indexing
+                index_key = index_value.value
+            else:
                 raise RuntimeError(
-                    f"List index must be integer, got {index_value.get_type()}",
+                    f"List index must be integer or string, got {index_value.get_type()}",
                     node.target.indices[0].position
                 )
 
-            # Use graph-based ListValue implementation
+            # Use graph-based ListValue implementation with enhanced indexing
             try:
-                target_value[index_value.value] = value
+                target_value[index_key] = value
             except (IndexError, TypeError) as e:
-                raise RuntimeError(f"Index {index_value.value} out of range", node.target.indices[0].position)
-            self.result = f"Set {node.target.target.name}[{index_value.value}] = {value.to_display_string()}"
+                raise RuntimeError(f"Index {index_key} out of range", node.target.indices[0].position)
+            # Get target name safely - could be VariableRef or nested IndexAccess
+            target_name = getattr(node.target.target, 'name', 'target')
+            self.result = f"Set {target_name}[{index_key}] = {value.to_display_string()}"
 
         # Handle hash index assignment - creates/updates data node (both old and new implementations)
         elif isinstance(target_value, (HashValue, HashValue)):
@@ -2641,11 +2849,13 @@ class ASTExecutor(BaseASTVisitor):
                     f"Hash index must be string, got {index_value.get_type()}",
                     node.target.indices[0].position
                 )
-            
+
             key = index_value.value
-            # Set the key-value pair in the map (this creates the data node internally)
-            target_value.set(key, value)
-            self.result = f"Set {node.target.target.name}['{key}'] = {value.to_display_string()}"
+            # Use HashValue's enhanced __setitem__ which handles both keys and names
+            target_value[key] = value
+            # Get target name safely - could be VariableRef or nested IndexAccess
+            target_name = getattr(node.target.target, 'name', 'target')
+            self.result = f"Set {target_name}['{key}'] = {value.to_display_string()}"
         
         else:
             raise RuntimeError(
@@ -2660,12 +2870,36 @@ class ASTExecutor(BaseASTVisitor):
     def visit_slice_access(self, node) -> None:
         """Visit slice access for strings and lists."""
         target_value = self.execute(node.target)
-        
+
         # Evaluate slice parameters
         start = None if node.start is None else self.execute(node.start)
         stop = None if node.stop is None else self.execute(node.stop)
         step = None if node.step is None else self.execute(node.step)
-        
+
+        # Helper function to convert name to index for lists with names
+        def name_to_index(param, param_name, target_value):
+            """Convert a string name to an index for slicing."""
+            if isinstance(param, StringValue) and isinstance(target_value, ListValue):
+                # Try to find the index of this name
+                names = target_value.get_names()
+                name_str = param.value
+                try:
+                    index = names.index(name_str)
+                    # Keep the same exclusive stop behavior as numeric slicing
+                    return NumberValue(index, param.position)
+                except (ValueError, AttributeError):
+                    raise RuntimeError(
+                        f"Name '{name_str}' not found in list names",
+                        node.position
+                    )
+            return param
+
+        # Convert string names to indices for lists
+        if isinstance(target_value, ListValue):
+            start = name_to_index(start, "start", target_value)
+            stop = name_to_index(stop, "stop", target_value)
+            # Note: step should always be numeric, not a name
+
         # Validate slice parameters are integers or None
         for param, name in [(start, "start"), (stop, "stop"), (step, "step")]:
             if param is not None:
@@ -2674,7 +2908,7 @@ class ASTExecutor(BaseASTVisitor):
                         f"Slice {name} must be integer, got {param.get_type()}",
                         node.position
                     )
-        
+
         # Extract integer values or None
         start_val = None if start is None else start.value
         stop_val = None if stop is None else stop.value
