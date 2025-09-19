@@ -2184,33 +2184,7 @@ class ASTExecutor(BaseASTVisitor):
                             args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle hash method calls."""
         
-        if method_name == "get":
-            # Issue deprecation warning
-            import warnings
-            warnings.warn(
-                "The hash.get() method is deprecated. Use hash[key] for direct value access or hash.node(key) for data node access.",
-                DeprecationWarning,
-                stacklevel=2
-            )
-
-            if len(args) != 1:
-                from .errors import ArgumentError
-                raise ArgumentError(f"get() takes 1 argument, got {len(args)}", position)
-
-            key_arg = args[0]
-            if not isinstance(key_arg, StringValue):
-                from .errors import ArgumentError
-                raise ArgumentError(f"Hash key must be string, got {key_arg.get_type()}", position)
-
-            value = target.get(key_arg.value)
-            if value is None:
-                return StringValue("", position)  # Return empty string for missing keys
-
-            # Return as data node (backward compatibility with old behavior)
-            from .values import DataValue
-            return DataValue(key_arg.value, value, target.constraint, position)
-
-        elif method_name == "node":
+        if method_name == "node":
             if len(args) != 1:
                 from .errors import ArgumentError
                 raise ArgumentError(f"node() takes 1 argument, got {len(args)}", position)

@@ -94,8 +94,8 @@ class TestMapExecution:
             assert len(result.value.pairs) == 2
         else:
             assert len(result.value.graph) == 2
-        assert result.value.get("host").value == "localhost"
-        assert result.value.get("port").value == 8080
+        assert result.value["host"].value == "localhost"
+        assert result.value["port"].value == 8080
     
     def test_hash_variable_declaration(self):
         """Test declaring hash variables."""
@@ -110,8 +110,8 @@ class TestMapExecution:
         result = session.execute_statement('config')
         assert result.success
         assert isinstance(result.value, HashValue)
-        assert result.value.get("debug").value is True
-        assert result.value.get("port").value == 3000
+        assert result.value["debug"].value == True
+        assert result.value["port"].value == 3000
     
     def test_constrained_hash_declaration(self):
         """Test hash with type constraints."""
@@ -139,22 +139,20 @@ class TestMapExecution:
 class TestMapMethods:
     """Test hash method calls."""
     
-    def test_hash_get_method(self):
-        """Test hash.get() method (deprecated)."""
+    def test_hash_node_method(self):
+        """Test hash.node() method (replacement for deprecated get)."""
         session = ExecutionSession()
         session.execute_statement('hash config = { "host": "localhost", "port": 8080 }')
 
-        # Get existing key - now returns data node, not raw value
-        with pytest.warns(DeprecationWarning, match="The hash.get\\(\\) method is deprecated"):
-            result = session.execute_statement('config.get("host")')
+        # Get existing key as data node
+        result = session.execute_statement('config.node("host")')
         assert result.success
         assert str(result.value) == '{ "host": localhost }'
 
-        # Get missing key (should return empty string)
-        with pytest.warns(DeprecationWarning, match="The hash.get\\(\\) method is deprecated"):
-            result = session.execute_statement('config.get("missing")')
-        assert result.success
-        assert str(result.value) == ""
+        # Missing key should raise error (unlike deprecated get which returned empty string)
+        result = session.execute_statement('config.node("missing")')
+        assert not result.success
+        assert "not found" in str(result.error)
     
     def test_hash_set_method(self):
         """Test hash.set() method."""
@@ -165,9 +163,8 @@ class TestMapMethods:
         result = session.execute_statement('config.set("port", 8080)')
         assert result.success
 
-        # Verify it was set - get() now returns data node
-        with pytest.warns(DeprecationWarning, match="The hash.get\\(\\) method is deprecated"):
-            result = session.execute_statement('config.get("port")')
+        # Verify it was set using node() method
+        result = session.execute_statement('config.node("port")')
         assert result.success
         assert str(result.value) == '{ "port": 8080 }'
 
@@ -175,10 +172,9 @@ class TestMapMethods:
         result = session.execute_statement('config.set("host", "127.0.0.1")')
         assert result.success
 
-        with pytest.warns(DeprecationWarning, match="The hash.get\\(\\) method is deprecated"):
-            result = session.execute_statement('config.get("host")')
+        result = session.execute_statement('config.node("host")')
         assert result.success
-        assert str(result.value) == '{ "host": 127.0.0.1 }'  # get() returns data node
+        assert str(result.value) == '{ "host": 127.0.0.1 }'  # node() returns data node
     
     def test_hash_has_key_method(self):
         """Test hash.has_key() method."""
@@ -334,7 +330,7 @@ class TestMapMethods:
         result = session.execute_statement('hash1.merge(hash3)')
         assert result.success
         
-        result = session.execute_statement('hash1.get("a")')
+        result = session.execute_statement('hash1.node("a")')
         assert result.success
         assert str(result.value) == '{ "a": 999 }'
     
@@ -367,14 +363,14 @@ class TestMapMethods:
         assert result.success
         assert result.value.value is True
         
-        # Verify the data node values - get() returns data node, not raw value
-        result = session.execute_statement('people.get("name")')
+        # Verify the data node values - node() returns data node, not raw value
+        result = session.execute_statement('people.node("name")')
         assert result.success
-        assert str(result.value) == '{ "name": Alice }'  # get() returns data node
-        
-        result = session.execute_statement('people.get("age")')
+        assert str(result.value) == '{ "name": Alice }'  # node() returns data node
+
+        result = session.execute_statement('people.node("age")')
         assert result.success
-        assert str(result.value) == '{ "age": 25 }'  # get() returns data node
+        assert str(result.value) == '{ "age": 25 }'  # node() returns data node
     
     def test_hash_pop_method(self):
         """Test hash.pop() method."""
@@ -501,7 +497,7 @@ class TestMapSemanticAnalysis:
         assert result.success
         
         # Valid method
-        ast = parser.parse('config.get("host")')
+        ast = parser.parse('config.node("host")')
         result = analyzer.analyze(ast, clear_state=False)
         assert result.success
         
@@ -575,8 +571,8 @@ class TestHashIndexAccess:
         assert isinstance(result.value, BooleanValue)
         assert result.value.value is True
 
-    def test_hash_index_vs_get_method(self):
-        """Test difference between hash[key] and hash.get(key)."""
+    def test_hash_index_vs_node_method(self):
+        """Test difference between hash[key] and hash.node(key)."""
         session = ExecutionSession()
         session.execute_statement('hash data = { "name": "Alice", "age": 25 }')
 
@@ -586,11 +582,10 @@ class TestHashIndexAccess:
         assert isinstance(result.value, StringValue)
         assert result.value.value == "Alice"
 
-        # hash.get(key) returns data node
-        with pytest.warns(DeprecationWarning, match="The hash.get\\(\\) method is deprecated"):
-            result = session.execute_statement('data.get("name")')
+        # hash.node(key) returns data node
+        result = session.execute_statement('data.node("name")')
         assert result.success
-        # get() method should return data node representation
+        # node() method returns data node representation
         assert str(result.value) == '{ "name": Alice }'
 
     def test_hash_index_with_variables(self):
@@ -726,31 +721,23 @@ result
         # result = session.execute_statement('config["server"]["host"]')
         # For now, just verify we can get the nested hash
 
-    def test_backward_compatibility_preservation(self):
-        """Test that .get() method still works as before for backward compatibility (deprecated)."""
+    def test_hash_index_vs_node_behavior(self):
+        """Test behavior differences between hash[key] and hash.node(key)."""
         session = ExecutionSession()
         session.execute_statement('hash config = { "host": "localhost", "port": 8080 }')
 
-        # .get() should still return data nodes as before
-        with pytest.warns(DeprecationWarning, match="The hash.get\\(\\) method is deprecated"):
-            result = session.execute_statement('config.get("host")')
-        assert result.success
-        assert str(result.value) == '{ "host": localhost }'
-
-        # .get() with missing key returns empty string
-        with pytest.warns(DeprecationWarning, match="The hash.get\\(\\) method is deprecated"):
-            result = session.execute_statement('config.get("missing")')
-        assert result.success
-        assert str(result.value) == ""
-
-        # Compare: hash[key] vs hash.get(key) for existing key
+        # Compare: hash[key] vs hash.node(key) for existing key
         result1 = session.execute_statement('config["host"]')
-        with pytest.warns(DeprecationWarning, match="The hash.get\\(\\) method is deprecated"):
-            result2 = session.execute_statement('config.get("host")')
+        result2 = session.execute_statement('config.node("host")')
 
         assert result1.success and result2.success
         assert result1.value.value == "localhost"  # Direct value
         assert str(result2.value) == '{ "host": localhost }'  # Data node representation
+
+        # Missing key behavior: [key] raises error, node() also raises error
+        result1 = session.execute_statement('config["missing"]')
+        result2 = session.execute_statement('config.node("missing")')
+        assert not result1.success and not result2.success
 
 
 class TestMapEdgeCases:
@@ -761,14 +748,12 @@ class TestMapEdgeCases:
         session = ExecutionSession()
         session.execute_statement('hash config = { "host": "localhost" }')
         
-        # get() with wrong argument count
-        with pytest.warns(DeprecationWarning, match="The hash.get\\(\\) method is deprecated"):
-            result = session.execute_statement('config.get()')
+        # node() with wrong argument count
+        result = session.execute_statement('config.node()')
         assert not result.success
         assert "argument" in str(result.error)
 
-        with pytest.warns(DeprecationWarning, match="The hash.get\\(\\) method is deprecated"):
-            result = session.execute_statement('config.get("host", "extra")')
+        result = session.execute_statement('config.node("host", "extra")')
         assert not result.success
         assert "argument" in str(result.error)
         
@@ -782,9 +767,8 @@ class TestMapEdgeCases:
         session = ExecutionSession()
         session.execute_statement('hash config = { "host": "localhost" }')
         
-        # Non-string key
-        with pytest.warns(DeprecationWarning, match="The hash.get\\(\\) method is deprecated"):
-            result = session.execute_statement('config.get(123)')
+        # Non-string key for node()
+        result = session.execute_statement('config.node(123)')
         assert not result.success
         assert "string" in str(result.error)
         

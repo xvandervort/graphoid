@@ -151,7 +151,7 @@ class SemanticAnalyzer(BaseASTVisitor):
                         symbol = self.symbol_table.lookup_symbol(expr.target.name)
                         return symbol.symbol_type
                 return None  # Cannot determine
-            elif expr.method_name in ['get', 'pop']:
+            elif expr.method_name in ['node', 'pop']:
                 # Hash methods that return data nodes
                 return 'data'
             elif expr.method_name == 'keys':
@@ -701,7 +701,7 @@ class SemanticAnalyzer(BaseASTVisitor):
             'bool': {'flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'} | universal_methods,
             'data': {'key', 'value'} | universal_methods,
             'hash': {
-                'get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop',
+                'node', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop',
                 'to_string', 'to_bool', 'can_accept',
                 'add_value_edge', 'get_connected_keys',
                 'set_names', 'get_names', 'has_names', 'get_name', 'set_name', 'metadata'
