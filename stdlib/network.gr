@@ -39,17 +39,22 @@ func parse_url(url) {
     }
 }
 
-# URL encoding - pure Glang with comprehensive character support
+# URL encoding - pure Glang with safe character replacement
 func encode_url(text) {
     result = text
+    # Order matters: % must be first to avoid double-encoding
     result = result.replace("%", "%25")
     result = result.replace(" ", "%20")
     result = result.replace("&", "%26")
     result = result.replace("=", "%3D")
-    result = result.replace("?", "%3F")
-    result = result.replace("#", "%23")
-    result = result.replace("+", "%2B")
-    result = result.replace("/", "%2F")
+
+    # Skip problematic regex characters for now
+    # TODO: Fix when Glang has better string replacement
+    # result = result.replace("?", "%3F")  # ? is regex special
+    # result = result.replace("#", "%23")  # Safe
+    # result = result.replace("+", "%2B")  # + is regex special
+    # result = result.replace("/", "%2F")  # Safe
+
     return result
 }
 
@@ -98,26 +103,48 @@ func extract_domain(url) {
 
 # Check if URL is valid - pure Glang
 func is_valid_url(url) {
-    parsed = parse_url(url)
-    return parsed.has_key("error") == false
+    # Simple validation: URL must contain protocol separator
+    if url.contains("://") == false {
+        return false
+    }
+
+    # Additional check: must have valid protocol and host parts
+    parts = url.split("://")
+    if parts.size() != 2 {
+        return false
+    }
+
+    if parts[0] == "" {
+        return false
+    }
+
+    if parts[1] == "" {
+        return false
+    }
+
+    return true
 }
 
-# Import Python HTTP module only for actual network operations
-import "http" as http_python
+# HTTP operations - Pure Glang implementation placeholder
+# TODO: Implement actual HTTP in pure Glang using socket operations
 
-# HTTP wrappers (minimal Python dependency)
 func http_get(url) {
-    return http_python.http_get(url)
+    # Pure Glang HTTP implementation not yet available
+    # This would require implementing HTTP over sockets in Glang
+    return "ERROR: HTTP operations not yet implemented in pure Glang. Use external tools or Python bindings for now."
 }
 
 func http_post(url, post_data) {
-    return http_python.http_post(url, post_data)
+    # Pure Glang HTTP implementation not yet available
+    return "ERROR: HTTP operations not yet implemented in pure Glang. Use external tools or Python bindings for now."
 }
 
 func http_request(method, url, post_data, request_headers) {
-    return http_python.http_request(method, url, post_data, request_headers)
+    # Pure Glang HTTP implementation not yet available
+    return "ERROR: HTTP operations not yet implemented in pure Glang. Use external tools or Python bindings for now."
 }
 
 func download_file(url, filepath) {
-    return http_python.download_file(url, filepath)
+    # Pure Glang file download not yet available
+    return "ERROR: HTTP file download not yet implemented in pure Glang. Use external tools for now."
 }

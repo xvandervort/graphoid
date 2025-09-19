@@ -1,0 +1,70 @@
+#!/usr/bin/env glang
+
+# Network Module Demo - Pure Glang Implementation
+# Demonstrates URL operations and shows what's not yet implemented
+
+import "network" as net
+
+print("=== Glang Email Module Demo ===")
+
+# Example 1: Email Validation
+print("\n1. Email Validation")
+test_emails = [
+    "valid@example.com",
+    "user.name@domain.org",
+    "invalid-email",
+    "missing@domain"
+]
+
+for email in test_emails {
+    is_valid = http.validate_email(email)
+    status = "❌ Invalid"
+    if is_valid {
+        status = "✅ Valid"
+    }
+    print(email + " -> " + status)
+}
+
+# Example 2: Email Sending (Demo - would require real credentials)
+print("\n2. Email Sending (Demo)")
+print("Note: Actual sending requires SMTP credentials")
+
+recipient = "user@example.com"
+subject = "Test from Glang"
+message = "This is a test email sent from the Glang programming language!"
+
+print("Would send email:")
+print("  To: " + recipient)
+print("  Subject: " + subject)
+print("  Body: " + message)
+
+# Validate recipient before sending
+if http.validate_email(recipient) {
+    print("  Status: ✅ Recipient email is valid")
+
+    # Example of how to send (commented out - requires credentials):
+    # result = http.send_email(recipient, subject, message, none, none, "your_email@gmail.com", "your_password")
+    # print("  Email sent: " + result.to_string())
+
+    print("  Status: 📧 Ready to send (credentials needed)")
+} else {
+    print("  Status: ❌ Invalid recipient email")
+}
+
+# Example 3: Simple Notification
+print("\n3. Simple Notification (Demo)")
+notification_message = "System alert: Your Glang program has completed successfully!"
+
+print("Would send notification:")
+print("  Message: " + notification_message)
+print("  Type: Simple notification email")
+
+# Example of notification sending (commented out):
+# result = http.send_notification("admin@example.com", notification_message, "your_email@gmail.com", "your_password")
+
+print("\n=== Email Demo Complete ===")
+print("💡 To use email functionality:")
+print("   1. Set up Gmail app password or SMTP server")
+print("   2. Use http.send_email() with credentials")
+print("   3. Use http.send_notification() for simple alerts")
+print("   4. Always validate emails with http.validate_email() first")

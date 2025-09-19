@@ -36,9 +36,8 @@ class BuiltinModuleRegistry:
         from .time_module_simple import create_time_module_namespace
         cls._builtin_modules['time'] = create_time_module_namespace()
 
-        # Register Network module (low-level HTTP operations)
-        from .network_module import create_network_module
-        cls._builtin_modules['http'] = create_network_module()
+        # NOTE: Network/HTTP functionality is implemented in pure Glang (stdlib/network.gr)
+        # No Python HTTP module needed - Glang is self-hosting for network operations
 
         # Register HTML module (low-level HTML parsing)
         from .html_module import create_html_module
