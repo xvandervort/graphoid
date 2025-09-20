@@ -683,7 +683,7 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'types', 'coerce_to_constraint', 'indexOf', 'count', 'min', 'max', 'sum', 'sort',
                 'map', 'filter', 'each', 'select', 'reject',
                 'to_string', 'to_bool',
-                'add_edge', 'get_connected_to', 'to_graph',
+                'add_edge', 'get_connected_to', 'to_graph', 'get_edges', 'get_edge_count', 'can_add_edge',
                 'set_names', 'get_names', 'has_names', 'get_name', 'set_name', 'metadata'
             } | universal_methods | behavior_methods,
             'string': {

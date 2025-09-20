@@ -37,6 +37,35 @@ This represents a major architectural challenge but is essential for Glang's uni
 
 ## Recent Changes (September 2025)
 
+### 🚧 IN PROGRESS: Edge Governance System (December 2025)
+**MULTI-WEEK PROJECT: Implementing safe graph operations**
+
+- **🎯 GOAL**: Add Layer 3 (Control) to existing graph architecture for safe edge operations
+- **⚠️ PROBLEM SOLVED**: Current edge system allows dangerous operations (cycles, cross-contamination)
+- **🏗️ ARCHITECTURE**: Building on five-layer graph vision (Data, Behavior, **Control**, Metadata, System Boundary)
+- **📋 CURRENT FOCUS**: Practical implementation for binary trees and DataFrames
+
+**🗓️ Progress Tracking (8-week timeline):**
+- **Week 1**: ✅ **COMPLETED** - Basic control layer + essential rules (`no_list_cycles`, `same_structure_only`)
+  - ✅ `ControlLayer` class with validation framework
+  - ✅ Two fundamental rules: cycle prevention & cross-structure protection
+  - ✅ Integration with `GraphNode.add_edge_to()`
+  - ✅ Edge inspection methods: `get_edges()`, `get_edge_count()`, `can_add_edge()`
+  - ✅ Language integration: all methods work from Glang code
+  - ✅ **VERIFICATION**: All tests pass - dangerous operations correctly blocked!
+- **Week 2**: ⏳ Inspection tools + simple rule management
+- **Week 3-4**: ⏳ Binary tree implementation with tree-specific rules
+- **Week 5-7**: ⏳ DataFrame foundation with structure rules
+- **Week 8**: ⏳ Testing, polish, documentation
+
+**📋 IMPLEMENTATION EVIDENCE**: See design in `dev_docs/EDGE_GOVERNANCE_DESIGN.md`
+**🔬 KEY PRINCIPLE**: Strict by default, explicit opt-out for power users
+**🎯 PRACTICAL FOCUS**: Binary trees first, then DataFrames - no user-exposed edge manipulation
+
+**This establishes Glang as the first language with intrinsic multi-layer graph governance for safe graph programming.**
+
+---
+
 ### ✅ FOUNDATIONAL ARCHITECTURE BREAKTHROUGH COMPLETE (September 2025)
 **THE MOST TRANSFORMATIVE ACHIEVEMENT IN GLANG'S DEVELOPMENT**
 

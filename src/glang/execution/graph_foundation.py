@@ -108,6 +108,13 @@ class GraphNode:
 
     def add_edge_to(self, target: 'GraphNode', metadata: EdgeMetadata) -> None:
         """Add an outgoing edge to another node."""
+        # Validate edge operation through control layer (if graph has one)
+        if self._graph and hasattr(self._graph, 'control_layer'):
+            is_valid, reason = self._graph.control_layer.validate_edge_operation(self, target, metadata)
+            if not is_valid:
+                from .control_layer import RuleViolationError
+                raise RuleViolationError("edge_validation", reason)
+
         edge_id = f"{self.node_id}->{target.node_id}"
         self._outgoing[edge_id] = (target, metadata)
         target._incoming[edge_id] = (self, metadata)
@@ -192,6 +199,10 @@ class GraphStructure:
         self.root_node = root_node
         # Universal metadata layer - always present
         self.metadata = MetadataLayer()
+
+        # Control layer - Layer 3 governance (import here to avoid circular imports)
+        from .control_layer import ControlLayer
+        self.control_layer = ControlLayer(self)
 
         if root_node:
             self.add_node(root_node)

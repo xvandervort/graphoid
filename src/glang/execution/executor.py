@@ -1201,6 +1201,42 @@ class ASTExecutor(BaseASTVisitor):
             result_graph = target.to_graph(pattern.value)
             return result_graph
 
+        # Edge inspection methods
+        elif method_name == "get_edges":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_edges() takes no arguments, got {len(args)}", position)
+            # Get all custom edges as (from_index, to_index, relationship) tuples
+            edges = target.get_edges()
+            edge_lists = []
+            for from_idx, to_idx, relationship in edges:
+                edge_data = [NumberValue(from_idx), NumberValue(to_idx), StringValue(relationship)]
+                edge_lists.append(ListValue(edge_data, None, position))
+            return ListValue(edge_lists, None, position)
+
+        elif method_name == "get_edge_count":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_edge_count() takes no arguments, got {len(args)}", position)
+            count = target.get_edge_count()
+            return NumberValue(count, position)
+
+        elif method_name == "can_add_edge":
+            if len(args) < 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"can_add_edge() takes at least 2 arguments (from_index, to_index), got {len(args)}", position)
+            from_index = args[0]
+            to_index = args[1]
+            relationship = args[2] if len(args) > 2 else StringValue("related")
+            # Validate arguments
+            if not isinstance(from_index, NumberValue) or not isinstance(to_index, NumberValue):
+                raise RuntimeError("can_add_edge() requires numeric indices", position)
+            if not isinstance(relationship, StringValue):
+                raise RuntimeError("can_add_edge() relationship must be a string", position)
+            # Check if edge can be added
+            can_add, reason = target.can_add_edge(int(from_index.value), int(to_index.value), relationship.value)
+            return BooleanValue(can_add, position)
+
         # Behavior management methods (from GraphContainer mixin)
         elif method_name == "add_rule":
             if len(args) < 1:

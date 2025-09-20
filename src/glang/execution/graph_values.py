@@ -262,6 +262,43 @@ class ListValue(GlangValue, GraphContainer):
             return connected_indices
         return []
 
+    def get_edges(self) -> List[Tuple[int, int, str]]:
+        """Get all custom edges (non-sequential) in the list."""
+        edges = []
+        for i, node in enumerate(self.graph.sequence_order):
+            for target, metadata in node._outgoing.values():
+                # Skip sequential edges (those are structural, not custom)
+                if metadata.edge_type.value != "sequential":
+                    try:
+                        target_index = self.graph.sequence_order.index(target)
+                        edges.append((i, target_index, str(metadata.key)))
+                    except ValueError:
+                        # Target not in sequence - shouldn't happen but be safe
+                        pass
+        return edges
+
+    def get_edge_count(self) -> int:
+        """Get total number of custom edges."""
+        return len(self.get_edges())
+
+    def can_add_edge(self, from_index: int, to_index: int, relationship: str = "related") -> Tuple[bool, str]:
+        """Check if an edge can be added without actually adding it."""
+        if not (0 <= from_index < len(self.graph.sequence_order) and
+                0 <= to_index < len(self.graph.sequence_order)):
+            return False, "Invalid index range"
+
+        from_node = self.graph.sequence_order[from_index]
+        to_node = self.graph.sequence_order[to_index]
+
+        from .graph_foundation import EdgeMetadata, EdgeType
+        metadata = EdgeMetadata(
+            edge_type=EdgeType.NAMED,
+            key=relationship
+        )
+
+        # Use control layer validation
+        return self.graph.control_layer.validate_edge_operation(from_node, to_node, metadata)
+
     def to_graph(self, connection_pattern: str = "chain") -> 'ListValue':
         """Convert to a graph with a specific connection pattern."""
         if connection_pattern == "chain":
