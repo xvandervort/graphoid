@@ -281,6 +281,57 @@ See: [`dev_docs/FOUNDATIONAL_PRIORITY_CALL_GRAPH.md`](./FOUNDATIONAL_PRIORITY_CA
 
 **Deliverables**: v1.0 release with true graph/tree primitives and test framework
 
+#### 2.3 Custom Graph Types and Behaviors (NEW - HIGH PRIORITY)
+**Goal**: Enable user-defined graph types with custom behaviors (graph-as-classes)
+
+##### 2.3.1 Custom Behavior API
+- [ ] **User Function Behaviors**: Attach custom functions to graph behavior plane
+  ```glang
+  my_list.add_behavior("custom_method", func(self, x) { ... })
+  ```
+- [ ] **Behavior Inheritance**: Custom behaviors compose with base type behaviors
+- [ ] **Behavior Scoping**: Local vs inherited behavior resolution
+
+##### 2.3.2 Graph Type Extension System
+- [ ] **`from` Syntax**: Custom graph types based on built-ins
+  ```glang
+  MyTree from BinaryTree {
+      behavior {
+          balance: func(self) { ... }
+          pretty_print: func(self) { ... }
+      }
+  }
+  ```
+- [ ] **Composition Model**: Extension through composition, not graph merging
+- [ ] **Governance Extension**: Custom rules for custom graph types
+
+##### 2.3.3 Multi-File Program Loading
+- [ ] **Flexible Loading System**: Ruby-style hierarchical loading
+  ```glang
+  load "my_app"           # Can load files or entire directories
+  load "graphics_lib"     # Library with dependencies
+  ```
+- [ ] **Directory Structure**: Support complex application organization
+- [ ] **Dependency Management**: Automatic dependency resolution
+
+**Priority**: Custom behaviors first (enables graph-as-classes), then multi-file loading
+**Impact**: Transforms Glang into object-oriented graph language
+
+#### 2.4 Self-Hosting Architecture Planning (3-5 Year Goal)
+**Goal**: Plan bootstrap path to self-hosted Glang interpreter
+
+##### 2.4.1 Bootstrap Strategy Design
+- [ ] **Phase Analysis**: Python → Glang transition path
+- [ ] **Minimal Interpreter**: Define minimum viable self-hosted subset
+- [ ] **Standard Library Migration**: Core algorithms and data structures in Glang
+
+##### 2.4.2 Nice-to-Have Features (Advanced)
+- [ ] **Graph Merging**: Advanced graph structure merging (experimental mode only)
+- [ ] **Free-Form Graphs**: Eventually allow user-defined graph structures
+
+**Timeline**: 3-5 years for full self-hosting
+**Philosophy**: Solid foundations first, then gradual transition
+
 ### 🔮 Phase 3: Self-Aware Systems (2026)
 **Goal**: Enable self-understanding and self-modification
 
