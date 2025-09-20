@@ -53,7 +53,12 @@ This represents a major architectural challenge but is essential for Glang's uni
   - ✅ Edge inspection methods: `get_edges()`, `get_edge_count()`, `can_add_edge()`
   - ✅ Language integration: all methods work from Glang code
   - ✅ **VERIFICATION**: All tests pass - dangerous operations correctly blocked!
-- **Week 2**: ⏳ Inspection tools + simple rule management
+- **Week 2**: ✅ **COMPLETED** - Enhanced inspection tools + rule configuration helpers
+  - ✅ Control layer access from Glang: `get_active_rules()`, `disable_rule()`, `enable_rule()`
+  - ✅ Graph visualization methods: `get_graph_summary()`, `visualize_structure()` (text/dot/summary formats)
+  - ✅ Rule configuration helpers: `configure_for_safe_mode()`, `configure_for_experimental_mode()`
+  - ✅ Enhanced `can_add_edge()` returns detailed reason strings for failures
+  - ✅ **VERIFICATION**: All 1324 tests pass - comprehensive edge governance system operational!
 - **Week 3-4**: ⏳ Binary tree implementation with tree-specific rules
 - **Week 5-7**: ⏳ DataFrame foundation with structure rules
 - **Week 8**: ⏳ Testing, polish, documentation

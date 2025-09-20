@@ -13,7 +13,7 @@ Key Features:
 - Five-layer integration - validates across all graph layers
 """
 
-from typing import Dict, Set, Optional, Tuple, Any, TYPE_CHECKING
+from typing import Dict, Set, Optional, Tuple, Any, List, TYPE_CHECKING
 from enum import Enum
 
 if TYPE_CHECKING:
@@ -201,3 +201,160 @@ class ControlLayer:
             return False, "Cannot create edges to nodes not in this graph structure"
 
         return True, ""
+
+    # Visualization methods
+    def get_graph_summary(self) -> Dict[str, Any]:
+        """Get a summary of the graph structure."""
+        total_nodes = len(self.parent_graph.nodes)
+        total_edges = sum(len(node.edges) for node in self.parent_graph.nodes.values())
+
+        graph_type = self._infer_graph_type()
+        active_rules = self.get_active_rules()
+
+        return {
+            'type': graph_type,
+            'node_count': total_nodes,
+            'edge_count': total_edges,
+            'active_rules': active_rules,
+            'disabled_rules': list(self.disabled_rules)
+        }
+
+    def visualize_structure(self, format: str = "text") -> str:
+        """Visualize the graph structure in different formats."""
+        if format == "text":
+            return self._visualize_text()
+        elif format == "dot":
+            return self._visualize_dot()
+        elif format == "summary":
+            return self._visualize_summary()
+        else:
+            raise ValueError(f"Unknown visualization format: {format}")
+
+    def _visualize_text(self) -> str:
+        """Create a text-based visualization of the graph."""
+        lines = []
+        lines.append("Graph Structure:")
+        lines.append("=" * 40)
+
+        summary = self.get_graph_summary()
+        lines.append(f"Type: {summary['type']}")
+        lines.append(f"Nodes: {summary['node_count']}")
+        lines.append(f"Edges: {summary['edge_count']}")
+        lines.append(f"Active Rules: {', '.join(summary['active_rules'])}")
+
+        if summary['disabled_rules']:
+            lines.append(f"Disabled Rules: {', '.join(summary['disabled_rules'])}")
+
+        lines.append("")
+        lines.append("Node Connections:")
+
+        for node_id, node in self.parent_graph.nodes.items():
+            if node.edges:
+                lines.append(f"  {node_id}:")
+                for edge in node.edges:
+                    target_id = edge.target.node_id
+                    relationship = edge.metadata.key if edge.metadata else "connected"
+                    lines.append(f"    → {target_id} ({relationship})")
+            else:
+                lines.append(f"  {node_id}: (no outgoing edges)")
+
+        return "\n".join(lines)
+
+    def _visualize_dot(self) -> str:
+        """Create a DOT format visualization for Graphviz."""
+        lines = []
+        lines.append("digraph GraphStructure {")
+        lines.append("  rankdir=LR;")
+        lines.append("  node [shape=box];")
+
+        # Add nodes
+        for node_id in self.parent_graph.nodes:
+            lines.append(f'  "{node_id}";')
+
+        # Add edges
+        for node_id, node in self.parent_graph.nodes.items():
+            for edge in node.edges:
+                target_id = edge.target.node_id
+                relationship = edge.metadata.key if edge.metadata else "connected"
+                lines.append(f'  "{node_id}" -> "{target_id}" [label="{relationship}"];')
+
+        lines.append("}")
+        return "\n".join(lines)
+
+    def _visualize_summary(self) -> str:
+        """Create a summary visualization."""
+        summary = self.get_graph_summary()
+        lines = []
+        lines.append(f"[{summary['type'].upper()}] {summary['node_count']} nodes, {summary['edge_count']} edges")
+        lines.append(f"Rules: {', '.join(summary['active_rules'])}")
+        if summary['disabled_rules']:
+            lines.append(f"Disabled: {', '.join(summary['disabled_rules'])}")
+        return "\n".join(lines)
+
+    # Rule configuration helpers
+    def configure_for_safe_mode(self) -> None:
+        """Configure control layer for maximum safety (all rules enabled)."""
+        # Clear disabled rules to enable all defaults
+        self.disabled_rules.clear()
+
+    def configure_for_experimental_mode(self) -> None:
+        """Configure control layer for experimental use (minimal restrictions)."""
+        # Disable all safety rules for experimentation
+        all_rules = self._get_active_rules()
+        for rule_name in all_rules:
+            self.disable_rule(rule_name)
+
+    def configure_for_list_processing(self) -> None:
+        """Configure optimal settings for list processing (cycles disabled, cross-structure enabled)."""
+        # Keep cycle prevention but allow cross-structure operations
+        self.enable_rule("no_list_cycles")
+        self.disable_rule("same_structure_only")
+
+    def configure_for_tree_structures(self) -> None:
+        """Configure optimal settings for tree structures (strict hierarchy)."""
+        # Enable all rules for strict tree structure
+        self.enable_rule("no_list_cycles")
+        self.enable_rule("same_structure_only")
+
+    def get_configuration_status(self) -> Dict[str, Any]:
+        """Get current configuration status with recommendations."""
+        active_rules = self.get_active_rules()
+        disabled_rules = list(self.disabled_rules)
+
+        # Determine configuration mode
+        if len(disabled_rules) == 0:
+            mode = "safe"
+            description = "Maximum safety - all rules enabled"
+        elif len(active_rules) == 0:
+            mode = "experimental"
+            description = "Experimental mode - no safety restrictions"
+        elif "no_list_cycles" in active_rules and "same_structure_only" not in active_rules:
+            mode = "list_processing"
+            description = "Optimized for list processing - cycles prevented"
+        elif "no_list_cycles" in active_rules and "same_structure_only" in active_rules:
+            mode = "tree_structures"
+            description = "Optimized for tree structures - strict hierarchy"
+        else:
+            mode = "custom"
+            description = "Custom configuration"
+
+        return {
+            'mode': mode,
+            'description': description,
+            'active_rules': active_rules,
+            'disabled_rules': disabled_rules,
+            'recommendations': self._get_configuration_recommendations(mode)
+        }
+
+    def _get_configuration_recommendations(self, current_mode: str) -> List[str]:
+        """Get recommendations based on current configuration."""
+        recommendations = []
+
+        if current_mode == "experimental":
+            recommendations.append("Consider enabling 'no_list_cycles' to prevent infinite loops")
+            recommendations.append("Consider enabling 'same_structure_only' to prevent data corruption")
+        elif current_mode == "custom":
+            recommendations.append("Use configure_for_safe_mode() for maximum safety")
+            recommendations.append("Use configure_for_experimental_mode() for research")
+
+        return recommendations

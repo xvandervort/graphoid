@@ -684,6 +684,8 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'map', 'filter', 'each', 'select', 'reject',
                 'to_string', 'to_bool',
                 'add_edge', 'get_connected_to', 'to_graph', 'get_edges', 'get_edge_count', 'can_add_edge',
+                'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule',
+                'get_graph_summary', 'visualize_structure',
                 'set_names', 'get_names', 'has_names', 'get_name', 'set_name', 'metadata'
             } | universal_methods | behavior_methods,
             'string': {
@@ -703,7 +705,9 @@ class SemanticAnalyzer(BaseASTVisitor):
             'hash': {
                 'node', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop',
                 'to_string', 'to_bool', 'can_accept',
-                'add_value_edge', 'get_connected_keys',
+                'add_value_edge', 'get_connected_keys', 'get_edges', 'get_edge_count', 'can_add_edge',
+                'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule',
+                'get_graph_summary', 'visualize_structure',
                 'set_names', 'get_names', 'has_names', 'get_name', 'set_name', 'metadata'
             } | universal_methods | behavior_methods,
             'time': {'get_type', 'to_string', 'to_num'} | universal_methods,

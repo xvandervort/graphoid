@@ -7,7 +7,7 @@ container-based ListValue and HashValue with true graph structures.
 These maintain full backward compatibility while providing graph capabilities.
 """
 
-from typing import List, Optional, Any, Tuple, Union, Iterator
+from typing import List, Optional, Any, Tuple, Union, Iterator, Dict
 from .values import GlangValue, NoneValue
 from .graph_foundation import SequentialGraph, KeyedGraph, GraphNode, EdgeType, EdgeMetadata
 from ..graph_container import GraphContainer
@@ -298,6 +298,36 @@ class ListValue(GlangValue, GraphContainer):
 
         # Use control layer validation
         return self.graph.control_layer.validate_edge_operation(from_node, to_node, metadata)
+
+    # Control layer access methods (Layer 3)
+    def get_active_rules(self) -> List[str]:
+        """Get list of currently active edge rules."""
+        return self.graph.control_layer.get_active_rules()
+
+    def get_rule_status(self, rule_name: str) -> str:
+        """Get status of a specific rule: 'active', 'disabled', or 'unknown'."""
+        return self.graph.control_layer.get_rule_status(rule_name)
+
+    def disable_rule(self, rule_name: str) -> 'NoneValue':
+        """Disable a specific edge rule."""
+        from .values import NoneValue
+        self.graph.control_layer.disable_rule(rule_name)
+        return NoneValue()
+
+    def enable_rule(self, rule_name: str) -> 'NoneValue':
+        """Re-enable a previously disabled edge rule."""
+        from .values import NoneValue
+        self.graph.control_layer.enable_rule(rule_name)
+        return NoneValue()
+
+    # Visualization methods
+    def get_graph_summary(self) -> Dict[str, Any]:
+        """Get a summary of the graph structure."""
+        return self.graph.control_layer.get_graph_summary()
+
+    def visualize_structure(self, format: str = "text") -> str:
+        """Visualize the graph structure in different formats."""
+        return self.graph.control_layer.visualize_structure(format)
 
     def to_graph(self, connection_pattern: str = "chain") -> 'ListValue':
         """Convert to a graph with a specific connection pattern."""
@@ -772,6 +802,73 @@ class HashValue(GlangValue, GraphContainer):
     def has_names(self) -> bool:
         """Check if any hash elements have names."""
         return self.graph.has_names()
+
+    # Edge inspection methods (for consistency with ListValue)
+    def get_edges(self) -> List[Tuple[str, str, str]]:
+        """Get all edges between hash values as (from_key, to_key, relationship) tuples."""
+        edges = []
+        for from_key, from_node in self.graph.key_to_node.items():
+            for edge in from_node.edges:
+                # Find the target key
+                target_node = edge.target
+                for to_key, to_node in self.graph.key_to_node.items():
+                    if to_node is target_node:
+                        edges.append((from_key, to_key, edge.metadata.key))
+                        break
+        return edges
+
+    def get_edge_count(self) -> int:
+        """Get total number of edges between hash values."""
+        return len(self.get_edges())
+
+    def can_add_edge(self, from_key: str, to_key: str, relationship: str = "related") -> Tuple[bool, str]:
+        """Check if an edge can be added between two hash values."""
+        from_node = self.get_value_node(from_key)
+        to_node = self.get_value_node(to_key)
+
+        if not from_node:
+            return False, f"Key '{from_key}' not found in hash"
+        if not to_node:
+            return False, f"Key '{to_key}' not found in hash"
+
+        from .graph_foundation import EdgeMetadata, EdgeType
+        metadata = EdgeMetadata(
+            edge_type=EdgeType.NAMED,
+            key=relationship
+        )
+
+        # Use control layer validation
+        return self.graph.control_layer.validate_edge_operation(from_node, to_node, metadata)
+
+    # Control layer access methods (Layer 3)
+    def get_active_rules(self) -> List[str]:
+        """Get list of currently active edge rules."""
+        return self.graph.control_layer.get_active_rules()
+
+    def get_rule_status(self, rule_name: str) -> str:
+        """Get status of a specific rule: 'active', 'disabled', or 'unknown'."""
+        return self.graph.control_layer.get_rule_status(rule_name)
+
+    def disable_rule(self, rule_name: str) -> 'NoneValue':
+        """Disable a specific edge rule."""
+        from .values import NoneValue
+        self.graph.control_layer.disable_rule(rule_name)
+        return NoneValue()
+
+    def enable_rule(self, rule_name: str) -> 'NoneValue':
+        """Re-enable a previously disabled edge rule."""
+        from .values import NoneValue
+        self.graph.control_layer.enable_rule(rule_name)
+        return NoneValue()
+
+    # Visualization methods
+    def get_graph_summary(self) -> Dict[str, Any]:
+        """Get a summary of the graph structure."""
+        return self.graph.control_layer.get_graph_summary()
+
+    def visualize_structure(self, format: str = "text") -> str:
+        """Visualize the graph structure in different formats."""
+        return self.graph.control_layer.visualize_structure(format)
 
     def _deep_freeze(self):
         """Freeze all values in the hash (deep freeze)."""

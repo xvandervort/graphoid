@@ -1237,6 +1237,43 @@ class ASTExecutor(BaseASTVisitor):
             can_add, reason = target.can_add_edge(int(from_index.value), int(to_index.value), relationship.value)
             return BooleanValue(can_add, position)
 
+        # Control layer access methods (Layer 3)
+        elif method_name == "get_active_rules":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_active_rules() takes no arguments, got {len(args)}", position)
+            active_rules = target.get_active_rules()
+            rule_strings = [StringValue(rule) for rule in active_rules]
+            return ListValue(rule_strings, "string", position)
+
+        elif method_name == "get_rule_status":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_rule_status() takes exactly 1 argument (rule_name), got {len(args)}", position)
+            rule_name = args[0]
+            if not isinstance(rule_name, StringValue):
+                raise RuntimeError("get_rule_status() rule_name must be a string", position)
+            status = target.get_rule_status(rule_name.value)
+            return StringValue(status, position)
+
+        elif method_name == "disable_rule":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"disable_rule() takes exactly 1 argument (rule_name), got {len(args)}", position)
+            rule_name = args[0]
+            if not isinstance(rule_name, StringValue):
+                raise RuntimeError("disable_rule() rule_name must be a string", position)
+            return target.disable_rule(rule_name.value)
+
+        elif method_name == "enable_rule":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"enable_rule() takes exactly 1 argument (rule_name), got {len(args)}", position)
+            rule_name = args[0]
+            if not isinstance(rule_name, StringValue):
+                raise RuntimeError("enable_rule() rule_name must be a string", position)
+            return target.enable_rule(rule_name.value)
+
         # Behavior management methods (from GraphContainer mixin)
         elif method_name == "add_rule":
             if len(args) < 1:
@@ -2466,6 +2503,82 @@ class ASTExecutor(BaseASTVisitor):
             connected_keys = target.get_connected_keys(key.value, relationship.value)
             key_values = [StringValue(k) for k in connected_keys]
             return ListValue(key_values, "string", position)
+
+        # Edge inspection methods (for consistency with ListValue)
+        elif method_name == "get_edges":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_edges() takes no arguments, got {len(args)}", position)
+            # Get all custom edges as (from_key, to_key, relationship) tuples
+            edges = target.get_edges()
+            edge_lists = []
+            for from_key, to_key, relationship in edges:
+                edge_data = [StringValue(from_key), StringValue(to_key), StringValue(relationship)]
+                edge_lists.append(ListValue(edge_data, None, position))
+            return ListValue(edge_lists, None, position)
+
+        elif method_name == "get_edge_count":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_edge_count() takes no arguments, got {len(args)}", position)
+            return NumberValue(target.get_edge_count(), position)
+
+        elif method_name == "can_add_edge":
+            if len(args) < 2 or len(args) > 3:
+                from .errors import ArgumentError
+                raise ArgumentError(f"can_add_edge() takes 2-3 arguments (from_key, to_key, [relationship]), got {len(args)}", position)
+
+            from_key = args[0]
+            to_key = args[1]
+            relationship = args[2] if len(args) == 3 else StringValue("related")
+
+            if not isinstance(from_key, StringValue):
+                raise RuntimeError("can_add_edge() from_key must be a string", position)
+            if not isinstance(to_key, StringValue):
+                raise RuntimeError("can_add_edge() to_key must be a string", position)
+            if not isinstance(relationship, StringValue):
+                raise RuntimeError("can_add_edge() relationship must be a string", position)
+
+            # Check if edge can be added
+            can_add, reason = target.can_add_edge(from_key.value, to_key.value, relationship.value)
+            return BooleanValue(can_add, position)
+
+        # Control layer access methods (Layer 3)
+        elif method_name == "get_active_rules":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_active_rules() takes no arguments, got {len(args)}", position)
+            active_rules = target.get_active_rules()
+            rule_strings = [StringValue(rule) for rule in active_rules]
+            return ListValue(rule_strings, "string", position)
+
+        elif method_name == "get_rule_status":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_rule_status() takes exactly 1 argument (rule_name), got {len(args)}", position)
+            rule_name = args[0]
+            if not isinstance(rule_name, StringValue):
+                raise RuntimeError("get_rule_status() rule_name must be a string", position)
+            status = target.get_rule_status(rule_name.value)
+            return StringValue(status, position)
+
+        elif method_name == "disable_rule":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"disable_rule() takes exactly 1 argument (rule_name), got {len(args)}", position)
+            rule_name = args[0]
+            if not isinstance(rule_name, StringValue):
+                raise RuntimeError("disable_rule() rule_name must be a string", position)
+            return target.disable_rule(rule_name.value)
+
+        elif method_name == "enable_rule":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"enable_rule() takes exactly 1 argument (rule_name), got {len(args)}", position)
+            rule_name = args[0]
+            if not isinstance(rule_name, StringValue):
+                raise RuntimeError("enable_rule() rule_name must be a string", position)
+            return target.enable_rule(rule_name.value)
 
         # Behavior management methods (from GraphContainer mixin)
         elif method_name == "add_rule":

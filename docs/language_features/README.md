@@ -23,6 +23,16 @@ Language-level behavior configuration system that provides explicit control over
 - **Domain-specific configuration** (data science, finance, systems)
 - **Hierarchical inheritance** with clear override rules
 
+### [Edge Governance](edge_governance.md) ✅ **NEW**
+Sophisticated graph operation safety system that provides intelligent rule-based validation for edge creation and manipulation in lists and hashes.
+
+- **Default safety rules** prevent cycles and cross-contamination
+- **Configuration modes** (safe, experimental, list processing, tree structures)
+- **Edge inspection methods** for graph analysis and debugging
+- **Graph visualization** in multiple formats (text, DOT, summary)
+- **Rule management** with runtime enable/disable capabilities
+- **Smart validation** with detailed error messages
+
 ## Planned Features
 
 Future language features will be documented here as they are implemented:

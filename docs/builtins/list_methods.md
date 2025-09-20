@@ -419,7 +419,7 @@ for i in [1, 2, 3, 4, 5] {
 print(results)  # [4, 16]
 ```
 
-### Immutable Data Structures
+#### Immutable Data Structures
 ```glang
 # Create immutable configuration
 config_values = [8080, "localhost", true]
@@ -428,3 +428,104 @@ config_values.freeze()
 # Safe to share - cannot be modified
 process_config(config_values)
 ```
+
+## Edge Governance and Graph Operations
+
+Lists in Glang are true graph structures with nodes and edges. The edge governance system provides safe graph operations with configurable rules.
+
+### Adding Edges
+```glang
+numbers = [10, 20, 30, 40]
+
+# Add edge from index 0 to index 1
+numbers.add_edge(0, 1, "next")
+
+# Add edge with custom relationship
+numbers.add_edge(1, 2, "flows_to")
+```
+
+### Edge Inspection
+```glang
+# Get all edges as [from_index, to_index, relationship] lists
+edges = numbers.get_edges()
+print(edges)  # [[0, 1, "next"], [1, 2, "flows_to"]]
+
+# Count total edges
+count = numbers.get_edge_count()
+print(count)  # 2
+
+# Check if edge can be added (returns true/false)
+can_add = numbers.can_add_edge(0, 2, "skip")
+print(can_add)  # true
+
+# Try invalid edge (would create cycle)
+can_add = numbers.can_add_edge(3, 0, "cycle")
+print(can_add)  # false - blocked by governance rules
+```
+
+### Graph Visualization
+```glang
+numbers = [1, 2, 3]
+numbers.add_edge(0, 1, "connects")
+
+# Get structured summary
+summary = numbers.get_graph_summary()
+print(summary["type"])        # "list"
+print(summary["node_count"])  # 3
+print(summary["edge_count"])  # 1
+
+# Visualize structure (text format)
+viz = numbers.visualize_structure("text")
+print(viz)
+# Graph Structure:
+# ========================================
+# Type: list
+# Nodes: 3
+# Edges: 1
+# Active Rules: no_list_cycles, same_structure_only
+
+# DOT format for Graphviz
+dot = numbers.visualize_structure("dot")
+
+# Compact summary
+summary = numbers.visualize_structure("summary")
+print(summary)  # [LIST] 3 nodes, 1 edges
+```
+
+### Rule Management
+```glang
+# View active governance rules
+active = numbers.get_active_rules()
+print(active)  # ["no_list_cycles", "same_structure_only"]
+
+# Check specific rule status
+status = numbers.get_rule_status("no_list_cycles")
+print(status)  # "active", "disabled", or "unknown"
+
+# Temporarily disable cycle prevention
+numbers.disable_rule("no_list_cycles")
+
+# Now cycles are allowed
+numbers.add_edge(2, 0, "cycle")  # Works!
+
+# Re-enable the rule
+numbers.enable_rule("no_list_cycles")
+```
+
+### Configuration Modes
+```glang
+# Maximum safety (default)
+numbers.configure_for_safe_mode()
+
+# No restrictions for experimentation
+numbers.configure_for_experimental_mode()
+numbers.add_edge(2, 0, "cycle")  # Now allowed
+
+# Optimized for list processing
+numbers.configure_for_list_processing()
+
+# Strict hierarchy for tree structures
+numbers.configure_for_tree_structures()
+```
+
+See the [Edge Governance Guide](../language_features/edge_governance.md) for complete documentation on graph operations and safety rules.

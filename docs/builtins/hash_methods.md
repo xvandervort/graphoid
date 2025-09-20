@@ -402,3 +402,124 @@ system_config.freeze()
 process_with_config(system_config)
 # system_config["timeout"] = 60  # Would throw error
 ```
+
+## Edge Governance and Graph Operations
+
+Hashes in Glang are true graph structures where keys connect to value nodes. The edge governance system provides safe graph operations with configurable rules.
+
+### Adding Value Edges
+```glang
+config = { "host": "localhost", "port": 8080, "ssl": true }
+
+# Add edge between values (beyond key-based structure)
+config.add_value_edge("host", "port", "connects_to")
+config.add_value_edge("port", "ssl", "requires")
+```
+
+### Edge Inspection
+```glang
+# Get all edges as [from_key, to_key, relationship] lists
+edges = config.get_edges()
+print(edges)  # [["host", "port", "connects_to"], ["port", "ssl", "requires"]]
+
+# Count total edges between values
+count = config.get_edge_count()
+print(count)  # 2
+
+# Check if edge can be added between two keys
+can_add = config.can_add_edge("ssl", "host", "back_reference")
+print(can_add)  # true or false, depending on governance rules
+
+# Get keys whose values are connected to a specific key
+connected = config.get_connected_keys("port", "connects_to")
+print(connected)  # ["ssl"] (if port connects to ssl with "connects_to")
+```
+
+### Graph Visualization
+```glang
+config = { "db": "mysql", "cache": "redis", "queue": "rabbitmq" }
+config.add_value_edge("db", "cache", "uses")
+
+# Get structured summary
+summary = config.get_graph_summary()
+print(summary["type"])        # "hash"
+print(summary["node_count"])  # 3 (plus root node)
+print(summary["edge_count"])  # 1
+
+# Visualize structure (text format)
+viz = config.visualize_structure("text")
+print(viz)
+# Graph Structure:
+# ========================================
+# Type: hash
+# Nodes: 4
+# Edges: 4 (3 key-value + 1 custom)
+# Active Rules: no_list_cycles, same_structure_only
+
+# DOT format for Graphviz
+dot = config.visualize_structure("dot")
+
+# Compact summary
+summary = config.visualize_structure("summary")
+print(summary)  # [HASH] 4 nodes, 4 edges
+```
+
+### Rule Management
+```glang
+# View active governance rules
+active = config.get_active_rules()
+print(active)  # ["no_list_cycles", "same_structure_only"]
+
+# Check specific rule status
+status = config.get_rule_status("same_structure_only")
+print(status)  # "active", "disabled", or "unknown"
+
+# Temporarily disable cross-structure protection
+config.disable_rule("same_structure_only")
+
+# Now cross-hash edges might be allowed (depending on implementation)
+# config.add_external_edge(other_hash)
+
+# Re-enable the rule
+config.enable_rule("same_structure_only")
+```
+
+### Configuration Modes
+```glang
+# Maximum safety (default)
+config.configure_for_safe_mode()
+
+# No restrictions for experimentation
+config.configure_for_experimental_mode()
+
+# Optimized for list processing
+config.configure_for_list_processing()
+
+# Strict hierarchy for tree structures
+config.configure_for_tree_structures()
+```
+
+### Value Relationships
+```glang
+# Model configuration dependencies
+services = {
+    "web": "nginx",
+    "app": "python",
+    "db": "postgresql",
+    "cache": "redis"
+}
+
+# Define service dependencies
+services.add_value_edge("web", "app", "proxies_to")
+services.add_value_edge("app", "db", "connects_to")
+services.add_value_edge("app", "cache", "uses")
+
+# Query relationships
+db_dependencies = services.get_connected_keys("app", "connects_to")
+print(db_dependencies)  # ["db"]
+
+all_edges = services.get_edges()
+print(all_edges)  # [["web", "app", "proxies_to"], ["app", "db", "connects_to"], ...]
+```
+
+See the [Edge Governance Guide](../language_features/edge_governance.md) for complete documentation on graph operations and safety rules.
