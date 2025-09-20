@@ -33,6 +33,16 @@ Sophisticated graph operation safety system that provides intelligent rule-based
 - **Rule management** with runtime enable/disable capabilities
 - **Smart validation** with detailed error messages
 
+### [Binary Trees](../builtins/tree_methods.md) ✅ **NEW**
+Graph-based binary search tree implementation with automatic ordering and efficient operations.
+
+- **BST semantics** with automatic value ordering
+- **Type constraints** for homogeneous trees (`tree<num>`, `tree<string>`)
+- **Tree traversals** (in-order, pre-order, post-order)
+- **Efficient operations** (insert, search, size, height)
+- **Edge governance integration** with tree-specific rules
+- **Graph visualization** and analysis capabilities
+
 ## Planned Features
 
 Future language features will be documented here as they are implemented:

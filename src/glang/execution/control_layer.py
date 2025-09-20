@@ -91,6 +91,16 @@ class ControlLayer:
         """Re-enable a previously disabled rule."""
         self.disabled_rules.discard(rule_name)
 
+    def configure_for_tree_structures(self) -> None:
+        """Configure this control layer for tree structures."""
+        # Add tree-specific rules if not already added
+        if hasattr(self, '_tree_rules_added'):
+            return  # Already configured
+
+        # Import the tree rules from tree_structures module
+        from .tree_structures import _add_tree_rules
+        _add_tree_rules(self)
+
     def get_active_rules(self) -> list[str]:
         """Get list of currently active rule names."""
         active_rules = self._get_active_rules()
@@ -115,6 +125,10 @@ class ControlLayer:
 
     def _infer_graph_type(self) -> str:
         """Infer the type of graph structure."""
+        # Check if this is a TreeGraph (tree-like)
+        if hasattr(self.parent_graph, 'root_node_id'):
+            return 'tree'
+
         # Check if this is a SequentialGraph (list-like)
         if hasattr(self.parent_graph, 'sequence_order'):
             return 'list'
@@ -206,7 +220,7 @@ class ControlLayer:
     def get_graph_summary(self) -> Dict[str, Any]:
         """Get a summary of the graph structure."""
         total_nodes = len(self.parent_graph.nodes)
-        total_edges = sum(len(node.edges) for node in self.parent_graph.nodes.values())
+        total_edges = sum(len(node._outgoing) for node in self.parent_graph.nodes.values())
 
         graph_type = self._infer_graph_type()
         active_rules = self.get_active_rules()
@@ -249,11 +263,11 @@ class ControlLayer:
         lines.append("Node Connections:")
 
         for node_id, node in self.parent_graph.nodes.items():
-            if node.edges:
+            if node._outgoing:
                 lines.append(f"  {node_id}:")
-                for edge in node.edges:
-                    target_id = edge.target.node_id
-                    relationship = edge.metadata.key if edge.metadata else "connected"
+                for edge_id, (target_node, metadata) in node._outgoing.items():
+                    target_id = target_node.node_id
+                    relationship = metadata.key if metadata else "connected"
                     lines.append(f"    → {target_id} ({relationship})")
             else:
                 lines.append(f"  {node_id}: (no outgoing edges)")
@@ -273,9 +287,9 @@ class ControlLayer:
 
         # Add edges
         for node_id, node in self.parent_graph.nodes.items():
-            for edge in node.edges:
-                target_id = edge.target.node_id
-                relationship = edge.metadata.key if edge.metadata else "connected"
+            for edge_id, (target_node, metadata) in node._outgoing.items():
+                target_id = target_node.node_id
+                relationship = metadata.key if metadata else "connected"
                 lines.append(f'  "{node_id}" -> "{target_id}" [label="{relationship}"];')
 
         lines.append("}")

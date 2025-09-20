@@ -710,6 +710,13 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'get_graph_summary', 'visualize_structure',
                 'set_names', 'get_names', 'has_names', 'get_name', 'set_name', 'metadata'
             } | universal_methods | behavior_methods,
+            'tree': {
+                'insert', 'search', 'size', 'empty', 'height',
+                'in_order', 'pre_order', 'post_order',
+                'to_string', 'to_bool',
+                'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule',
+                'get_graph_summary', 'visualize_structure'
+            } | universal_methods,
             'time': {'get_type', 'to_string', 'to_num'} | universal_methods,
             'file': {'write', 'read', 'read_line', 'flush', 'close', 'kill', 'capability_type'} | universal_methods,
             'module': universal_methods.copy()  # Modules can have any method - validated at runtime

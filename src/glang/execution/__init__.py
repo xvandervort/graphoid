@@ -15,12 +15,13 @@ Components:
 
 from .values import GlangValue, StringValue, NumberValue, BooleanValue
 from .graph_values import ListValue, HashValue
+from .tree_structures import BinaryTreeValue
 from .executor import ASTExecutor, ExecutionContext
 from .errors import RuntimeError, VariableNotFoundError, TypeConstraintError
 from .pipeline import ExecutionPipeline, ExecutionSession, ExecutionResult
 
 __all__ = [
-    'GlangValue', 'StringValue', 'NumberValue', 'BooleanValue', 'ListValue', 'HashValue',
+    'GlangValue', 'StringValue', 'NumberValue', 'BooleanValue', 'ListValue', 'HashValue', 'BinaryTreeValue',
     'ASTExecutor', 'ExecutionContext',
     'RuntimeError', 'VariableNotFoundError', 'TypeConstraintError',
     'ExecutionPipeline', 'ExecutionSession', 'ExecutionResult'

@@ -607,6 +607,8 @@ class ASTExecutor(BaseASTVisitor):
             return self._dispatch_data_method(target, method_name, args, position)
         elif target_type == "hash":
             return self._dispatch_hash_method(target, method_name, args, position)
+        elif target_type == "tree":
+            return self._dispatch_tree_method(target, method_name, args, position)
         elif target_type == "time":
             return self._dispatch_time_method(target, method_name, args, position)
         elif target_type == "file":
@@ -2708,7 +2710,158 @@ class ASTExecutor(BaseASTVisitor):
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "hash", position)
-    
+
+    def _dispatch_tree_method(self, target, method_name: str,
+                             args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
+        """Handle binary tree method calls."""
+
+        # Import BinaryTreeValue here to avoid circular import issues
+        from .tree_structures import BinaryTreeValue
+
+        if not isinstance(target, BinaryTreeValue):
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, target.get_type(), position)
+
+        # Tree operations
+        if method_name == "insert":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"insert() takes exactly 1 argument (value), got {len(args)}", position)
+            return target.insert(args[0])
+
+        elif method_name == "search":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"search() takes exactly 1 argument (value), got {len(args)}", position)
+            return target.search(args[0])
+
+        elif method_name == "size":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"size() takes no arguments, got {len(args)}", position)
+            return target.size()
+
+        elif method_name == "empty":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"empty() takes no arguments, got {len(args)}", position)
+            return target.empty()
+
+        elif method_name == "height":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"height() takes no arguments, got {len(args)}", position)
+            return target.height()
+
+        # Traversal methods
+        elif method_name == "in_order":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"in_order() takes no arguments, got {len(args)}", position)
+            return target.in_order()
+
+        elif method_name == "pre_order":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"pre_order() takes no arguments, got {len(args)}", position)
+            return target.pre_order()
+
+        elif method_name == "post_order":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"post_order() takes no arguments, got {len(args)}", position)
+            return target.post_order()
+
+        # Edge governance methods
+        elif method_name == "get_active_rules":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_active_rules() takes no arguments, got {len(args)}", position)
+            active_rules = target.get_active_rules()
+            rule_strings = [StringValue(rule) for rule in active_rules]
+            return ListValue(rule_strings, "string", position)
+
+        elif method_name == "get_rule_status":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_rule_status() takes exactly 1 argument (rule_name), got {len(args)}", position)
+            rule_name = args[0]
+            if not isinstance(rule_name, StringValue):
+                raise RuntimeError("get_rule_status() rule_name must be a string", position)
+            status = target.get_rule_status(rule_name.value)
+            return StringValue(status, position)
+
+        elif method_name == "disable_rule":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"disable_rule() takes exactly 1 argument (rule_name), got {len(args)}", position)
+            rule_name = args[0]
+            if not isinstance(rule_name, StringValue):
+                raise RuntimeError("disable_rule() rule_name must be a string", position)
+            return target.disable_rule(rule_name.value)
+
+        elif method_name == "enable_rule":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"enable_rule() takes exactly 1 argument (rule_name), got {len(args)}", position)
+            rule_name = args[0]
+            if not isinstance(rule_name, StringValue):
+                raise RuntimeError("enable_rule() rule_name must be a string", position)
+            return target.enable_rule(rule_name.value)
+
+        # Visualization methods
+        elif method_name == "get_graph_summary":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"get_graph_summary() takes no arguments, got {len(args)}", position)
+
+            summary = target.get_graph_summary()
+            # Convert to a hash structure that Glang can use
+            hash_pairs = []
+            for key, value in summary.items():
+                if isinstance(value, list):
+                    # Convert lists to ListValue
+                    list_items = [StringValue(item) for item in value]
+                    hash_pairs.append((key, ListValue(list_items, "string", position)))
+                elif isinstance(value, (int, float)):
+                    hash_pairs.append((key, NumberValue(value, position)))
+                elif isinstance(value, str):
+                    hash_pairs.append((key, StringValue(value, position)))
+                else:
+                    hash_pairs.append((key, StringValue(str(value), position)))
+
+            return HashValue(hash_pairs, None, position)
+
+        elif method_name == "visualize_structure":
+            if len(args) > 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"visualize_structure() takes 0-1 arguments, got {len(args)}", position)
+
+            format_arg = args[0] if len(args) == 1 else StringValue("text")
+            if not isinstance(format_arg, StringValue):
+                raise RuntimeError("visualize_structure() format must be a string", position)
+
+            result = target.visualize_structure(format_arg.value)
+            return StringValue(result, position)
+
+        # Universal methods
+        elif method_name == "to_string":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_string() takes no arguments, got {len(args)}", position)
+            return StringValue(target.to_display_string(), position)
+
+        elif method_name == "to_bool":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_bool() takes no arguments, got {len(args)}", position)
+            # Tree is truthy if it has nodes
+            return BooleanValue(not target.empty().value, position)
+
+        else:
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, "tree", position)
+
     def _dispatch_time_method(self, target, method_name: str,
                              args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle time method calls."""

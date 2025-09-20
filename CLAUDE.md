@@ -15,7 +15,7 @@ Glang aims to be:
 ### Core Features (Implemented)
 - **Complete Function System** - Functions, lambdas, closures, and recursion
 - **Strong Type System** - With optional type inference and type constraints
-- **Modern Collections** - Lists, hashes, and data nodes (currently container-based, not true graphs yet)
+- **Graph-Based Collections** - Lists, hashes, data nodes, and binary trees with true graph foundation
 - **Method-Based Design** - Everything uses methods: `list.append()`, `string.upper()`, `num.abs()`
 - **File Loading System** - Modular programming with `.gr` files
 - **Clean AST Architecture** - Reliable execution with excellent error messages
@@ -27,13 +27,14 @@ Glang aims to be:
 - **Intuitive Syntax** - Natural programming constructs that feel familiar
 - **Developer Experience** - Excellent error messages, REPL environment, and reflection capabilities
 
-### Architectural Discovery (January 2025)
-**Critical Realization**: Current "graph" types (lists, hashes) are actually just containers. True graph features require:
-- **Edges**: Explicit relationships between nodes with metadata
-- **Node Awareness**: Nodes knowing their container and neighbors
-- **Graph Traversal**: Real pathfinding and connectivity analysis
+### Architectural Breakthrough (September 2025)
+**ACHIEVED**: True graph-based data structures are now implemented! All collections are built on genuine graph foundations:
+- **✅ Edges**: Explicit relationships between nodes with metadata (EdgeMetadata system)
+- **✅ Node Awareness**: GraphNodes with edge tracking and neighbor access
+- **✅ Graph Traversal**: Real pathfinding and connectivity analysis (binary tree traversals)
+- **✅ Edge Governance**: Rule-based validation system for graph operations
 
-This represents a major architectural challenge but is essential for Glang's unique vision.
+**Binary Trees** demonstrate the power of this architecture - they're real graph structures with nodes, edges, and governance, not simulated tree behavior. This transforms Glang from a container-based language to a genuinely graph-theoretic programming platform.
 
 ## Recent Changes (September 2025)
 
@@ -59,7 +60,11 @@ This represents a major architectural challenge but is essential for Glang's uni
   - ✅ Rule configuration helpers: `configure_for_safe_mode()`, `configure_for_experimental_mode()`
   - ✅ Enhanced `can_add_edge()` returns detailed reason strings for failures
   - ✅ **VERIFICATION**: All 1324 tests pass - comprehensive edge governance system operational!
-- **Week 3-4**: ⏳ Binary tree implementation with tree-specific rules
+- **Week 3-4**: ✅ **COMPLETED** - Binary tree implementation with tree-specific rules
+  - ✅ `BinaryTreeValue` class with complete BST operations (insert, search, traversals)
+  - ✅ Tree-specific governance rules: `max_children_two`, `tree_hierarchy`, `no_tree_cycles`
+  - ✅ Integration with control layer and AST execution system
+  - ✅ **VERIFICATION**: All 20 tree tests pass + 1344 total tests passing - true graph-based trees operational!
 - **Week 5-7**: ⏳ DataFrame foundation with structure rules
 - **Week 8**: ⏳ Testing, polish, documentation
 
@@ -208,6 +213,11 @@ bool is_valid = false
 list<num> scores = [95, 87, 92]
 list<string> names = ["alice", "bob", "charlie"]
 list<bool> flags = [true, false, true]
+
+# Binary trees (type inferred from usage or explicit constraints)
+my_tree = tree{}                   # Infers tree type from literal
+tree<num> numbers = tree{}         # Explicit constraint for homogeneous trees
+tree<string> words = tree{}        # String-only binary search tree
 
 # Data nodes (type inferred from literal)
 user = { "name": "Alice" }           # Infers data type
