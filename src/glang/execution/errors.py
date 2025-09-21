@@ -18,6 +18,11 @@ if TYPE_CHECKING:
     from .stack_trace import EnhancedStackTrace
 
 
+class GraphError(Exception):
+    """Error related to graph operations."""
+    pass
+
+
 class RuntimeError(Exception):
     """Base runtime error with position information and optional stack trace."""
 

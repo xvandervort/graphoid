@@ -27,10 +27,51 @@ items.can("invalid")  # Returns false
 ```
 
 ### inspect()
-Returns detailed information about the list.
+Returns detailed structural information about the list including graph structure, rules, and connections.
 ```glang
 items = [1, 2, 3]
-items.inspect()  # Returns detailed list information
+items.names(['red', 'orange', 'yellow'])
+items.inspect()
+# Returns:
+# Graph Structure:
+# ========================================
+# Type: list
+# Nodes: 3
+# Edges: 2
+# Active Rules: no_list_cycles, same_structure_only
+#
+# Node Connections:
+#   red (1):
+#     → orange (2) (0)
+#   orange (2):
+#     → yellow (3) (1)
+#   yellow (3): (no outgoing edges)
+```
+
+### visualize()
+Shows the shape and flow of the list structure. Names are displayed when available.
+```glang
+items = [1, 2, 3, 4, 5]
+items.visualize()  # Returns "[1 → 2 → 3 → 4 → 5]"
+
+# With names
+items.names(['first', 'second', 'third', 'fourth', 'fifth'])
+items.visualize()  # Returns "[first → second → third → fourth → fifth]"
+
+# Large lists are abbreviated
+big_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+big_list.visualize()  # Returns "[1 → 2 → 3 → ... → 10 → 11 → 12] (12 elements)"
+```
+
+### view()
+Shows a clean display of names and values together.
+```glang
+items = [1, 2, 3]
+items.view()  # Returns "[1, 2, 3]"
+
+# With names
+items.names(['red', 'orange', 'yellow'])
+items.view()  # Returns ["red": 1, "orange": 2, "yellow": 3]
 ```
 
 ## Size and State
@@ -144,12 +185,12 @@ items.clear()  # items becomes []
 
 ## Searching and Counting
 
-### indexOf(element)
+### index_of(element)
 Returns the index of the first occurrence of an element.
 ```glang
 items = [10, 20, 30, 20, 40]
-items.indexOf(20)  # Returns 1
-items.indexOf(50)  # Returns -1 (not found)
+items.index_of(20)  # Returns 1
+items.index_of(50)  # Returns -1 (not found)
 ```
 
 ### count(element)
@@ -164,6 +205,66 @@ Counts occurrences of a value (alias for count).
 ```glang
 items = ["a", "b", "a", "c", "a"]
 items.count_values("a")  # Returns 3
+```
+
+## Element Naming
+
+Lists support semantic naming of elements, similar to R's named vectors. Names are displayed in visualization methods and provide meaningful labels for list elements.
+
+### names()
+Gets the current names assigned to list elements.
+```glang
+items = [1, 2, 3]
+items.names()  # Returns [none, none, none] (no names set)
+
+# After setting names
+items.names(['first', 'second', 'third'])
+items.names()  # Returns ['first', 'second', 'third']
+```
+
+### names(list)
+Sets names for list elements. The names list must be the same length as the list.
+```glang
+items = [10, 20, 30]
+items.names(['min', 'avg', 'max'])  # Sets names
+
+# Names can be mixed with nil for unnamed elements
+items.names(['min', none, 'max'])  # Middle element has no name
+```
+
+### has_names()
+Checks if any elements in the list have names assigned.
+```glang
+items = [1, 2, 3]
+items.has_names()  # Returns false
+
+items.names(['a', 'b', 'c'])
+items.has_names()  # Returns true
+
+# Even partial names return true
+items.names(['a', none, none])
+items.has_names()  # Returns true
+```
+
+### name(index)
+Gets the name of a specific element by index.
+```glang
+items = [10, 20, 30]
+items.names(['min', 'avg', 'max'])
+
+items.name(0)  # Returns 'min'
+items.name(1)  # Returns 'avg'
+items.name(2)  # Returns 'max'
+```
+
+### set_name(index, name)
+Sets the name for a single element at the specified index.
+```glang
+items = [10, 20, 30]
+items.set_name(0, 'minimum')
+items.set_name(2, 'maximum')
+
+items.names()  # Returns ['minimum', none, 'maximum']
 ```
 
 ## Ordering and Sorting
@@ -447,12 +548,15 @@ numbers.add_edge(1, 2, "flows_to")
 ### Edge Inspection
 ```glang
 # Get all edges as [from_index, to_index, relationship] lists
-edges = numbers.get_edges()
+edges = numbers.edges()
 print(edges)  # [[0, 1, "next"], [1, 2, "flows_to"]]
 
-# Count total edges
-count = numbers.get_edge_count()
-print(count)  # 2
+# Count nodes and edges
+node_count = numbers.count_nodes()
+print(node_count)  # 4
+
+edge_count = numbers.count_edges()
+print(edge_count)  # 2
 
 # Check if edge can be added (returns true/false)
 can_add = numbers.can_add_edge(0, 2, "skip")
@@ -464,32 +568,42 @@ print(can_add)  # false - blocked by governance rules
 ```
 
 ### Graph Visualization
+
+Lists provide three levels of visualization:
+
 ```glang
 numbers = [1, 2, 3]
+numbers.names(['alpha', 'beta', 'gamma'])
 numbers.add_edge(0, 1, "connects")
 
-# Get structured summary
-summary = numbers.get_graph_summary()
-print(summary["type"])        # "list"
-print(summary["node_count"])  # 3
-print(summary["edge_count"])  # 1
-
-# Visualize structure (text format)
-viz = numbers.visualize_structure("text")
-print(viz)
+# Technical inspection - detailed structure
+numbers.inspect()
 # Graph Structure:
 # ========================================
 # Type: list
 # Nodes: 3
 # Edges: 1
 # Active Rules: no_list_cycles, same_structure_only
+#
+# Node Connections:
+#   alpha (1):
+#     → beta (2) (connects)
+#   beta (2): (no outgoing edges)
+#   gamma (3): (no outgoing edges)
 
-# DOT format for Graphviz
-dot = numbers.visualize_structure("dot")
+# Quick shape overview
+numbers.visualize()
+# [alpha → beta → gamma]
 
-# Compact summary
-summary = numbers.visualize_structure("summary")
-print(summary)  # [LIST] 3 nodes, 1 edges
+# Clean semantic display
+numbers.view()
+# ["alpha": 1, "beta": 2, "gamma": 3]
+
+# Get structured summary
+summary = numbers.get_graph_summary()
+print(summary["type"])        # "list"
+print(summary["node_count"])  # 3
+print(summary["edge_count"])  # 1
 ```
 
 ### Rule Management

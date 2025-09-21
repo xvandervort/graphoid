@@ -106,6 +106,9 @@ class GraphNode:
         # Parent graph reference
         self._graph: Optional['GraphStructure'] = None
 
+        # Set bidirectional link: value knows its node, node knows its value
+        value._graph_node = self
+
     def add_edge_to(self, target: 'GraphNode', metadata: EdgeMetadata) -> None:
         """Add an outgoing edge to another node."""
         # Validate edge operation through control layer (if graph has one)
@@ -169,6 +172,42 @@ class GraphNode:
         """Check if this node has an edge to the target node."""
         edge_id = f"{self.node_id}->{target.node_id}"
         return edge_id in self._outgoing
+
+    @property
+    def neighbors(self) -> List['GraphNode']:
+        """Get all neighboring nodes (both outgoing and incoming connections)."""
+        # Combine outgoing and incoming neighbors, removing duplicates
+        all_neighbors = set()
+        for target, _ in self._outgoing.values():
+            all_neighbors.add(target)
+        for source, _ in self._incoming.values():
+            all_neighbors.add(source)
+        return list(all_neighbors)
+
+    @property
+    def container(self) -> Optional['GraphStructure']:
+        """Get the graph structure that contains this node."""
+        return self._graph
+
+    @property
+    def id(self) -> str:
+        """Get the unique identifier for this node."""
+        return self.node_id
+
+    def has_neighbor(self, other: 'GraphNode') -> bool:
+        """Check if another node is a neighbor."""
+        return self.has_edge_to(other) or other.has_edge_to(self)
+
+    def path_to(self, target: 'GraphNode') -> Optional[List['GraphNode']]:
+        """Find a path from this node to the target node."""
+        if self._graph:
+            return self._graph.shortest_path(self, target)
+        return None
+
+    def distance_to(self, target: 'GraphNode') -> Optional[int]:
+        """Get the shortest distance to another node."""
+        path = self.path_to(target)
+        return len(path) - 1 if path else None
 
     def get_edges_by_key(self, key: Union[str, int]) -> List[Tuple['GraphNode', EdgeMetadata]]:
         """Get all edges with a specific key."""

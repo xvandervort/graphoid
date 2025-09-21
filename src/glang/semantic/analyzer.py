@@ -671,22 +671,22 @@ class SemanticAnalyzer(BaseASTVisitor):
 
         # Define valid methods for each type
         # Universal reflection methods available on all types
-        universal_methods = {'type', 'methods', 'can', 'inspect', 'size'}
+        universal_methods = {'type', 'methods', 'can', 'inspect', 'size', 'node'}
 
         # Behavior management methods (available on list and hash types)
-        behavior_methods = {'add_rule', 'remove_rule', 'has_rule', 'get_rules', 'clear_rules'}
+        behavior_methods = {'add_rule', 'remove_rule', 'has_rule', 'rules', 'clear_rules'}
 
         valid_methods = {
             'list': {
                 'append', 'prepend', 'insert', 'remove', 'pop', 'clear', 'reverse',
                 'size', 'empty', 'constraint', 'validate_constraint', 'type_summary',
-                'types', 'coerce_to_constraint', 'indexOf', 'count', 'min', 'max', 'sum', 'sort',
+                'types', 'coerce_to_constraint', 'index_of', 'count', 'min', 'max', 'sum', 'sort',
                 'map', 'filter', 'each', 'select', 'reject',
                 'to_string', 'to_bool',
-                'add_edge', 'get_connected_to', 'to_graph', 'get_edges', 'get_edge_count', 'can_add_edge',
-                'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule',
-                'get_graph_summary', 'visualize_structure',
-                'set_names', 'get_names', 'has_names', 'get_name', 'set_name', 'metadata'
+                'add_edge', 'connected_to', 'to_graph', 'edges', 'can_add_edge',
+                'count_edges', 'count_nodes', 'graph_summary', 'visualize_structure', 'visualize', 'view',
+                'active_rules', 'rule_status', 'disable_rule', 'enable_rule',
+                'names', 'has_names', 'name', 'set_name', 'metadata', 'rules'
             } | universal_methods | behavior_methods,
             'string': {
                 'size', 'empty', 'upper', 'lower', 'split', 'split_on_any', 'trim', 'join',
@@ -719,6 +719,7 @@ class SemanticAnalyzer(BaseASTVisitor):
             } | universal_methods,
             'time': {'get_type', 'to_string', 'to_num'} | universal_methods,
             'file': {'write', 'read', 'read_line', 'flush', 'close', 'kill', 'capability_type'} | universal_methods,
+            'node': {'neighbors', 'value', 'container', 'id', 'has_neighbor', 'path_to', 'distance_to', 'edges'} | universal_methods,
             'module': universal_methods.copy()  # Modules can have any method - validated at runtime
         }
         

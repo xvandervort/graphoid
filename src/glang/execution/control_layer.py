@@ -262,15 +262,51 @@ class ControlLayer:
         lines.append("")
         lines.append("Node Connections:")
 
+        # Check if we have names for the nodes
+        has_names = self.parent_graph.has_names()
+        names = self.parent_graph.get_names() if has_names else []
+
+        # Create a mapping from node_id to index for efficient name lookup
+        node_id_to_index = {}
+        if has_names:
+            if hasattr(self.parent_graph, 'sequence_order'):
+                # For sequential graphs (lists)
+                for i, graph_node in enumerate(self.parent_graph.sequence_order):
+                    # Use the node's ID, not the node object itself
+                    node_id_to_index[graph_node.node_id] = i
+            elif hasattr(self.parent_graph, 'key_to_node'):
+                # For keyed graphs (hashes) - use insertion order
+                for i, key in enumerate(self.parent_graph.key_to_node.keys()):
+                    node = self.parent_graph.key_to_node[key]
+                    node_id_to_index[node.node_id] = i
+
         for node_id, node in self.parent_graph.nodes.items():
+            # Show name if available, otherwise show the value
+            node_value = node.value.to_display_string() if node.value else "None"
+
+            # Get the name for this node if available
+            display_name = node_value
+            if has_names and node_id in node_id_to_index:
+                index = node_id_to_index[node_id]
+                if index < len(names) and names[index] is not None:
+                    display_name = f"{names[index]} ({node_value})"
+
             if node._outgoing:
-                lines.append(f"  {node_id}:")
+                lines.append(f"  {display_name}:")
                 for edge_id, (target_node, metadata) in node._outgoing.items():
-                    target_id = target_node.node_id
+                    target_value = target_node.value.to_display_string() if target_node.value else "None"
+
+                    # Also show target name if available
+                    target_display = target_value
+                    if has_names and target_node.node_id in node_id_to_index:
+                        target_index = node_id_to_index[target_node.node_id]
+                        if target_index < len(names) and names[target_index] is not None:
+                            target_display = f"{names[target_index]} ({target_value})"
+
                     relationship = metadata.key if metadata else "connected"
-                    lines.append(f"    → {target_id} ({relationship})")
+                    lines.append(f"    → {target_display} ({relationship})")
             else:
-                lines.append(f"  {node_id}: (no outgoing edges)")
+                lines.append(f"  {display_name}: (no outgoing edges)")
 
         return "\n".join(lines)
 
@@ -281,16 +317,18 @@ class ControlLayer:
         lines.append("  rankdir=LR;")
         lines.append("  node [shape=box];")
 
-        # Add nodes
-        for node_id in self.parent_graph.nodes:
-            lines.append(f'  "{node_id}";')
-
-        # Add edges
+        # Add nodes with readable values
         for node_id, node in self.parent_graph.nodes.items():
+            node_value = node.value.to_display_string() if node.value else "None"
+            lines.append(f'  "{node_value}";')
+
+        # Add edges with readable values
+        for node_id, node in self.parent_graph.nodes.items():
+            node_value = node.value.to_display_string() if node.value else "None"
             for edge_id, (target_node, metadata) in node._outgoing.items():
-                target_id = target_node.node_id
+                target_value = target_node.value.to_display_string() if target_node.value else "None"
                 relationship = metadata.key if metadata else "connected"
-                lines.append(f'  "{node_id}" -> "{target_id}" [label="{relationship}"];')
+                lines.append(f'  "{node_value}" -> "{target_value}" [label="{relationship}"];')
 
         lines.append("}")
         return "\n".join(lines)

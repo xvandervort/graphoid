@@ -586,7 +586,7 @@ class ASTExecutor(BaseASTVisitor):
         2. Type-specific methods (in dispatchers)
         """
         # First check for universal methods
-        if method_name in ['type', 'size', 'inspect']:
+        if method_name in ['type', 'size', 'inspect', 'freeze', 'is_frozen', 'contains_frozen', 'node']:
             return self._dispatch_universal_method(target, method_name, args, position)
         elif method_name in ['methods', 'can']:
             # These need access to the method registry, so handled specially
@@ -613,6 +613,8 @@ class ASTExecutor(BaseASTVisitor):
             return self._dispatch_time_method(target, method_name, args, position)
         elif target_type == "file":
             return self._dispatch_file_method(target, method_name, args, position)
+        elif target_type == "node":
+            return self._dispatch_node_method(target, method_name, args, position)
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, target_type, position)
@@ -651,6 +653,81 @@ class ASTExecutor(BaseASTVisitor):
 
         return ''.join(result)
 
+    def _dispatch_node_method(self, target, method_name: str,
+                            args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
+        """Handle node method calls."""
+        from .node_value import NodeValue
+
+        if not isinstance(target, NodeValue):
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, "node", position)
+
+        if method_name == "neighbors":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"neighbors() takes no arguments, got {len(args)}", position)
+            return target.neighbors
+
+        elif method_name == "value":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"value() takes no arguments, got {len(args)}", position)
+            return target.value
+
+        elif method_name == "container":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"container() takes no arguments, got {len(args)}", position)
+            return target.container
+
+        elif method_name == "id":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"id() takes no arguments, got {len(args)}", position)
+            return target.id
+
+        elif method_name == "has_neighbor":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"has_neighbor() takes 1 argument, got {len(args)}", position)
+            return target.has_neighbor(args[0])
+
+        elif method_name == "path_to":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"path_to() takes 1 argument, got {len(args)}", position)
+            return target.path_to(args[0])
+
+        elif method_name == "distance_to":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"distance_to() takes 1 argument, got {len(args)}", position)
+            return target.distance_to(args[0])
+
+        elif method_name == "edges":
+            if len(args) > 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"edges() takes 0 or 1 arguments, got {len(args)}", position)
+
+            if len(args) == 0:
+                return target.edges()  # Default to out
+            else:
+                # Get direction argument
+                if not isinstance(args[0], StringValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"edges() argument must be string, got {args[0].get_type()}", position)
+
+                direction = args[0].value
+                if direction not in ("out", "in", "all"):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"edges() direction must be 'out', 'in', or 'all', got '{direction}'", position)
+
+                return target.edges(direction)
+
+        else:
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, "node", position)
+
     def _dispatch_universal_method(self, target: GlangValue, method_name: str,
                                   args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle universal methods that all nodes inherit."""
@@ -671,7 +748,13 @@ class ASTExecutor(BaseASTVisitor):
             if len(args) != 0:
                 from .errors import ArgumentError
                 raise ArgumentError(f"inspect() takes no arguments, got {len(args)}", position)
-            return target.universal_inspect()
+            # Show detailed structural information (what visualize_structure used to do)
+            if hasattr(target, 'visualize_structure'):
+                structure_info = target.visualize_structure()
+                return StringValue(structure_info, position)
+            else:
+                # Fallback for non-graph types
+                return StringValue(f"{target.get_type()} with value: {target.to_display_string()}", position)
         
         elif method_name == "freeze":
             if len(args) != 0:
@@ -690,7 +773,16 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"contains_frozen() takes no arguments, got {len(args)}", position)
             return BooleanValue(target.contains_frozen_data(), position)
-        
+
+        elif method_name == "node":
+            # Access the graph node wrapper for this value
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"node() takes no arguments, got {len(args)}", position)
+            # Wrap the GraphNode in a NodeValue for method dispatch
+            from .node_value import NodeValue
+            return NodeValue(target.node, position)
+
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, target.get_type(), position)
@@ -732,19 +824,20 @@ class ASTExecutor(BaseASTVisitor):
     def _get_available_methods(self, target_type: str) -> List[str]:
         """Get list of available methods for a given type."""
         # Universal methods available on all types
-        universal_methods = ['type', 'methods', 'can', 'inspect', 'size', 'freeze', 'is_frozen', 'contains_frozen']
+        universal_methods = ['type', 'methods', 'can', 'inspect', 'size', 'freeze', 'is_frozen', 'contains_frozen', 'node']
         
         # Behavior management methods (available on list and hash types)
-        behavior_methods = ['add_rule', 'remove_rule', 'has_rule', 'get_rules', 'clear_rules']
+        behavior_methods = ['add_rule', 'remove_rule', 'has_rule', 'rules', 'clear_rules']
 
         # Type-specific methods
         type_methods = {
-            'list': ['append', 'prepend', 'insert', 'reverse', 'indexOf', 'count', 'min', 'max', 'sum', 'sort', 'map', 'filter', 'select', 'reject', 'each', 'clear', 'empty', 'pop', 'remove', 'constraint', 'types', 'type_summary', 'validate_constraint', 'coerce_to_constraint', 'to_string', 'to_bool', 'can_accept', 'add_edge', 'get_connected_to', 'to_graph', 'set_names', 'get_names', 'has_names', 'get_name', 'set_name'] + behavior_methods,
+            'list': ['append', 'prepend', 'insert', 'reverse', 'index_of', 'count', 'min', 'max', 'sum', 'sort', 'map', 'filter', 'select', 'reject', 'each', 'clear', 'empty', 'pop', 'remove', 'constraint', 'types', 'type_summary', 'validate_constraint', 'coerce_to_constraint', 'to_string', 'to_bool', 'can_accept', 'add_edge', 'connected_to', 'to_graph', 'edges', 'can_add_edge', 'count_edges', 'count_nodes', 'graph_summary', 'visualize_structure', 'visualize', 'view', 'names', 'has_names', 'name', 'set_name'] + behavior_methods,
             'string': ['length', 'contains', 'extract', 'count', 'count_chars', 'find_first', 'find_first_char', 'up', 'toUpper', 'down', 'toLower', 'split', 'split_on_any', 'trim', 'join', 'matches', 'replace', 'find_all', 'findAll', 'is_email', 'is_number', 'is_url', 'reverse', 'unique', 'chars', 'starts_with', 'ends_with', 'to_string', 'to_num', 'to_bool', 'to_time'],
             'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time'],
             'bool': ['flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'],
             'data': ['key', 'value', 'can_accept'],
             'hash': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept', 'to_string', 'to_bool', 'add_value_edge', 'get_connected_keys'] + behavior_methods,
+            'node': ['neighbors', 'value', 'container', 'id', 'has_neighbor', 'path_to', 'distance_to', 'edges'],
             'time': ['get_type', 'to_string', 'to_num']
         }
         
@@ -831,18 +924,6 @@ class ASTExecutor(BaseASTVisitor):
             return ListValue(reversed_elements, target.constraint, position)
         
         # List analysis methods
-        elif method_name == "indexOf":
-            if len(args) != 1:
-                from .errors import ArgumentError
-                raise ArgumentError(f"indexOf() takes 1 argument, got {len(args)}", position)
-            
-            search_value = args[0]
-            for i, element in enumerate(target.elements):
-                if element == search_value:
-                    return NumberValue(i, position)
-            
-            # Return -1 if not found (following common convention)
-            return NumberValue(-1, position)
         
         elif method_name == "count":
             if len(args) != 1:
@@ -1216,12 +1297,6 @@ class ASTExecutor(BaseASTVisitor):
                 edge_lists.append(ListValue(edge_data, None, position))
             return ListValue(edge_lists, None, position)
 
-        elif method_name == "get_edge_count":
-            if len(args) != 0:
-                from .errors import ArgumentError
-                raise ArgumentError(f"get_edge_count() takes no arguments, got {len(args)}", position)
-            count = target.get_edge_count()
-            return NumberValue(count, position)
 
         elif method_name == "can_add_edge":
             if len(args) < 2:
@@ -1238,6 +1313,38 @@ class ASTExecutor(BaseASTVisitor):
             # Check if edge can be added
             can_add, reason = target.can_add_edge(int(from_index.value), int(to_index.value), relationship.value)
             return BooleanValue(can_add, position)
+
+        # Better named edge/node counting methods
+        elif method_name == "count_edges":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"count_edges() takes no arguments, got {len(args)}", position)
+            count = target.count_edges()
+            return NumberValue(count, position)
+
+        elif method_name == "count_nodes":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"count_nodes() takes no arguments, got {len(args)}", position)
+            count = target.count_nodes()
+            return NumberValue(count, position)
+
+        elif method_name == "graph_summary":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"graph_summary() takes no arguments, got {len(args)}", position)
+            summary = target.graph_summary()
+            # Convert to a hash structure that Glang can use
+            hash_pairs = []
+            for key, value in summary.items():
+                if isinstance(value, list):
+                    # Convert lists to ListValue
+                    list_elements = [StringValue(str(v)) for v in value]
+                    hash_pairs.append((key, ListValue(list_elements)))
+                else:
+                    # Convert other values to strings
+                    hash_pairs.append((key, StringValue(str(value))))
+            return HashValue(hash_pairs, position)
 
         # Control layer access methods (Layer 3)
         elif method_name == "get_active_rules":
@@ -1402,6 +1509,145 @@ class ASTExecutor(BaseASTVisitor):
         # Check if it's a universal method
         elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
             return self._dispatch_universal_method(target, method_name, args, position)
+
+        # Missing methods that are listed but not implemented
+        elif method_name == "visualize_structure":
+            if len(args) > 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"visualize_structure() takes 0-1 arguments, got {len(args)}", position)
+            format_arg = args[0] if len(args) == 1 else StringValue("text")
+            if not isinstance(format_arg, StringValue):
+                raise RuntimeError("visualize_structure() format must be a string", position)
+            result = target.visualize_structure(format_arg.value)
+            return StringValue(result, position)
+
+        elif method_name == "visualize":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"visualize() takes no arguments, got {len(args)}", position)
+            # Show shape/structure representation with names if available
+            size = len(target.elements)
+
+            # Get display names (prefer names over values)
+            def get_display_name(index, elem):
+                if hasattr(target, 'has_names') and target.has_names():
+                    names = target.get_names()
+                    if index < len(names) and names[index] is not None:
+                        return names[index]
+                return elem.to_display_string()
+
+            if size <= 10:
+                # Small list: show actual shape
+                shape = " → ".join([get_display_name(i, elem) for i, elem in enumerate(target.elements)])
+                result = f"[{shape}]"
+            else:
+                # Large list: show abbreviated shape
+                first_three = " → ".join([get_display_name(i, elem) for i, elem in enumerate(target.elements[:3])])
+                last_three = " → ".join([get_display_name(size-3+i, elem) for i, elem in enumerate(target.elements[-3:])])
+                result = f"[{first_three} → ... → {last_three}] ({size} elements)"
+            return StringValue(result, position)
+
+        elif method_name == "view":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"view() takes no arguments, got {len(args)}", position)
+            # Show names and values together
+            if hasattr(target, 'has_names') and target.has_names():
+                names = target.get_names()
+                elements = []
+                for i, elem in enumerate(target.elements):
+                    if i < len(names) and names[i] is not None:
+                        elements.append(f'"{names[i]}": {elem.to_display_string()}')
+                    else:
+                        elements.append(elem.to_display_string())
+                result = "[" + ", ".join(elements) + "]"
+            else:
+                # No names, just show values
+                result = "[" + ", ".join([elem.to_display_string() for elem in target.elements]) + "]"
+            return StringValue(result, position)
+
+        # Snake_case alternatives for verbose methods
+        # Proper snake_case method
+        elif method_name == "index_of":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"index_of() takes 1 argument, got {len(args)}", position)
+
+            search_value = args[0]
+            for i, element in enumerate(target.elements):
+                if element == search_value:
+                    return NumberValue(i, position)
+
+            # Return -1 if not found (following common convention)
+            return NumberValue(-1, position)
+
+        # Clean snake_case methods (no more "get_" delegation)
+        elif method_name == "edges":
+            # Get custom edges directly
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"edges() takes no arguments, got {len(args)}", position)
+            edges = target.get_edges()  # Call the underlying method directly
+            edge_lists = []
+            for from_idx, to_idx, relationship in edges:
+                edge_data = [NumberValue(from_idx), NumberValue(to_idx), StringValue(relationship)]
+                edge_lists.append(ListValue(edge_data, None, position))
+            return ListValue(edge_lists, None, position)
+
+        elif method_name == "connected_to":
+            # Get connected elements directly
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"connected_to() takes 1 argument, got {len(args)}", position)
+            index_arg = args[0]
+            if not isinstance(index_arg, NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"connected_to() expects integer index, got {index_arg.get_type()}", position)
+            connected = target.get_connected_to(int(index_arg.value))
+            connected_values = [NumberValue(idx) for idx in connected]
+            return ListValue(connected_values, "num", position)
+
+        elif method_name == "names":
+            # Overloaded method: get names (no args) or set names (with args)
+            if len(args) == 0:
+                # Get node names directly
+                names = target.get_names()
+                if names is None:
+                    return ListValue([], "string", position)
+                name_values = [StringValue(name) if name is not None else NoneValue() for name in names]
+                return ListValue(name_values, None, position)
+            elif len(args) == 1:
+                # Set names (replaces set_names)
+                names_list = args[0]
+                if not isinstance(names_list, ListValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"names() expects a list, got {names_list.get_type()}", position)
+
+                # Convert Glang list to Python list of optional strings
+                python_names = []
+                for elem in names_list.elements:
+                    if isinstance(elem, StringValue):
+                        python_names.append(elem.value)
+                    elif isinstance(elem, NoneValue):
+                        python_names.append(None)
+                    else:
+                        from .errors import ArgumentError
+                        raise ArgumentError(f"Names must be strings or nil, got {elem.get_type()}", position)
+
+                target.set_names(python_names)
+                return names_list  # Return the list that was set
+            else:
+                from .errors import ArgumentError
+                raise ArgumentError(f"names() takes 0 or 1 arguments, got {len(args)}", position)
+
+        elif method_name == "rules":
+            # Get active rules directly
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"rules() takes no arguments, got {len(args)}", position)
+            rules = target.get_rules()
+            rule_values = [StringValue(rule) for rule in rules]
+            return ListValue(rule_values, "string", position)
 
         else:
             from .errors import MethodNotFoundError
@@ -2163,9 +2409,9 @@ class ASTExecutor(BaseASTVisitor):
             # Convert timestamp to time value
             from .values import TimeValue
             return TimeValue(target.value, position)
-        
+
         # Check if it's a universal method
-        elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
+        elif method_name in ['freeze', 'is_frozen', 'contains_frozen', 'node']:
             return self._dispatch_universal_method(target, method_name, args, position)
         
         else:

@@ -281,6 +281,20 @@ class ListValue(GlangValue, GraphContainer):
         """Get total number of custom edges."""
         return len(self.get_edges())
 
+    def count_edges(self) -> int:
+        """Count structural edges in the list (better name than get_edge_count)."""
+        if len(self.elements) <= 1:
+            return 0
+        return len(self.elements) - 1  # n nodes = n-1 structural edges
+
+    def count_nodes(self) -> int:
+        """Count nodes in the list."""
+        return len(self.elements)
+
+    def graph_summary(self) -> Dict[str, Any]:
+        """Get graph summary (better name than get_graph_summary)."""
+        return self.get_graph_summary()
+
     def can_add_edge(self, from_index: int, to_index: int, relationship: str = "related") -> Tuple[bool, str]:
         """Check if an edge can be added without actually adding it."""
         if not (0 <= from_index < len(self.graph.sequence_order) and

@@ -37,6 +37,7 @@ class GlangValue(ABC):
         self.position = position
         self.is_frozen = False
         self.contains_frozen = False
+        self._graph_node = None  # Reference to GraphNode when in a graph
 
     @abstractmethod
     def to_python(self) -> Any:
@@ -67,6 +68,14 @@ class GlangValue(ABC):
     
     def __str__(self) -> str:
         return self.to_display_string()
+
+    @property
+    def node(self):
+        """Access the graph node wrapper for this value."""
+        if self._graph_node is None:
+            from .errors import GraphError
+            raise GraphError(f"Value {self.to_display_string()} is not part of a graph. Cannot access .node property.")
+        return self._graph_node
     
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.to_python()!r})"
