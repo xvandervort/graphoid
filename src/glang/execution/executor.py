@@ -605,7 +605,7 @@ class ASTExecutor(BaseASTVisitor):
             return self._dispatch_bool_method(target, method_name, args, position)
         elif target_type == "data":
             return self._dispatch_data_method(target, method_name, args, position)
-        elif target_type == "hash":
+        elif target_type == "map":
             return self._dispatch_hash_method(target, method_name, args, position)
         elif target_type == "tree":
             return self._dispatch_tree_method(target, method_name, args, position)
@@ -824,25 +824,36 @@ class ASTExecutor(BaseASTVisitor):
     def _get_available_methods(self, target_type: str) -> List[str]:
         """Get list of available methods for a given type."""
         # Universal methods available on all types
-        universal_methods = ['type', 'methods', 'can', 'inspect', 'size', 'freeze', 'is_frozen', 'contains_frozen', 'node']
-        
+        universal_methods = ['type', 'methods', 'can', 'inspect', 'size', 'freeze', 'is_frozen', 'contains_frozen']
+
         # Behavior management methods (available on list and hash types)
         behavior_methods = ['add_rule', 'remove_rule', 'has_rule', 'rules', 'clear_rules']
 
-        # Type-specific methods
-        type_methods = {
-            'list': ['append', 'prepend', 'insert', 'reverse', 'index_of', 'count', 'min', 'max', 'sum', 'sort', 'map', 'filter', 'select', 'reject', 'each', 'clear', 'empty', 'pop', 'remove', 'constraint', 'types', 'type_summary', 'validate_constraint', 'coerce_to_constraint', 'to_string', 'to_bool', 'can_accept', 'add_edge', 'connected_to', 'to_graph', 'edges', 'can_add_edge', 'count_edges', 'count_nodes', 'graph_summary', 'visualize_structure', 'visualize', 'view', 'names', 'has_names', 'name', 'set_name'] + behavior_methods,
-            'string': ['length', 'contains', 'extract', 'count', 'count_chars', 'find_first', 'find_first_char', 'up', 'toUpper', 'down', 'toLower', 'split', 'split_on_any', 'trim', 'join', 'matches', 'replace', 'find_all', 'findAll', 'is_email', 'is_number', 'is_url', 'reverse', 'unique', 'chars', 'starts_with', 'ends_with', 'to_string', 'to_num', 'to_bool', 'to_time'],
-            'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time'],
-            'bool': ['flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'],
-            'data': ['key', 'value', 'can_accept'],
-            'hash': ['set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept', 'to_string', 'to_bool', 'add_value_edge', 'get_connected_keys', 'names', 'has_names', 'can_add_edge', 'count_edges', 'count_nodes', 'get_edges', 'get_graph_summary', 'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule', 'visualize', 'view'] + behavior_methods,
+        # Methods that require experimental/graph mode
+        graph_mode_methods = {
+            'list': ['add_edge', 'connected_to', 'to_graph', 'edges', 'can_add_edge', 'graph_summary', 'visualize_structure', 'visualize', 'view'],
+            'map': ['add_edge', 'get_connected_keys', 'can_add_edge', 'get_edges', 'get_graph_summary', 'visualize_structure', 'visualize', 'view']
+        }
+
+        # Basic methods available in default mode
+        basic_methods = {
+            'list': ['append', 'prepend', 'insert', 'reverse', 'index_of', 'count', 'min', 'max', 'sum', 'sort', 'map', 'filter', 'select', 'reject', 'each', 'clear', 'empty', 'pop', 'remove', 'constraint', 'types', 'validate_constraint', 'coerce_to_constraint', 'to_string', 'to_bool', 'can_accept', 'names', 'has_names', 'name', 'set_name', 'count_edges', 'count_nodes'] + behavior_methods,
+            'string': ['length', 'contains', 'extract', 'count', 'count_chars', 'find_first', 'find_first_char', 'up', 'toUpper', 'down', 'toLower', 'split', 'split_on_any', 'trim', 'join', 'matches', 'replace', 'find_all', 'findAll', 'is_email', 'is_number', 'is_url', 'reverse', 'unique', 'chars', 'starts_with', 'ends_with', 'to_string', 'to_num', 'to_bool', 'to_time', 'node'],
+            'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time', 'node'],
+            'bool': ['flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool', 'node'],
+            'data': ['key', 'value', 'can_accept', 'node'],
+            'map': ['set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept', 'to_string', 'to_bool', 'names', 'has_names', 'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule', 'count_edges', 'count_nodes'] + behavior_methods,
             'node': ['neighbors', 'value', 'container', 'id', 'has_neighbor', 'path_to', 'distance_to', 'edges'],
             'time': ['get_type', 'to_string', 'to_num']
         }
-        
-        specific_methods = type_methods.get(target_type, [])
-        return universal_methods + specific_methods
+
+        # Get basic methods for this type
+        basic = basic_methods.get(target_type, [])
+        # Get graph mode methods for this type (marked with *)
+        graph = graph_mode_methods.get(target_type, [])
+        graph_marked = [f"{method}*" for method in graph]
+
+        return universal_methods + basic + graph_marked
     
     def _dispatch_list_method(self, target: ListValue, method_name: str, 
                              args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
@@ -929,11 +940,30 @@ class ASTExecutor(BaseASTVisitor):
             if len(args) != 1:
                 from .errors import ArgumentError
                 raise ArgumentError(f"count() takes 1 argument, got {len(args)}", position)
-            
+
             search_value = args[0]
             count = sum(1 for element in target.elements if element == search_value)
             return NumberValue(count, position)
-        
+
+        elif method_name == "types":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"types() takes no arguments, got {len(args)}", position)
+
+            # Collect unique types from all elements
+            unique_types = []
+            seen_types = set()
+
+            for element in target.elements:
+                element_type = element.get_type()
+                if element_type not in seen_types:
+                    unique_types.append(element_type)
+                    seen_types.add(element_type)
+
+            # Return as list of strings
+            type_strings = [StringValue(type_name, position) for type_name in unique_types]
+            return ListValue(type_strings, "string", position)
+
         elif method_name == "min":
             if len(args) != 0:
                 from .errors import ArgumentError
@@ -2702,7 +2732,7 @@ class ASTExecutor(BaseASTVisitor):
             else:
                 items = []
                 for key in target.keys():
-                    value = target.pairs.get(key)
+                    value = target.get(key)
                     items.append(f'"{key}": {value.to_display_string()}')
                 return StringValue(f"{{{', '.join(items)}}}", position)
 
@@ -2714,10 +2744,10 @@ class ASTExecutor(BaseASTVisitor):
             return BooleanValue(len(target.pairs) > 0, position)
 
         # Graph-specific methods (for HashValue)
-        elif method_name == "add_value_edge":
+        elif method_name == "add_edge":
             if len(args) < 2:
                 from .errors import ArgumentError
-                raise ArgumentError(f"add_value_edge() takes at least 2 arguments (from_key, to_key), got {len(args)}", position)
+                raise ArgumentError(f"add_edge() takes at least 2 arguments (from_key, to_key), got {len(args)}", position)
 
             from_key = args[0]
             to_key = args[1]
@@ -2725,12 +2755,12 @@ class ASTExecutor(BaseASTVisitor):
 
             # Validate arguments
             if not isinstance(from_key, StringValue) or not isinstance(to_key, StringValue):
-                raise RuntimeError("add_value_edge() requires string keys", position)
+                raise RuntimeError("add_edge() requires string keys", position)
             if not isinstance(relationship, StringValue):
-                raise RuntimeError("add_value_edge() relationship must be a string", position)
+                raise RuntimeError("add_edge() relationship must be a string", position)
 
             # Call the graph method
-            success = target.add_value_edge(from_key.value, to_key.value, relationship.value)
+            success = target.add_edge(from_key.value, to_key.value, relationship.value)
             return BooleanValue(success, position)
 
         elif method_name == "get_connected_keys":
@@ -3041,9 +3071,19 @@ class ASTExecutor(BaseASTVisitor):
             # Use the hash's node counting method
             return NumberValue(target.count_nodes(), position)
 
+        elif method_name == "visualize_structure":
+            if len(args) > 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"visualize_structure() takes 0-1 arguments, got {len(args)}", position)
+            format_arg = args[0] if len(args) == 1 else StringValue("text")
+            if not isinstance(format_arg, StringValue):
+                raise RuntimeError("visualize_structure() format must be a string", position)
+            result = target.visualize_structure(format_arg.value)
+            return StringValue(result, position)
+
         else:
             from .errors import MethodNotFoundError
-            raise MethodNotFoundError(method_name, "hash", position)
+            raise MethodNotFoundError(method_name, "map", position)
 
     def _dispatch_tree_method(self, target, method_name: str,
                              args: List[GlangValue], position: Optional[SourcePosition]) -> Any:

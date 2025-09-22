@@ -1127,13 +1127,8 @@ class ASTParser:
             
             self.consume(TokenType.RBRACE, "Expected '}' after pairs")
             
-            # If there's exactly one pair, return a DataNodeLiteral for backward compatibility
-            if len(pairs) == 1:
-                key, value = pairs[0]
-                return DataNodeLiteral(key, value, SourcePosition(brace_token.line, brace_token.column))
-            else:
-                # Multiple pairs = map literal
-                return MapLiteral(pairs, SourcePosition(brace_token.line, brace_token.column))
+            # Always return a MapLiteral regardless of pair count
+            return MapLiteral(pairs, SourcePosition(brace_token.line, brace_token.column))
         
         # Special print function call
         if self.check(TokenType.IDENTIFIER) and self.peek().value == "print":

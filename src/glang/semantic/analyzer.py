@@ -76,7 +76,7 @@ class SemanticAnalyzer(BaseASTVisitor):
         elif isinstance(expr, DataNodeLiteral):
             return 'data'
         elif isinstance(expr, MapLiteral):
-            return 'hash'
+            return 'map'
         elif isinstance(expr, SymbolLiteral):
             return 'symbol'
         elif isinstance(expr, VariableRef):
@@ -106,8 +106,8 @@ class SemanticAnalyzer(BaseASTVisitor):
             elif target_type == 'string':
                 # String indexing returns a string (single character)
                 return 'string'
-            elif target_type == 'hash':
-                # Hash indexing returns data nodes
+            elif target_type == 'map':
+                # Map indexing returns values directly
                 return 'data'
             else:
                 return None  # Cannot determine
@@ -255,12 +255,12 @@ class SemanticAnalyzer(BaseASTVisitor):
                         'hkdf_expand': 'list',   # Returns list of derived key bytes
                         
                         # Asymmetric encryption (RSA)
-                        'rsa_generate_keypair': 'hash',  # Returns hash with private/public keys
+                        'rsa_generate_keypair': 'map',  # Returns map with private/public keys
                         'rsa_encrypt': 'list',   # Returns list of encrypted bytes
                         'rsa_decrypt': 'list',   # Returns list of decrypted bytes
                         
                         # Elliptic Curve Diffie-Hellman (ECDH)
-                        'ecdh_generate_keypair': 'hash',  # Returns hash with private/public/curve
+                        'ecdh_generate_keypair': 'map',  # Returns map with private/public/curve
                         'ecdh_compute_shared_secret': 'list',  # Returns list of shared secret bytes
                         'ecdh_public_key_from_private': 'list',  # Returns list of public key bytes
                         
@@ -347,8 +347,8 @@ class SemanticAnalyzer(BaseASTVisitor):
                         return symbol.type_constraint if symbol.type_constraint else None
                     elif symbol.symbol_type == 'string':
                         return 'string'  # String indexing returns string
-                    elif symbol.symbol_type == 'hash':
-                        return 'data'  # Hash indexing returns data node
+                    elif symbol.symbol_type == 'map':
+                        return 'data'  # Map indexing returns data node
         elif isinstance(expr, MatchExpression):
             # For match expressions, infer type from the first arm's result
             # All arms should return the same type (this could be enforced later)
@@ -362,21 +362,21 @@ class SemanticAnalyzer(BaseASTVisitor):
     def visit_variable_declaration(self, node: VariableDeclaration) -> None:
         """Analyze variable declarations."""
         # Validate type
-        valid_types = {'list', 'string', 'num', 'bool', 'data', 'hash', 'function', 'file', 'any'}
+        valid_types = {'list', 'string', 'num', 'bool', 'data', 'map', 'function', 'file', 'any'}
         if node.var_type not in valid_types:
             self.report_error(InvalidTypeError(node.var_type, node.position))
             return
         
         # Validate constraint if present
         if node.type_constraint:
-            valid_constraints = {'string', 'num', 'bool', 'list', 'data', 'hash'}
+            valid_constraints = {'string', 'num', 'bool', 'list', 'data', 'map'}
             if node.type_constraint not in valid_constraints:
                 self.report_error(InvalidConstraintError(
                     node.type_constraint, node.var_type, node.position))
                 return
             
             # Only list, data, and hash types support constraints currently
-            if node.var_type not in ['list', 'data', 'hash']:
+            if node.var_type not in ['list', 'data', 'map']:
                 self.report_error(InvalidConstraintError(
                     node.type_constraint, node.var_type, node.position))
                 return
@@ -591,7 +591,7 @@ class SemanticAnalyzer(BaseASTVisitor):
         # Check if target is indexable
         if isinstance(node.target, VariableRef):
             symbol = self.symbol_table.lookup_symbol(node.target.name)
-            if symbol and symbol.symbol_type not in {'list', 'string', 'hash', 'any'}:
+            if symbol and symbol.symbol_type not in {'list', 'string', 'map', 'any'}:
                 self.report_error(InvalidMethodCallError(
                     "index access", symbol.symbol_type,
                     "Type is not indexable", node.position))
@@ -671,7 +671,7 @@ class SemanticAnalyzer(BaseASTVisitor):
 
         # Define valid methods for each type
         # Universal reflection methods available on all types
-        universal_methods = {'type', 'methods', 'can', 'inspect', 'size', 'node'}
+        universal_methods = {'type', 'methods', 'can', 'inspect', 'size'}
 
         # Behavior management methods (available on list and hash types)
         behavior_methods = {'add_rule', 'remove_rule', 'has_rule', 'rules', 'clear_rules'}
@@ -679,7 +679,7 @@ class SemanticAnalyzer(BaseASTVisitor):
         valid_methods = {
             'list': {
                 'append', 'prepend', 'insert', 'remove', 'pop', 'clear', 'reverse',
-                'size', 'empty', 'constraint', 'validate_constraint', 'type_summary',
+                'size', 'empty', 'constraint', 'validate_constraint',
                 'types', 'coerce_to_constraint', 'index_of', 'count', 'min', 'max', 'sum', 'sort',
                 'map', 'filter', 'each', 'select', 'reject',
                 'to_string', 'to_bool',
@@ -691,21 +691,21 @@ class SemanticAnalyzer(BaseASTVisitor):
             'string': {
                 'size', 'empty', 'upper', 'lower', 'split', 'split_on_any', 'trim', 'join',
                 'matches', 'replace', 'find_all', 'findAll',
-                'length', 'contains', 'extract', 
+                'length', 'contains', 'extract',
                 'count', 'count_chars', 'find_first', 'find_first_char',
                 'is_email', 'is_number', 'is_url',
                 'up', 'toUpper', 'down', 'toLower',
                 'reverse', 'unique', 'chars',
                 'starts_with', 'ends_with',
-                'to_string', 'to_num', 'to_bool', 'to_time'
+                'to_string', 'to_num', 'to_bool', 'to_time', 'node'
             } | universal_methods,
-            'num': {'abs', 'round', 'to', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time'} | universal_methods,
-            'bool': {'flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'} | universal_methods,
-            'data': {'key', 'value'} | universal_methods,
-            'hash': {
-                'node', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop',
+            'num': {'abs', 'round', 'to', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time', 'node'} | universal_methods,
+            'bool': {'flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool', 'node'} | universal_methods,
+            'data': {'key', 'value', 'node'} | universal_methods,
+            'map': {
+                'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop',
                 'to_string', 'to_bool', 'can_accept',
-                'add_value_edge', 'get_connected_keys', 'get_edges', 'can_add_edge',
+                'add_edge', 'get_connected_keys', 'get_edges', 'can_add_edge',
                 'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule',
                 'get_graph_summary', 'visualize_structure',
                 'has_names', 'metadata',

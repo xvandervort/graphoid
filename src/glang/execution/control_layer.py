@@ -133,9 +133,9 @@ class ControlLayer:
         if hasattr(self.parent_graph, 'sequence_order'):
             return 'list'
 
-        # Check if this is a KeyedGraph (hash-like)
+        # Check if this is a KeyedGraph (map-like)
         if hasattr(self.parent_graph, 'key_to_node'):
-            return 'hash'
+            return 'map'
 
         # Default to generic graph
         return 'graph'

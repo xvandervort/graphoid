@@ -546,8 +546,8 @@ class ListValue(GlangValue, GraphContainer):
             raise TypeError(f"List indices must be integers or strings, not {type(key)}")
 
 
-class HashValue(GlangValue, GraphContainer):
-    """Graph-based hash value where keys are edges connecting root to value nodes."""
+class MapValue(GlangValue, GraphContainer):
+    """Graph-based map value where keys are edges connecting root to value nodes."""
 
     def __init__(self, pairs: List[Tuple[str, GlangValue]], constraint: Optional[str] = None,
                  position: Optional[SourcePosition] = None):
@@ -578,7 +578,7 @@ class HashValue(GlangValue, GraphContainer):
         return {key: value.to_python() for key, value in self.graph.items()}
 
     def get_type(self) -> str:
-        return "hash"
+        return "map"
 
     def to_display_string(self) -> str:
         pairs = []
@@ -736,7 +736,7 @@ class HashValue(GlangValue, GraphContainer):
 
         return connected_keys
 
-    def add_value_edge(self, from_key: str, to_key: str, relationship: str = "related") -> bool:
+    def add_edge(self, from_key: str, to_key: str, relationship: str = "related") -> bool:
         """Add an edge between two values (beyond the key-based structure)."""
         from_node = self.get_value_node(from_key)
         to_node = self.get_value_node(to_key)
@@ -836,14 +836,23 @@ class HashValue(GlangValue, GraphContainer):
         return len(self.get_edges())
 
     def count_edges(self) -> int:
-        """Count structural edges in the hash (better name than get_edge_count)."""
-        # Hashes have structural edges from root to each value
-        return len(self.pairs)
+        """Count actual edges between map values (not phantom root edges)."""
+        # Count real edges between the actual values in the map
+        # A map with independent key-value pairs has zero edges by default
+        edge_count = 0
+
+        # Count edges between the value nodes themselves
+        for key in self.keys():
+            value_node = self.get_value_node(key)
+            if value_node and hasattr(value_node, '_outgoing'):
+                edge_count += len(value_node._outgoing)
+
+        return edge_count
 
     def count_nodes(self) -> int:
-        """Count nodes in the hash."""
-        # Root node + one node per value
-        return len(self.pairs) + 1
+        """Count actual value nodes in the map (no phantom root)."""
+        # Just the actual value nodes - no phantom root
+        return len(self.pairs)
 
     def can_add_edge(self, from_key: str, to_key: str, relationship: str = "related") -> Tuple[bool, str]:
         """Check if an edge can be added between two hash values."""
@@ -898,3 +907,7 @@ class HashValue(GlangValue, GraphContainer):
         """Freeze all values in the hash (deep freeze)."""
         for value in self.values():
             value.freeze()
+
+
+# Backward compatibility alias during transition
+HashValue = MapValue

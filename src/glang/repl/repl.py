@@ -267,6 +267,10 @@ class REPL:
         print("  /inspect <var>              # Detailed variable inspection")
         print("  /can <var> <method>         # Check method availability")
         print("  /exit, /x                   # Exit REPL")
+        print()
+        print("Method Legend:")
+        print("  Methods marked with * require graph/experimental mode")
+        print("  Example: add_edge*, visualize_structure*")
     
     def _handle_version_command(self, args: List[str]) -> None:
         """Show version information."""
