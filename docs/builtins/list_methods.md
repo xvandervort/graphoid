@@ -109,18 +109,23 @@ list<num> scores = [95, 87, 92]
 scores.validate_constraint()  # Returns true
 ```
 
-### type_summary()
-Returns a summary of types in the list.
-```glang
-mixed = [1, "hello", true, 2, "world"]
-mixed.type_summary()  # Returns {"num": 2, "string": 2, "bool": 1}
-```
-
 ### types()
-Returns unique types present in the list.
+Returns unique types present in the list. Useful for checking homogeneity and type composition.
 ```glang
+# Homogeneous list
+numbers = [1, 2, 3]
+numbers.types()  # Returns ["num"]
+
+# Mixed list
 mixed = [1, "hello", true, 2]
-mixed.types()  # Returns ["num", "string", "bool"]
+mixed.types()  # Returns ["string", "num", "bool"]
+
+# Empty list
+empty = []
+empty.types()  # Returns []
+
+# Check if list is homogeneous
+is_homogeneous = mixed.types().size() == 1  # false
 ```
 
 ### coerce_to_constraint(type)

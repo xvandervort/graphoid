@@ -1,15 +1,21 @@
-# Hash Methods
+# Map Methods
 
-Hash is a built-in collection type in Glang representing key-value mappings. Hashes store data nodes and provide efficient lookup by key.
+Map is a built-in collection type in Glang representing ordered key-value mappings. Maps store data nodes and provide efficient lookup by key.
 
 ## ✨ Recent Changes
 
-**Hash Access Improvement**: Hash indexing now returns values directly for intuitive use:
-- **NEW**: `hash[key]` returns the value directly (e.g., `"localhost"`, `8080`)
-- **NEW**: `hash.node(key)` for explicit data node access when needed
-- **DEPRECATED**: `hash.get(key)` issues deprecation warnings - use the above instead
+**Map Access Improvement**: Map indexing now returns values directly for intuitive use:
+- **NEW**: `map[key]` returns the value directly (e.g., `"localhost"`, `8080`)
+- **NEW**: `map.get_pair(key)` for explicit data node access when needed
+- **DEPRECATED**: `map.get(key)` issues deprecation warnings - use the above instead
 
-This makes hash usage much more intuitive while preserving access to Glang's graph-theoretic features when explicitly needed.
+This makes map usage much more intuitive while preserving access to Glang's graph-theoretic features when explicitly needed.
+
+## Method Legend
+
+**Methods marked with * require graph/experimental mode**
+- Example: `add_edge*`, `visualize_structure*`
+- Use mode configuration methods to enable advanced graph operations
 
 ## Type Information
 
@@ -17,33 +23,33 @@ This makes hash usage much more intuitive while preserving access to Glang's gra
 Returns the type of the value.
 ```glang
 config = { "host": "localhost", "port": 8080 }
-config.type()  # Returns "hash"
+config.type()  # Returns "map"
 ```
 
 ### methods()
-Returns a list of all available methods for hashes.
+Returns a list of all available methods for maps.
 ```glang
 config = { "debug": true }
-config.methods()  # Returns ["type", "methods", "can", "inspect", "get", "set", "has_key", ...]
+config.methods()  # Returns ["type", "methods", "can", "inspect", "set", "has_key", ...]
 ```
 
 ### can(method_name)
-Checks if a method is available on the hash.
+Checks if a method is available on the map.
 ```glang
 config = { "key": "value" }
-config.can("get")  # Returns true
+config.can("set")  # Returns true
 config.can("invalid")  # Returns false
 ```
 
 ### inspect()
-Returns detailed information about the hash.
+Returns detailed information about the map.
 ```glang
 config = { "host": "localhost", "port": 8080 }
-config.inspect()  # Returns detailed hash information
+config.inspect()  # Returns detailed map information
 ```
 
 ### size()
-Returns the number of key-value pairs in the hash.
+Returns the number of key-value pairs in the map.
 ```glang
 settings = { "theme": "dark", "lang": "en", "debug": true }
 settings.size()  # Returns 3
@@ -52,7 +58,7 @@ settings.size()  # Returns 3
 ## Key-Value Operations
 
 ### get(key) ⚠️ DEPRECATED
-**DEPRECATED**: Use `hash[key]` for direct value access or `hash.node(key)` for data node access.
+**DEPRECATED**: Use `map[key]` for direct value access or `map.get_pair(key)` for data node access.
 
 Retrieves a data node by key.
 ```glang
@@ -65,14 +71,14 @@ host_node.value()  # Returns "localhost"
 host = config["host"]  # Returns "localhost" directly
 
 # PREFERRED - Explicit data node access when needed
-host_node = config.node("host")  # Returns { "host": "localhost" }
+host_node = config.get_pair("host")  # Returns { "host": "localhost" }
 ```
 
-### node(key) ✅ NEW
+### get_pair(key) ✅ NEW
 Explicitly retrieves a data node by key. Use this when you need access to the graph-theoretic data node structure.
 ```glang
 config = { "host": "localhost", "port": 8080 }
-host_node = config.node("host")  # Returns { "host": "localhost" } (data node)
+host_node = config.get_pair("host")  # Returns { "host": "localhost" } (data node)
 host_node.key()    # Returns "host"
 host_node.value()  # Returns "localhost"
 ```
@@ -86,7 +92,7 @@ config.set("host", "127.0.0.1")  # Updates existing key
 ```
 
 ### has_key(key)
-Checks if a key exists in the hash.
+Checks if a key exists in the map.
 ```glang
 config = { "host": "localhost", "port": 8080 }
 config.has_key("host")  # Returns true
@@ -94,7 +100,7 @@ config.has_key("debug")  # Returns false
 ```
 
 ### remove(key)
-Removes a key-value pair from the hash.
+Removes a key-value pair from the map.
 ```glang
 config = { "host": "localhost", "port": 8080, "debug": true }
 config.remove("debug")  # config becomes { "host": "localhost", "port": 8080 }
@@ -118,68 +124,68 @@ config.push("theme", "dark")  # config becomes { "theme": "dark" }
 ## Collection Operations
 
 ### keys()
-Returns a list of all keys in the hash.
+Returns a list of all keys in the map.
 ```glang
 config = { "host": "localhost", "port": 8080, "debug": true }
 config.keys()  # Returns ["host", "port", "debug"]
 ```
 
 ### values()
-Returns a list of all values in the hash.
+Returns a list of all values in the map.
 ```glang
 config = { "host": "localhost", "port": 8080, "debug": true }
 config.values()  # Returns ["localhost", 8080, true]
 ```
 
 ### empty()
-Checks if the hash is empty.
+Checks if the map is empty.
 ```glang
 {}.empty()  # Returns true
 { "key": "value" }.empty()  # Returns false
 ```
 
 ### count_values(value)
-Counts occurrences of a specific value in the hash.
+Counts occurrences of a specific value in the map.
 ```glang
 settings = { "color1": "blue", "color2": "red", "color3": "blue" }
 settings.count_values("blue")  # Returns 2
 settings.count_values("green")  # Returns 0
 ```
 
-### merge(other_hash)
-Merges another hash into this one.
+### merge(other_map)
+Merges another map into this one.
 ```glang
 config1 = { "host": "localhost", "port": 8080 }
 config2 = { "debug": true, "port": 9000 }
-config1.merge(config2)  
+config1.merge(config2)
 # config1 becomes { "host": "localhost", "port": 9000, "debug": true }
 ```
 
 ## Type Constraints
 
-Hashes can be type-constrained to ensure all values are of the same type:
+Maps can be type-constrained to ensure all values are of the same type:
 
 ```glang
-# Type-constrained hash
-hash<string> settings = { "theme": "dark", "lang": "en" }
+# Type-constrained map
+map<string> settings = { "theme": "dark", "lang": "en" }
 settings["font"] = "Arial"  # OK
 # settings["size"] = 12  # Would throw error (not a string)
 
-# Mixed-type hash (no constraint)
+# Mixed-type map (no constraint)
 config = { "host": "localhost", "port": 8080, "debug": true }
 ```
 
 ## Type Conversion
 
 ### to_string()
-Converts the hash to a string representation.
+Converts the map to a string representation.
 ```glang
 config = { "host": "localhost", "port": 8080 }
 config.to_string()  # Returns '{"host": "localhost", "port": 8080}'
 ```
 
 ### to_bool()
-Converts the hash to a boolean. Empty hashes are false, non-empty are true.
+Converts the map to a boolean. Empty maps are false, non-empty are true.
 ```glang
 { "key": "value" }.to_bool()  # Returns true
 {}.to_bool()  # Returns false
@@ -188,7 +194,7 @@ Converts the hash to a boolean. Empty hashes are false, non-empty are true.
 ## Immutability Methods
 
 ### freeze()
-Makes the hash and all its contents immutable. Returns self for chaining.
+Makes the map and all its contents immutable. Returns self for chaining.
 ```glang
 config = { "host": "localhost", "port": 8080 }
 config.freeze()
@@ -197,7 +203,7 @@ config.is_frozen()  # Returns true
 ```
 
 ### is_frozen()
-Checks if the hash is frozen (immutable).
+Checks if the map is frozen (immutable).
 ```glang
 config = { "key": "value" }
 config.freeze()
@@ -205,7 +211,7 @@ config.is_frozen()  # Returns true
 ```
 
 ### contains_frozen()
-Checks if the hash contains any frozen values.
+Checks if the map contains any frozen values.
 ```glang
 config = { "host": "localhost" }
 frozen_value = "frozen"
@@ -214,7 +220,7 @@ frozen_value.freeze()
 ```
 
 ### can_accept(value)
-Checks if a value can be added to the hash (respects frozen state).
+Checks if a value can be added to the map (respects frozen state).
 ```glang
 config = { "host": "localhost" }
 frozen_value = 8080
@@ -224,7 +230,7 @@ config.can_accept(frozen_value)  # Returns false (can't mix)
 
 ## Index Operations
 
-Hashes support bracket notation for accessing and setting values:
+Maps support bracket notation for accessing and setting values:
 
 ### Index Access ✅ PREFERRED
 ```glang
@@ -234,7 +240,7 @@ config["host"]  # Returns "localhost" directly
 config["port"]  # Returns 8080 directly
 
 # For explicit data node access when needed:
-config.node("host")  # Returns { "host": "localhost" } (data node)
+config.get_pair("host")  # Returns { "host": "localhost" } (data node)
 ```
 
 ### Index Assignment
@@ -331,7 +337,7 @@ for subject in subjects {
 print("Best subject: " + best_subject + " (" + max_score.to_string() + ")")
 ```
 
-### Hash Merging
+### Map Merging
 ```glang
 # Default settings
 defaults = {
@@ -351,10 +357,10 @@ defaults.merge(user_settings)
 # defaults now: { "timeout": 60, "retries": 3, "logging": true, "verbose": true }
 ```
 
-### Type-Constrained Hashes
+### Type-Constrained Maps
 ```glang
 # Ensure all values are strings
-hash<string> labels = {
+map<string> labels = {
     "name": "Product Name",
     "description": "Product Description",
     "category": "Electronics"
@@ -364,7 +370,7 @@ labels["brand"] = "BrandName"  # OK
 # labels["price"] = 99.99  # Would throw error
 
 # Ensure all values are numbers
-hash<num> metrics = {
+map<num> metrics = {
     "cpu_usage": 45.2,
     "memory_usage": 67.8,
     "disk_usage": 82.1
@@ -373,9 +379,9 @@ hash<num> metrics = {
 metrics["network_usage"] = 23.5  # OK
 ```
 
-### Building Hashes Dynamically
+### Building Maps Dynamically
 ```glang
-# Build hash from parallel lists
+# Build map from parallel lists
 keys = ["name", "age", "city"]
 values = ["Alice", 25, "New York"]
 
@@ -403,27 +409,29 @@ process_with_config(system_config)
 # system_config["timeout"] = 60  # Would throw error
 ```
 
-## Edge Governance and Graph Operations
+## Edge Governance and Graph Operations *
 
-Hashes in Glang are true graph structures where keys connect to value nodes. The edge governance system provides safe graph operations with configurable rules.
+Maps in Glang are true graph structures where keys connect to value nodes. The edge governance system provides safe graph operations with configurable rules.
 
-### Adding Value Edges
+**Note**: All methods in this section require graph/experimental mode.
+
+### add_edge*
 ```glang
 config = { "host": "localhost", "port": 8080, "ssl": true }
 
 # Add edge between values (beyond key-based structure)
-config.add_value_edge("host", "port", "connects_to")
-config.add_value_edge("port", "ssl", "requires")
+config.add_edge("host", "port", "connects_to")
+config.add_edge("port", "ssl", "requires")
 ```
 
-### Edge Inspection
+### Edge Inspection *
 ```glang
 # Get all edges as [from_key, to_key, relationship] lists
 edges = config.get_edges()
 print(edges)  # [["host", "port", "connects_to"], ["port", "ssl", "requires"]]
 
 # Count total edges between values
-count = config.get_edge_count()
+count = config.count_edges()
 print(count)  # 2
 
 # Check if edge can be added between two keys
@@ -435,15 +443,15 @@ connected = config.get_connected_keys("port", "connects_to")
 print(connected)  # ["ssl"] (if port connects to ssl with "connects_to")
 ```
 
-### Graph Visualization
+### Graph Visualization *
 ```glang
 config = { "db": "mysql", "cache": "redis", "queue": "rabbitmq" }
-config.add_value_edge("db", "cache", "uses")
+config.add_edge("db", "cache", "uses")
 
 # Get structured summary
 summary = config.get_graph_summary()
-print(summary["type"])        # "hash"
-print(summary["node_count"])  # 3 (plus root node)
+print(summary["type"])        # "map"
+print(summary["node_count"])  # 3
 print(summary["edge_count"])  # 1
 
 # Visualize structure (text format)
@@ -451,9 +459,9 @@ viz = config.visualize_structure("text")
 print(viz)
 # Graph Structure:
 # ========================================
-# Type: hash
-# Nodes: 4
-# Edges: 4 (3 key-value + 1 custom)
+# Type: map
+# Nodes: 3
+# Edges: 1 custom edge
 # Active Rules: no_list_cycles, same_structure_only
 
 # DOT format for Graphviz
@@ -461,10 +469,10 @@ dot = config.visualize_structure("dot")
 
 # Compact summary
 summary = config.visualize_structure("summary")
-print(summary)  # [HASH] 4 nodes, 4 edges
+print(summary)  # [MAP] 3 nodes, 1 edge
 ```
 
-### Rule Management
+### Rule Management *
 ```glang
 # View active governance rules
 active = config.get_active_rules()
@@ -477,14 +485,14 @@ print(status)  # "active", "disabled", or "unknown"
 # Temporarily disable cross-structure protection
 config.disable_rule("same_structure_only")
 
-# Now cross-hash edges might be allowed (depending on implementation)
-# config.add_external_edge(other_hash)
+# Now cross-map edges might be allowed (depending on implementation)
+# config.add_external_edge(other_map)
 
 # Re-enable the rule
 config.enable_rule("same_structure_only")
 ```
 
-### Configuration Modes
+### Configuration Modes *
 ```glang
 # Maximum safety (default)
 config.configure_for_safe_mode()
@@ -510,9 +518,9 @@ services = {
 }
 
 # Define service dependencies
-services.add_value_edge("web", "app", "proxies_to")
-services.add_value_edge("app", "db", "connects_to")
-services.add_value_edge("app", "cache", "uses")
+services.add_edge("web", "app", "proxies_to")
+services.add_edge("app", "db", "connects_to")
+services.add_edge("app", "cache", "uses")
 
 # Query relationships
 db_dependencies = services.get_connected_keys("app", "connects_to")
