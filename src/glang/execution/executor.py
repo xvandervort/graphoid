@@ -836,7 +836,7 @@ class ASTExecutor(BaseASTVisitor):
             'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time'],
             'bool': ['flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool'],
             'data': ['key', 'value', 'can_accept'],
-            'hash': ['get', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept', 'to_string', 'to_bool', 'add_value_edge', 'get_connected_keys'] + behavior_methods,
+            'hash': ['set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept', 'to_string', 'to_bool', 'add_value_edge', 'get_connected_keys', 'names', 'has_names', 'can_add_edge', 'count_edges', 'count_nodes', 'get_edges', 'get_graph_summary', 'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule', 'visualize', 'view'] + behavior_methods,
             'node': ['neighbors', 'value', 'container', 'id', 'has_neighbor', 'path_to', 'distance_to', 'edges'],
             'time': ['get_type', 'to_string', 'to_num']
         }
@@ -2952,6 +2952,94 @@ class ASTExecutor(BaseASTVisitor):
             # Return the metadata layer as a special metadata value that can be used for get/set operations
             # For now, return a placeholder since we need to implement a MetadataValue type
             return StringValue("metadata_access_placeholder", position)
+
+        # NEW: Overloaded names() method for hash
+        elif method_name == "names":
+            # Overloaded method: 0 args = get, 1 arg = set
+            if len(args) == 0:
+                # Get names
+                python_names = target.get_names()
+                glang_names = []
+                for name in python_names:
+                    if name is None:
+                        glang_names.append(NoneValue(position))
+                    else:
+                        glang_names.append(StringValue(name, position))
+                return ListValue(glang_names, None, position)
+            elif len(args) == 1:
+                # Set names
+                names_list = args[0]
+                if not isinstance(names_list, ListValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"names() setter expects a list, got {names_list.get_type()}", position)
+
+                python_names = []
+                for elem in names_list.elements:
+                    if isinstance(elem, StringValue):
+                        python_names.append(elem.value)
+                    elif isinstance(elem, NoneValue):
+                        python_names.append(None)
+                    else:
+                        from .errors import ArgumentError
+                        raise ArgumentError(f"Names must be strings or nil, got {elem.get_type()}", position)
+
+                return target.set_names(python_names)
+            else:
+                from .errors import ArgumentError
+                raise ArgumentError(f"names() takes 0 or 1 arguments, got {len(args)}", position)
+
+        # NEW: Visualization methods for hashes
+        elif method_name == "visualize":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"visualize() takes no arguments, got {len(args)}", position)
+            # Quick shape overview of the hash
+            if len(target.pairs) == 0:
+                return StringValue("{}", position)
+            elif len(target.pairs) <= 10:
+                # Show all keys for small hashes
+                keys = sorted(target.keys())
+                return StringValue(f"{{ {', '.join(keys)} }}", position)
+            else:
+                # Abbreviated view for large hashes
+                keys = sorted(target.keys())
+                shown_keys = keys[:3] + ['...'] + keys[-2:]
+                return StringValue(f"{{ {', '.join(shown_keys)} }} ({len(target.pairs)} entries)", position)
+
+        elif method_name == "view":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"view() takes no arguments, got {len(args)}", position)
+            # Clean semantic display of keys and values
+            if len(target.pairs) == 0:
+                return StringValue("{}", position)
+            else:
+                items = []
+                for key in sorted(target.keys()):
+                    value = target.get(key)
+                    value_str = value.to_display_string()
+                    items.append(f'"{key}": {value_str}')
+                # Limit items shown for very large hashes
+                if len(items) > 20:
+                    shown_items = items[:10] + [f'... {len(items) - 15} more entries ...'] + items[-5:]
+                    return StringValue(f"{{ {', '.join(shown_items)} }}", position)
+                else:
+                    return StringValue(f"{{ {', '.join(items)} }}", position)
+
+        # NEW: Consistent naming for edge/node counting
+        elif method_name == "count_edges":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"count_edges() takes no arguments, got {len(args)}", position)
+            # Use the hash's structural edge counting method
+            return NumberValue(target.count_edges(), position)
+
+        elif method_name == "count_nodes":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"count_nodes() takes no arguments, got {len(args)}", position)
+            # Use the hash's node counting method
+            return NumberValue(target.count_nodes(), position)
 
         else:
             from .errors import MethodNotFoundError

@@ -822,18 +822,28 @@ class HashValue(GlangValue, GraphContainer):
         """Get all edges between hash values as (from_key, to_key, relationship) tuples."""
         edges = []
         for from_key, from_node in self.graph.key_to_node.items():
-            for edge in from_node.edges:
+            # Use _outgoing instead of edges
+            for edge_id, (target_node, metadata) in from_node._outgoing.items():
                 # Find the target key
-                target_node = edge.target
                 for to_key, to_node in self.graph.key_to_node.items():
                     if to_node is target_node:
-                        edges.append((from_key, to_key, edge.metadata.key))
+                        edges.append((from_key, to_key, metadata.key))
                         break
         return edges
 
     def get_edge_count(self) -> int:
-        """Get total number of edges between hash values."""
+        """Get total number of custom edges between hash values."""
         return len(self.get_edges())
+
+    def count_edges(self) -> int:
+        """Count structural edges in the hash (better name than get_edge_count)."""
+        # Hashes have structural edges from root to each value
+        return len(self.pairs)
+
+    def count_nodes(self) -> int:
+        """Count nodes in the hash."""
+        # Root node + one node per value
+        return len(self.pairs) + 1
 
     def can_add_edge(self, from_key: str, to_key: str, relationship: str = "related") -> Tuple[bool, str]:
         """Check if an edge can be added between two hash values."""
