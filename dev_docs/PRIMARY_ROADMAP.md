@@ -4,20 +4,24 @@
 ## Mission Statement
 Transform Glang from a practical programming language into a revolutionary platform for graph-based, self-aware computational systems.
 
-## Current State (September 2025)
+## Current State (January 2025)
 - **Version**: Pre-1.0 (Development Phase)
-- **Test Coverage**: 67% (1239 tests passing)
+- **Test Coverage**: 66% (1345 tests passing)
 - **Core Features**: Complete function system, type inference, collections, file loading
-- **Architecture**: Container-based (lists, hashes, data nodes)
-- **🚨 CRITICAL ARCHITECTURE ISSUE**: **Functions use variable lookup instead of graph traversal**
-  - **Glang is not truly graph-based** - it's simulating graph features
-  - **Foundational bug** prevents basic module function composition
-  - **Highest priority fix required** before any other development
-- **Production Readiness**: BLOCKED until graph foundation is implemented
+- **Architecture**: ✅ **Graph-based function discovery system** (BREAKTHROUGH COMPLETE!)
+  - ✅ Functions stored as graph nodes with proper connectivity
+  - ✅ Function calls use graph traversal, not variable lookup
+  - ✅ Module functions connected through graph structure
+  - ✅ **Glang is now TRULY graph-based** - foundational architecture complete
+- **Production Readiness**: ✅ **UNBLOCKED** - ready for feature development
 - **🎯 Self-Hosting Progress**: 80% reduction in Python dependency achieved!
   - Network/HTML processing now 80% pure Glang (major breakthrough)
   - Only network I/O and complex DOM parsing still require Python
   - Demonstrates Glang's capability for real-world applications
+- **✅ Hash→Map Migration**: Complete API migration from "hash" to "map" terminology
+  - All 1345 tests passing after comprehensive update
+  - Data nodes are now internal-only, accessed via `map.node()` method
+  - Clean architecture alignment with graph-theoretic vision
 
 ## Development Phases
 
@@ -30,34 +34,30 @@ Transform Glang from a practical programming language into a revolutionary platf
 - REPL environment
 - 70% test coverage
 
-### 🔥 FOUNDATIONAL PRIORITY #1: True Graph Architecture (IMMEDIATE)
+### ✅ FOUNDATIONAL PRIORITY #1: True Graph Architecture (COMPLETED)
 **Goal**: Transform Glang from simulated graph language to TRUE graph language
 
-**CRITICAL INSIGHT**: Without graph-based function discovery, Glang isn't Glang - it's just pretending to be graph-based.
+**🎉 BREAKTHROUGH ACHIEVED**: Graph-based function discovery system is complete!
 
-#### 🚨 FOUNDATIONAL ARCHITECTURE BUG (BLOCKS EVERYTHING)
-**Current Problem**: Functions use variable-based lookup instead of graph traversal
-- ❌ Functions stored as "variables" in flat dictionaries
-- ❌ Function calls do `get_variable(name)` lookups
-- ❌ No graph structure for function discovery
-- ❌ **Glang is theoretically broken** - not actually graph-based
-
-**Required Fix**: **Graph-based function discovery system**
-- ✅ Functions as graph nodes with connectivity
-- ✅ Function calls traverse graph edges
+#### ✅ FOUNDATIONAL ARCHITECTURE BREAKTHROUGH (JANUARY 2025)
+**Revolutionary Achievement**: Functions now use graph-based lookup system
+- ✅ Functions stored as graph nodes with proper connectivity
+- ✅ Function calls use `call_graph.find_function()` graph traversal
 - ✅ Module functions connected through graph structure
-- ✅ AST as temporary subgraph that merges into permanent call graph
+- ✅ **Glang is now TRULY graph-based** - foundational architecture complete
 
-**Implementation Priority**: **ABSOLUTE HIGHEST** - No other features until this is fixed
-**Timeline**: 2 weeks (Phase 1: Foundation, Phase 2: AST Integration)
-**Impact**: Transforms Glang from fake graph language to revolutionary true graph language
+**Implementation Status**: **COMPLETE** - All function calls now use graph traversal
+**Timeline**: Completed ahead of schedule
+**Impact**: Transformed Glang from simulated to genuinely graph-theoretic language
 
-See: [`dev_docs/FOUNDATIONAL_PRIORITY_CALL_GRAPH.md`](./FOUNDATIONAL_PRIORITY_CALL_GRAPH.md)
+**Validation**: All 1345 tests passing, including complex intra-module and cross-module function calls
 
 ---
 
-### 📍 Phase 1: Production Readiness (Q1-Q2 2025) - BLOCKED UNTIL GRAPH FOUNDATION
-**Goal**: Make Glang practical for real-world applications (AFTER graph foundation is complete)
+### 📍 Phase 1: Production Readiness (Q1-Q2 2025) - ✅ **READY TO PROCEED**
+**Goal**: Make Glang practical for real-world applications
+
+**🚀 UNBLOCKED**: Foundation complete - now focusing on practical features
 
 #### ✅ 1.0 CRITICAL PARSER FIXES (COMPLETED September 2025)
 **Status**: All blocking issues from cryptocurrency analytics experiment have been resolved
@@ -74,7 +74,58 @@ See: [`dev_docs/FOUNDATIONAL_PRIORITY_CALL_GRAPH.md`](./FOUNDATIONAL_PRIORITY_CA
 
 **Validation**: Cryptocurrency analytics experiments now run without workarounds
 
-#### 1.1 Data Analytics & Visualization Support
+#### 🎯 1.1 IMMEDIATE PRIORITIES (January 2025)
+**Status**: Foundation complete - implementing practical features
+
+##### 1.1.1 Standard Feature Development (Non-Experimental)
+- [ ] **List Generators**: Essential iteration and list building capabilities
+  - `list.generate(start, end, step)` - Lazy number sequences
+  - `list.upto(end)` - Convenient 0-to-n generation
+  - `list.from_function(count, func)` - Generate using function
+  - Lazy evaluation for memory efficiency, `.to_list()` for eager creation
+- [ ] **Benchmarking Infrastructure**: Built-in performance measurement
+  - `benchmark.time_operation(func, iterations)` - Time measurement
+  - `benchmark.compare_operations(ops_map, iterations)` - Comparison testing
+  - `benchmark.memory_usage(func)` - Memory tracking
+  - `benchmark.operation_count(func)` - Graph operation counting
+  - Essential for validating experimental features
+
+##### 1.1.2 Sandbox Architecture for Experimental Features
+- [ ] **Sandbox Infrastructure**: Safe experimentation environment
+  - `GLANG_SANDBOX=true` environment variable activation
+  - Sandbox-only feature loading with `require_sandbox()`
+  - Behavior override system for existing types
+  - Clean separation of experimental vs production code
+- [ ] **Experimental Documentation**: Separate docs for sandbox features
+  - `docs/sandbox/` - Experimental feature documentation
+  - Migration guides from sandbox to production
+  - Lifecycle management (experimental → stabilizing → ready → archived)
+
+##### 1.1.3 Graphs-as-Rulesets Experiment (Sandbox Only)
+**Goal**: Test revolutionary architecture where all data structures are graphs with governance rules
+
+- [ ] **Core Graph Infrastructure**: Foundation for rule-based graphs
+  - `BaseGraph` - Unrestricted nodes and edges
+  - `RuleEngine` - Validation, modification, and maintenance system
+  - `GraphWithRules` - Integration layer combining graph + rules
+- [ ] **Rule System**: Define and compose graph behaviors
+  - Built-in rules: `no_duplicates`, `heap_property`, `sequential`, `no_cycles`
+  - Rule DSL in Glang for user-defined rules
+  - Rule composition and conflict resolution
+- [ ] **Performance Validation**: Benchmark rule overhead vs native operations
+  - Measure rule checking performance impact
+  - Compare rule-based vs specialized implementations
+  - Validate hybrid approach (fast path for common cases)
+- [ ] **Migration Decision**: Commit to architecture or abandon based on evidence
+  - Performance must be <2x overhead for common operations
+  - User experience must be intuitive and practical
+  - Implementation complexity must be manageable
+
+**Timeline**: 4-week experiment with go/no-go decision point
+**Success Criteria**: Rule-based graphs prove practical and performant
+**Fallback**: Keep existing specialized types, abandon unified approach
+
+#### 1.2 Data Analytics & Visualization Support
 **Status**: Foundational capabilities needed for real-world data processing
 
 - [ ] **CSV Module**: Native CSV parsing and generation
@@ -435,7 +486,7 @@ The following documents have been superseded by this roadmap:
 
 ## Next Actions
 
-### Immediate (This Month) - **UPDATED PRIORITIES**
+### Immediate (This Month) - **JANUARY 2025 PRIORITIES**
 1. ✅ ~~Complete I/O module implementation~~
 2. ✅ ~~Add string manipulation functions~~
 3. ✅ ~~Write v0.9 release notes~~
@@ -446,10 +497,15 @@ The following documents have been superseded by this roadmap:
 8. ✅ ~~Add intrinsic behavior system for automatic value transformation~~
 9. ✅ ~~Improve error handling with enhanced stack traces~~
 10. ✅ ~~HTML module conversion to hybrid pure Glang implementation~~
-11. **🚨 NEW PRIORITY: Fix quote character handling in lexer** (enables full Glang parsing)
-12. **🚨 NEW PRIORITY: Add essential string methods** (`char_at`, `index_of`, `substring`)
-13. **🚨 NEW PRIORITY: Design tree/graph data structures** (enables true DOM processing)
-14. Implement package manager (glang-package command)
+11. ✅ ~~Complete graph-based function discovery system~~
+12. ✅ ~~Complete hash→map API migration~~
+13. **🎯 CURRENT PRIORITY: Implement list generators** (`list.generate()`, `list.upto()`)
+14. **🎯 CURRENT PRIORITY: Add benchmarking infrastructure** (`stdlib/benchmark.gr`)
+15. **🎯 CURRENT PRIORITY: Design sandbox architecture** (experimental feature support)
+16. **🚨 DEFERRED: Fix quote character handling in lexer** (enables full Glang parsing)
+17. **🚨 DEFERRED: Add essential string methods** (`char_at`, `index_of`, `substring`)
+18. **🚨 DEFERRED: Design tree/graph data structures** (enables true DOM processing)
+19. **🚨 DEFERRED: Implement package manager** (glang-package command)
 
 ### Q1 2025
 1. Finish standard library modules
