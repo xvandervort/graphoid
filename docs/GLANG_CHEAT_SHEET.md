@@ -31,6 +31,12 @@ mixed = [1, "hello", true]
 list<string> cities = ["NYC", "LA", "Chicago"]
 list<num> temperatures = [72.5, 68.2, 75.1]
 
+# Generators (programmatic creation)
+nums = []
+sequence = nums.generate(1, 10, 2)     # [1, 3, 5, 7, 9]
+count = nums.upto(5)                   # [0, 1, 2, 3, 4, 5]
+squares = nums.from_function(4, x => x * x)  # [0, 1, 4, 9]
+
 # Access & modification
 numbers[0]                 # Get: 1
 numbers[0] = 99           # Set

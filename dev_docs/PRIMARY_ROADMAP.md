@@ -77,7 +77,7 @@ Transform Glang from a practical programming language into a revolutionary platf
 #### 🎯 1.1 IMMEDIATE PRIORITIES (January 2025)
 **Status**: Foundation complete - implementing practical features
 
-##### 1.1.1 Standard Feature Development (Non-Experimental)
+##### 1.1.1 Standard Feature Development
 - [ ] **List Generators**: Essential iteration and list building capabilities
   - `list.generate(start, end, step)` - Lazy number sequences
   - `list.upto(end)` - Convenient 0-to-n generation
@@ -90,19 +90,9 @@ Transform Glang from a practical programming language into a revolutionary platf
   - `benchmark.operation_count(func)` - Graph operation counting
   - Essential for validating experimental features
 
-##### 1.1.2 Sandbox Architecture for Experimental Features
-- [ ] **Sandbox Infrastructure**: Safe experimentation environment
-  - `GLANG_SANDBOX=true` environment variable activation
-  - Sandbox-only feature loading with `require_sandbox()`
-  - Behavior override system for existing types
-  - Clean separation of experimental vs production code
-- [ ] **Experimental Documentation**: Separate docs for sandbox features
-  - `docs/sandbox/` - Experimental feature documentation
-  - Migration guides from sandbox to production
-  - Lifecycle management (experimental → stabilizing → ready → archived)
-
-##### 1.1.3 Graphs-as-Rulesets Experiment (Sandbox Only)
+##### 1.1.2 Graphs-as-Rulesets Experiment
 **Goal**: Test revolutionary architecture where all data structures are graphs with governance rules
+**Note**: Development on experimental git branch for clean separation
 
 - [ ] **Core Graph Infrastructure**: Foundation for rule-based graphs
   - `BaseGraph` - Unrestricted nodes and edges
@@ -501,11 +491,10 @@ The following documents have been superseded by this roadmap:
 12. ✅ ~~Complete hash→map API migration~~
 13. **🎯 CURRENT PRIORITY: Implement list generators** (`list.generate()`, `list.upto()`)
 14. **🎯 CURRENT PRIORITY: Add benchmarking infrastructure** (`stdlib/benchmark.gr`)
-15. **🎯 CURRENT PRIORITY: Design sandbox architecture** (experimental feature support)
-16. **🚨 DEFERRED: Fix quote character handling in lexer** (enables full Glang parsing)
-17. **🚨 DEFERRED: Add essential string methods** (`char_at`, `index_of`, `substring`)
-18. **🚨 DEFERRED: Design tree/graph data structures** (enables true DOM processing)
-19. **🚨 DEFERRED: Implement package manager** (glang-package command)
+15. **Fix quote character handling in lexer** (enables full Glang parsing)
+16. **Add essential string methods** (`char_at`, `index_of`, `substring`)
+17. **Design tree/graph data structures** (enables true DOM processing)
+18. **Implement package manager** (glang-package command)
 
 ### Q1 2025
 1. Finish standard library modules

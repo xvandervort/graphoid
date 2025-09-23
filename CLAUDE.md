@@ -255,6 +255,12 @@ size = items.size      # Without parentheses (property-like access)
 user.key()         # Get key: "name"
 user.value()       # Get value: "Alice"
 
+# List generator methods
+nums = []
+sequence = nums.generate(1, 10, 2)    # [1, 3, 5, 7, 9]
+count = nums.upto(5)                  # [0, 1, 2, 3, 4, 5]
+squares = nums.from_function(4, x => x * x)  # [0, 1, 4, 9]
+
 # Functional programming operations (new!)
 numbers = [1, 2, 3, 4, 5]
 numbers.map("double")        # [2, 4, 6, 8, 10]

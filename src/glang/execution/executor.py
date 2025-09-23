@@ -434,6 +434,12 @@ class ASTExecutor(BaseASTVisitor):
         """Evaluate variable reference."""
         value = self.context.get_variable(node.name)
         if value is None:
+            # Check if it's a function in the call graph
+            func_value = self.context.call_graph.find_function(node.name, "global")
+            if func_value is not None:
+                self.result = func_value
+                return
+
             stack_trace = create_enhanced_error_trace(f"Variable '{node.name}' not found", "VariableNotFoundError")
             raise VariableNotFoundError(node.name, node.position, stack_trace)
         self.result = value
@@ -1683,6 +1689,108 @@ class ASTExecutor(BaseASTVisitor):
             rules = target.get_rules()
             rule_values = [StringValue(rule) for rule in rules]
             return ListValue(rule_values, "string", position)
+
+        # List generator methods
+        elif method_name == "generate":
+            if len(args) < 2 or len(args) > 3:
+                from .errors import ArgumentError
+                raise ArgumentError(f"generate() takes 2-3 arguments (start, end, [step]), got {len(args)}", position)
+
+            start_val = args[0]
+            end_val = args[1]
+            step_val = args[2] if len(args) == 3 else NumberValue(1)
+
+            # Validate arguments
+            if not isinstance(start_val, NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"generate() start must be a number, got {start_val.get_type()}", position)
+            if not isinstance(end_val, NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"generate() end must be a number, got {end_val.get_type()}", position)
+            if not isinstance(step_val, NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"generate() step must be a number, got {step_val.get_type()}", position)
+
+            # Generate the sequence
+            start = start_val.value
+            end = end_val.value
+            step = step_val.value
+
+            if step == 0:
+                raise RuntimeError("generate() step cannot be zero", position)
+
+            # Generate numbers based on step direction
+            generated = []
+            if step > 0:
+                current = start
+                while current <= end:
+                    generated.append(NumberValue(current, position))
+                    current += step
+            else:
+                current = start
+                while current >= end:
+                    generated.append(NumberValue(current, position))
+                    current += step
+
+            return ListValue(generated, "num", position)
+
+        elif method_name == "upto":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"upto() takes 1 argument (end), got {len(args)}", position)
+
+            end_val = args[0]
+            if not isinstance(end_val, NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"upto() argument must be a number, got {end_val.get_type()}", position)
+
+            # Generate from 0 to end (inclusive)
+            end = int(end_val.value)
+            generated = [NumberValue(i, position) for i in range(end + 1)]
+            return ListValue(generated, "num", position)
+
+        elif method_name == "from_function":
+            if len(args) != 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"from_function() takes 2 arguments (count, func), got {len(args)}", position)
+
+            count_val = args[0]
+            func_val = args[1]
+
+            # Validate count
+            if not isinstance(count_val, NumberValue) or not isinstance(count_val.value, int):
+                from .errors import ArgumentError
+                raise ArgumentError(f"from_function() count must be an integer, got {count_val.get_type()}", position)
+
+            # Validate function (could be FunctionValue or LambdaValue)
+            from .values import FunctionValue, LambdaValue
+            if not isinstance(func_val, (FunctionValue, LambdaValue)):
+                from .errors import ArgumentError
+                raise ArgumentError(f"from_function() second argument must be a function, got {func_val.get_type()}", position)
+
+            count = int(count_val.value)
+            if count < 0:
+                raise RuntimeError("from_function() count cannot be negative", position)
+
+            # Generate values by calling the function with indices
+            generated = []
+            for i in range(count):
+                # Call the function with the current index
+                index_arg = NumberValue(i, position)
+
+                # Use the public call_function method which handles both functions and lambdas
+                result = self.call_function(func_val, [index_arg], position)
+
+                generated.append(result)
+
+            # Infer constraint from generated elements
+            constraint = None
+            if generated:
+                first_type = generated[0].get_type()
+                if all(elem.get_type() == first_type for elem in generated):
+                    constraint = first_type
+
+            return ListValue(generated, constraint, position)
 
         else:
             from .errors import MethodNotFoundError

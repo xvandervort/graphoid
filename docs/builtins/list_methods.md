@@ -525,6 +525,59 @@ for i in [1, 2, 3, 4, 5] {
 print(results)  # [4, 16]
 ```
 
+## List Generators
+
+List generators provide convenient ways to create lists with specific patterns of values.
+
+### generate(start, end, step)
+Creates a list of numbers from `start` to `end` (inclusive) with the given `step`.
+```glang
+nums = []
+sequence = nums.generate(1, 10, 2)  # [1, 3, 5, 7, 9]
+decimals = nums.generate(0, 1, 0.25)  # [0, 0.25, 0.5, 0.75, 1]
+countdown = nums.generate(10, 0, -2)  # [10, 8, 6, 4, 2, 0]
+```
+
+### upto(end)
+Creates a list of integers from 0 to `end` (inclusive).
+```glang
+nums = []
+count = nums.upto(5)  # [0, 1, 2, 3, 4, 5]
+single = nums.upto(0)  # [0]
+```
+
+### from_function(count, func)
+Creates a list by calling a function with indices from 0 to count-1.
+```glang
+items = []
+
+# With lambda
+double = x => x * 2
+evens = items.from_function(5, double)  # [0, 2, 4, 6, 8]
+
+# With function
+func square(x) { return x * x }
+squares = items.from_function(4, square)  # [0, 1, 4, 9]
+
+# Generating strings
+make_label = x => "Item " + x.to_string()
+labels = items.from_function(3, make_label)  # ["Item 0", "Item 1", "Item 2"]
+```
+
+### Generator Chaining
+```glang
+# Generators work seamlessly with functional operations
+nums = []
+result = nums.generate(1, 20, 1)
+    .filter("even")      # Keep only even numbers
+    .map("double")       # Double each value
+print(result)  # [4, 8, 12, 16, 20, 24, 28, 32, 36, 40]
+
+# Generate test data
+random_score = x => 70 + (x * 3) % 30
+scores = [].from_function(10, random_score)
+```
+
 #### Immutable Data Structures
 ```glang
 # Create immutable configuration

@@ -682,6 +682,7 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'size', 'empty', 'constraint', 'validate_constraint',
                 'types', 'coerce_to_constraint', 'index_of', 'count', 'min', 'max', 'sum', 'sort',
                 'map', 'filter', 'each', 'select', 'reject',
+                'generate', 'upto', 'from_function',
                 'to_string', 'to_bool',
                 'add_edge', 'connected_to', 'to_graph', 'edges', 'can_add_edge',
                 'count_edges', 'count_nodes', 'graph_summary', 'visualize_structure', 'visualize', 'view',
