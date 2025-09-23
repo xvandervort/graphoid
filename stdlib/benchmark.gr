@@ -1,8 +1,6 @@
 # Benchmarking Infrastructure for Glang
 # Provides performance measurement and comparison tools
-#
-# NOTE: Due to current language limitations with function parameters,
-# this module uses a different approach that works within current constraints
+# Uses modern function parameter passing for flexible timing
 
 import "time" as Time
 
@@ -21,34 +19,22 @@ func end_timer(start_time) {
     }
 }
 
-# Measure operation by name using a dispatch pattern
-func measure_operation(operation_name, iterations, test_data) {
+# Measure operation using function parameter
+func time_operation(operation, iterations) {
     if iterations <= 0 {
         iterations = 1
     }
 
     start_time = start_timer()
 
-    # Dispatch to specific operations
     for i in [].upto(iterations - 1) {
-        if operation_name == "list_append" {
-            _benchmark_list_append(test_data)
-        } else if operation_name == "list_generate" {
-            _benchmark_list_generate(test_data)
-        } else if operation_name == "list_map" {
-            _benchmark_list_map(test_data)
-        } else if operation_name == "list_filter" {
-            _benchmark_list_filter(test_data)
-        } else {
-            print("Unknown operation: " + operation_name)
-        }
+        operation()
     }
 
     timing = end_timer(start_time)
     avg_duration = timing["duration"] / iterations
 
     return {
-        "operation": operation_name,
         "iterations": iterations,
         "total_duration": timing["duration"],
         "average_duration": avg_duration,
@@ -56,85 +42,60 @@ func measure_operation(operation_name, iterations, test_data) {
     }
 }
 
-# Predefined benchmark operations
-func _benchmark_list_append(size) {
+# Predefined benchmark operations for testing (fixed size = 100)
+func benchmark_list_append() {
     items = []
-    for i in [].upto(size - 1) {
+    for i in [].upto(99) {
         items.append(i)
     }
     return items.size()
 }
 
-func _benchmark_list_generate(size) {
+func benchmark_list_generate() {
     nums = []
-    result = nums.generate(1, size, 1)
+    result = nums.generate(1, 100, 1)
     return result.size()
 }
 
-func _benchmark_list_map(size) {
+func benchmark_list_map() {
     nums = []
-    base = nums.upto(size)
+    base = nums.upto(100)
     result = base.map("double")
     return result.size()
 }
 
-func _benchmark_list_filter(size) {
+func benchmark_list_filter() {
     nums = []
-    base = nums.upto(size)
+    base = nums.upto(100)
     result = base.filter("even")
     return result.size()
 }
 
-# Compare multiple operations
-func compare_operations(operation_names, iterations, test_size) {
-    results = {}
-
-    for name in operation_names {
-        timing = measure_operation(name, iterations, test_size)
-        results[name] = timing
-    }
-
-    return results
+# Format timing results for display
+func format_timing(timing, operation_name) {
+    output = "Benchmark Results for " + operation_name + ":\n"
+    output = output + "Iterations: " + timing["iterations"].to_string() + "\n"
+    output = output + "Total Duration: " + timing["total_duration"].to_string() + " seconds\n"
+    output = output + "Average Duration: " + timing["average_duration"].to_string() + " seconds\n"
+    output = output + "Operations/Second: " + timing["operations_per_second"].to_string()
+    return output
 }
 
-# Format results for display
-func format_results(results) {
-    if results.has_key("operation") {
-        # Single operation result
-        output = "Benchmark Results:\n"
-        output = output + "Operation: " + results["operation"] + "\n"
-        output = output + "Iterations: " + results["iterations"].to_string() + "\n"
-        output = output + "Total Duration: " + results["total_duration"].to_string() + " seconds\n"
-        output = output + "Average Duration: " + results["average_duration"].to_string() + " seconds\n"
-        output = output + "Operations/Second: " + results["operations_per_second"].to_string()
-        return output
-    } else {
-        # Comparison results - print directly to avoid string concatenation issues
-        print("Benchmark Comparison:")
-        print("Operation          | Avg Time    | Ops/Sec")
-        print("-------------------|-------------|--------")
-
-        for name in results.keys() {
-            timing = results[name]
-            avg_str = timing["average_duration"].to_string()
-            ops_str = timing["operations_per_second"].to_string()
-            line = name + " | " + avg_str + "s | " + ops_str
-            print(line)
-        }
-        return "Comparison complete"
-    }
-}
-
-# Run a benchmark suite
-func run_suite(suite_name, operation_names, iterations, test_size) {
-    print("=== " + suite_name + " ===")
-    results = compare_operations(operation_names, iterations, test_size)
-    print(format_results(results))
-    return results
-}
-
-# Quick performance test
+# Quick performance test using the new function parameter approach
 func quick_performance_test() {
-    operations = ["list_append", "list_generate", "list_map", "list_filter"]
-    return run_suite("Quick Performance Test", operations, 10, 100)
+    print("=== Quick Performance Test ===")
+
+    append_timing = time_operation(benchmark_list_append, 10)
+    print("List Append: " + append_timing["operations_per_second"].to_string() + " ops/sec")
+
+    generate_timing = time_operation(benchmark_list_generate, 10)
+    print("List Generate: " + generate_timing["operations_per_second"].to_string() + " ops/sec")
+
+    map_timing = time_operation(benchmark_list_map, 10)
+    print("List Map: " + map_timing["operations_per_second"].to_string() + " ops/sec")
+
+    filter_timing = time_operation(benchmark_list_filter, 10)
+    print("List Filter: " + filter_timing["operations_per_second"].to_string() + " ops/sec")
+
+    return "Performance test complete"
 }

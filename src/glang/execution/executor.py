@@ -4582,13 +4582,13 @@ class ASTExecutor(BaseASTVisitor):
         # Phase 3: PURE GRAPH TRAVERSAL for function discovery
         func_value = self.context.call_graph.find_function(node.name, self.context.current_module)
 
-        # Limited fallback ONLY for lambdas and builtin functions (not regular functions)
+        # Limited fallback for lambdas, builtin functions, and function parameters
         if func_value is None:
             candidate = self.context.get_variable(node.name)
-            # Only allow LambdaValue and BuiltinFunctionValue (not regular FunctionValue)
-            if isinstance(candidate, (LambdaValue, BuiltinFunctionValue)):
+            # Allow LambdaValue, BuiltinFunctionValue, and FunctionValue (for function parameters)
+            if isinstance(candidate, (LambdaValue, BuiltinFunctionValue, FunctionValue)):
                 func_value = candidate
-            # Regular FunctionValue should NEVER be found via variable lookup in Phase 3
+            # Note: FunctionValue found as variable is likely a function parameter
 
         if func_value is None:
             from .errors import VariableNotFoundError

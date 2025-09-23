@@ -55,6 +55,14 @@ emails = regex.find_all("\\b\\w+@\\w+\\.\\w+\\b", text)
 
 ### Utility Modules
 
+#### [Benchmark Module](../stdlib/benchmark.md) ⭐ NEW
+Performance measurement and timing analysis with function parameter support.
+```glang
+load "stdlib/benchmark.gr"
+timing = time_operation(my_function, 10)
+print("Ops/sec: " + timing["operations_per_second"].to_string())
+```
+
 #### [Random Module](random.md) ⭐ NEW
 Random number generation, statistical distributions, sampling, and cryptographic randomness.
 ```glang
@@ -128,6 +136,7 @@ io.write_file("events.json", json_data)
 | **regex** | ✅ Complete | Pattern matching, extraction, validation | [Full docs](regex.md) |
 | **random** | ✅ Complete | RNG, distributions, sampling, security | [Full docs](random.md) |
 | **crypto** | ✅ Complete | Hashing, encryption, secure operations | [Full docs](crypto.md) |
+| **benchmark** | ✅ Complete | Function timing, performance analysis, comparisons | [Full docs](../stdlib/benchmark.md) |
 
 ## Design Philosophy
 

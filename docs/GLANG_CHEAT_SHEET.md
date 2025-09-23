@@ -253,6 +253,18 @@ processed = process_list(data, 2)  # [6, 8, 10]
 # Functions can be assigned to variables
 operation = add
 sum_result = operation(10, 20)     # 30
+
+# Functions as parameters (NEW!)
+load "stdlib/benchmark.gr"
+
+func my_operation() {
+    nums = []
+    return nums.upto(100).filter("even").size()
+}
+
+# Time a function by passing it as parameter
+timing = time_operation(my_operation, 10)
+print("Operations per second: " + timing["operations_per_second"].to_string())
 ```
 
 ## 🎯 Functional Programming
