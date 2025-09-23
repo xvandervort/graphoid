@@ -446,16 +446,22 @@ class ASTExecutor(BaseASTVisitor):
     
     def visit_string_literal(self, node: StringLiteral) -> None:
         """Evaluate string literal."""
-        # Remove quotes from the literal value
-        cleaned_value = node.value
-        if (cleaned_value.startswith('"') and cleaned_value.endswith('"')) or \
-           (cleaned_value.startswith("'") and cleaned_value.endswith("'")):
-            cleaned_value = cleaned_value[1:-1]
+        value = node.value
 
-        # Process escape sequences
-        cleaned_value = self._process_escape_sequences(cleaned_value)
+        # Use the processed flag to determine if we need to process the string
+        if hasattr(node, 'processed') and node.processed:
+            # String was already processed by the parser - use as-is
+            pass
+        else:
+            # String was created directly (likely in tests) - needs processing
+            if len(value) >= 2 and \
+               ((value.startswith('"') and value.endswith('"')) or \
+                (value.startswith("'") and value.endswith("'"))):
+                # Remove quotes and process escape sequences
+                value = value[1:-1]
+                value = self._process_escape_sequences(value)
 
-        self.result = StringValue(cleaned_value, node.position)
+        self.result = StringValue(value, node.position)
     
     def visit_number_literal(self, node: NumberLiteral) -> None:
         """Evaluate number literal."""

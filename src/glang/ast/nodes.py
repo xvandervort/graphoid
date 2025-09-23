@@ -41,12 +41,13 @@ class VariableRef(Expression):
     def accept(self, visitor):
         return visitor.visit_variable_ref(self)
 
-@dataclass  
+@dataclass
 class StringLiteral(Expression):
     """String literal: "hello world" """
     value: str
     position: Optional[SourcePosition] = None
-    
+    processed: bool = False  # True if value is already processed by parser
+
     def accept(self, visitor):
         return visitor.visit_string_literal(self)
 

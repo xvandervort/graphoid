@@ -1062,7 +1062,7 @@ class ASTParser:
             token = self.advance()
             # Remove quotes and handle escape sequences
             value = self.process_string_literal(token.value)
-            return StringLiteral(value, SourcePosition(token.line, token.column))
+            return StringLiteral(value, SourcePosition(token.line, token.column), processed=True)
 
         # Symbols are not allowed in general user code - only for internal system use
         # They can appear in specific contexts like result pattern lists
@@ -1239,14 +1239,14 @@ class ASTParser:
         """Process string literal, removing quotes and handling escapes."""
         # Remove surrounding quotes
         content = literal[1:-1]
-        
+
         # Handle basic escape sequences
         content = content.replace('\\"', '"')
         content = content.replace("\\'", "'")
         content = content.replace('\\\\', '\\')
         content = content.replace('\\n', '\n')
         content = content.replace('\\t', '\t')
-        
+
         return content
     
     # Helper methods for parsing
