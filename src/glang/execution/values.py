@@ -176,8 +176,14 @@ class CharNode(GlangValue):
 
     def __init__(self, value: str, position: Optional[SourcePosition] = None):
         super().__init__(position)
-        if len(value) != 1:
-            raise ValueError("CharNode must contain exactly one character")
+        # Import Unicode utilities to validate grapheme clusters
+        from .unicode_utils import UnicodeUtils
+
+        # Accept grapheme clusters (what users perceive as single characters)
+        # This includes single characters, emoji, combining characters, etc.
+        grapheme_count = UnicodeUtils.grapheme_length(value)
+        if grapheme_count != 1:
+            raise ValueError(f"CharNode must contain exactly one grapheme cluster, got {grapheme_count}")
         self.value = value
 
     def to_python(self) -> str:
@@ -310,7 +316,12 @@ class StringValue(GlangValue):
     def to_char_nodes(self) -> List['CharNode']:
         """Convert string to list of character nodes for graph operations."""
         if self._char_nodes is None:
-            self._char_nodes = [CharNode(char, self.position) for char in self.value]
+            # Import Unicode utilities for proper grapheme cluster handling
+            from .unicode_utils import UnicodeUtils
+
+            # Split into grapheme clusters instead of individual code points
+            grapheme_clusters = UnicodeUtils.grapheme_clusters(self.value)
+            self._char_nodes = [CharNode(cluster, self.position) for cluster in grapheme_clusters]
         return self._char_nodes
     
     def from_char_nodes(self, char_nodes: List['CharNode']) -> 'StringValue':

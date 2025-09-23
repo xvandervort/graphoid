@@ -1802,10 +1802,13 @@ class ASTExecutor(BaseASTVisitor):
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "list", position)
     
-    def _dispatch_string_method(self, target: StringValue, method_name: str, 
+    def _dispatch_string_method(self, target: StringValue, method_name: str,
                                args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle string method calls."""
-        
+
+        # Import Unicode utilities for proper Unicode handling
+        from .unicode_utils import UnicodeUtils
+
         # Type conversion methods
         if method_name == "to_string":
             if len(args) != 0:
@@ -1833,13 +1836,15 @@ class ASTExecutor(BaseASTVisitor):
             # Empty string is false, non-empty is true
             return BooleanValue(len(target.value) > 0, position)
         
-        # Length method
+        # Length method - uses grapheme cluster counting for proper Unicode support
         elif method_name == "length":
             if len(args) != 0:
                 from .errors import ArgumentError
                 raise ArgumentError(f"length() takes no arguments, got {len(args)}", position)
-            
-            return NumberValue(len(target.value), position)
+
+            # Use grapheme-aware length for proper Unicode handling
+            length = UnicodeUtils.grapheme_length(target.value)
+            return NumberValue(length, position)
         
         # Contains method - unified interface with backward compatibility
         elif method_name == "contains":
@@ -2378,7 +2383,7 @@ class ASTExecutor(BaseASTVisitor):
             
             return target.ends_with(args[0])
 
-        # Index finding methods
+        # Index finding methods - uses grapheme cluster indexing
         elif method_name == "index_of":
             if len(args) < 1 or len(args) > 2:
                 from .errors import ArgumentError
@@ -2389,7 +2394,6 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"index_of() substring must be string, got {args[0].get_type()}", position)
 
             substring = args[0].value
-            text = target.value
             start_index = 0
 
             if len(args) == 2:
@@ -2398,11 +2402,9 @@ class ASTExecutor(BaseASTVisitor):
                     raise ArgumentError(f"index_of() start_index must be number, got {args[1].get_type()}", position)
                 start_index = int(args[1].value)
 
-            try:
-                index = text.index(substring, start_index)
-                return NumberValue(index, position)
-            except ValueError:
-                return NumberValue(-1, position)  # Return -1 if not found
+            # Use grapheme-aware index finding
+            index = UnicodeUtils.grapheme_index_of(target.value, substring, start_index)
+            return NumberValue(index, position)
 
         elif method_name == "last_index_of":
             if len(args) < 1 or len(args) > 2:
@@ -2414,8 +2416,7 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"last_index_of() substring must be string, got {args[0].get_type()}", position)
 
             substring = args[0].value
-            text = target.value
-            end_index = len(text)
+            end_index = None
 
             if len(args) == 2:
                 if not isinstance(args[1], NumberValue):
@@ -2423,13 +2424,11 @@ class ASTExecutor(BaseASTVisitor):
                     raise ArgumentError(f"last_index_of() end_index must be number, got {args[1].get_type()}", position)
                 end_index = int(args[1].value)
 
-            try:
-                index = text.rindex(substring, 0, end_index)
-                return NumberValue(index, position)
-            except ValueError:
-                return NumberValue(-1, position)  # Return -1 if not found
+            # Use grapheme-aware last index finding
+            index = UnicodeUtils.grapheme_last_index_of(target.value, substring, end_index)
+            return NumberValue(index, position)
 
-        # Substring extraction method
+        # Substring extraction method - uses grapheme cluster boundaries
         elif method_name == "substring":
             if len(args) < 1 or len(args) > 2:
                 from .errors import ArgumentError
@@ -2440,14 +2439,6 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"substring() start index must be number, got {args[0].get_type()}", position)
 
             start = int(args[0].value)
-            text = target.value
-
-            # Handle negative start index
-            if start < 0:
-                start = len(text) + start
-
-            # Clamp to valid range
-            start = max(0, min(start, len(text)))
 
             if len(args) == 2:
                 if not isinstance(args[1], NumberValue):
@@ -2455,22 +2446,12 @@ class ASTExecutor(BaseASTVisitor):
                     raise ArgumentError(f"substring() end index must be number, got {args[1].get_type()}", position)
 
                 end = int(args[1].value)
-
-                # Handle negative end index
-                if end < 0:
-                    end = len(text) + end
-
-                # Clamp to valid range
-                end = max(0, min(end, len(text)))
-
-                # Ensure start <= end
-                if start > end:
-                    start, end = end, start
-
-                return StringValue(text[start:end], position)
+                result = UnicodeUtils.grapheme_substring(target.value, start, end)
             else:
                 # Only start index provided - go to end of string
-                return StringValue(text[start:], position)
+                result = UnicodeUtils.grapheme_substring(target.value, start)
+
+            return StringValue(result, position)
 
         # String repetition method
         elif method_name == "repeat":

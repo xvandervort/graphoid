@@ -46,14 +46,14 @@ class TestCharNode:
         assert char2 != char3
     
     def test_char_node_invalid_length(self):
-        """Test that CharNode only accepts single characters."""
-        with pytest.raises(ValueError, match="exactly one character"):
+        """Test that CharNode only accepts single grapheme clusters."""
+        with pytest.raises(ValueError, match="exactly one grapheme cluster"):
             CharNode("")
-        
-        with pytest.raises(ValueError, match="exactly one character"):
+
+        with pytest.raises(ValueError, match="exactly one grapheme cluster"):
             CharNode("ab")
-        
-        with pytest.raises(ValueError, match="exactly one character"):
+
+        with pytest.raises(ValueError, match="exactly one grapheme cluster"):
             CharNode("hello")
 
 
