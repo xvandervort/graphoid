@@ -501,9 +501,13 @@ The following documents have been superseded by this roadmap:
     - **Testing**: 20 comprehensive tests covering all functionality and edge cases
     - **Documentation**: Integrated into list methods reference and language cheat sheet
     - **Future Enhancements**: Named parameter syntax (`from: 2, to: 100, step: 2`), character/word generators
-14. **🎯 CURRENT PRIORITY: Add benchmarking infrastructure** (`stdlib/benchmark.gr`)
-15. **Fix quote character handling in lexer** (enables full Glang parsing)
-16. **Add essential string methods** (`char_at`, `index_of`, `substring`)
+14. **✅ COMPLETED: Add benchmarking infrastructure** (`stdlib/benchmark.gr`)
+15. **✅ COMPLETED: Fix quote character handling in lexer** (enables full Glang parsing)
+16. **✅ COMPLETED: Add essential string methods** (`index_of`, `substring`, `repeat`, `pad_left`, `pad_right`, `last_index_of`)
+    - **Implementation**: 6 new string methods working with comprehensive test coverage (18 tests)
+    - **Methods Added**: Index finding, substring extraction, string repetition, and padding
+    - **Integration**: Semantic analyzer updated to recognize new methods
+    - **Note**: Removed redundant `char_at()` method since strings already support indexing syntax `text[0]`
 17. **Design tree/graph data structures** (enables true DOM processing)
 18. **Implement package manager** (glang-package command)
 

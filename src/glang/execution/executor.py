@@ -2377,7 +2377,175 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"ends_with() argument must be string, got {args[0].get_type()}", position)
             
             return target.ends_with(args[0])
-        
+
+        # Index finding methods
+        elif method_name == "index_of":
+            if len(args) < 1 or len(args) > 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"index_of() takes 1-2 arguments (substring, [start_index]), got {len(args)}", position)
+
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"index_of() substring must be string, got {args[0].get_type()}", position)
+
+            substring = args[0].value
+            text = target.value
+            start_index = 0
+
+            if len(args) == 2:
+                if not isinstance(args[1], NumberValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"index_of() start_index must be number, got {args[1].get_type()}", position)
+                start_index = int(args[1].value)
+
+            try:
+                index = text.index(substring, start_index)
+                return NumberValue(index, position)
+            except ValueError:
+                return NumberValue(-1, position)  # Return -1 if not found
+
+        elif method_name == "last_index_of":
+            if len(args) < 1 or len(args) > 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"last_index_of() takes 1-2 arguments (substring, [end_index]), got {len(args)}", position)
+
+            if not isinstance(args[0], StringValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"last_index_of() substring must be string, got {args[0].get_type()}", position)
+
+            substring = args[0].value
+            text = target.value
+            end_index = len(text)
+
+            if len(args) == 2:
+                if not isinstance(args[1], NumberValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"last_index_of() end_index must be number, got {args[1].get_type()}", position)
+                end_index = int(args[1].value)
+
+            try:
+                index = text.rindex(substring, 0, end_index)
+                return NumberValue(index, position)
+            except ValueError:
+                return NumberValue(-1, position)  # Return -1 if not found
+
+        # Substring extraction method
+        elif method_name == "substring":
+            if len(args) < 1 or len(args) > 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"substring() takes 1-2 arguments (start, [end]), got {len(args)}", position)
+
+            if not isinstance(args[0], NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"substring() start index must be number, got {args[0].get_type()}", position)
+
+            start = int(args[0].value)
+            text = target.value
+
+            # Handle negative start index
+            if start < 0:
+                start = len(text) + start
+
+            # Clamp to valid range
+            start = max(0, min(start, len(text)))
+
+            if len(args) == 2:
+                if not isinstance(args[1], NumberValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"substring() end index must be number, got {args[1].get_type()}", position)
+
+                end = int(args[1].value)
+
+                # Handle negative end index
+                if end < 0:
+                    end = len(text) + end
+
+                # Clamp to valid range
+                end = max(0, min(end, len(text)))
+
+                # Ensure start <= end
+                if start > end:
+                    start, end = end, start
+
+                return StringValue(text[start:end], position)
+            else:
+                # Only start index provided - go to end of string
+                return StringValue(text[start:], position)
+
+        # String repetition method
+        elif method_name == "repeat":
+            if len(args) != 1:
+                from .errors import ArgumentError
+                raise ArgumentError(f"repeat() takes 1 argument (count), got {len(args)}", position)
+
+            if not isinstance(args[0], NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"repeat() count must be number, got {args[0].get_type()}", position)
+
+            count = int(args[0].value)
+            if count < 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"repeat() count must be non-negative, got {count}", position)
+
+            return StringValue(target.value * count, position)
+
+        # String padding methods
+        elif method_name == "pad_left":
+            if len(args) < 1 or len(args) > 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"pad_left() takes 1-2 arguments (length, [padding_char]), got {len(args)}", position)
+
+            if not isinstance(args[0], NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"pad_left() length must be number, got {args[0].get_type()}", position)
+
+            target_length = int(args[0].value)
+            padding_char = " "  # Default padding
+
+            if len(args) == 2:
+                if not isinstance(args[1], StringValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"pad_left() padding_char must be string, got {args[1].get_type()}", position)
+                padding_char = args[1].value
+                if len(padding_char) != 1:
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"pad_left() padding_char must be single character, got '{padding_char}'", position)
+
+            text = target.value
+            if len(text) >= target_length:
+                return target  # Already long enough
+
+            padding_needed = target_length - len(text)
+            return StringValue(padding_char * padding_needed + text, position)
+
+        elif method_name == "pad_right":
+            if len(args) < 1 or len(args) > 2:
+                from .errors import ArgumentError
+                raise ArgumentError(f"pad_right() takes 1-2 arguments (length, [padding_char]), got {len(args)}", position)
+
+            if not isinstance(args[0], NumberValue):
+                from .errors import ArgumentError
+                raise ArgumentError(f"pad_right() length must be number, got {args[0].get_type()}", position)
+
+            target_length = int(args[0].value)
+            padding_char = " "  # Default padding
+
+            if len(args) == 2:
+                if not isinstance(args[1], StringValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"pad_right() padding_char must be string, got {args[1].get_type()}", position)
+                padding_char = args[1].value
+                if len(padding_char) != 1:
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"pad_right() padding_char must be single character, got '{padding_char}'", position)
+
+            text = target.value
+            if len(text) >= target_length:
+                return target  # Already long enough
+
+            padding_needed = target_length - len(text)
+            return StringValue(text + padding_char * padding_needed, position)
+
         # Check if it's a universal method
         elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
             return self._dispatch_universal_method(target, method_name, args, position)

@@ -698,6 +698,8 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'up', 'toUpper', 'down', 'toLower',
                 'reverse', 'unique', 'chars',
                 'starts_with', 'ends_with',
+                'index_of', 'last_index_of', 'substring',
+                'repeat', 'pad_left', 'pad_right',
                 'to_string', 'to_num', 'to_bool', 'to_time', 'node'
             } | universal_methods,
             'num': {'abs', 'round', 'to', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time', 'node'} | universal_methods,

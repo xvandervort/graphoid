@@ -471,6 +471,24 @@ text.length()              # 13
 text.contains("World")     # true
 text.starts_with("Hello")  # true
 text.ends_with("!")        # true
+
+# Character access using indexing syntax
+text[0]                    # "H" (first character)
+text[-1]                   # "!" (last character)
+
+# String searching methods (NEW!)
+text.index_of("World")     # 7 (position of "World")
+text.last_index_of("l")    # 10 (last occurrence of "l")
+
+# Substring extraction (NEW!)
+text.substring(7, 12)      # "World" (extract substring)
+text.substring(7)          # "World!" (from index to end)
+text.substring(-6)         # "World!" (last 6 characters)
+
+# String formatting (NEW!)
+"Hi".repeat(3)             # "HiHiHi" (repeat string)
+"42".pad_left(5, "0")      # "00042" (pad with zeros)
+"Hi".pad_right(5, ".")     # "Hi..." (pad with dots)
 ```
 
 ### String Splitting
@@ -519,6 +537,48 @@ if email.ends_with("@domain.com") {
 name = "Hello World"
 name.starts_with("hello")  # false (case-sensitive)
 name.starts_with("Hello")  # true
+```
+
+### String Processing Examples (NEW!)
+```glang
+# Extract file information
+filename = "my_document.pdf"
+dot_pos = filename.last_index_of(".")
+if dot_pos != -1 {
+    basename = filename.substring(0, dot_pos)     # "my_document"
+    extension = filename.substring(dot_pos + 1)   # "pdf"
+}
+
+# Format data in columns
+names = ["Alice", "Bob", "Charlie"]
+for name in names {
+    padded = name.pad_right(10, ".")
+    print(padded + " Present")
+    # Alice..... Present
+    # Bob....... Present
+    # Charlie... Present
+}
+
+# Create visual separators
+title = "REPORT"
+width = 50
+separator = "=".repeat(width)
+centered = title.pad_left((width + title.length()) / 2).pad_right(width)
+print(separator)
+print(centered)
+print(separator)
+
+# Parse structured text
+data = "Name:Alice,Age:25,City:Boston"
+fields = data.split(",")
+for field in fields {
+    colon_pos = field.index_of(":")
+    if colon_pos != -1 {
+        key = field.substring(0, colon_pos)
+        value = field.substring(colon_pos + 1)
+        print(key + " = " + value)
+    }
+}
 ```
 
 ### Practical String Processing

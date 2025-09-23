@@ -123,6 +123,32 @@ text = "hello world"
 text.replace("world", "glang")  # Returns "hello glang"
 ```
 
+### repeat(count)
+Repeats the string a specified number of times.
+```glang
+text = "Hi"
+text.repeat(3)  # Returns "HiHiHi"
+text.repeat(0)  # Returns ""
+```
+
+### pad_left(length, [padding_char])
+Pads the string on the left to reach the target length. Default padding character is space.
+```glang
+text = "Hi"
+text.pad_left(5)      # Returns "   Hi"
+text.pad_left(5, "0") # Returns "000Hi"
+text.pad_left(1)      # Returns "Hi" (already long enough)
+```
+
+### pad_right(length, [padding_char])
+Pads the string on the right to reach the target length. Default padding character is space.
+```glang
+text = "Hi"
+text.pad_right(5)     # Returns "Hi   "
+text.pad_right(5, "*") # Returns "Hi***"
+text.pad_right(1)     # Returns "Hi" (already long enough)
+```
+
 ## String Analysis
 
 ### contains(substring)
@@ -131,6 +157,39 @@ Checks if the string contains a substring.
 text = "hello world"
 text.contains("world")  # Returns true
 text.contains("xyz")  # Returns false
+```
+
+
+### index_of(substring, [start_index])
+Returns the index of the first occurrence of substring, or -1 if not found.
+```glang
+text = "hello world"
+text.index_of("o")      # Returns 4 (first 'o')
+text.index_of("o", 5)   # Returns 7 (second 'o')
+text.index_of("world")  # Returns 6
+text.index_of("xyz")    # Returns -1 (not found)
+```
+
+### last_index_of(substring, [end_index])
+Returns the index of the last occurrence of substring, or -1 if not found.
+```glang
+text = "hello world"
+text.last_index_of("o")     # Returns 7 (last 'o')
+text.last_index_of("o", 6)  # Returns 4 (last 'o' before index 6)
+text.last_index_of("l")     # Returns 9 (last 'l' in "world")
+text.last_index_of("xyz")   # Returns -1 (not found)
+```
+
+### substring(start, [end])
+Extracts a substring from start index to end index (exclusive). Supports negative indices.
+```glang
+text = "hello world"
+text.substring(6)       # Returns "world" (from index 6 to end)
+text.substring(0, 5)    # Returns "hello"
+text.substring(6, 11)   # Returns "world"
+text.substring(-5)      # Returns "world" (last 5 characters)
+text.substring(0, -6)   # Returns "hello" (all but last 6 characters)
+text.substring(-5, -1)  # Returns "worl" (negative range)
 ```
 
 ### matches(pattern)
@@ -292,4 +351,44 @@ print(name + " is " + age.to_string() + " years old")
 parts = ["apple", "banana", "cherry"]
 result = ", ".join(parts)
 print("Fruits: " + result)  # "Fruits: apple, banana, cherry"
+```
+
+### Text Processing with New Methods
+```glang
+# Extract and manipulate parts of text
+text = "Hello World"
+first_char = text[0]                # "H" (using indexing syntax)
+world_pos = text.index_of("World")  # 6
+hello_part = text.substring(0, 5)   # "Hello"
+
+# Format with padding
+name = "Alice"
+formatted = name.pad_right(10, ".") + " Done"  # "Alice..... Done"
+
+# Create repeating patterns
+separator = "=".repeat(40)  # "========================================"
+print(separator)
+print("TITLE".pad_left(22).pad_right(40))  # Centers "TITLE"
+print(separator)
+```
+
+### String Utility Functions
+```glang
+# Find and replace with position awareness
+text = "The cat in the hat"
+first_the = text.index_of("the")      # 11 (case sensitive)
+last_the = text.last_index_of("the")  # 11 (same in this case)
+
+# Extract file extension
+filename = "document.pdf"
+dot_pos = filename.last_index_of(".")
+if dot_pos != -1 {
+    extension = filename.substring(dot_pos + 1)  # "pdf"
+    basename = filename.substring(0, dot_pos)     # "document"
+}
+
+# Create formatted output
+value = "42"
+padded = value.pad_left(6, "0")  # "000042"
+repeated = "X".repeat(5)         # "XXXXX"
 ```
