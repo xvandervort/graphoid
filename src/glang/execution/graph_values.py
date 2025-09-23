@@ -626,7 +626,7 @@ class MapValue(GlangValue, GraphContainer):
         if not self.validate_constraint(value):
             from .errors import TypeConstraintError
             raise TypeConstraintError(
-                f"Cannot set {value.get_type()} in hash<{self.constraint}>",
+                f"Cannot set {value.get_type()} in map<{self.constraint}>",
                 value.position
             )
 
@@ -657,6 +657,16 @@ class MapValue(GlangValue, GraphContainer):
         """Get all key-value pairs."""
         return self.graph.items()
 
+    def node(self, key: str) -> 'DataValue':
+        """Get data node for a specific key (replacement for deprecated get)."""
+        from .values import DataValue
+
+        if not self.has_key(key):
+            raise RuntimeError(f"Key '{key}' not found in map")
+
+        value = self.get(key)
+        return DataValue(key, value, self.position)
+
     def size(self) -> int:
         """Get number of key-value pairs."""
         return len(self.graph)
@@ -667,10 +677,10 @@ class MapValue(GlangValue, GraphContainer):
         return NumberValue(self.size(), self.position)
 
     def universal_inspect(self) -> 'StringValue':
-        """Hash-specific inspection showing constraint and size."""
+        """Map-specific inspection showing constraint and size."""
         from .values import StringValue
         constraint_info = f"<{self.constraint}>" if self.constraint else ""
-        info = f'hash{constraint_info} ({len(self.graph)} pairs)'
+        info = f'map{constraint_info} ({len(self.graph)} pairs)'
         return StringValue(info, self.position)
 
     @property

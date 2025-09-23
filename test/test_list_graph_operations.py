@@ -20,42 +20,42 @@ from glang.ast.nodes import SourcePosition
 class TestListAnalysisMethods:
     """Test list analysis methods that examine graph properties."""
     
-    def test_indexOf_basic(self):
-        """Test indexOf finds correct index of elements."""
+    def test_index_of_basic(self):
+        """Test index_of finds correct index of elements."""
         session = ExecutionSession()
         
         result = session.execute_statement('list<num> numbers = [10, 20, 30, 20]')
         assert result.success
         
         # Find first occurrence
-        result = session.execute_statement('numbers.indexOf(20)')
+        result = session.execute_statement('numbers.index_of(20)')
         assert result.success
         assert result.value.value == 1
         
         # Find different element
-        result = session.execute_statement('numbers.indexOf(30)')
+        result = session.execute_statement('numbers.index_of(30)')
         assert result.success
         assert result.value.value == 2
     
-    def test_indexOf_not_found(self):
-        """Test indexOf returns -1 when element not found."""
+    def test_index_of_not_found(self):
+        """Test index_of returns -1 when element not found."""
         session = ExecutionSession()
         
         result = session.execute_statement('list<num> numbers = [1, 2, 3]')
         assert result.success
         
-        result = session.execute_statement('numbers.indexOf(99)')
+        result = session.execute_statement('numbers.index_of(99)')
         assert result.success
         assert result.value.value == -1
     
-    def test_indexOf_string_list(self):
-        """Test indexOf works with string lists."""
+    def test_index_of_string_list(self):
+        """Test index_of works with string lists."""
         session = ExecutionSession()
         
         result = session.execute_statement('list<string> words = ["apple", "banana", "cherry"]')
         assert result.success
         
-        result = session.execute_statement('words.indexOf("banana")')
+        result = session.execute_statement('words.index_of("banana")')
         assert result.success
         assert result.value.value == 1
     
@@ -416,12 +416,12 @@ class TestListMethodValidation:
         result = session.execute_statement('list<num> numbers = [1, 2, 3]')
         assert result.success
         
-        # indexOf requires exactly 1 argument
-        result = session.execute_statement('numbers.indexOf()')
+        # index_of requires exactly 1 argument
+        result = session.execute_statement('numbers.index_of()')
         assert not result.success
         assert "takes 1 argument" in str(result.error).lower()
         
-        result = session.execute_statement('numbers.indexOf(1, 2)')
+        result = session.execute_statement('numbers.index_of(1, 2)')
         assert not result.success
         assert "takes 1 argument" in str(result.error).lower()
         
@@ -471,7 +471,7 @@ class TestMethodDiscoverability:
         methods = [elem.value for elem in result.value.elements]
         
         # Check that all new analysis methods are present
-        assert "indexOf" in methods
+        assert "index_of" in methods
         assert "count" in methods
         assert "min" in methods
         assert "max" in methods
@@ -491,7 +491,7 @@ class TestMethodDiscoverability:
         assert result.success
         
         # Test new analysis methods
-        result = session.execute_statement('numbers.can("indexOf")')
+        result = session.execute_statement('numbers.can("index_of")')
         assert result.success
         assert result.value.value == True
         

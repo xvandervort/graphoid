@@ -141,7 +141,7 @@ class TestBehaviorParsing:
             
             # Constrained types with behaviors
             'list<num> scores with [nil_to_zero, validate_range(0, 100)] = [95, 87]',
-            'hash<string> config with [env_normalize] = {"key": "value"}',
+            'map<string> config with [env_normalize] = {"key": "value"}',
             
             # Multiple behaviors with various argument patterns
             'num temp with [nil_to_zero, validate_range(95, 105), round_to_int] = 98.6',

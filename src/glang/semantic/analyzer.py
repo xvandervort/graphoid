@@ -703,7 +703,7 @@ class SemanticAnalyzer(BaseASTVisitor):
             'bool': {'flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool', 'node'} | universal_methods,
             'data': {'key', 'value', 'node'} | universal_methods,
             'map': {
-                'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop',
+                'node', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop',
                 'to_string', 'to_bool', 'can_accept',
                 'add_edge', 'get_connected_keys', 'get_edges', 'can_add_edge',
                 'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule',

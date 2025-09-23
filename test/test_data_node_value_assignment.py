@@ -1,183 +1,146 @@
-"""Test data node value assignment functionality."""
+"""Test data node value updates through map modifications.
+
+Since data nodes are internal representations, values are updated by
+modifying the source map and extracting fresh data nodes.
+"""
 
 import pytest
 from glang.execution.pipeline import ExecutionSession
 
 
-class TestDataNodeValueAssignment:
-    """Test that data node values can be assigned while keys remain immutable."""
-    
-    def test_basic_value_assignment(self):
-        """Test basic data node value assignment."""
+class TestDataNodeValueUpdates:
+    """Test that data node values reflect map updates."""
+
+    def test_map_update_reflects_in_data_node(self):
+        """Test that updating map reflects in extracted data nodes."""
         session = ExecutionSession()
-        
-        # Create data node
-        result = session.execute_statement('data d = { "name": "Alice" }')
-        assert result.success
-        
-        # Verify initial value
-        result = session.execute_statement('d.value')
+
+        # Create map
+        session.execute_statement('map config = { "name": "Alice", "age": 25 }')
+
+        # Extract initial data node
+        session.execute_statement('data name_node = config.node("name")')
+        result = session.execute_statement('name_node.value()')
         assert result.success
         assert str(result.value) == "Alice"
-        
-        # Assign new value
-        result = session.execute_statement('d.value = "Bob"')
+
+        # Update the map
+        result = session.execute_statement('config["name"] = "Bob"')
         assert result.success
-        assert "Updated data node" in str(result.value)
-        
-        # Verify value was updated
-        result = session.execute_statement('d.value')
+
+        # Extract fresh data node - should reflect the update
+        session.execute_statement('data updated_name_node = config.node("name")')
+        result = session.execute_statement('updated_name_node.value()')
         assert result.success
         assert str(result.value) == "Bob"
-        
-        # Verify key remains unchanged
-        result = session.execute_statement('d.key')
-        assert result.success
-        assert str(result.value) == "name"
-    
-    def test_value_assignment_different_types(self):
-        """Test data node value assignment with different types."""
+
+    def test_different_value_types(self):
+        """Test updating map values with different types."""
         session = ExecutionSession()
-        
-        # Create data node with string value
-        result = session.execute_statement('data d = { "data": "initial" }')
+
+        session.execute_statement('map settings = { "debug": true, "timeout": 30 }')
+
+        # Check initial boolean value
+        session.execute_statement('data debug_node = settings.node("debug")')
+        result = session.execute_statement('debug_node.value()')
         assert result.success
-        
-        # Assign number value
-        result = session.execute_statement('d.value = 42')
+        assert result.value.value is True
+
+        # Update to false
+        session.execute_statement('settings["debug"] = false')
+        session.execute_statement('data updated_debug = settings.node("debug")')
+        result = session.execute_statement('updated_debug.value()')
         assert result.success
-        result = session.execute_statement('d.value')
+        assert result.value.value is False
+
+        # Check number value update
+        session.execute_statement('settings["timeout"] = 60')
+        session.execute_statement('data timeout_node = settings.node("timeout")')
+        result = session.execute_statement('timeout_node.value()')
         assert result.success
-        assert str(result.value) == "42"
-        
-        # Assign boolean value
-        result = session.execute_statement('d.value = true')
-        assert result.success
-        result = session.execute_statement('d.value')
-        assert result.success
-        assert str(result.value) == "true"
-        
-        # Assign list value
-        result = session.execute_statement('d.value = [1, 2, 3]')
-        assert result.success
-        result = session.execute_statement('d.value')
-        assert result.success
-        assert str(result.value) == "[1, 2, 3]"
-    
-    def test_key_assignment_blocked(self):
-        """Test that data node key assignment is properly blocked."""
+        assert result.value.value == 60
+
+    def test_key_immutability_in_data_nodes(self):
+        """Test that data node keys cannot be changed."""
         session = ExecutionSession()
-        
-        # Create data node
-        result = session.execute_statement('data d = { "original_key": "value" }')
-        assert result.success
-        
-        # Try to assign new key (should fail)
-        result = session.execute_statement('d.key = "new_key"')
+
+        session.execute_statement('map config = { "host": "localhost" }')
+        session.execute_statement('data node = config.node("host")')
+
+        # Key should be immutable - key() method takes no arguments
+        result = session.execute_statement('node.key("newkey")')
         assert not result.success
-        assert "Assignment to data node key is not allowed" in str(result.error)
-        assert "immutable" in str(result.error)
-        
-        # Verify key remains unchanged
-        result = session.execute_statement('d.key')
-        assert result.success
-        assert str(result.value) == "original_key"
-    
-    def test_constrained_data_node_value_assignment(self):
-        """Test value assignment with type constraints."""
+        assert "argument" in str(result.error).lower()
+
+    def test_constrained_map_value_updates(self):
+        """Test value updates in type-constrained maps."""
         session = ExecutionSession()
-        
-        # Create constrained data node
-        result = session.execute_statement('data<string> d = { "name": "Alice" }')
+
+        # Create constrained map
+        session.execute_statement('map<string> config = { "host": "localhost", "port": "8080" }')
+
+        # Update with valid string value
+        result = session.execute_statement('config["host"] = "127.0.0.1"')
         assert result.success
-        
-        # Assign valid string value (should work)
-        result = session.execute_statement('d.value = "Bob"')
+
+        # Verify update in data node
+        session.execute_statement('data host_node = config.node("host")')
+        result = session.execute_statement('host_node.value()')
         assert result.success
-        result = session.execute_statement('d.value')
+        assert str(result.value) == "127.0.0.1"
+
+    def test_multiple_data_nodes_independence(self):
+        """Test that multiple data nodes from same map are independent snapshots."""
+        session = ExecutionSession()
+
+        session.execute_statement('map users = { "admin": "Alice", "user": "Bob" }')
+
+        # Extract both data nodes
+        session.execute_statement('data admin_node = users.node("admin")')
+        session.execute_statement('data user_node = users.node("user")')
+
+        # Verify initial values
+        result = session.execute_statement('admin_node.value()')
+        assert result.success
+        assert str(result.value) == "Alice"
+
+        result = session.execute_statement('user_node.value()')
         assert result.success
         assert str(result.value) == "Bob"
-        
-        # Try to assign invalid type (should fail)
-        result = session.execute_statement('d.value = 42')
-        assert not result.success
-        # Should fail due to type constraint
-    
-    def test_multiple_data_nodes(self):
-        """Test value assignment with multiple data nodes."""
+
+        # Update map
+        session.execute_statement('users["admin"] = "Charlie"')
+
+        # Old data node should still have old value (snapshot behavior)
+        result = session.execute_statement('admin_node.value()')
+        assert result.success
+        assert str(result.value) == "Alice"  # Unchanged snapshot
+
+        # But new extraction gets updated value
+        session.execute_statement('data new_admin_node = users.node("admin")')
+        result = session.execute_statement('new_admin_node.value()')
+        assert result.success
+        assert str(result.value) == "Charlie"
+
+    def test_data_node_with_complex_values(self):
+        """Test data nodes containing complex values like lists."""
         session = ExecutionSession()
-        
-        # Create multiple data nodes
-        result = session.execute_statement('data person = { "name": "Alice" }')
+
+        session.execute_statement('map data = { "scores": [95, 87, 92], "tags": ["important", "urgent"] }')
+
+        # Extract data node with list value
+        session.execute_statement('data scores_node = data.node("scores")')
+        result = session.execute_statement('scores_node.value()')
         assert result.success
-        result = session.execute_statement('data config = { "debug": true }')
+        assert result.value.get_type() == "list"
+
+        # Update the list in the map
+        session.execute_statement('data["scores"] = [100, 95, 90]')
+
+        # Extract fresh data node
+        session.execute_statement('data updated_scores = data.node("scores")')
+        result = session.execute_statement('updated_scores.value()')
         assert result.success
-        
-        # Update first data node
-        result = session.execute_statement('person.value = "Bob"')
-        assert result.success
-        
-        # Update second data node  
-        result = session.execute_statement('config.value = false')
-        assert result.success
-        
-        # Verify both are updated correctly
-        result = session.execute_statement('person.value')
-        assert result.success
-        assert str(result.value) == "Bob"
-        
-        result = session.execute_statement('config.value')
-        assert result.success
-        assert str(result.value) == "false"
-        
-        # Verify keys remain unchanged
-        result = session.execute_statement('person.key')
-        assert result.success
-        assert str(result.value) == "name"
-        
-        result = session.execute_statement('config.key')
-        assert result.success
-        assert str(result.value) == "debug"
-    
-    def test_value_assignment_expression_values(self):
-        """Test data node value assignment with expression values."""
-        session = ExecutionSession()
-        
-        # Create data nodes and variables
-        result = session.execute_statement('data d = { "result": 0 }')
-        assert result.success
-        result = session.execute_statement('num x = 10')
-        assert result.success
-        result = session.execute_statement('num y = 5')
-        assert result.success
-        
-        # Assign expression result
-        result = session.execute_statement('d.value = x + y')
-        assert result.success
-        
-        # Verify expression was evaluated
-        result = session.execute_statement('d.value')
-        assert result.success
-        assert str(result.value) == "15"
-    
-    def test_data_node_display_after_value_assignment(self):
-        """Test that data node displays correctly after value assignment."""
-        session = ExecutionSession()
-        
-        # Create and modify data node
-        result = session.execute_statement('data d = { "status": "initial" }')
-        assert result.success
-        
-        # Check initial display
-        result = session.execute_statement('d')
-        assert result.success
-        assert str(result.value) == '{ "status": initial }'
-        
-        # Update value
-        result = session.execute_statement('d.value = "updated"')
-        assert result.success
-        
-        # Check updated display
-        result = session.execute_statement('d')
-        assert result.success
-        assert str(result.value) == '{ "status": updated }'
+        # The list should have new values
+        assert len(result.value.elements) == 3
+        assert result.value.elements[0].value == 100

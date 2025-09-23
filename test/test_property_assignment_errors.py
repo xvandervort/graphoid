@@ -32,17 +32,19 @@ class TestPropertyAssignmentErrors:
     def test_data_property_assignment_execution_errors(self):
         """Test that property assignments fail at execution with proper error messages."""
         session = ExecutionSession()
-        
-        # Create a data node
-        result = session.execute_statement('data d = { "mykey": "myvalue" }')
+
+        # Create a map and extract a data node
+        result = session.execute_statement('m = { "mykey": "myvalue" }')
         assert result.success
-        
+        result = session.execute_statement('d = m.node("mykey")')
+        assert result.success
+
         # Test key assignment fails with proper error (keys are immutable)
         result = session.execute_statement('d.key = "newkey"')
         assert not result.success
         assert "Assignment to data node key is not allowed" in str(result.error)
         assert "immutable" in str(result.error)
-        
+
         # Test value assignment succeeds (values are mutable)
         result = session.execute_statement('d.value = "newvalue"')
         assert result.success
@@ -95,21 +97,23 @@ class TestPropertyAssignmentErrors:
     def test_method_calls_still_work(self):
         """Test that regular method calls (not assignments) still work correctly."""
         session = ExecutionSession()
-        
-        # Create a data node
-        result = session.execute_statement('data d = { "testkey": "testvalue" }')
+
+        # Create a map and extract a data node
+        result = session.execute_statement('m = { "testkey": "testvalue" }')
         assert result.success
-        
+        result = session.execute_statement('d = m.node("testkey")')
+        assert result.success
+
         # Test method calls without parentheses work
         result = session.execute_statement('d.key')
         assert result.success
         assert str(result.value) == "testkey"
-        
+
         # Test method calls with parentheses work
         result = session.execute_statement('d.key()')
         assert result.success
         assert str(result.value) == "testkey"
-        
+
         # Test value method calls
         result = session.execute_statement('d.value')
         assert result.success
@@ -133,11 +137,13 @@ class TestPropertyAssignmentErrors:
     def test_complex_property_assignment_scenarios(self):
         """Test various complex scenarios for property assignments."""
         session = ExecutionSession()
-        
+
         # Set up test data
-        result = session.execute_statement('data d = { "key": [1, 2, 3] }')
+        result = session.execute_statement('m = { "key": [1, 2, 3] }')
         assert result.success
-        
+        result = session.execute_statement('d = m.node("key")')
+        assert result.success
+
         # Test nested property access assignment (should fail)
         result = session.execute_statement('d.value.size = 10')
         assert not result.success
@@ -146,13 +152,15 @@ class TestPropertyAssignmentErrors:
     def test_before_vs_after_error_messages(self):
         """Demonstrate the improvement in error messaging."""
         # This test documents the behavior change:
-        # BEFORE: "Unexpected token: =" (confusing parser error)  
+        # BEFORE: "Unexpected token: =" (confusing parser error)
         # AFTER: Meaningful execution-time errors with proper distinction between keys and values
-        
+
         session = ExecutionSession()
-        result = session.execute_statement('data d = { "key": "value" }')
+        result = session.execute_statement('m = { "key": "value" }')
         assert result.success
-        
+        result = session.execute_statement('d = m.node("key")')
+        assert result.success
+
         # Test key assignment - should fail with clear message
         result = session.execute_statement('d.key = "shizzle"')
         assert not result.success
@@ -160,7 +168,7 @@ class TestPropertyAssignmentErrors:
         assert "Assignment to data node key is not allowed" in error_msg
         assert "immutable" in error_msg
         assert "Unexpected token" not in error_msg  # No more parser errors
-        
+
         # Test value assignment - should succeed (values are mutable!)
         result = session.execute_statement('d.value = "shizzle"')
         assert result.success

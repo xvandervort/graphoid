@@ -5,7 +5,7 @@ from glang.execution.graph_foundation import (
     GraphNode, GraphStructure, SequentialGraph, KeyedGraph,
     EdgeType, EdgeMetadata
 )
-from glang.execution.graph_values import ListValue, HashValue
+from glang.execution.graph_values import ListValue, MapValue
 from glang.execution.values import NumberValue, StringValue, BooleanValue
 
 
@@ -135,75 +135,75 @@ class TestListValue:
         assert not graph_list.contains(NumberValue(99))
 
 
-class TestHashValue:
+class TestMapValue:
     """Test graph-based hash implementation."""
 
-    def test_hash_creation(self):
+    def test_map_creation(self):
         """Test creating graph hashes."""
         pairs = [("name", StringValue("Bob")), ("age", NumberValue(30))]
-        graph_hash = HashValue(pairs)
+        graph_map = MapValue(pairs)
 
-        assert len(graph_hash) == 2
-        assert graph_hash["name"].value == "Bob"
-        assert graph_hash["age"].value == 30
-        assert graph_hash.get_type() == "hash"
+        assert len(graph_map) == 2
+        assert graph_map["name"].value == "Bob"
+        assert graph_map["age"].value == 30
+        assert graph_map.get_type() == "map"
 
-    def test_hash_operations(self):
+    def test_map_operations(self):
         """Test hash operations."""
-        graph_hash = HashValue([])
+        graph_map = MapValue([])
 
         # Set values
-        graph_hash["key1"] = StringValue("value1")
-        graph_hash["key2"] = NumberValue(42)
+        graph_map["key1"] = StringValue("value1")
+        graph_map["key2"] = NumberValue(42)
 
-        assert len(graph_hash) == 2
-        assert graph_hash["key1"].value == "value1"
-        assert "key1" in graph_hash
+        assert len(graph_map) == 2
+        assert graph_map["key1"].value == "value1"
+        assert "key1" in graph_map
 
-    def test_hash_keys_values_items(self):
+    def test_map_keys_values_items(self):
         """Test keys, values, and items methods."""
         pairs = [("a", NumberValue(1)), ("b", NumberValue(2))]
-        graph_hash = HashValue(pairs)
+        graph_map = MapValue(pairs)
 
-        keys = graph_hash.keys()
-        values = graph_hash.values()
-        items = graph_hash.items()
+        keys = graph_map.keys()
+        values = graph_map.values()
+        items = graph_map.items()
 
         assert set(keys) == {"a", "b"}
         assert len(values) == 2
         assert len(items) == 2
 
-    def test_hash_graph_features(self):
+    def test_map_graph_features(self):
         """Test graph-specific features of hashes."""
         pairs = [("user1", StringValue("Alice")), ("user2", StringValue("Bob"))]
-        graph_hash = HashValue(pairs)
+        graph_map = MapValue(pairs)
 
         # Add edge between values
-        graph_hash.add_value_edge("user1", "user2", "friend")
-        connected = graph_hash.get_connected_keys("user1", "friend")
+        graph_map.add_edge("user1", "user2", "friend")
+        connected = graph_map.get_connected_keys("user1", "friend")
         assert "user2" in connected
 
-    def test_hash_merge(self):
+    def test_map_merge(self):
         """Test hash merging."""
-        hash1 = HashValue([("a", NumberValue(1)), ("b", NumberValue(2))])
-        hash2 = HashValue([("b", NumberValue(3)), ("c", NumberValue(4))])
+        map1 = MapValue([("a", NumberValue(1)), ("b", NumberValue(2))])
+        map2 = MapValue([("b", NumberValue(3)), ("c", NumberValue(4))])
 
-        merged = hash1.merge(hash2)
+        merged = map1.merge(map2)
         assert len(merged) == 3
         assert merged["b"].value == 3  # Later value wins
         assert merged["c"].value == 4
 
-    def test_hash_backward_compatibility(self):
+    def test_map_backward_compatibility(self):
         """Test that graph hashes work like old hashes."""
-        graph_hash = HashValue([("key", StringValue("value"))])
+        graph_map = MapValue([("key", StringValue("value"))])
 
         # Test contains
-        assert "key" in graph_hash
-        assert "missing" not in graph_hash
+        assert "key" in graph_map
+        assert "missing" not in graph_map
 
         # Test get/set
-        graph_hash["new_key"] = NumberValue(123)
-        assert graph_hash.get("new_key").value == 123
+        graph_map["new_key"] = NumberValue(123)
+        assert graph_map.get("new_key").value == 123
 
 
 class TestGraphMigration:
@@ -263,8 +263,8 @@ class TestGraphCompatibility:
         display = graph_list.to_display_string()
         assert "1" in display and "2" in display
 
-        graph_hash = HashValue([("key", StringValue("value"))])
-        display = graph_hash.to_display_string()
+        graph_map = MapValue([("key", StringValue("value"))])
+        display = graph_map.to_display_string()
         assert "key" in display and "value" in display
 
     def test_equality_comparison(self):

@@ -1,6 +1,6 @@
 # Data Node Methods
 
-Data Node is a built-in type in Glang representing a single key-value pair. Data nodes are the fundamental building blocks of hashes and provide a way to associate metadata with values.
+Data Node is a built-in type in Glang representing a single key-value pair. Data nodes are the fundamental building blocks of maps and provide a way to associate metadata with values.
 
 ## Creating Data Nodes
 
@@ -194,14 +194,14 @@ letter = grade.value()  # Guaranteed to be string
 result = passed.value()  # Guaranteed to be bool
 ```
 
-### Building Hashes from Data Nodes
+### Building Maps from Data Nodes
 ```glang
-# Data nodes are the building blocks of hashes
+# Data nodes are the building blocks of maps
 name_node = { "name": "Alice" }
 age_node = { "age": 25 }
 city_node = { "city": "New York" }
 
-# Combine into a hash
+# Combine into a map
 person = {}
 person[name_node.key()] = name_node.value()
 person[age_node.key()] = age_node.value()

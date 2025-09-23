@@ -15,7 +15,7 @@ Glang aims to be:
 ### Core Features (Implemented)
 - **Complete Function System** - Functions, lambdas, closures, and recursion
 - **Strong Type System** - With optional type inference and type constraints
-- **Graph-Based Collections** - Lists, hashes, data nodes, and binary trees with true graph foundation
+- **Graph-Based Collections** - Lists, maps, data nodes, and binary trees with true graph foundation
 - **Method-Based Design** - Everything uses methods: `list.append()`, `string.upper()`, `num.abs()`
 - **File Loading System** - Modular programming with `.gr` files
 - **Clean AST Architecture** - Reliable execution with excellent error messages
@@ -102,7 +102,7 @@ Glang aims to be:
 - **Multi-line Support**: Complex expressions with line breaks now work correctly
 - **✅ ALL CRITICAL PARSER ISSUES RESOLVED (September 2025)**:
   - **Logical Operator Precedence**: Fixed - expressions like `a == 1 or b == 2` now parse correctly
-  - **Hash Variable Key Access**: Fixed - `hash[variable_key]` syntax now works
+  - **Map Variable Key Access**: Fixed - `map[variable_key]` syntax now works
   - **Variable Scoping**: Fixed - proper lexical scoping allows variable reuse in different scopes
 
 ### ✅ Bitcoin Price Tracker Success
@@ -174,7 +174,7 @@ black src/ test/
 mypy src/
 
 # Demonstrate the language
-echo -e "string greeting = \"Hello World\"\nlist items = [1, 2, 3]\ndata user = { \"name\": \"Alice\" }\nhash config = { \"host\": \"localhost\", \"port\": 8080 }\nitems.append(4)\nconfig[\"debug\"] = true\n/namespace\n/exit" | glang
+echo -e "string greeting = \"Hello World\"\nlist items = [1, 2, 3]\ndata user = { \"name\": \"Alice\" }\nmap config = { \"host\": \"localhost\", \"port\": 8080 }\nitems.append(4)\nconfig[\"debug\"] = true\n/namespace\n/exit" | glang
 ```
 
 ## REPL Commands
@@ -223,9 +223,9 @@ tree<string> words = tree{}        # String-only binary search tree
 user = { "name": "Alice" }           # Infers data type
 data<num> score = { "final": 95 }    # Explicit constraint
 
-# Hashes (type inferred from literal)
-config = { "host": "localhost", "port": 8080, "debug": true }  # Infers hash type
-hash<string> settings = { "theme": "dark", "lang": "en" }       # Explicit constraint
+# Maps (type inferred from literal)
+config = { "host": "localhost", "port": 8080, "debug": true }  # Infers map type
+map<string> settings = { "theme": "dark", "lang": "en" }       # Explicit constraint
 ```
 
 ### Advanced Operations
@@ -233,12 +233,12 @@ hash<string> settings = { "theme": "dark", "lang": "en" }       # Explicit const
 # Index access
 items[0]           # Get first element from list
 items[-1]          # Get last element (if supported)
-config["host"]     # Get data node from hash: { "host": "localhost" }
+config["host"]     # Get data node from map: { "host": "localhost" }
 
 # Index assignment  
 items[0] = 99      # Set first element in list
 scores[1] = 100    # Update element
-config["port"] = 9000  # Create/update data node in hash
+config["port"] = 9000  # Create/update data node in map
 
 # Method calls
 items.append(4)    # Add element to list
@@ -378,7 +378,7 @@ func fibonacci(n) {
 
 ### Intrinsic Behavior System (NEW!)
 
-Glang provides a powerful **intrinsic behavior system** where data structures (lists, hashes, and future graphs) can have behaviors attached that automatically apply to all values during operations:
+Glang provides a powerful **intrinsic behavior system** where data structures (lists, maps, and future graphs) can have behaviors attached that automatically apply to all values during operations:
 
 ```glang
 # Create a list with automatic nil handling
@@ -409,9 +409,9 @@ temperatures.remove_rule("positive")        # Remove specific behavior
 temperatures.clear_rules()                   # Remove all behaviors
 ```
 
-#### Hash Behaviors
+#### Map Behaviors
 ```glang
-# Behaviors work on hashes too
+# Behaviors work on maps too
 config = { "timeout": nil, "retries": -5, "port": 9999 }
 config.add_rule("nil_to_zero")              # nil values become 0
 config.add_rule("positive")                 # negative values become positive
@@ -441,7 +441,7 @@ config["min_threads"] = -10                 # Becomes 10 (positive), then clampe
 - **One-Step Process**: `list.add_rule("nil_to_zero")` - that's it!
 - **Type-Safe**: Behaviors respect and work with type constraints
 - **Composable**: Multiple behaviors apply in order
-- **Graph Foundation**: Since lists and hashes are graph structures, behaviors are inherited by all graph types
+- **Graph Foundation**: Since lists and maps are graph structures, behaviors are inherited by all graph types
 
 #### Future: Custom Behaviors
 ```glang
@@ -493,7 +493,7 @@ if a || b {           # Same as 'or'
 # - Numbers: 0 is false, non-zero is true
 # - Strings: empty string is false, non-empty is true
 # - Lists: empty list is false, non-empty is true
-# - Hashes: empty hash is false, non-empty is true
+# - Maps: empty map is false, non-empty is true
 
 # KNOWN LIMITATION: Complex chained expressions need parentheses
 # This will be fixed in the next language update
@@ -777,7 +777,7 @@ Glang uses a clean, modern architecture:
 - ✅ Method calls with type constraint enforcement
 - ✅ Index access and assignment for lists, strings, and maps
 - ✅ Data nodes with key-value semantics and type constraints
-- ✅ Hashes as collections of data nodes with Ruby hash-like syntax
+- ✅ Maps as collections of data nodes with Ruby hash-like syntax
 - ✅ Functional programming operations: map, filter, each with built-in transformations
 - ✅ Control flow structures: if/else, while, for-in, break/continue with proper nesting
 - ✅ **Logical operators** with operator synonyms: `and`/`&&` and `or`/`||` with proper truthiness and short-circuiting
@@ -790,7 +790,7 @@ Glang uses a clean, modern architecture:
 - ✅ Standard library foundation with math constants module (stdlib/math.gr)
 - ✅ **JSON module** with encode, decode, pretty printing, and validation (json.encode, json.decode, json.is_valid)
 - ✅ **Time module** with single Time type, UTC timestamps, and full type casting (Time.now, Time.from_components, time.to_num, string.to_time)
-- ✅ **Intrinsic behavior system** where lists/hashes have built-in behaviors that auto-apply to all values (GraphContainer mixin)
+- ✅ **Intrinsic behavior system** where lists/maps have built-in behaviors that auto-apply to all values (GraphContainer mixin)
 - ✅ **Comprehensive test suite** (1205+ tests, 67% coverage)
 
 ### Development Guidelines
@@ -808,7 +808,7 @@ Glang uses a clean, modern architecture:
 **COMPLETED PRIORITIES:**
 - **✅ FOUNDATIONAL CALL GRAPH ARCHITECTURE**: 🔥 **REVOLUTIONARY BREAKTHROUGH** - Implemented true graph-based function discovery system replacing variable-based lookup. Functions now stored as graph nodes with proper connectivity. Intra-module and cross-module function calls work correctly via graph traversal (`call_graph.find_function()`). This transforms Glang from a simulated graph language to a genuinely graph-theoretic programming language.
 - **✅ Fixed Logical Operator Precedence**: Successfully implemented proper parser precedence with `parse_logical_or` → `parse_logical_and` → `parse_comparison`. Complex expressions like `a == 1 or b == 2 and c > 3` now parse correctly without requiring parentheses. Also added short-circuit evaluation for performance.
-- **✅ Hash Variable Key Access**: The `hash[variable_key]` syntax now works correctly (was previously reporting "Key must be a string literal" error).
+- **✅ Map Variable Key Access**: The `map[variable_key]` syntax now works correctly (was previously reporting "Key must be a string literal" error).
 - **✅ Variable Scoping**: Fixed global variable conflict issue. Variables can now be reused in different loop scopes without "Variable already declared" errors. Implemented proper scoped symbol table with `enter_scope()`/`exit_scope()`.
 - **✅ Line Continuation**: Fixed multi-line logical expression parsing. Complex expressions like `a or b or\n   c or d` now parse correctly by skipping newlines within expressions.
 

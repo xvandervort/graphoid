@@ -939,7 +939,7 @@ class ASTParser:
         while True:
             if self.match(TokenType.DOT):
                 # Method call
-                method_token = self.consume(TokenType.IDENTIFIER, "Expected method name")
+                method_token = self.consume_method_name("Expected method name")
                 method_name = method_token.value
                 pos = SourcePosition(method_token.line, method_token.column)
                 
@@ -1382,6 +1382,22 @@ class ASTParser:
             return self.advance()
         current = self.peek()
         raise ParseError(f"{message}. Got '{current.value}'", current)
+
+    def consume_method_name(self, message: str) -> Token:
+        """Consume a method name - can be identifier or keyword."""
+        current = self.peek()
+
+        # Allow identifiers
+        if current.type == TokenType.IDENTIFIER:
+            return self.advance()
+
+        # Allow keywords as method names
+        from ..language.keyword_registry import KEYWORD_REGISTRY
+        if KEYWORD_REGISTRY.is_keyword(current.value):
+            return self.advance()
+
+        # Error if neither
+        raise ParseError(f"{message}. Got '{current.value}' - expected a variable or method name", current)
     
     def check_slice_syntax(self) -> bool:
         """Look ahead to see if this is slice syntax (contains : before ])"""

@@ -111,29 +111,31 @@ class TestOptionalTypeDeclarations:
         assert executor.context.variables["items"].elements[2].value == 3
     
     def test_data_literal_inference(self):
-        """Test type inference from data node literal."""
+        """Test type inference from map literal (data nodes are internal)."""
         parser = ASTParser()
         analyzer = SemanticAnalyzer()
         symbol_table = SymbolTable()
         context = ExecutionContext(symbol_table)
         executor = ASTExecutor(context)
-        
-        # Without explicit type
+
+        # Without explicit type - {} literals now create maps
         ast = parser.parse('user = { "name": "Alice" }')
         assert isinstance(ast, Assignment)
-        
+
         # After semantic analysis
         result = analyzer.analyze(ast)
         assert result.success
         assert analyzer.symbol_table.symbol_exists("user")
         symbol = analyzer.symbol_table.lookup_symbol("user")
-        assert symbol.symbol_type == "data"
-        
+        assert symbol.symbol_type == "map"
+
         # Should execute successfully
         executor.execute(ast)
         assert "user" in executor.context.variables
-        assert executor.context.variables["user"].key == "name"
-        assert executor.context.variables["user"].value.value == "Alice"
+        # Map should contain the key-value pair
+        user_map = executor.context.variables["user"]
+        assert user_map.has_key("name")
+        assert user_map.get("name").value == "Alice"
     
     def test_map_literal_inference(self):
         """Test type inference from map literal."""
@@ -142,24 +144,26 @@ class TestOptionalTypeDeclarations:
         symbol_table = SymbolTable()
         context = ExecutionContext(symbol_table)
         executor = ASTExecutor(context)
-        
+
         # Without explicit type
         ast = parser.parse('config = { "host": "localhost", "port": 8080 }')
         assert isinstance(ast, Assignment)
-        
+
         # After semantic analysis
         result = analyzer.analyze(ast)
         assert result.success
         assert analyzer.symbol_table.symbol_exists("config")
         symbol = analyzer.symbol_table.lookup_symbol("config")
-        assert symbol.symbol_type == "hash"
-        
+        assert symbol.symbol_type == "map"
+
         # Should execute successfully
         executor.execute(ast)
         assert "config" in executor.context.variables
-        # Map should contain data nodes
-        # HashValue uses 'pairs' to store its key-value pairs
-        assert len(executor.context.variables["config"].pairs) == 2
+        # Map should contain the key-value pairs
+        config_map = executor.context.variables["config"]
+        assert len(config_map) == 2
+        assert config_map.has_key("host")
+        assert config_map.has_key("port")
     
     def test_explicit_type_still_works(self):
         """Test that explicit type declarations still work."""

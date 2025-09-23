@@ -160,23 +160,24 @@ class ASTExecutor(BaseASTVisitor):
                         initializer_value.value.position or node.position
                     )
         
-        # For hash declarations, handle both HashValue and DataValue (single pair) initializers
-        elif node.var_type == "hash":
+        # For map declarations, handle both MapValue and DataValue (single pair) initializers
+        elif node.var_type == "map":
             init_type = initializer_value.get_type()
             if init_type == "data":
-                # Convert single DataValue to HashValue for hash declarations
+                # Convert single DataValue to MapValue for map declarations
                 pairs = [(initializer_value.key, initializer_value.value)]
-                initializer_value = HashValue(pairs, node.type_constraint, initializer_value.position)
-            elif init_type == "hash":
+                from .graph_values import MapValue
+                initializer_value = MapValue(pairs, node.type_constraint, initializer_value.position)
+            elif init_type == "map":
                 if node.type_constraint:
                     initializer_value.constraint = node.type_constraint
 
             # Validate constraint if specified
-            if node.type_constraint and initializer_value.get_type() == "hash":
-                for key, value in initializer_value.pairs.items():
+            if node.type_constraint and initializer_value.get_type() == "map":
+                for key, value in initializer_value.graph.items():
                     if not initializer_value.validate_constraint(value):
                         raise TypeConstraintError(
-                            f"Value {value.to_display_string()} for key '{key}' violates hash<{node.type_constraint}> constraint",
+                            f"Value {value.to_display_string()} for key '{key}' violates map<{node.type_constraint}> constraint",
                             value.position or node.position
                         )
         
@@ -186,9 +187,9 @@ class ASTExecutor(BaseASTVisitor):
             value_type = initializer_value.get_type()
             if value_type == "list":
                 initializer_value = behavior_pipeline.apply_to_list(initializer_value)
-            elif value_type == "hash":
-                # For hashes, we'd need to apply to specific keys
-                # For now, just apply to the hash as a whole (limited functionality)
+            elif value_type == "map":
+                # For maps, we'd need to apply to specific keys
+                # For now, just apply to the map as a whole (limited functionality)
                 pass
             else:
                 initializer_value = behavior_pipeline.apply(initializer_value)
@@ -586,7 +587,12 @@ class ASTExecutor(BaseASTVisitor):
         2. Type-specific methods (in dispatchers)
         """
         # First check for universal methods
-        if method_name in ['type', 'size', 'inspect', 'freeze', 'is_frozen', 'contains_frozen', 'node']:
+        # Note: 'node' is excluded for maps because maps have a specialized node(key) method
+        universal_methods = ['type', 'size', 'inspect', 'freeze', 'is_frozen', 'contains_frozen']
+        if target.get_type() != "map":
+            universal_methods.append('node')
+
+        if method_name in universal_methods:
             return self._dispatch_universal_method(target, method_name, args, position)
         elif method_name in ['methods', 'can']:
             # These need access to the method registry, so handled specially
@@ -748,10 +754,9 @@ class ASTExecutor(BaseASTVisitor):
             if len(args) != 0:
                 from .errors import ArgumentError
                 raise ArgumentError(f"inspect() takes no arguments, got {len(args)}", position)
-            # Show detailed structural information (what visualize_structure used to do)
-            if hasattr(target, 'visualize_structure'):
-                structure_info = target.visualize_structure()
-                return StringValue(structure_info, position)
+            # Use type-specific inspect method if available
+            if hasattr(target, 'universal_inspect'):
+                return target.universal_inspect()
             else:
                 # Fallback for non-graph types
                 return StringValue(f"{target.get_type()} with value: {target.to_display_string()}", position)
@@ -842,7 +847,7 @@ class ASTExecutor(BaseASTVisitor):
             'num': ['to', 'abs', 'sqrt', 'log', 'pow', 'rnd', 'rnd_up', 'rnd_dwn', 'to_string', 'to_num', 'to_bool', 'to_time', 'node'],
             'bool': ['flip', 'toggle', 'numify', 'toNum', 'to_string', 'to_num', 'to_bool', 'node'],
             'data': ['key', 'value', 'can_accept', 'node'],
-            'map': ['set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept', 'to_string', 'to_bool', 'names', 'has_names', 'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule', 'count_edges', 'count_nodes'] + behavior_methods,
+            'map': ['node', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept', 'to_string', 'to_bool', 'names', 'has_names', 'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule', 'count_edges', 'count_nodes'] + behavior_methods,
             'node': ['neighbors', 'value', 'container', 'id', 'has_neighbor', 'path_to', 'distance_to', 'edges'],
             'time': ['get_type', 'to_string', 'to_num']
         }
@@ -2531,7 +2536,7 @@ class ASTExecutor(BaseASTVisitor):
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "data", position)
     
-    def _dispatch_hash_method(self, target: HashValue, method_name: str,
+    def _dispatch_hash_method(self, target, method_name: str,
                             args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle hash method calls."""
         
@@ -2637,13 +2642,13 @@ class ASTExecutor(BaseASTVisitor):
             # Using already imported HashValue
             if not isinstance(other_map, (HashValue, HashValue)):
                 from .errors import ArgumentError
-                raise ArgumentError(f"merge() requires a hash argument, got {other_map.get_type()}", position)
+                raise ArgumentError(f"merge() requires a map argument, got {other_map.get_type()}", position)
             
             # Check constraint compatibility
             if target.constraint and other_map.constraint and target.constraint != other_map.constraint:
                 from .errors import TypeConstraintError
                 raise TypeConstraintError(
-                    f"Cannot merge hash<{other_map.constraint}> into hash<{target.constraint}>",
+                    f"Cannot merge map<{other_map.constraint}> into map<{target.constraint}>",
                     position
                 )
             
@@ -2653,7 +2658,7 @@ class ASTExecutor(BaseASTVisitor):
                 if not target.validate_constraint(value):
                     from .errors import TypeConstraintError
                     raise TypeConstraintError(
-                        f"Value {value.to_display_string()} for key '{key}' violates hash<{target.constraint}> constraint",
+                        f"Value {value.to_display_string()} for key '{key}' violates map<{target.constraint}> constraint",
                         value.position or position
                     )
                 target.set(key, value)
@@ -2679,7 +2684,7 @@ class ASTExecutor(BaseASTVisitor):
             if not target.validate_constraint(value):
                 from .errors import TypeConstraintError
                 raise TypeConstraintError(
-                    f"Value {value.to_display_string()} violates hash<{target.constraint}> constraint",
+                    f"Value {value.to_display_string()} violates map<{target.constraint}> constraint",
                     value.position or position
                 )
             

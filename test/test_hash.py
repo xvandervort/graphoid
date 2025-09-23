@@ -6,7 +6,7 @@ from glang.parser.ast_parser import ASTParser
 from glang.execution.pipeline import ExecutionSession
 from glang.ast.nodes import MapLiteral, VariableDeclaration, Assignment
 from glang.execution.values import StringValue, NumberValue, BooleanValue
-from glang.execution.graph_values import ListValue, HashValue
+from glang.execution.graph_values import ListValue, MapValue
 from glang.semantic.analyzer import SemanticAnalyzer
 from glang.execution.executor import ASTExecutor, ExecutionContext
 from glang.semantic.symbol_table import SymbolTable
@@ -30,12 +30,13 @@ class TestMapParsing:
         """Test parsing of single key-value pair."""
         parser = ASTParser()
         ast = parser.parse('{ "name": "Alice" }')
-        
-        # Single pair should still return DataNodeLiteral (not MapLiteral) for backward compatibility
-        from glang.ast.nodes import ExpressionStatement, DataNodeLiteral
+
+        # Single pair now also returns MapLiteral (consistent behavior)
+        from glang.ast.nodes import ExpressionStatement
         assert isinstance(ast, ExpressionStatement)
-        assert isinstance(ast.expression, DataNodeLiteral)
-        assert ast.expression.key == "name"
+        assert isinstance(ast.expression, MapLiteral)
+        assert len(ast.expression.pairs) == 1
+        assert ast.expression.pairs[0][0] == "name"
     
     def test_multiple_pair_hash_parsing(self):
         """Test parsing of multiple key-value pairs."""
@@ -74,7 +75,7 @@ class TestMapExecution:
         result = session.execute_statement('{}')
         
         assert result.success
-        assert isinstance(result.value, HashValue)
+        assert isinstance(result.value, MapValue)
         # Check length differently for each type
         if hasattr(result.value, 'pairs'):
             assert len(result.value.pairs) == 0
@@ -88,7 +89,7 @@ class TestMapExecution:
         result = session.execute_statement('{ "host": "localhost", "port": 8080 }')
         
         assert result.success
-        assert isinstance(result.value, HashValue)
+        assert isinstance(result.value, MapValue)
         # Check length differently for each type
         if hasattr(result.value, 'pairs'):
             assert len(result.value.pairs) == 2
@@ -102,14 +103,14 @@ class TestMapExecution:
         session = ExecutionSession()
         
         # Basic hash declaration
-        result = session.execute_statement('hash config = { "debug": true, "port": 3000 }')
+        result = session.execute_statement('map config = { "debug": true, "port": 3000 }')
         assert result.success
-        assert "Declared hash variable 'config'" in str(result.value)
+        assert "Declared map variable 'config'" in str(result.value)
         
         # Verify the variable exists
         result = session.execute_statement('config')
         assert result.success
-        assert isinstance(result.value, HashValue)
+        assert isinstance(result.value, MapValue)
         assert result.value["debug"].value == True
         assert result.value["port"].value == 3000
     
@@ -118,7 +119,7 @@ class TestMapExecution:
         session = ExecutionSession()
         
         # Valid constraint
-        result = session.execute_statement('hash<string> names = { "first": "Alice", "last": "Smith" }')
+        result = session.execute_statement('map<string> names = { "first": "Alice", "last": "Smith" }')
         assert result.success
         
         # Verify constraint is applied
@@ -131,7 +132,7 @@ class TestMapExecution:
         session = ExecutionSession()
         
         # Should fail - number values in string-constrained hash
-        result = session.execute_statement('hash<string> config = { "name": "test", "port": 8080 }')
+        result = session.execute_statement('map<string> config = { "name": "test", "port": 8080 }')
         assert not result.success
         assert "constraint" in str(result.error)
 
@@ -142,7 +143,7 @@ class TestMapMethods:
     def test_hash_node_method(self):
         """Test hash.node() method (replacement for deprecated get)."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost", "port": 8080 }')
+        session.execute_statement('map config = { "host": "localhost", "port": 8080 }')
 
         # Get existing key as data node
         result = session.execute_statement('config.node("host")')
@@ -157,7 +158,7 @@ class TestMapMethods:
     def test_hash_set_method(self):
         """Test hash.set() method."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost" }')
+        session.execute_statement('map config = { "host": "localhost" }')
         
         # Set new key
         result = session.execute_statement('config.set("port", 8080)')
@@ -179,7 +180,7 @@ class TestMapMethods:
     def test_hash_has_key_method(self):
         """Test hash.has_key() method."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "debug": true, "port": 3000 }')
+        session.execute_statement('map config = { "debug": true, "port": 3000 }')
         
         # Existing key
         result = session.execute_statement('config.has_key("debug")')
@@ -194,7 +195,7 @@ class TestMapMethods:
     def test_hash_count_values_method(self):
         """Test hash.count_values() method."""
         session = ExecutionSession()
-        session.execute_statement('hash data = { "a": 100, "b": 200, "c": 100, "d": 300, "e": 100 }')
+        session.execute_statement('map data = { "a": 100, "b": 200, "c": 100, "d": 300, "e": 100 }')
         
         # Count value that appears multiple times
         result = session.execute_statement('data.count_values(100)')
@@ -212,7 +213,7 @@ class TestMapMethods:
         assert result.value.value == 0
         
         # Test with string values
-        session.execute_statement('hash names = { "first": "Alice", "second": "Bob", "third": "Alice" }')
+        session.execute_statement('map names = { "first": "Alice", "second": "Bob", "third": "Alice" }')
         result = session.execute_statement('names.count_values("Alice")')
         assert result.success
         assert result.value.value == 2
@@ -220,7 +221,7 @@ class TestMapMethods:
     def test_hash_keys_method(self):
         """Test hash.keys() method."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost", "port": 8080, "debug": true }')
+        session.execute_statement('map config = { "host": "localhost", "port": 8080, "debug": true }')
         
         result = session.execute_statement('config.keys()')
         assert result.success
@@ -238,7 +239,7 @@ class TestMapMethods:
     def test_hash_values_method(self):
         """Test hash.values() method."""
         session = ExecutionSession()
-        session.execute_statement('hash data = { "name": "Alice", "age": 30 }')
+        session.execute_statement('map data = { "name": "Alice", "age": 30 }')
         
         result = session.execute_statement('data.values()')
         assert result.success
@@ -256,7 +257,7 @@ class TestMapMethods:
     def test_hash_remove_method(self):
         """Test hash.remove() method."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost", "port": 8080, "debug": true }')
+        session.execute_statement('map config = { "host": "localhost", "port": 8080, "debug": true }')
         
         # Remove existing key
         result = session.execute_statement('config.remove("debug")')
@@ -280,13 +281,13 @@ class TestMapMethods:
         session = ExecutionSession()
         
         # Empty hash
-        session.execute_statement('hash empty_config = {}')
+        session.execute_statement('map empty_config = {}')
         result = session.execute_statement('empty_config.empty()')
         assert result.success
         assert result.value.value is True
         
         # Non-empty hash
-        session.execute_statement('hash config = { "host": "localhost" }')
+        session.execute_statement('map config = { "host": "localhost" }')
         result = session.execute_statement('config.empty()')
         assert result.success
         assert result.value.value is False
@@ -294,7 +295,7 @@ class TestMapMethods:
     def test_hash_size_method(self):
         """Test hash.size() universal method."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost", "port": 8080, "debug": true }')
+        session.execute_statement('map config = { "host": "localhost", "port": 8080, "debug": true }')
         
         result = session.execute_statement('config.size()')
         assert result.success
@@ -303,8 +304,8 @@ class TestMapMethods:
     def test_hash_merge_method(self):
         """Test hash.merge() method."""
         session = ExecutionSession()
-        session.execute_statement('hash hash1 = { "a": 1, "b": 2 }')
-        session.execute_statement('hash hash2 = { "c": 3, "d": 4 }')
+        session.execute_statement('map hash1 = { "a": 1, "b": 2 }')
+        session.execute_statement('map hash2 = { "c": 3, "d": 4 }')
         
         # Basic merge
         result = session.execute_statement('hash1.merge(hash2)')
@@ -326,7 +327,7 @@ class TestMapMethods:
         assert result.value.value is True
         
         # Test key collision (should overwrite)
-        session.execute_statement('hash hash3 = { "a": 999 }')
+        session.execute_statement('map hash3 = { "a": 999 }')
         result = session.execute_statement('hash1.merge(hash3)')
         assert result.success
         
@@ -337,16 +338,16 @@ class TestMapMethods:
     def test_hash_push_method(self):
         """Test hash.push() method for data nodes."""
         session = ExecutionSession()
-        session.execute_statement('data node1 = { "name": "Alice" }')
-        session.execute_statement('data node2 = { "age": 25 }')
-        session.execute_statement('hash people = {}')
-        
-        # Push data nodes
-        result = session.execute_statement('people.push(node1)')
+        session.execute_statement('map temp1 = { "name": "Alice" }')
+        session.execute_statement('map temp2 = { "age": 25 }')
+        session.execute_statement('map people = {}')
+
+        # Push data nodes extracted from maps
+        result = session.execute_statement('people.push(temp1.node("name"))')
         assert result.success
         assert "Pushed data node with key 'name'" in str(result.value)
-        
-        result = session.execute_statement('people.push(node2)')
+
+        result = session.execute_statement('people.push(temp2.node("age"))')
         assert result.success
         assert "Pushed data node with key 'age'" in str(result.value)
         
@@ -375,7 +376,7 @@ class TestMapMethods:
     def test_hash_pop_method(self):
         """Test hash.pop() method."""
         session = ExecutionSession()
-        session.execute_statement('hash people = { "alice": { "name": "Alice" }, "bob": { "name": "Bob" } }')
+        session.execute_statement('map people = { "alice": { "name": "Alice" }, "bob": { "name": "Bob" } }')
         
         # Pop existing key
         result = session.execute_statement('people.pop("alice")')
@@ -404,7 +405,7 @@ class TestMapConstraints:
         """Test valid string constraint."""
         session = ExecutionSession()
         
-        result = session.execute_statement('hash<string> names = { "first": "Alice", "last": "Smith" }')
+        result = session.execute_statement('map<string> names = { "first": "Alice", "last": "Smith" }')
         assert result.success
         
         # Adding valid string value
@@ -414,18 +415,18 @@ class TestMapConstraints:
     def test_invalid_constraint_violation(self):
         """Test constraint violation."""
         session = ExecutionSession()
-        session.execute_statement('hash<string> names = { "first": "Alice" }')
+        session.execute_statement('map<string> names = { "first": "Alice" }')
         
         # Try to set non-string value (should fail)
         result = session.execute_statement('names.set("age", 30)')
         assert not result.success
-        assert "hash<string>" in str(result.error)
+        assert "map<string>" in str(result.error)
     
     def test_number_constrained_hash(self):
         """Test number-constrained hash."""
         session = ExecutionSession()
         
-        result = session.execute_statement('hash<num> scores = { "math": 95, "science": 87 }')
+        result = session.execute_statement('map<num> scores = { "math": 95, "science": 87 }')
         assert result.success
         
         # Valid number
@@ -435,14 +436,14 @@ class TestMapConstraints:
         # Invalid string (should fail)
         result = session.execute_statement('scores.set("art", "A+")')
         assert not result.success
-        assert "hash<num>" in str(result.error)
+        assert "map<num>" in str(result.error)
     
     def test_hash_merge_constraints(self):
         """Test constraint validation in merge operations."""
         session = ExecutionSession()
-        session.execute_statement('hash<string> strings = { "a": "hello" }')
-        session.execute_statement('hash<string> more_strings = { "b": "world" }')
-        session.execute_statement('hash<num> numbers = { "c": 42 }')
+        session.execute_statement('map<string> strings = { "a": "hello" }')
+        session.execute_statement('map<string> more_strings = { "b": "world" }')
+        session.execute_statement('map<num> numbers = { "c": 42 }')
         
         # Valid merge with same constraint
         result = session.execute_statement('strings.merge(more_strings)')
@@ -451,7 +452,7 @@ class TestMapConstraints:
         # Invalid merge with different constraint
         result = session.execute_statement('strings.merge(numbers)')
         assert not result.success
-        assert "Cannot merge hash<num> into hash<string>" in str(result.error)
+        assert "Cannot merge map<num> into map<string>" in str(result.error)
 
 
 class TestMapSemanticAnalysis:
@@ -463,7 +464,7 @@ class TestMapSemanticAnalysis:
         analyzer = SemanticAnalyzer()
         
         # Valid hash declaration
-        ast = parser.parse('hash config = { "host": "localhost", "port": 8080 }')
+        ast = parser.parse('map config = { "host": "localhost", "port": 8080 }')
         result = analyzer.analyze(ast)
         assert result.success
         
@@ -477,12 +478,12 @@ class TestMapSemanticAnalysis:
         analyzer = SemanticAnalyzer()
         
         # Valid constraint
-        ast = parser.parse('hash<string> names = { "first": "Alice" }')
+        ast = parser.parse('map<string> names = { "first": "Alice" }')
         result = analyzer.analyze(ast)
         assert result.success
         
         # Invalid constraint
-        ast = parser.parse('hash<invalid_constraint> data = {}')
+        ast = parser.parse('map<invalid_constraint> data = {}')
         result = analyzer.analyze(ast)
         assert not result.success
     
@@ -492,7 +493,7 @@ class TestMapSemanticAnalysis:
         analyzer = SemanticAnalyzer()
         
         # First declare the hash
-        ast = parser.parse('hash config = { "host": "localhost" }')
+        ast = parser.parse('map config = { "host": "localhost" }')
         result = analyzer.analyze(ast)
         assert result.success
         
@@ -526,7 +527,7 @@ class TestMapDisplay:
         assert result.success
         
         # Remove the temp key to get single pair
-        session.execute_statement('hash m = { "name": "Alice" }')
+        session.execute_statement('map m = { "name": "Alice" }')
         result = session.execute_statement('m')
         assert result.success
         assert str(result.value) == '{ "name": Alice }'
@@ -551,7 +552,7 @@ class TestHashIndexAccess:
     def test_hash_index_returns_values_directly(self):
         """Test that hash[key] returns values directly, not data nodes."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost", "port": 8080, "debug": true }')
+        session.execute_statement('map config = { "host": "localhost", "port": 8080, "debug": true }')
 
         # String value access
         result = session.execute_statement('config["host"]')
@@ -574,7 +575,7 @@ class TestHashIndexAccess:
     def test_hash_index_vs_node_method(self):
         """Test difference between hash[key] and hash.node(key)."""
         session = ExecutionSession()
-        session.execute_statement('hash data = { "name": "Alice", "age": 25 }')
+        session.execute_statement('map data = { "name": "Alice", "age": 25 }')
 
         # hash[key] returns value directly
         result = session.execute_statement('data["name"]')
@@ -591,7 +592,7 @@ class TestHashIndexAccess:
     def test_hash_index_with_variables(self):
         """Test hash[key] with variable keys."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost", "port": 8080 }')
+        session.execute_statement('map config = { "host": "localhost", "port": 8080 }')
         session.execute_statement('string key = "host"')
 
         # Variable key access
@@ -609,7 +610,7 @@ class TestHashIndexAccess:
     def test_hash_index_assignment(self):
         """Test hash[key] = value assignment."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost" }')
+        session.execute_statement('map config = { "host": "localhost" }')
 
         # Set new value
         result = session.execute_statement('config["port"] = 8080')
@@ -631,7 +632,7 @@ class TestHashIndexAccess:
     def test_hash_index_missing_key(self):
         """Test hash[key] with missing keys."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost" }')
+        session.execute_statement('map config = { "host": "localhost" }')
 
         # Access missing key should fail
         result = session.execute_statement('config["missing"]')
@@ -641,7 +642,7 @@ class TestHashIndexAccess:
     def test_hash_index_in_conditions(self):
         """Test hash[key] in if conditions and expressions."""
         session = ExecutionSession()
-        session.execute_statement('hash settings = { "debug": true, "port": 8080, "name": "server" }')
+        session.execute_statement('map settings = { "debug": true, "port": 8080, "name": "server" }')
 
         # Boolean in condition
         result = session.execute_statement('''
@@ -674,7 +675,7 @@ result
     def test_hash_index_method_chaining(self):
         """Test method chaining with hash[key] values."""
         session = ExecutionSession()
-        session.execute_statement('hash data = { "name": "alice", "items": [1, 2, 3, 4] }')
+        session.execute_statement('map data = { "name": "alice", "items": [1, 2, 3, 4] }')
 
         # String method chaining - using correct method name
         result = session.execute_statement('data["name"].toUpper()')
@@ -689,7 +690,7 @@ result
     def test_hash_index_with_constraints(self):
         """Test hash[key] with type-constrained hashes."""
         session = ExecutionSession()
-        session.execute_statement('hash<string> names = { "first": "Alice", "last": "Smith" }')
+        session.execute_statement('map<string> names = { "first": "Alice", "last": "Smith" }')
 
         # Access constrained values
         result = session.execute_statement('names["first"]')
@@ -700,20 +701,20 @@ result
         # Verify constraint enforcement on assignment
         result = session.execute_statement('names["age"] = 25')
         assert not result.success
-        assert "hash<string>" in str(result.error)
+        assert "map<string>" in str(result.error)
 
     def test_hash_index_nested_access(self):
         """Test nested hash access patterns."""
         session = ExecutionSession()
-        session.execute_statement('hash server = { "host": "localhost", "port": 8080 }')
-        session.execute_statement('hash database = { "host": "db.example.com", "port": 5432 }')
-        session.execute_statement('hash config = { "server": server, "database": database }')
+        session.execute_statement('map server = { "host": "localhost", "port": 8080 }')
+        session.execute_statement('map database = { "host": "db.example.com", "port": 5432 }')
+        session.execute_statement('map config = { "server": server, "database": database }')
 
         # This test verifies that we can access nested hashes
-        # Note: config["server"] should return the HashValue, not a DataValue
+        # Note: config["server"] should return the MapValue, not a DataValue
         result = session.execute_statement('config["server"]')
         assert result.success
-        # The value should be a HashValue
+        # The value should be a MapValue
         assert hasattr(result.value, 'pairs')  # Should be a hash
 
         # Test that we can then access nested properties if hash indexing is recursive
@@ -724,7 +725,7 @@ result
     def test_hash_index_vs_node_behavior(self):
         """Test behavior differences between hash[key] and hash.node(key)."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost", "port": 8080 }')
+        session.execute_statement('map config = { "host": "localhost", "port": 8080 }')
 
         # Compare: hash[key] vs hash.node(key) for existing key
         result1 = session.execute_statement('config["host"]')
@@ -746,7 +747,7 @@ class TestMapEdgeCases:
     def test_hash_method_argument_errors(self):
         """Test method calls with wrong number of arguments."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost" }')
+        session.execute_statement('map config = { "host": "localhost" }')
         
         # node() with wrong argument count
         result = session.execute_statement('config.node()')
@@ -765,7 +766,7 @@ class TestMapEdgeCases:
     def test_hash_method_type_errors(self):
         """Test method calls with wrong argument types."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost" }')
+        session.execute_statement('map config = { "host": "localhost" }')
         
         # Non-string key for node()
         result = session.execute_statement('config.node(123)')
@@ -779,7 +780,7 @@ class TestMapEdgeCases:
     def test_hash_merge_edge_cases(self):
         """Test merge method edge cases."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost" }')
+        session.execute_statement('map config = { "host": "localhost" }')
         
         # Wrong argument count
         result = session.execute_statement('config.merge()')
@@ -793,12 +794,12 @@ class TestMapEdgeCases:
         # Wrong argument type
         result = session.execute_statement('config.merge("not_a_hash")')
         assert not result.success
-        assert "hash argument" in str(result.error)
+        assert "map argument" in str(result.error)
     
     def test_hash_push_edge_cases(self):
         """Test push method edge cases."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost" }')
+        session.execute_statement('map config = { "host": "localhost" }')
         
         # Wrong argument count
         result = session.execute_statement('config.push()')
@@ -821,7 +822,7 @@ class TestMapEdgeCases:
     def test_hash_pop_edge_cases(self):
         """Test pop method edge cases."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost" }')
+        session.execute_statement('map config = { "host": "localhost" }')
         
         # Wrong argument count
         result = session.execute_statement('config.pop()')
@@ -840,12 +841,12 @@ class TestMapEdgeCases:
     def test_hash_universal_methods(self):
         """Test that hashs support universal methods."""
         session = ExecutionSession()
-        session.execute_statement('hash config = { "host": "localhost", "port": 8080 }')
+        session.execute_statement('map config = { "host": "localhost", "port": 8080 }')
         
         # type()
         result = session.execute_statement('config.type()')
         assert result.success
-        assert str(result.value) == "hash"
+        assert str(result.value) == "map"
         
         # size()
         result = session.execute_statement('config.size()')
@@ -855,7 +856,7 @@ class TestMapEdgeCases:
         # inspect()
         result = session.execute_statement('config.inspect()')
         assert result.success
-        assert "hash" in str(result.value)
+        assert "map" in str(result.value)
         assert "2 pairs" in str(result.value)
         
         # methods() - should return complete list
@@ -864,8 +865,8 @@ class TestMapEdgeCases:
         methods_list = result.value
         assert methods_list.get_type() == "list"
         
-        # Should have 29 methods total (8 universal + 12 hash-specific + 5 behavior + 2 conversion + 2 graph)
-        assert len(methods_list.elements) == 29  # Updated count with behavior, conversion, and graph methods
+        # Should have 43 methods total (8 universal + 12 map-specific + 5 behavior + 10 governance + 8 graph)
+        assert len(methods_list.elements) == 43  # Updated count with behavior, governance, and graph methods
         
         # Check that all expected methods are present
         method_names = [elem.value for elem in methods_list.elements]
@@ -875,11 +876,11 @@ class TestMapEdgeCases:
             assert method in method_names, f"Missing universal method: {method}"
             
         # Map-specific methods
-        for method in ['get', 'set', 'has_key', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'count_values', 'can_accept']:
-            assert method in method_names, f"Missing hash method: {method}"
+        for method in ['node', 'set', 'has_key', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'count_values', 'can_accept']:
+            assert method in method_names, f"Missing map method: {method}"
 
         # Behavior management methods
-        for method in ['add_rule', 'remove_rule', 'has_rule', 'get_rules', 'clear_rules']:
+        for method in ['add_rule', 'remove_rule', 'has_rule', 'rules', 'clear_rules']:
             assert method in method_names, f"Missing behavior method: {method}"
 
         # Type conversion methods

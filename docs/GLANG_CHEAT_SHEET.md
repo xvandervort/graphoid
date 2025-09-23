@@ -57,11 +57,11 @@ user.key()                # Get key: "name"
 user.value()              # Get value: "Alice"
 ```
 
-### Hashes (Collections of Data Nodes)
+### Maps (Collections of Data Nodes)
 ```glang
-# Creation  
+# Creation
 settings = { "theme": "dark", "lang": "en", "debug": true }
-hash<string> prefs = { "color": "blue", "font": "arial" }
+map<string> prefs = { "color": "blue", "font": "arial" }
 
 # Access & modification
 settings["theme"]         # Get: { "theme": "dark" }
@@ -304,9 +304,9 @@ temps.append(nil)                      # Becomes 0
 temps.append(110)                      # Clamped to 105
 ```
 
-### Adding Behaviors to Hashes
+### Adding Behaviors to Maps
 ```glang
-# Behaviors work on hash values too
+# Behaviors work on map values too
 config = { "timeout": nil, "retries": -5 }
 config.add_rule("nil_to_zero")        # nil → 0
 config.add_rule("positive")           # negative → positive
@@ -548,7 +548,7 @@ items = [1, 2, 3]
 items.freeze()             # All elements become frozen too
 print(items.contains_frozen())  # true
 
-# Same for hashes and data nodes
+# Same for maps and data nodes
 user = { "name": "Alice", "age": 25 }
 user.freeze()              # All values become frozen
 ```
@@ -577,8 +577,8 @@ config = { "debug": true }
 config.freeze()
 
 # These will throw runtime errors:
-# config["debug"] = false  # Cannot modify frozen hash
-# config.set("port", 8080) # Cannot add to frozen hash
+# config["debug"] = false  # Cannot modify frozen map
+# config.set("port", 8080) # Cannot add to frozen map
 
 # Use is_frozen() to check before mutations
 if !config.is_frozen() {
@@ -595,7 +595,7 @@ value.contains_frozen()    # Check if contains frozen data
 
 # Collection-specific methods  
 list.can_accept(item)      # Check if item can be added
-hash.can_accept(value)     # Check if value can be stored
+map.can_accept(value)      # Check if value can be stored
 data.can_accept(value)     # Check if value can be set
 ```
 

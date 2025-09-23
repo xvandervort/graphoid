@@ -40,6 +40,14 @@ class TreeGraph(GraphStructure):
             return self.nodes.get(self.root_node_id)
         return None
 
+    def has_names(self) -> bool:
+        """Check if tree nodes have names. Trees don't support naming."""
+        return False
+
+    def get_names(self) -> List[Optional[str]]:
+        """Get names for tree nodes. Trees don't support naming."""
+        return []
+
 
 class BinaryTreeValue(GlangValue, GraphContainer):
     """Binary tree implementation using graph foundation with edge governance."""

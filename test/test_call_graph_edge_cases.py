@@ -337,7 +337,7 @@ func private_func() {
             return items.size()
         }
 
-        hash config = {"debug": true}
+        map config = {"debug": true}
 
         func third_func() {
             return config["debug"]
