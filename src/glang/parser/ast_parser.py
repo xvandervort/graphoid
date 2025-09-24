@@ -1105,25 +1105,21 @@ class ASTParser:
                 return MapLiteral(pairs, SourcePosition(brace_token.line, brace_token.column))
             
             # Parse first key-value pair
-            if not self.check(TokenType.STRING_LITERAL):
-                raise ParseError("Key must be a string literal", self.peek())
-            key_token = self.advance()
-            key = self.process_string_literal(key_token.value)
-            
+            # Allow any expression as a key (will be evaluated to string at runtime)
+            key_expr = self.parse_expression()
+
             self.consume(TokenType.COLON, "Expected ':' after key")
             value = self.parse_expression()
-            pairs.append((key, value))
+            pairs.append((key_expr, value))
             
             # Check if there are more pairs (comma-separated)
             while self.match(TokenType.COMMA):
-                if not self.check(TokenType.STRING_LITERAL):
-                    raise ParseError("Key must be a string literal", self.peek())
-                key_token = self.advance()
-                key = self.process_string_literal(key_token.value)
-                
+                # Allow any expression as a key
+                key_expr = self.parse_expression()
+
                 self.consume(TokenType.COLON, "Expected ':' after key")
                 value = self.parse_expression()
-                pairs.append((key, value))
+                pairs.append((key_expr, value))
             
             self.consume(TokenType.RBRACE, "Expected '}' after pairs")
             

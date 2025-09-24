@@ -170,10 +170,10 @@ class DataNodeLiteral(Expression):
 
 @dataclass
 class MapLiteral(Expression):
-    """Map literal: { "key1": value1, "key2": value2, ... }"""
-    pairs: List[Tuple[str, Expression]]  # List of (key, value) pairs
+    """Map literal: { "key1": value1, "key2": value2, ... } or { expr1: value1, expr2: value2 }"""
+    pairs: List[Tuple[Expression, Expression]]  # List of (key_expr, value_expr) pairs
     position: Optional[SourcePosition] = None
-    
+
     def accept(self, visitor):
         return visitor.visit_map_literal(self)
 
@@ -714,8 +714,9 @@ class BaseASTVisitor(ASTVisitor):
         return node
     
     def visit_map_literal(self, node: MapLiteral):
-        for key, value in node.pairs:
-            value.accept(self)
+        for key_expr, value_expr in node.pairs:
+            key_expr.accept(self)
+            value_expr.accept(self)
         return node
     
     def visit_variable_declaration(self, node: VariableDeclaration):

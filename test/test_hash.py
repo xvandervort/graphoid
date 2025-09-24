@@ -36,7 +36,9 @@ class TestMapParsing:
         assert isinstance(ast, ExpressionStatement)
         assert isinstance(ast.expression, MapLiteral)
         assert len(ast.expression.pairs) == 1
-        assert ast.expression.pairs[0][0] == "name"
+        # Key is now a StringLiteral expression, not a string
+        key_expr = ast.expression.pairs[0][0]
+        assert hasattr(key_expr, 'value') and key_expr.value == "name"
     
     def test_multiple_pair_hash_parsing(self):
         """Test parsing of multiple key-value pairs."""
@@ -48,10 +50,14 @@ class TestMapParsing:
         assert isinstance(ast.expression, MapLiteral)
         assert len(ast.expression.pairs) == 3
         
-        keys = [pair[0] for pair in ast.expression.pairs]
-        assert "name" in keys
-        assert "age" in keys  
-        assert "active" in keys
+        # Keys are now expressions, extract their values
+        key_values = []
+        for key_expr, _ in ast.expression.pairs:
+            if hasattr(key_expr, 'value'):
+                key_values.append(key_expr.value)
+        assert "name" in key_values
+        assert "age" in key_values
+        assert "active" in key_values
     
     def test_hash_with_expression_values(self):
         """Test hash with complex expressions as values."""
@@ -62,8 +68,11 @@ class TestMapParsing:
         assert isinstance(ast, ExpressionStatement)
         assert isinstance(ast.expression, MapLiteral)
         assert len(ast.expression.pairs) == 2
-        assert ast.expression.pairs[0][0] == "sum"
-        assert ast.expression.pairs[1][0] == "list"
+        # Key is now a StringLiteral expression
+        key_expr = ast.expression.pairs[0][0]
+        assert hasattr(key_expr, 'value') and key_expr.value == "sum"
+        key_expr2 = ast.expression.pairs[1][0]
+        assert hasattr(key_expr2, 'value') and key_expr2.value == "list"
 
 
 class TestMapExecution:

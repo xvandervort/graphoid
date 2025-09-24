@@ -1,0 +1,89 @@
+#!/usr/bin/env glang
+
+# Test Variable Keys in Map Literals - Bug Fix Verification
+
+print("=== Testing Variable Keys in Map Literals ===")
+print("")
+
+# Test 1: Simple variable keys
+print("Test 1: Simple variable keys")
+col1 = "product"
+col2 = "price"
+col3 = "quantity"
+
+item = { col1: "Widget", col2: 19.99, col3: 100 }
+print("Created: " + item.to_string())
+print("")
+
+# Test 2: Expression keys
+print("Test 2: Expression keys")
+prefix = "field_"
+suffix = "_value"
+
+data = {
+    prefix + "1" + suffix: "First",
+    prefix + "2" + suffix: "Second",
+    prefix + "3" + suffix: "Third"
+}
+print("Field 1: " + data["field_1_value"])
+print("Field 2: " + data["field_2_value"])
+print("")
+
+# Test 3: Function result as key
+print("Test 3: Function result as key")
+func make_key(num) {
+    return "key_" + num.to_string()
+}
+
+dynamic_map = {
+    make_key(1): "Value One",
+    make_key(2): "Value Two",
+    make_key(3): "Value Three"
+}
+print("Key 1: " + dynamic_map["key_1"])
+print("Key 2: " + dynamic_map["key_2"])
+print("")
+
+# Test 4: Building DataFrame-like structure with variable keys
+print("Test 4: DataFrame-like structure")
+
+# Column names as variables
+name_col = "name"
+age_col = "age"
+dept_col = "department"
+
+# Create records using variable keys
+employees = [
+    { name_col: "Alice", age_col: 30, dept_col: "Engineering" },
+    { name_col: "Bob", age_col: 25, dept_col: "Sales" },
+    { name_col: "Charlie", age_col: 35, dept_col: "Marketing" }
+]
+
+print("Created " + employees.size().to_string() + " employee records")
+
+# Access using variable keys
+for emp in employees {
+    print("  " + emp[name_col] + " (" + emp[age_col].to_string() + ") - " + emp[dept_col])
+}
+print("")
+
+# Test 5: Computed property names (like JavaScript)
+print("Test 5: Computed property names")
+
+config_type = "database"
+config_env = "production"
+
+settings = {
+    config_type + "_" + config_env: {
+        "host": "prod.db.example.com",
+        "port": 5432
+    }
+}
+
+db_key = "database_production"
+print("Database host: " + settings[db_key]["host"])
+print("Database port: " + settings[db_key]["port"].to_string())
+print("")
+
+print("=== All Tests Passed! ===")
+print("Variable keys in map literals now work correctly!")

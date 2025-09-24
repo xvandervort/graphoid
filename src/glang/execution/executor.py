@@ -502,14 +502,23 @@ class ASTExecutor(BaseASTVisitor):
     
     def visit_map_literal(self, node: MapLiteral) -> None:
         """Evaluate map literal."""
-        # Evaluate all value expressions
+        # Evaluate all key and value expressions
         evaluated_pairs = []
-        for key, value_expr in node.pairs:
+        for key_expr, value_expr in node.pairs:
+            # Evaluate the key expression and convert to string
+            key_value = self.execute(key_expr)
+            if isinstance(key_value, StringValue):
+                key_str = key_value.value
+            else:
+                # Convert non-string keys to string
+                key_str = key_value.to_display_string()
+
+            # Evaluate the value expression
             value = self.execute(value_expr)
             if not isinstance(value, GlangValue):
                 value = python_to_glang_value(value, value_expr.position)
-            evaluated_pairs.append((key, value))
-        
+            evaluated_pairs.append((key_str, value))
+
         # Create HashValue with the evaluated pairs
         self.result = HashValue(evaluated_pairs, None, node.position)
     

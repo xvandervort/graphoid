@@ -123,9 +123,9 @@ Several missing features are blocked by Glang language limitations:
    - Blocks: Proper group_by implementation
    - Workaround: Track keys separately
 
-2. **Limited map literal syntax** - Can't use variables as keys in literals
-   - Blocks: Dynamic map construction
-   - Workaround: Build maps incrementally
+2. ~~**Limited map literal syntax** - Can't use variables as keys in literals~~ **FIXED**
+   - ✅ Variables and expressions can now be used as keys: `{ variable: value }`
+   - ✅ Dynamic map construction now works: `{ prefix + "_id": 123 }`
 
 3. **No lambda parameters in map/filter** - Can't pass custom functions easily
    - Blocks: Flexible transformations
