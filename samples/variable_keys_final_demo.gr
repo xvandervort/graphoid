@@ -1,0 +1,46 @@
+#!/usr/bin/env glang
+
+# Final demonstration of variable keys improvement
+
+# Variable keys in map literals - THE KEY IMPROVEMENT!
+name_key = "name"
+age_key = "age"
+dept_key = "department"
+
+# This was IMPOSSIBLE before the bug fix!
+alice = { name_key: "Alice", age_key: 30, dept_key: "Engineering" }
+bob = { name_key: "Bob", age_key: 25, dept_key: "Sales" }
+
+print("Variable keys working:")
+print("Alice: " + alice["name"])
+print("Bob: " + bob["name"])
+
+# DataFrame construction improvement
+columns = ["product", "price", "qty"]
+inventory = { "_columns": columns }
+
+# Initialize using variable keys (already worked)
+for col in columns {
+    inventory[col] = []
+}
+
+# But now we can create items with clean syntax!
+product_col = "product"
+price_col = "price"
+qty_col = "qty"
+
+laptop = { product_col: "Laptop", price_col: 1299.99, qty_col: 5 }
+mouse = { product_col: "Mouse", price_col: 29.99, qty_col: 20 }
+
+inventory["product"].append(laptop["product"])
+inventory["price"].append(laptop["price"])
+inventory["qty"].append(laptop["qty"])
+
+inventory["product"].append(mouse["product"])
+inventory["price"].append(mouse["price"])
+inventory["qty"].append(mouse["qty"])
+
+print("Inventory created with variable keys:")
+print("Products: " + inventory["product"].to_string())
+print("Prices: " + inventory["price"].to_string())
+print("SUCCESS: Variable keys enable cleaner DataFrame construction!")

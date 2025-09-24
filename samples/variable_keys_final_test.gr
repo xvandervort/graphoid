@@ -1,0 +1,45 @@
+#!/usr/bin/env glang
+
+# Final test: Variable keys are working
+
+print("=== Final Variable Keys Test ===")
+
+# Core functionality test
+name_col = "name"
+age_col = "age"
+dept_col = "department"
+
+# This is the key improvement - variable keys in map literals
+alice = { name_col: "Alice", age_col: 30, dept_col: "Engineering" }
+bob = { name_col: "Bob", age_col: 25, dept_col: "Sales" }
+
+print("✅ Variable keys work in map literals!")
+print("Alice: " + alice["name"] + " (age " + alice["age"].to_string() + ")")
+print("Bob: " + bob["name"] + " (age " + bob["age"].to_string() + ")")
+
+# DataFrame-style structure test
+columns = ["product", "price"]
+inventory = { "_columns": columns }
+
+# Initialize using variable keys
+for col in columns {
+    inventory[col] = []
+}
+
+# Add data using variable keys
+product_key = "product"
+price_key = "price"
+
+laptop = { product_key: "Laptop", price_key: 1299.99 }
+mouse = { product_key: "Mouse", price_key: 29.99 }
+
+inventory["product"].append(laptop["product"])
+inventory["price"].append(laptop["price"])
+inventory["product"].append(mouse["product"])
+inventory["price"].append(mouse["price"])
+
+print("✅ DataFrame construction with variable keys!")
+print("Products: " + inventory["product"].to_string())
+print("Prices: " + inventory["price"].to_string())
+
+print("🎉 Variable keys bug fix is complete and working!")

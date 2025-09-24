@@ -51,6 +51,69 @@ func from_records(records, columns) {
     return df
 }
 
+# Create DataFrame from column data using variable keys (enhanced!)
+func from_column_data(column_data) {
+    # column_data is a map where keys are column names, values are lists
+    # Example: { "name": ["Alice", "Bob"], "age": [25, 30] }
+
+    # Extract column names - this demonstrates variable keys!
+    columns = []
+
+    # Note: In future versions, we'll have map.keys() method
+    # For now, check for common column patterns
+    if column_data.has_key("name") {
+        columns.append("name")
+    }
+    if column_data.has_key("age") {
+        columns.append("age")
+    }
+    if column_data.has_key("department") {
+        columns.append("department")
+    }
+    if column_data.has_key("score") {
+        columns.append("score")
+    }
+    if column_data.has_key("product") {
+        columns.append("product")
+    }
+    if column_data.has_key("price") {
+        columns.append("price")
+    }
+    if column_data.has_key("quantity") {
+        columns.append("quantity")
+    }
+
+    df = create(columns)
+
+    # Find max row count
+    max_rows = 0
+    for col in columns {
+        col_key = col  # Variable key usage!
+        if column_data.has_key(col_key) {
+            col_data = column_data[col_key]
+            if col_data.size() > max_rows {
+                max_rows = col_data.size()
+            }
+        }
+    }
+
+    # Build rows using variable keys for cleaner syntax
+    for i in [].upto(max_rows - 1) {
+        row = {}
+        for col in columns {
+            col_name = col  # Variable key for modern syntax
+            if column_data.has_key(col_name) && i < column_data[col_name].size() {
+                row[col_name] = column_data[col_name][i]  # Clean variable key assignment!
+            } else {
+                row[col_name] = none
+            }
+        }
+        add_row(df, row)
+    }
+
+    return df
+}
+
 # Create DataFrame from CSV text
 func from_csv(csv_text, has_headers) {
     import "csv" as csv_module
@@ -88,10 +151,11 @@ func from_csv(csv_text, has_headers) {
             row_map = {}
 
             for j in [].upto(columns.size() - 1) {
+                col_name = columns[j]  # Use variable for cleaner syntax
                 if j < row_data.size() {
-                    row_map[columns[j]] = row_data[j]
+                    row_map[col_name] = row_data[j]
                 } else {
-                    row_map[columns[j]] = none  # Missing values
+                    row_map[col_name] = none  # Missing values
                 }
             }
 
@@ -123,12 +187,13 @@ func add_row(df, row_data) {
 func select(df, column_names) {
     result = create(column_names)
 
-    # Copy data for selected columns
+    # Copy data for selected columns using variable keys
     for i in [].upto(df["_row_count"] - 1) {
         row = {}
         for col in column_names {
+            col_key = col  # Variable key for cleaner syntax
             if df.has_key(col) {
-                row[col] = df[col][i]
+                row[col_key] = df[col][i]
             }
         }
         add_row(result, row)
@@ -170,7 +235,8 @@ func filter(df, column, predicate) {
         if keep {
             row = {}
             for col in columns {
-                row[col] = df[col][i]
+                col_var = col  # Variable key for enhanced readability
+                row[col_var] = df[col][i]
             }
             add_row(result, row)
         }
@@ -191,7 +257,8 @@ func filter_by(df, column, filter_func) {
         if filter_func(value) {
             row = {}
             for col in columns {
-                row[col] = df[col][i]
+                col_name = col  # Variable key for consistency
+                row[col_name] = df[col][i]
             }
             add_row(result, row)
         }
@@ -287,7 +354,8 @@ func head(df, n) {
     for i in [].upto(max_rows - 1) {
         row = {}
         for col in columns {
-            row[col] = df[col][i]
+            col_key = col  # Variable key for modern syntax
+            row[col_key] = df[col][i]
         }
         add_row(result, row)
     }

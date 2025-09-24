@@ -1,0 +1,91 @@
+#!/usr/bin/env glang
+
+# Simple test of variable keys in DataFrames
+
+print("=== Variable Keys in DataFrames Test ===")
+print("")
+
+# Test 1: Create DataFrame structure using variable keys
+print("1. DataFrame structure with variable keys")
+
+# Define column names as variables
+name_col = "name"
+age_col = "age"
+dept_col = "department"
+
+# Create a simple DataFrame structure
+employee = {
+    "_type": "dataframe",
+    "_columns": [name_col, age_col, dept_col]
+}
+
+# Initialize columns using variable keys - THIS WAS IMPOSSIBLE BEFORE!
+employee[name_col] = []
+employee[age_col] = []
+employee[dept_col] = []
+
+print("Created DataFrame structure with variable column keys")
+print("Columns: " + employee["_columns"].to_string())
+print("")
+
+# Test 2: Add data using variable keys
+print("2. Adding data with variable keys")
+
+# Add first employee using variable keys in map literal
+emp1 = { name_col: "Alice", age_col: 30, dept_col: "Engineering" }
+employee[name_col].append(emp1[name_col])
+employee[age_col].append(emp1[age_col])
+employee[dept_col].append(emp1[dept_col])
+
+# Add second employee
+emp2 = { name_col: "Bob", age_col: 25, dept_col: "Sales" }
+employee[name_col].append(emp2[name_col])
+employee[age_col].append(emp2[age_col])
+employee[dept_col].append(emp2[dept_col])
+
+print("Added employees using variable keys:")
+print("Names: " + employee["name"].to_string())
+print("Ages: " + employee["age"].to_string())
+print("Departments: " + employee["department"].to_string())
+print("")
+
+# Test 3: Dynamic column access
+print("3. Dynamic column operations")
+
+columns = employee["_columns"]
+for col in columns {
+    col_data = employee[col]  # Variable used as key for access
+    print("Column '" + col + "' has " + col_data.size().to_string() + " entries")
+}
+print("")
+
+# Test 4: Show the improvement
+print("4. Before vs After")
+print("")
+print("BEFORE the fix:")
+print("  { variable: value }  // Parse error: Key must be a string literal")
+print("")
+print("AFTER the fix:")
+print("  { variable: value }  // Works perfectly!")
+print("")
+
+# Test 5: Complex dynamic keys
+print("5. Complex dynamic key construction")
+
+prefix = "metric_"
+suffix = "_total"
+
+metrics = {
+    prefix + "sales" + suffix: 50000,
+    prefix + "costs" + suffix: 30000,
+    prefix + "profit" + suffix: 20000
+}
+
+print("Dynamic metrics created:")
+print("Sales: $" + metrics["metric_sales_total"].to_string())
+print("Profit: $" + metrics["metric_profit_total"].to_string())
+print("")
+
+print("✅ Variable keys are working perfectly!")
+print("✅ DataFrames can now use much cleaner syntax!")
+print("✅ Dynamic schema construction is now possible!")

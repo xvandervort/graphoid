@@ -1,0 +1,47 @@
+#!/usr/bin/env glang
+
+# SUCCESS: Variable keys now work in map literals!
+
+# Before the fix: This would fail with "Key must be a string literal"
+# After the fix: This works perfectly!
+
+name_key = "name"
+age_key = "age"
+dept_key = "department"
+
+# Clean variable key syntax - THE MAJOR IMPROVEMENT!
+employee1 = { name_key: "Alice", age_key: 30, dept_key: "Engineering" }
+employee2 = { name_key: "Bob", age_key: 25, dept_key: "Sales" }
+
+print("✅ Variable keys work in map literals!")
+print("Alice: " + employee1["name"] + ", age " + employee1["age"].to_string())
+print("Bob: " + employee2["name"] + ", age " + employee2["age"].to_string())
+
+# DataFrame construction is now much cleaner
+columns = ["product", "price", "quantity"]
+inventory = { "_columns": columns }
+
+# Initialize columns using variables
+for col in columns {
+    inventory[col] = []
+}
+
+# Add items using clean syntax
+col1 = "product"
+col2 = "price"
+col3 = "quantity"
+
+item1 = { col1: "Laptop", col2: 1299.99, col3: 3 }
+item2 = { col1: "Mouse", col2: 29.99, col3: 15 }
+
+inventory["product"].append(item1["product"])
+inventory["price"].append(item1["price"])
+inventory["quantity"].append(item1["quantity"])
+
+inventory["product"].append(item2["product"])
+inventory["price"].append(item2["price"])
+inventory["quantity"].append(item2["quantity"])
+
+print("✅ DataFrame construction with variable keys!")
+print("Products: " + inventory["product"].to_string())
+print("Prices: " + inventory["price"].to_string())

@@ -1,0 +1,39 @@
+#!/usr/bin/env glang
+
+# Test the updated DataFrame module with variable keys
+
+import "dataframe" as df
+
+print("=== Testing Updated DataFrame Module ===")
+
+# Test basic functionality still works
+employee_df = df.create(["name", "age", "department"])
+
+# Test the new from_column_data function that showcases variable keys
+data = {
+    "name": ["Alice", "Bob", "Charlie"],
+    "age": [30, 25, 35],
+    "department": ["Engineering", "Sales", "Engineering"]
+}
+
+new_df = df.from_column_data(data)
+
+print("Created DataFrame using from_column_data:")
+print("Names: " + new_df["name"].to_string())
+print("Ages: " + new_df["age"].to_string())
+print("Departments: " + new_df["department"].to_string())
+
+# Test row addition with clean syntax
+name_key = "name"
+age_key = "age"
+dept_key = "department"
+
+# Variable keys in map literals - the key improvement!
+david = { name_key: "David", age_key: 28, dept_key: "Marketing" }
+df.add_row(new_df, david)
+
+print("After adding David with variable keys:")
+print("Names: " + new_df["name"].to_string())
+print("Row count: " + df.row_count(new_df).to_string())
+
+print("✅ Updated DataFrame module leverages variable keys!")
