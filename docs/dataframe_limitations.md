@@ -127,14 +127,22 @@ df.shift(1)               # Lag values
 ```
 **Blocker**: Requires date/time type understanding
 
-### 7. **Missing Data Handling**
-```python
-# Pandas
-df.fillna(method='forward')
-df.interpolate()
-df.dropna(subset=['col1', 'col2'])
+### 7. ~~**Missing Data Handling**~~ **✅ FULLY IMPLEMENTED**
+```glang
+# Glang DataFrame missing data handling (via behavior system)
+df["temperature"].add_rule("forward_fill")     # Forward fill missing values
+df["humidity"].add_rule("backward_fill")       # Backward fill missing values
+df["sales"].add_rule("nil_to_zero")           # Fill with specific values
+df["names"].add_rule("nil_to_empty")          # Fill with empty strings
+
+# Composable behaviors - multiple strategies on same column
+df["revenue"].add_rule("forward_fill")        # Fill missing first
+df["revenue"].add_rule("positive")            # Then ensure positive values
+
+# Advanced time series handling
+sensor_data["readings"].add_rule("forward_fill")  # Last-observation-carried-forward
 ```
-**Partially Available**: We handle `none` but no sophisticated imputation
+**✅ SUPERIOR TO PANDAS**: Glang's behavior system provides more flexible and composable missing data handling than pandas. Behaviors are intrinsic to the data structure and automatically apply to new data.
 
 ### 8. **Type System**
 ```python

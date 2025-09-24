@@ -9,6 +9,38 @@ from .execution.values import GlangValue, NumberValue, StringValue, BooleanValue
 from .execution.graph_values import ListValue, HashValue
 
 
+class ForwardFillMarker(GlangValue):
+    """Marker for values that need forward fill processing."""
+
+    def __init__(self):
+        super().__init__()
+
+    def get_type(self) -> str:
+        return "forward_fill_marker"
+
+    def to_display_string(self) -> str:
+        return "<forward_fill>"
+
+    def to_python(self) -> str:
+        return "<forward_fill>"
+
+
+class BackwardFillMarker(GlangValue):
+    """Marker for values that need backward fill processing."""
+
+    def __init__(self):
+        super().__init__()
+
+    def get_type(self) -> str:
+        return "backward_fill_marker"
+
+    def to_display_string(self) -> str:
+        return "<backward_fill>"
+
+    def to_python(self) -> str:
+        return "<backward_fill>"
+
+
 class Behavior:
     """A composable behavior that can transform or validate values."""
     
@@ -128,6 +160,20 @@ class BehaviorRegistry:
             "positive",
             transform=ensure_positive
         )
+
+        # Forward Fill - replace None values with the last non-None value
+        # Note: This is a contextual behavior that needs full list processing
+        self.behaviors["forward_fill"] = Behavior(
+            "forward_fill",
+            transform=self._create_forward_fill_transform()
+        )
+
+        # Backward Fill - replace None values with the next non-None value
+        # Note: This is a contextual behavior that needs full list processing
+        self.behaviors["backward_fill"] = Behavior(
+            "backward_fill",
+            transform=self._create_backward_fill_transform()
+        )
     
     def get(self, name: str) -> Optional[Behavior]:
         """Get a behavior by name."""
@@ -136,6 +182,65 @@ class BehaviorRegistry:
     def register(self, name: str, behavior: Behavior):
         """Register a custom behavior."""
         self.behaviors[name] = behavior
+
+    def _create_forward_fill_transform(self):
+        """Create a transform function for forward fill.
+
+        This is a contextual behavior that should be applied to entire lists,
+        not individual elements. It marks elements that need processing.
+        """
+        def forward_fill_transform(value: GlangValue) -> GlangValue:
+            # For individual element processing, we just return a marker
+            # The actual fill logic happens in the container's _apply_behaviors_to_existing
+            if isinstance(value, NoneValue):
+                # Mark this as needing forward fill
+                return ForwardFillMarker()
+            return value
+
+        return forward_fill_transform
+
+    def _create_backward_fill_transform(self):
+        """Create a transform function for backward fill."""
+        def backward_fill_transform(value: GlangValue) -> GlangValue:
+            # For individual element processing, we just return a marker
+            if isinstance(value, NoneValue):
+                # Mark this as needing backward fill
+                return BackwardFillMarker()
+            return value
+
+        return backward_fill_transform
+
+    @staticmethod
+    def process_contextual_fills(elements: List[GlangValue]) -> List[GlangValue]:
+        """Process forward and backward fill markers in a list context."""
+        result = list(elements)  # Make a copy
+
+        # Forward fill pass
+        last_valid_value = None
+        for i, elem in enumerate(result):
+            if isinstance(elem, ForwardFillMarker):
+                if last_valid_value is not None:
+                    result[i] = last_valid_value
+                else:
+                    # No previous value, leave as None or convert to NoneValue
+                    result[i] = NoneValue()
+            elif not isinstance(elem, (ForwardFillMarker, BackwardFillMarker)):
+                last_valid_value = elem
+
+        # Backward fill pass
+        next_valid_value = None
+        for i in range(len(result) - 1, -1, -1):
+            elem = result[i]
+            if isinstance(elem, BackwardFillMarker):
+                if next_valid_value is not None:
+                    result[i] = next_valid_value
+                else:
+                    # No next value, leave as None
+                    result[i] = NoneValue()
+            elif not isinstance(elem, (ForwardFillMarker, BackwardFillMarker)):
+                next_valid_value = elem
+
+        return result
 
 
 # Global registry instance

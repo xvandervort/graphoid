@@ -38,6 +38,15 @@ class ListValue(GlangValue, GraphContainer):
         if self._has_behaviors():
             values = self.elements
             processed_values = [self._apply_behaviors(value) for value in values]
+
+            # Handle contextual fills (forward_fill, backward_fill)
+            from ..behaviors import BehaviorRegistry, ForwardFillMarker, BackwardFillMarker
+            has_fill_markers = any(isinstance(v, (ForwardFillMarker, BackwardFillMarker))
+                                 for v in processed_values)
+
+            if has_fill_markers:
+                processed_values = BehaviorRegistry.process_contextual_fills(processed_values)
+
             self.graph = SequentialGraph(processed_values)
 
     @property

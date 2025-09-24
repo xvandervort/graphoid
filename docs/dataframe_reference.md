@@ -188,6 +188,138 @@ print("Average salary: $" + stats["mean"].to_string())
 print("Salary range: $" + stats["range"].to_string())
 ```
 
+## Missing Data Handling 🆕
+
+Glang DataFrames provide powerful missing data handling through the **behavior system**. Behaviors are composable transformations that automatically apply to all values in a column or DataFrame.
+
+### Forward Fill Behavior
+Replace missing values with the last valid value.
+```glang
+# Create DataFrame with missing temperature data
+sensor_data = df.from_column_data({
+    "timestamp": ["09:00", "09:15", "09:30", "09:45", "10:00"],
+    "temperature": [22.5, none, none, 25.1, none]
+})
+
+# Apply forward fill to temperature column
+sensor_data["temperature"].add_rule("forward_fill")
+
+# Missing values are now filled forward
+# temperature column: [22.5, 22.5, 22.5, 25.1, 25.1]
+```
+
+### Backward Fill Behavior
+Replace missing values with the next valid value.
+```glang
+# Create DataFrame with missing humidity data
+weather_data = df.from_column_data({
+    "hour": [1, 2, 3, 4, 5],
+    "humidity": [none, 45, none, none, 52]
+})
+
+# Apply backward fill to humidity column
+weather_data["humidity"].add_rule("backward_fill")
+
+# Missing values are now filled backward
+# humidity column: [45, 45, 52, 52, 52]
+```
+
+### Value Replacement Behaviors
+Fill missing values with specific defaults.
+```glang
+# Fill missing sales data with zeros
+sales_data["revenue"].add_rule("nil_to_zero")     # none → 0
+sales_data["notes"].add_rule("nil_to_empty")      # none → ""
+
+# Revenue column: [1000, 0, 1500, 0] (nones become 0)
+# Notes column: ["Good month", "", "Best quarter", ""] (nones become "")
+```
+
+### Composable Behaviors
+Multiple behaviors can be applied to the same column and work together.
+```glang
+# Complex missing data strategy
+financial_data["profit"].add_rule("forward_fill")   # Fill missing first
+financial_data["profit"].add_rule("positive")       # Then ensure positive values
+
+# This creates a robust pipeline:
+# 1. Missing values are forward filled
+# 2. Any negative values become positive
+```
+
+### DataFrame-Level Missing Data Operations
+```glang
+# Apply behaviors to multiple columns at once
+quarterly_reports = df.from_column_data({
+    "Q1": [1000, none, 1500, none],
+    "Q2": [none, 1200, none, 1800],
+    "Q3": [900, none, 1400, 2000]
+})
+
+# Different strategies per column
+quarterly_reports["Q1"].add_rule("forward_fill")
+quarterly_reports["Q2"].add_rule("backward_fill")
+quarterly_reports["Q3"].add_rule("nil_to_zero")
+
+# Each column uses its optimal missing data strategy
+```
+
+### Time Series Missing Data
+```glang
+# Sensor readings with gaps
+sensor_readings = df.from_column_data({
+    "timestamp": ["10:00", "10:01", "10:02", "10:03", "10:04"],
+    "temperature": [23.1, 23.2, none, none, 23.8],
+    "pressure": [1013.2, none, 1013.1, none, 1013.5]
+})
+
+# Apply Last-Observation-Carried-Forward (LOCF) for temperature
+sensor_readings["temperature"].add_rule("forward_fill")
+
+# Apply Next-Observation-Carried-Backward (NOCB) for pressure
+sensor_readings["pressure"].add_rule("backward_fill")
+
+# Result: Realistic interpolation for continuous sensor data
+# temperature: [23.1, 23.2, 23.2, 23.2, 23.8] (forward filled)
+# pressure: [1013.2, 1013.1, 1013.1, 1013.5, 1013.5] (backward filled)
+```
+
+### Checking for Missing Data
+```glang
+# Check if columns have missing data before applying behaviors
+temp_col = sensor_data["temperature"]
+has_missing = false
+for value in temp_col {
+    if value.is_none() {
+        has_missing = true
+        break
+    }
+}
+
+if has_missing {
+    temp_col.add_rule("forward_fill")
+    print("Applied forward fill to temperature column")
+}
+```
+
+### Available Missing Data Behaviors
+
+| Behavior | Description | Use Case |
+|----------|-------------|----------|
+| `forward_fill` | Fill with last valid value | Time series, sensor data |
+| `backward_fill` | Fill with next valid value | Forecasting, planning data |
+| `nil_to_zero` | Replace with 0 | Financial data, counts |
+| `nil_to_empty` | Replace with empty string | Text fields, comments |
+
+### Benefits Over Traditional Approaches
+
+1. **Intrinsic to Data Structure**: Behaviors become part of the DataFrame, not external processing
+2. **Automatic Application**: Once attached, behaviors apply to all current and future values
+3. **Composable**: Multiple behaviors can work together on the same column
+4. **Type-Safe**: Behaviors respect column data types and constraints
+5. **Memory Efficient**: Behaviors use markers for efficient two-pass processing
+6. **Consistent**: Same missing data strategy applies automatically across operations
+
 ## Group Operations
 
 ### `group_by(df, group_column, agg_column, operation)`
