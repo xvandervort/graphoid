@@ -260,6 +260,111 @@ class TestHTMLModule:
         header_divs = HTMLModule.find_elements_by_class(parsed, StringValue("header"))
         assert len(header_divs.elements) == 1
 
+    def test_find_elements_by_attribute(self):
+        """Test finding elements by attribute."""
+        html_content = StringValue('<div><span data-id="123">First</span><span data-id="456">Second</span><p data-id="123">Paragraph</p></div>')
+        parsed = HTMLModule.parse_html(html_content)
+
+        # Find all elements with data-id attribute
+        elements = HTMLModule.find_elements_by_attribute(parsed, StringValue("data-id"))
+        assert len(elements.elements) == 3
+
+        # Find elements with specific data-id value
+        specific_elements = HTMLModule.find_elements_by_attribute(parsed, StringValue("data-id"), StringValue("123"))
+        assert len(specific_elements.elements) == 2
+
+    def test_find_elements_containing_text(self):
+        """Test finding elements containing specific text."""
+        html_content = StringValue('<div><p>Bitcoin price is $50000</p><span>Ethereum costs $3000</span><div>Bitcoin mining</div></div>')
+        parsed = HTMLModule.parse_html(html_content)
+
+        # Find elements containing "Bitcoin" - should find parent div + 2 child elements
+        bitcoin_elements = HTMLModule.find_elements_containing_text(parsed, StringValue("Bitcoin"))
+        assert len(bitcoin_elements.elements) == 3  # Parent div + p + inner div
+
+        # Test case sensitivity
+        case_sensitive_elements = HTMLModule.find_elements_containing_text(parsed, StringValue("bitcoin"), BooleanValue(True))
+        assert len(case_sensitive_elements.elements) == 0  # Should find none with strict case
+
+        case_insensitive_elements = HTMLModule.find_elements_containing_text(parsed, StringValue("bitcoin"), BooleanValue(False))
+        assert len(case_insensitive_elements.elements) == 3  # Should find all three
+
+    def test_extract_links(self):
+        """Test extracting links from HTML."""
+        html_content = StringValue('<div><a href="https://example.com">Example</a><a href="/home">Home</a><span>Not a link</span></div>')
+        parsed = HTMLModule.parse_html(html_content)
+
+        links = HTMLModule.extract_links(parsed)
+        assert isinstance(links, ListValue)
+        assert len(links.elements) == 2
+
+        # Check first link
+        first_link = links.elements[0]
+        url = first_link.graph.get("url")
+        assert url.value.value == "https://example.com"
+
+        text = first_link.graph.get("text")
+        assert text.value.value == "Example"
+
+    def test_extract_images(self):
+        """Test extracting images from HTML."""
+        html_content = StringValue('<div><img src="photo.jpg" alt="A photo"><img src="logo.png"><p>Not an image</p></div>')
+        parsed = HTMLModule.parse_html(html_content)
+
+        images = HTMLModule.extract_images(parsed)
+        assert isinstance(images, ListValue)
+        assert len(images.elements) == 2
+
+        # Check first image
+        first_image = images.elements[0]
+        src = first_image.graph.get("src")
+        assert src.value.value == "photo.jpg"
+
+        alt = first_image.graph.get("alt")
+        assert alt.value.value == "A photo"
+
+        # Check second image (no alt)
+        second_image = images.elements[1]
+        src2 = second_image.graph.get("src")
+        assert src2.value.value == "logo.png"
+
+        alt2 = second_image.graph.get("alt")
+        assert alt2.value.value == ""  # Should be empty string
+
+    def test_clean_text(self):
+        """Test text cleaning functionality."""
+        messy_text = StringValue("  Hello   World  \n\n  Test  \t  ")
+        cleaned = HTMLModule.clean_text(messy_text)
+
+        assert isinstance(cleaned, StringValue)
+        assert cleaned.value == "Hello World Test"
+
+    def test_get_element_info(self):
+        """Test getting comprehensive element information."""
+        html_content = StringValue('<div class="container"><p>Hello World</p><span></span></div>')
+        parsed = HTMLModule.parse_html(html_content)
+
+        div_element = parsed.elements[0]
+        info = HTMLModule.get_element_info(div_element)
+
+        assert isinstance(info, HashValue)
+
+        # Check tag
+        tag = info.graph.get("tag")
+        assert tag.value.value == "div"
+
+        # Check text (should include child text)
+        text = info.graph.get("text")
+        assert "Hello World" in text.value.value
+
+        # Check child count
+        child_count = info.graph.get("child_count")
+        assert child_count.value.value == 2  # p and span
+
+        # Check has_text
+        has_text = info.graph.get("has_text")
+        assert has_text.value.value == True
+
 
 if __name__ == '__main__':
     pytest.main([__file__])

@@ -28,13 +28,13 @@ class TestNetworkGlangModule:
 
         # Check the parsed components
         parsed_hash = result.value
-        assert "protocol" in parsed_hash.graph.keys()
-        assert "host" in parsed_hash.graph.keys()
-        assert "path" in parsed_hash.graph.keys()
+        assert "protocol" in parsed_hash.keys()
+        assert "host" in parsed_hash.keys()
+        assert "path" in parsed_hash.keys()
 
-        protocol_data = parsed_hash.graph.get("protocol")
-        host_data = parsed_hash.graph.get("host")
-        path_data = parsed_hash.graph.get("path")
+        protocol_data = parsed_hash.get("protocol")
+        host_data = parsed_hash.get("host")
+        path_data = parsed_hash.get("path")
 
         # The hash values are StringValue objects directly
         assert isinstance(protocol_data, StringValue)
@@ -105,17 +105,31 @@ class TestNetworkGlangModule:
         assert isinstance(result.value, BooleanValue)
         assert result.value.value is False
 
-    def test_http_functions_return_error_messages(self):
-        """Test that HTTP functions return helpful error messages."""
+    def test_http_functions_return_response_objects(self):
+        """Test that HTTP functions return proper response objects."""
         # Import the network module
         result = self.session.execute_statement('import "network" as net')
         assert result.success
 
-        # Test that HTTP functions return error messages
-        result = self.session.execute_statement('net.http_get("https://example.com")')
+        # Test that HTTP functions return response objects (not error strings)
+        result = self.session.execute_statement('net.http_get("https://httpbin.org/json")')
         assert result.success
-        assert isinstance(result.value, StringValue)
-        assert "ERROR: HTTP operations not yet implemented" in result.value.value
+
+        # Should return a HashValue response object, not a string
+        assert isinstance(result.value, HashValue)
+
+        # Check that response has expected fields
+        response_hash = result.value
+        assert "status" in response_hash.keys()
+        assert "success" in response_hash.keys()
+        assert "body" in response_hash.keys()
+
+        # The response should indicate success for httpbin.org
+        success_data = response_hash.get("success")
+        assert isinstance(success_data, BooleanValue)
+
+        status_data = response_hash.get("status")
+        assert isinstance(status_data, NumberValue)
 
 
 if __name__ == '__main__':

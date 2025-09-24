@@ -1,0 +1,323 @@
+# Enhanced Bitcoin Price Tracker with HTML Parsing
+# Uses advanced HTML parsing and Unicode-aware string processing
+# Demonstrates the power of Glang's HTML parsing library
+
+import "io" as io
+import "html_parser" as html
+import "time" as time
+
+print("₿ Enhanced Bitcoin Price Tracker")
+print("=================================")
+print("🚀 Using advanced HTML parsing for robust data extraction")
+
+# Configuration
+string coinmarketcap_url = "https://coinmarketcap.com/currencies/bitcoin/"
+string coingecko_url = "https://www.coingecko.com/en/coins/bitcoin"
+string csv_file = "data/bitcoin_prices_enhanced.csv"
+
+# Enhanced Bitcoin price extraction using HTML parsing
+func extract_bitcoin_price_html(html_content) {
+    print("🔍 Parsing HTML content for Bitcoin price...")
+
+    # Parse the HTML content
+    elements = html.parse(html_content)
+    print("✅ Parsed HTML structure with " + elements.size().to_string() + " root elements")
+
+    # Strategy 1: Look for elements containing price information
+    price_elements = html.find_containing_text(elements, "Bitcoin price")
+    if price_elements.size() > 0 {
+        print("🎯 Found " + price_elements.size().to_string() + " elements mentioning Bitcoin price")
+
+        for price_element in price_elements {
+            element_info = html.get_element_info(price_element)
+            text = element_info["text"]
+
+            print("📝 Analyzing text: " + text.value)
+
+            # Look for price pattern: $X,XXX.XX
+            if text.value.contains("$") {
+                # Extract price using our enhanced string methods
+                price = extract_price_from_text(text.value)
+                if price != "FAILED" {
+                    return price
+                }
+            }
+        }
+    }
+
+    # Strategy 2: Look for meta tags with price information
+    meta_elements = html.find_by_tag(elements, "meta")
+    print("🔍 Found " + meta_elements.size().to_string() + " meta elements")
+
+    for meta_element in meta_elements {
+        content_attr = html.get_attribute(meta_element, "content")
+        name_attr = html.get_attribute(meta_element, "name")
+        property_attr = html.get_attribute(meta_element, "property")
+
+        # Check if it's a description or price-related meta tag
+        if content_attr.contains("Bitcoin") and content_attr.contains("$") {
+            print("💰 Found price in meta content: " + content_attr.value)
+            price = extract_price_from_text(content_attr.value)
+            if price != "FAILED" {
+                return price
+            }
+        }
+    }
+
+    # Strategy 3: Look for span/div elements with price classes
+    price_containers = html.find_by_attribute(elements, "class")
+    for container in price_containers {
+        class_attr = html.get_attribute(container, "class")
+        if class_attr.contains("price") or class_attr.contains("value") {
+            element_info = html.get_element_info(container)
+            text = element_info["text"]
+
+            if text.value.contains("$") {
+                price = extract_price_from_text(text.value)
+                if price != "FAILED" {
+                    return price
+                }
+            }
+        }
+    }
+
+    print("❌ Could not extract Bitcoin price from HTML structure")
+    return "FAILED"
+}
+
+# Enhanced price extraction from text using Unicode-aware string methods
+func extract_price_from_text(text) {
+    print("🔤 Extracting price from: " + text.substring(0, 100) + "...")
+
+    # Clean the text first
+    clean_text = html.clean_text(text)
+
+    # Look for patterns like "$123,456.78" or "$123456.78"
+    if clean_text.contains("$") {
+        # Find all dollar sign positions
+        dollar_pos = clean_text.index_of("$")
+        if dollar_pos >= 0 {
+            # Extract text after dollar sign
+            after_dollar = clean_text.substring(dollar_pos + 1)
+
+            # Find the end of the price (first non-price character)
+            price_end = 0
+            while price_end < after_dollar.length() {
+                char = after_dollar[price_end]
+                # Price characters: digits, comma, period
+                if char.contains("any", "digits") or char == "," or char == "." {
+                    price_end = price_end + 1
+                } else {
+                    break
+                }
+            }
+
+            if price_end > 0 {
+                price = after_dollar.substring(0, price_end)
+                print("💰 Extracted price: $" + price)
+                return price
+            }
+        }
+    }
+
+    return "FAILED"
+}
+
+# Enhanced web scraping with multiple data sources
+func fetch_bitcoin_price_enhanced() {
+    print("🌐 Fetching Bitcoin price from multiple sources...")
+
+    # Try CoinMarketCap first
+    print("📊 Trying CoinMarketCap...")
+    content = io.http_get(coinmarketcap_url)
+
+    if content.length() > 1000 {
+        print("✅ Downloaded " + content.length().to_string() + " characters from CoinMarketCap")
+
+        price = extract_bitcoin_price_html(content)
+        if price != "FAILED" {
+            return { "price": price, "source": "CoinMarketCap" }
+        }
+    }
+
+    print("⚠️ CoinMarketCap failed, trying fallback method...")
+
+    # Fallback: Try simple text extraction
+    if content.contains("Bitcoin") and content.contains("$") {
+        # Use the old method as fallback
+        price = extract_bitcoin_price_fallback(content)
+        if price != "FAILED" {
+            return { "price": price, "source": "CoinMarketCap (fallback)" }
+        }
+    }
+
+    print("❌ All price extraction methods failed")
+    return { "price": "FAILED", "source": "None" }
+}
+
+# Fallback price extraction (original method)
+func extract_bitcoin_price_fallback(text) {
+    print("🔄 Using fallback price extraction...")
+
+    if text.contains("The live Bitcoin price today is $") {
+        parts = text.split("The live Bitcoin price today is $")
+        if parts.size() > 1 {
+            price_segment = parts[1]
+            usd_parts = price_segment.split(" USD")
+            if usd_parts.size() > 0 {
+                price = usd_parts[0]
+                print("🎯 Fallback extracted: $" + price)
+                return price
+            }
+        }
+    }
+
+    return "FAILED"
+}
+
+# Enhanced CSV saving with metadata
+func save_enhanced_csv(price_data, timestamp) {
+    print("💾 Saving enhanced data to " + csv_file)
+
+    # Check if file exists
+    bool file_exists = io.exists(csv_file)
+
+    if !file_exists {
+        # Create file with enhanced headers
+        string headers = "timestamp,price_usd,source,extraction_method,data_quality\n"
+        io.write_file(csv_file, headers)
+        print("📝 Created enhanced CSV file with metadata columns")
+    }
+
+    # Determine data quality
+    string quality = "high"
+    if price_data["source"].contains("fallback") {
+        quality = "medium"
+    }
+    if price_data["price"] == "FAILED" {
+        quality = "failed"
+    }
+
+    # Append enhanced data
+    string new_row = timestamp + "," +
+                    price_data["price"] + "," +
+                    price_data["source"] + "," +
+                    "html_parsing," +
+                    quality + "\n"
+
+    io.append_file(csv_file, new_row)
+    print("✅ Saved enhanced data: " + timestamp + " -> $" + price_data["price"] + " (" + price_data["source"] + ")")
+}
+
+# Enhanced statistics and analysis
+func show_enhanced_statistics() {
+    if io.exists(csv_file) {
+        print("\n📊 Enhanced Bitcoin Price Analysis:")
+        print("==================================")
+
+        string content = io.read_file(csv_file)
+        list<string> lines = content.split("\n")
+
+        # Skip header and count records
+        num records = 0
+        num successful = 0
+        num failed = 0
+        string latest_price = "N/A"
+        string latest_source = "N/A"
+
+        num i = 1  # Skip header
+        while i < lines.size() {
+            string line = lines[i].trim()
+            if line.length() > 0 {
+                list<string> parts = line.split(",")
+                if parts.size() >= 5 {
+                    records = records + 1
+
+                    string price = parts[1]
+                    string source = parts[2]
+                    string quality = parts[4]
+
+                    if quality == "failed" {
+                        failed = failed + 1
+                    } else {
+                        successful = successful + 1
+                        latest_price = price
+                        latest_source = source
+                    }
+                }
+            }
+            i = i + 1
+        }
+
+        # Display statistics
+        print("📈 Total Records: " + records.to_string())
+        print("✅ Successful: " + successful.to_string())
+        print("❌ Failed: " + failed.to_string())
+
+        if successful > 0 {
+            num success_rate = (successful * 100) / records
+            print("🎯 Success Rate: " + success_rate.to_string() + "%")
+            print("💰 Latest Price: $" + latest_price)
+            print("📊 Latest Source: " + latest_source)
+        }
+
+        # Show recent entries
+        print("\n📋 Recent Entries:")
+        num start = lines.size() - 6  # Show last 5 entries
+        if start < 1 { start = 1 }
+
+        num j = start
+        while j < lines.size() {
+            string line = lines[j].trim()
+            if line.length() > 0 {
+                list<string> parts = line.split(",")
+                if parts.size() >= 3 {
+                    print("  " + parts[0] + " -> $" + parts[1] + " (" + parts[2] + ")")
+                }
+            }
+            j = j + 1
+        }
+    }
+}
+
+# Main execution with enhanced error handling
+print("🚀 Starting enhanced Bitcoin price tracking...")
+print("✨ Features: HTML parsing, Unicode support, multiple sources, metadata")
+
+price_data = fetch_bitcoin_price_enhanced()
+
+if price_data["price"] != "FAILED" {
+    print("\n⏰ Getting timestamp...")
+    string timestamp = time.now().to_string()
+
+    print("💾 Saving enhanced data...")
+    save_enhanced_csv(price_data, timestamp)
+
+    print("\n📋 Summary:")
+    print("================")
+    print("  💰 Bitcoin Price: $" + price_data["price"])
+    print("  📊 Data Source: " + price_data["source"])
+    print("  ⏰ Timestamp: " + timestamp)
+    print("  📁 File: " + csv_file)
+    print("  🔧 Method: Advanced HTML parsing")
+
+    show_enhanced_statistics()
+
+    print("\n✨ Enhanced Bitcoin tracking completed successfully!")
+    print("🔍 Using HTML parsing and Unicode-aware string processing")
+    print("📈 Run regularly to build comprehensive price history")
+
+} else {
+    print("\n❌ Enhanced Bitcoin tracking failed")
+    print("  📊 All extraction methods unsuccessful")
+    print("  🌐 Check internet connection and try again")
+    print("  🔧 Consider updating extraction logic if site structure changed")
+
+    # Still save the failed attempt for analysis
+    string timestamp = time.now().to_string()
+    save_enhanced_csv(price_data, timestamp)
+}
+
+print("\n🔗 Data source: " + coinmarketcap_url)
+print("📁 Enhanced data file: " + csv_file)
+print("⚡ Powered by Glang HTML parsing library")

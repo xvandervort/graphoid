@@ -247,6 +247,195 @@ class HTMLModule:
         encoded = html.escape(text.value)
         return StringValue(encoded, position)
 
+    @staticmethod
+    def find_elements_by_attribute(html_elements: GlangValue, attr_name: GlangValue,
+                                 attr_value: GlangValue = None,
+                                 position: Optional[SourcePosition] = None) -> GlangValue:
+        """Find all elements with specific attribute (and optionally specific value)."""
+        if not isinstance(html_elements, ListValue):
+            raise RuntimeError(f"find_elements_by_attribute expects list, got {html_elements.get_type()}", position)
+
+        if not isinstance(attr_name, StringValue):
+            raise RuntimeError(f"find_elements_by_attribute expects string attr name, got {attr_name.get_type()}", position)
+
+        found_elements = []
+        target_attr = attr_name.value
+        target_value = attr_value.value if attr_value and isinstance(attr_value, StringValue) else None
+
+        def search_recursive(elements_list):
+            for element in elements_list.elements:
+                if isinstance(element, HashValue):
+                    attrs = element.graph.get("attributes")
+                    if attrs and isinstance(attrs.value, HashValue):
+                        attr = attrs.value.graph.get(target_attr)
+                        if attr and isinstance(attr.value, StringValue):
+                            if target_value is None or attr.value.value == target_value:
+                                found_elements.append(element)
+
+                    # Search children recursively
+                    children = element.graph.get("children")
+                    if children and isinstance(children.value, ListValue):
+                        search_recursive(children.value)
+
+        search_recursive(html_elements)
+        return ListValue(found_elements, position=position)
+
+    @staticmethod
+    def find_elements_containing_text(html_elements: GlangValue, text: GlangValue,
+                                    case_sensitive: GlangValue = None,
+                                    position: Optional[SourcePosition] = None) -> GlangValue:
+        """Find all elements containing specific text."""
+        if not isinstance(html_elements, ListValue):
+            raise RuntimeError(f"find_elements_containing_text expects list, got {html_elements.get_type()}", position)
+
+        if not isinstance(text, StringValue):
+            raise RuntimeError(f"find_elements_containing_text expects string text, got {text.get_type()}", position)
+
+        found_elements = []
+        search_text = text.value
+        is_case_sensitive = case_sensitive and isinstance(case_sensitive, BooleanValue) and case_sensitive.value
+
+        if not is_case_sensitive:
+            search_text = search_text.lower()
+
+        def search_recursive(elements_list):
+            for element in elements_list.elements:
+                if isinstance(element, HashValue):
+                    # Get all text content from element and children
+                    element_text = HTMLModule.get_element_text(element).value
+
+                    if not is_case_sensitive:
+                        element_text = element_text.lower()
+
+                    if search_text in element_text:
+                        found_elements.append(element)
+
+                    # Search children recursively
+                    children = element.graph.get("children")
+                    if children and isinstance(children.value, ListValue):
+                        search_recursive(children.value)
+
+        search_recursive(html_elements)
+        return ListValue(found_elements, position=position)
+
+    @staticmethod
+    def extract_links(html_elements: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Extract all links (a tags with href attributes) from HTML."""
+        if not isinstance(html_elements, ListValue):
+            raise RuntimeError(f"extract_links expects list, got {html_elements.get_type()}", position)
+
+        links = []
+
+        def search_recursive(elements_list):
+            for element in elements_list.elements:
+                if isinstance(element, HashValue):
+                    tag = element.graph.get("tag")
+                    if tag and isinstance(tag.value, StringValue) and tag.value.value.lower() == "a":
+                        attrs = element.graph.get("attributes")
+                        if attrs and isinstance(attrs.value, HashValue):
+                            href = attrs.value.graph.get("href")
+                            if href and isinstance(href.value, StringValue):
+                                # Create link info hash
+                                text = HTMLModule.get_element_text(element)
+                                link_pairs = [
+                                    ("url", DataValue("url", href.value)),
+                                    ("text", DataValue("text", text)),
+                                    ("element", DataValue("element", element))
+                                ]
+                                links.append(HashValue(link_pairs))
+
+                    # Search children recursively
+                    children = element.graph.get("children")
+                    if children and isinstance(children.value, ListValue):
+                        search_recursive(children.value)
+
+        search_recursive(html_elements)
+        return ListValue(links, position=position)
+
+    @staticmethod
+    def extract_images(html_elements: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Extract all images (img tags) from HTML."""
+        if not isinstance(html_elements, ListValue):
+            raise RuntimeError(f"extract_images expects list, got {html_elements.get_type()}", position)
+
+        images = []
+
+        def search_recursive(elements_list):
+            for element in elements_list.elements:
+                if isinstance(element, HashValue):
+                    tag = element.graph.get("tag")
+                    if tag and isinstance(tag.value, StringValue) and tag.value.value.lower() == "img":
+                        attrs = element.graph.get("attributes")
+                        if attrs and isinstance(attrs.value, HashValue):
+                            src = attrs.value.graph.get("src")
+                            alt = attrs.value.graph.get("alt")
+
+                            # Create image info hash
+                            image_pairs = [
+                                ("src", DataValue("src", src.value if src else StringValue(""))),
+                                ("alt", DataValue("alt", alt.value if alt else StringValue(""))),
+                                ("element", DataValue("element", element))
+                            ]
+                            images.append(HashValue(image_pairs))
+
+                    # Search children recursively
+                    children = element.graph.get("children")
+                    if children and isinstance(children.value, ListValue):
+                        search_recursive(children.value)
+
+        search_recursive(html_elements)
+        return ListValue(images, position=position)
+
+    @staticmethod
+    def clean_text(text: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Clean text by removing extra whitespace and normalizing."""
+        if not isinstance(text, StringValue):
+            raise RuntimeError(f"clean_text expects string text, got {text.get_type()}", position)
+
+        # Use our enhanced string methods for better text cleaning
+        cleaned = text.value
+
+        # Replace multiple whitespace with single space
+        import re
+        cleaned = re.sub(r'\s+', ' ', cleaned)
+
+        # Trim whitespace
+        cleaned = cleaned.strip()
+
+        return StringValue(cleaned, position)
+
+    @staticmethod
+    def get_element_info(element: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Get comprehensive information about an HTML element."""
+        if not isinstance(element, HashValue):
+            raise RuntimeError(f"get_element_info expects hash element, got {element.get_type()}", position)
+
+        # Extract basic info
+        tag = element.graph.get("tag")
+        tag_value = tag.value.value if tag and isinstance(tag.value, StringValue) else ""
+
+        text = HTMLModule.get_element_text(element)
+        clean_text = HTMLModule.clean_text(text)
+
+        attrs = element.graph.get("attributes")
+
+        # Count children
+        children = element.graph.get("children")
+        child_count = len(children.value.elements) if children and isinstance(children.value, ListValue) else 0
+
+        # Create comprehensive info hash
+        info_pairs = [
+            ("tag", DataValue("tag", StringValue(tag_value))),
+            ("text", DataValue("text", clean_text)),
+            ("raw_text", DataValue("raw_text", text)),
+            ("attributes", DataValue("attributes", attrs.value if attrs else HashValue([]))),
+            ("child_count", DataValue("child_count", NumberValue(child_count))),
+            ("has_text", DataValue("has_text", BooleanValue(len(clean_text.value) > 0))),
+            ("element", DataValue("element", element))
+        ]
+
+        return HashValue(info_pairs, position)
+
 
 def create_html_module() -> 'ModuleNamespace':
     """Create the HTML module namespace with all functions."""
@@ -264,10 +453,18 @@ def create_html_module() -> 'ModuleNamespace':
         'find_by_tag': HTMLModule.find_elements_by_tag,
         'find_by_id': HTMLModule.find_element_by_id,
         'find_by_class': HTMLModule.find_elements_by_class,
+        'find_by_attribute': HTMLModule.find_elements_by_attribute,
+        'find_containing_text': HTMLModule.find_elements_containing_text,
 
         # Content extraction
         'get_text': HTMLModule.get_element_text,
         'get_attribute': HTMLModule.get_element_attribute,
+        'get_element_info': HTMLModule.get_element_info,
+        'clean_text': HTMLModule.clean_text,
+
+        # Specialized extraction
+        'extract_links': HTMLModule.extract_links,
+        'extract_images': HTMLModule.extract_images,
 
         # Encoding/decoding
         'decode': HTMLModule.html_decode,

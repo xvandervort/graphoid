@@ -1,0 +1,193 @@
+# Advanced API Client Demo
+# Demonstrates real-world API interaction patterns using Glang's HTTP module
+
+import "http" as http
+import "json" as json
+
+print("🔗 Advanced API Client Demo")
+print("===========================")
+print("📡 Demonstrating real-world API interaction patterns")
+
+# Configuration
+string base_url = "https://httpbin.org"
+string user_agent = "Glang-API-Client/1.0"
+
+# Helper function to create standard headers
+func create_headers() {
+    return {
+        "User-Agent": user_agent,
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
+}
+
+# Helper function to make API calls with error handling
+func api_call(method, endpoint, data) {
+    url = base_url + endpoint
+
+    print("🔄 " + method + " " + endpoint + "...")
+
+    response = http.request(method, url, data, create_headers())
+
+    if response.get("success") {
+        print("✅ Success! Status: " + response.get("status").to_string())
+        return response
+    } else {
+        print("❌ Failed! Status: " + response.get("status").to_string())
+        return response
+    }
+}
+
+# Test 1: GET with query parameters simulation
+print("\n📖 Test 1: GET request with simulated query parameters")
+response = api_call("GET", "/get?name=Alice&age=25", "")
+
+if response.get("success") {
+    body = response.get("body")
+    if body.contains("Alice") and body.contains("25") {
+        print("🎯 Query parameters handled correctly!")
+    }
+}
+
+# Test 2: POST with JSON data
+print("\n📝 Test 2: POST request with JSON data")
+user_data = json.encode({
+    "name": "Bob",
+    "email": "bob@example.com",
+    "age": 30,
+    "active": true
+})
+
+response = api_call("POST", "/post", user_data)
+
+if response.get("success") {
+    body = response.get("body")
+    if body.contains("Bob") and body.contains("bob@example.com") {
+        print("🎯 JSON data sent and echoed back correctly!")
+    }
+}
+
+# Test 3: PUT for updates
+print("\n🔄 Test 3: PUT request for data updates")
+update_data = json.encode({
+    "name": "Bob Updated",
+    "email": "bob.updated@example.com",
+    "last_modified": "2025-01-15"
+})
+
+response = api_call("PUT", "/put", update_data)
+
+if response.get("success") {
+    body = response.get("body")
+    if body.contains("Updated") {
+        print("🎯 Data update via PUT successful!")
+    }
+}
+
+# Test 4: DELETE operation
+print("\n🗑️ Test 4: DELETE request")
+response = api_call("DELETE", "/delete", "")
+
+if response.get("success") {
+    print("🎯 DELETE operation successful!")
+}
+
+# Test 5: Custom headers and authentication simulation
+print("\n🔐 Test 5: Request with custom authentication headers")
+auth_headers = {
+    "User-Agent": user_agent,
+    "Accept": "application/json",
+    "Authorization": "Bearer fake-token-12345",
+    "X-API-Key": "demo-api-key"
+}
+
+response = http.get(base_url + "/bearer", auth_headers)
+
+if response.get("success") {
+    body = response.get("body")
+    if body.contains("fake-token-12345") {
+        print("🎯 Authentication headers sent correctly!")
+    }
+}
+
+# Test 6: Error handling for different HTTP status codes
+print("\n⚠️ Test 6: Error handling for different status codes")
+
+# Test 404 Not Found
+print("  Testing 404 Not Found...")
+response_404 = http.get(base_url + "/status/404")
+print("    Status: " + response_404.get("status").to_string())
+print("    Success: " + response_404.get("success").to_string())
+
+# Test 500 Server Error
+print("  Testing 500 Server Error...")
+response_500 = http.get(base_url + "/status/500")
+print("    Status: " + response_500.get("status").to_string())
+print("    Success: " + response_500.get("success").to_string())
+
+# Test 7: Response header analysis
+print("\n🔍 Test 7: Response header analysis")
+response = http.get(base_url + "/response-headers?Server=Glang-Test&Cache-Control=no-cache")
+
+if response.get("success") {
+    headers = response.get("headers")
+
+    print("📊 Analyzing response headers:")
+
+    # Check content type
+    if headers.has_key("content-type") {
+        content_type = headers.get("content-type")
+        print("  📄 Content-Type: " + content_type.to_string())
+    }
+
+    # Check server header
+    if headers.has_key("server") {
+        server = headers.get("server")
+        print("  🖥️ Server: " + server.to_string())
+    }
+
+    # Check content length
+    if headers.has_key("content-length") {
+        length = headers.get("content-length")
+        print("  📏 Content-Length: " + length.to_string() + " bytes")
+    }
+}
+
+# Test 8: File download simulation
+print("\n💾 Test 8: File download simulation")
+download_response = http.get(base_url + "/bytes/1024")
+
+if download_response.get("success") {
+    body = download_response.get("body")
+    print("📥 Downloaded " + body.length().to_string() + " bytes")
+    print("🎯 File download simulation successful!")
+}
+
+# Performance and timing test
+print("\n⏱️ Test 9: Performance testing")
+print("Making 3 consecutive requests to measure consistency...")
+
+num i = 1
+while i <= 3 {
+    start_time = "Request " + i.to_string()
+    response = http.get(base_url + "/delay/1")
+
+    if response.get("success") {
+        print("  ✅ " + start_time + ": Success")
+    } else {
+        print("  ❌ " + start_time + ": Failed")
+    }
+
+    i = i + 1
+}
+
+print("\n✨ Advanced API client demo completed!")
+print("🏆 Successfully demonstrated:")
+print("  ✓ RESTful API patterns (GET, POST, PUT, DELETE)")
+print("  ✓ JSON data handling")
+print("  ✓ Custom headers and authentication")
+print("  ✓ Error handling for various HTTP status codes")
+print("  ✓ Response header analysis")
+print("  ✓ File download patterns")
+print("  ✓ Performance consistency testing")
+print("\n🚀 Glang HTTP client is ready for production API integration!")

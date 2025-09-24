@@ -125,26 +125,53 @@ func is_valid_url(url) {
     return true
 }
 
-# HTTP operations - Pure Glang implementation placeholder
-# TODO: Implement actual HTTP in pure Glang using socket operations
+# HTTP operations - High-level API using built-in HTTP module
+import "http" as http
 
 func http_get(url) {
-    # Pure Glang HTTP implementation not yet available
-    # This would require implementing HTTP over sockets in Glang
-    return "ERROR: HTTP operations not yet implemented in pure Glang. Use external tools or Python bindings for now."
+    if is_valid_url(url) == false {
+        return { "error": "Invalid URL: " + url, "status": 0, "success": false }
+    }
+
+    return http.get(url)
 }
 
 func http_post(url, post_data) {
-    # Pure Glang HTTP implementation not yet available
-    return "ERROR: HTTP operations not yet implemented in pure Glang. Use external tools or Python bindings for now."
+    if is_valid_url(url) == false {
+        return { "error": "Invalid URL: " + url, "status": 0, "success": false }
+    }
+
+    return http.post(url, post_data)
 }
 
 func http_request(method, url, post_data, request_headers) {
-    # Pure Glang HTTP implementation not yet available
-    return "ERROR: HTTP operations not yet implemented in pure Glang. Use external tools or Python bindings for now."
+    if is_valid_url(url) == false {
+        return { "error": "Invalid URL: " + url, "status": 0, "success": false }
+    }
+
+    return http.request(method, url, post_data, request_headers)
 }
 
 func download_file(url, filepath) {
-    # Pure Glang file download not yet available
-    return "ERROR: HTTP file download not yet implemented in pure Glang. Use external tools for now."
+    if is_valid_url(url) == false {
+        return false
+    }
+
+    return http.download_file(url, filepath)
+}
+
+# Convenience wrapper for simple GET requests with error handling
+func fetch(url) {
+    response = http_get(url)
+
+    if response.has_key("success") and response["success"] == true {
+        return response["body"]
+    } else {
+        return ""
+    }
+}
+
+# Check if network is available
+func is_network_available() {
+    return http.is_available()
 }
