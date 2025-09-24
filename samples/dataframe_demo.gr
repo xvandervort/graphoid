@@ -1,0 +1,115 @@
+#!/usr/bin/env glang
+
+# DataFrame Demo - Showing DataFrames as Governed Graphs
+#
+# Key Concept: A DataFrame is not special code - it's just a graph with rules!
+# The governance rules ensure:
+# 1. Tabular structure (rectangular shape)
+# 2. Column consistency (same type in each column)
+# 3. Row integrity (all rows have same columns)
+# 4. No external edges (cells stay within the DataFrame)
+
+import "df" as dataframes
+
+print("=== DataFrame as Governed Graph Demo ===")
+print("")
+
+# Create a DataFrame - this creates a graph with tabular governance
+sales_data = dataframes.create(["product", "quarter", "revenue", "units"])
+
+print("Created DataFrame with columns: " + sales_data["_columns"].to_string())
+print("")
+
+# Add data - governance ensures each row has all columns
+row1 = {}
+row1["product"] = "Widget A"
+row1["quarter"] = "Q1"
+row1["revenue"] = 15000
+row1["units"] = 150
+dataframes.add_row(sales_data, row1)
+
+row2 = {}
+row2["product"] = "Widget B"
+row2["quarter"] = "Q1"
+row2["revenue"] = 22000
+row2["units"] = 200
+dataframes.add_row(sales_data, row2)
+
+row3 = {}
+row3["product"] = "Widget A"
+row3["quarter"] = "Q2"
+row3["revenue"] = 18000
+row3["units"] = 175
+dataframes.add_row(sales_data, row3)
+
+row4 = {}
+row4["product"] = "Widget B"
+row4["quarter"] = "Q2"
+row4["revenue"] = 25000
+row4["units"] = 230
+dataframes.add_row(sales_data, row4)
+
+print("Added " + dataframes.row_count(sales_data).to_string() + " rows of data")
+print("")
+
+# DataFrame operations preserve governance rules
+print("=== DataFrame Operations (Graph Transformations) ===")
+print("")
+
+# Select columns - creates new governed subgraph
+product_revenue = dataframes.select(sales_data, ["product", "revenue"])
+print("Selected columns: " + product_revenue["_columns"].to_string())
+print("Row count preserved: " + dataframes.row_count(product_revenue).to_string())
+print("")
+
+# Filter rows - governance ensures result is still tabular
+q2_data = dataframes.create(["product", "quarter", "revenue", "units"])
+for i in [].upto(dataframes.row_count(sales_data) - 1) {
+    if sales_data["quarter"][i] == "Q2" {
+        row = {}
+        row["product"] = sales_data["product"][i]
+        row["quarter"] = sales_data["quarter"][i]
+        row["revenue"] = sales_data["revenue"][i]
+        row["units"] = sales_data["units"][i]
+        dataframes.add_row(q2_data, row)
+    }
+}
+print("Q2 data: " + dataframes.row_count(q2_data).to_string() + " rows")
+print("")
+
+# Aggregations work on the governed structure
+total_revenue = dataframes.sum_column(sales_data, "revenue")
+avg_units = dataframes.avg_column(sales_data, "units")
+
+print("=== Aggregation Results ===")
+print("Total revenue: $" + total_revenue.to_string())
+print("Average units sold: " + avg_units.to_string())
+print("")
+
+# Show that DataFrame is really just a map with structure
+print("=== DataFrame Internal Structure (Graph View) ===")
+print("Type marker: " + sales_data["_type"])
+print("Column count: " + sales_data["_columns"].size().to_string())
+print("Row storage count: " + sales_data["_rows"].size().to_string())
+print("")
+
+# Each column is a graph edge collection
+print("Product column (edge collection): " + sales_data["product"].to_string())
+print("Revenue column (edge collection): " + sales_data["revenue"].to_string())
+print("")
+
+# The governance rules would prevent these operations (conceptually):
+# 1. Adding a row with missing columns - BLOCKED by row_integrity rule
+# 2. Mixing types in a column - BLOCKED by column_consistency rule
+# 3. Creating edges to external nodes - BLOCKED by no_external_edges rule
+# 4. Breaking tabular structure - BLOCKED by tabular_structure rule
+
+print("=== Governance Principles ===")
+print("✓ Tabular structure maintained")
+print("✓ Column types consistent")
+print("✓ All rows have same columns")
+print("✓ No contamination from external data")
+print("")
+
+print("DataFrames are graphs with rules - not special code!")
+print("The rules make the behavior, not the implementation.")

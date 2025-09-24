@@ -1,0 +1,364 @@
+#!/usr/bin/env glang
+
+module dataframe
+
+# DataFrame Module - Tabular data as graph structures with governance rules
+#
+# A DataFrame is a graph where:
+# - Nodes represent cells in a table
+# - Edges connect cells within rows and columns
+# - Governance rules ensure tabular structure integrity
+#
+# Key Principles:
+# 1. DataFrames are graphs with tabular governance rules
+# 2. All operations preserve structural integrity
+# 3. Columns have consistent types (enforced by rules)
+# 4. Rows maintain fixed column count
+
+# Create a new DataFrame from column definitions
+func create(columns) {
+    # For now, use a map to represent the DataFrame structure
+    # Future: This will be a native graph type with DataFrame governance
+    df = {
+        "_type": "dataframe",
+        "_columns": columns,
+        "_data": [],
+        "_row_count": 0
+    }
+
+    # Initialize empty columns
+    for col in columns {
+        df[col] = []
+    }
+
+    return df
+}
+
+# Create DataFrame from list of maps with explicit columns
+func from_records(records, columns) {
+    if records.size() == 0 {
+        return create([])
+    }
+
+    # Create DataFrame with specified columns
+    df = create(columns)
+
+    # Add each record as a row
+    for record in records {
+        add_row(df, record)
+    }
+
+    return df
+}
+
+# Create DataFrame from CSV text
+func from_csv(csv_text, has_headers) {
+    import "csv" as csv_module
+
+    # Parse CSV into list of lists
+    rows = csv_module.parse(csv_text, has_headers, ",")
+
+    if rows.size() == 0 {
+        return create([])
+    }
+
+    # Determine columns
+    columns = []
+    data_start = 0
+
+    if has_headers {
+        # First row contains column names
+        columns = rows[0]
+        data_start = 1
+    } else {
+        # Generate column names: col0, col1, etc.
+        first_row = rows[0]
+        for i in first_row.upto(first_row.size() - 1) {
+            columns.append("col" + i.to_string())
+        }
+    }
+
+    # Create DataFrame
+    df = create(columns)
+
+    # Add data rows
+    for i in [].upto(rows.size() - 1) {
+        if i >= data_start {
+            row_data = rows[i]
+            row_map = {}
+
+            for j in [].upto(columns.size() - 1) {
+                if j < row_data.size() {
+                    row_map[columns[j]] = row_data[j]
+                } else {
+                    row_map[columns[j]] = none  # Missing values
+                }
+            }
+
+            add_row(df, row_map)
+        }
+    }
+
+    return df
+}
+
+# Add a row to DataFrame
+func add_row(df, row_data) {
+    # Validate that row has correct columns
+    columns = df["_columns"]
+
+    for col in columns {
+        if row_data.has_key(col) {
+            df[col].append(row_data[col])
+        } else {
+            df[col].append(none)  # Fill missing with none
+        }
+    }
+
+    df["_data"].append(row_data)
+    df["_row_count"] = df["_row_count"] + 1
+}
+
+# Select specific columns
+func select(df, column_names) {
+    result = create(column_names)
+
+    # Copy data for selected columns
+    for i in [].upto(df["_row_count"] - 1) {
+        row = {}
+        for col in column_names {
+            if df.has_key(col) {
+                row[col] = df[col][i]
+            }
+        }
+        add_row(result, row)
+    }
+
+    return result
+}
+
+# Filter rows based on condition
+func filter(df, column, predicate) {
+    columns = df["_columns"]
+    result = create(columns)
+
+    # Check each row
+    for i in [].upto(df["_row_count"] - 1) {
+        value = df[column][i]
+
+        # Apply predicate
+        keep = false
+        if predicate == "positive" {
+            if value != none && value > 0 {
+                keep = true
+            }
+        } else if predicate == "negative" {
+            if value != none && value < 0 {
+                keep = true
+            }
+        } else if predicate == "non_empty" {
+            if value != none && value != "" {
+                keep = true
+            }
+        } else if predicate == "truthy" {
+            if value {
+                keep = true
+            }
+        }
+
+        # Add row if it passes filter
+        if keep {
+            row = {}
+            for col in columns {
+                row[col] = df[col][i]
+            }
+            add_row(result, row)
+        }
+    }
+
+    return result
+}
+
+# Filter with custom function
+func filter_by(df, column, filter_func) {
+    columns = df["_columns"]
+    result = create(columns)
+
+    for i in [].upto(df["_row_count"] - 1) {
+        value = df[column][i]
+
+        # Apply custom filter function
+        if filter_func(value) {
+            row = {}
+            for col in columns {
+                row[col] = df[col][i]
+            }
+            add_row(result, row)
+        }
+    }
+
+    return result
+}
+
+# Aggregate operations
+func aggregate(df, column, operation) {
+    col_data = df[column]
+
+    if operation == "sum" {
+        total = 0
+        for value in col_data {
+            if value != none {
+                total = total + value
+            }
+        }
+        return total
+    } else if operation == "mean" || operation == "avg" || operation == "average" {
+        total = 0
+        count = 0
+        for value in col_data {
+            if value != none {
+                total = total + value
+                count = count + 1
+            }
+        }
+        if count > 0 {
+            return total / count
+        } else {
+            return none
+        }
+    } else if operation == "min" {
+        min_val = none
+        for value in col_data {
+            if value != none {
+                if min_val == none || value < min_val {
+                    min_val = value
+                }
+            }
+        }
+        return min_val
+    } else if operation == "max" {
+        max_val = none
+        for value in col_data {
+            if value != none {
+                if max_val == none || value > max_val {
+                    max_val = value
+                }
+            }
+        }
+        return max_val
+    } else if operation == "count" {
+        count = 0
+        for value in col_data {
+            if value != none {
+                count = count + 1
+            }
+        }
+        return count
+    }
+
+    return none
+}
+
+# Group by column and aggregate (simplified version)
+func group_by(df, group_column, agg_column, operation) {
+    # For now, return a simplified aggregation result
+    # Full implementation requires map.keys() method
+
+    # Calculate aggregate for entire column as placeholder
+    return aggregate(df, agg_column, operation)
+}
+
+# Display DataFrame info
+func info(df) {
+    print("DataFrame with " + df["_row_count"].to_string() + " rows")
+    print("Columns: " + df["_columns"].to_string())
+}
+
+# Get first n rows
+func head(df, n) {
+    columns = df["_columns"]
+    result = create(columns)
+
+    max_rows = n
+    if n > df["_row_count"] {
+        max_rows = df["_row_count"]
+    }
+
+    for i in [].upto(max_rows - 1) {
+        row = {}
+        for col in columns {
+            row[col] = df[col][i]
+        }
+        add_row(result, row)
+    }
+
+    return result
+}
+
+# Convert DataFrame to CSV string
+func to_csv(df) {
+    lines = []
+    columns = df["_columns"]
+
+    # Add header row
+    header = ""
+    for i in [].upto(columns.size() - 1) {
+        if i > 0 {
+            header = header + ","
+        }
+        header = header + columns[i]
+    }
+    lines.append(header)
+
+    # Add data rows
+    for i in [].upto(df["_row_count"] - 1) {
+        row_str = ""
+        for j in [].upto(columns.size() - 1) {
+            if j > 0 {
+                row_str = row_str + ","
+            }
+            value = df[columns[j]][i]
+            if value != none {
+                row_str = row_str + value.to_string()
+            }
+        }
+        lines.append(row_str)
+    }
+
+    # Join lines
+    result = ""
+    for line in lines {
+        if result != "" {
+            result = result + "\n"
+        }
+        result = result + line
+    }
+
+    return result
+}
+
+# DataFrame Rules (Future: These will be enforced by control layer)
+#
+# 1. TABULAR_STRUCTURE: All rows must have same columns
+# 2. COLUMN_CONSISTENCY: Values in a column should have consistent type
+# 3. ROW_INTEGRITY: Rows maintain connection to their columns
+# 4. NO_CROSS_CONTAMINATION: Cell edges only within same DataFrame
+# 5. ORDERED_ACCESS: Rows accessed sequentially, columns by name
+
+# Future governance rules to be implemented:
+func _define_dataframe_rules() {
+    # These conceptual rules will be enforced when DataFrames
+    # become native graph types with control layer governance
+
+    rules = [
+        "tabular_structure",      # Enforces rectangular shape
+        "column_type_consistency", # Same type within column
+        "row_column_edges_only",   # No diagonal edges
+        "no_external_edges",       # Cells can't link outside
+        "preserve_row_order"       # Row sequence maintained
+    ]
+
+    return rules
+}
+
+print("DataFrame module loaded - tabular data with graph governance")
