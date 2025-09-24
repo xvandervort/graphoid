@@ -19,12 +19,7 @@ module dataframe
 func create(columns) {
     # For now, use a map to represent the DataFrame structure
     # Future: This will be a native graph type with DataFrame governance
-    df = {
-        "_type": "dataframe",
-        "_columns": columns,
-        "_data": [],
-        "_row_count": 0
-    }
+    df = { "_type": "dataframe", "_columns": columns, "_data": [], "_row_count": 0 }
 
     # Initialize empty columns
     for col in columns {
@@ -548,6 +543,184 @@ func normalize_column(df, column, normalize_func) {
     normalized = col_data.map(normalize_func)
     df[column] = normalized
     return df
+}
+
+# Get DataFrame dimensions (rows, columns)
+func shape(df) {
+    return [df["_row_count"], df["_columns"].size()]
+}
+
+# Get comprehensive statistical description of all numeric columns
+func describe(df) {
+    columns = df["_columns"]
+    result = {}
+
+    for col in columns {
+        col_data = df[col]
+        # Check if column contains numeric data
+        sample_value = none
+        for value in col_data {
+            if value != none {
+                sample_value = value
+                break
+            }
+        }
+
+        # Only describe numeric columns
+        if sample_value != none && sample_value.get_type() == "num" {
+            stats = compute_basic_stats(df, col)
+            result[col] = stats
+        }
+    }
+
+    return result
+}
+
+# Transform wide DataFrame to long format (melt)
+func melt(df, id_vars, value_vars, var_name, value_name) {
+    # id_vars: columns to keep as identifiers
+    # value_vars: columns to melt into rows
+    # var_name: name for variable column
+    # value_name: name for value column
+
+    if var_name == none {
+        var_name = "variable"
+    }
+    if value_name == none {
+        value_name = "value"
+    }
+
+    # Create result columns
+    result_columns = []
+    for id_col in id_vars {
+        result_columns.append(id_col)
+    }
+    result_columns.append(var_name)
+    result_columns.append(value_name)
+
+    result = create(result_columns)
+
+    # For each row in original DataFrame
+    for i in [].upto(df["_row_count"] - 1) {
+        # For each variable column to melt
+        for var_col in value_vars {
+            row = {}
+
+            # Copy identifier columns
+            for id_col in id_vars {
+                row[id_col] = df[id_col][i]
+            }
+
+            # Add variable name and value
+            row[var_name] = var_col
+            row[value_name] = df[var_col][i]
+
+            add_row(result, row)
+        }
+    }
+
+    return result
+}
+
+# Transform long DataFrame to wide format (pivot)
+func pivot(df, index_col, columns_col, values_col) {
+    # Get unique values for new columns
+    unique_columns = []
+    for value in df[columns_col] {
+        if value != none && !unique_columns.contains(value) {
+            unique_columns.append(value)
+        }
+    }
+
+    # Get unique index values
+    unique_indices = []
+    for value in df[index_col] {
+        if value != none && !unique_indices.contains(value) {
+            unique_indices.append(value)
+        }
+    }
+
+    # Create result columns: index + pivot columns
+    result_columns = [index_col]
+    for col in unique_columns {
+        result_columns.append(col)
+    }
+
+    result = create(result_columns)
+
+    # For each unique index value
+    for index_val in unique_indices {
+        row = {}
+        row[index_col] = index_val
+
+        # Initialize all pivot columns with none
+        for col in unique_columns {
+            row[col] = none
+        }
+
+        # Fill in values from original data
+        for i in [].upto(df["_row_count"] - 1) {
+            if df[index_col][i] == index_val {
+                pivot_col = df[columns_col][i]
+                if pivot_col != none {
+                    row[pivot_col] = df[values_col][i]
+                }
+            }
+        }
+
+        add_row(result, row)
+    }
+
+    return result
+}
+
+# Transpose DataFrame (swap rows and columns)
+func transpose(df) {
+    columns = df["_columns"]
+
+    # Create new DataFrame with row indices as columns
+    new_columns = ["index"]
+    for i in [].upto(df["_row_count"] - 1) {
+        new_columns.append("row_" + i.to_string())
+    }
+
+    result = create(new_columns)
+
+    # For each original column, create a row
+    for col in columns {
+        row = {}
+        row["index"] = col
+
+        # Add values from this column
+        for i in [].upto(df["_row_count"] - 1) {
+            row_key = "row_" + i.to_string()
+            row[row_key] = df[col][i]
+        }
+
+        add_row(result, row)
+    }
+
+    return result
+}
+
+# Check if DataFrame is in wide format (many columns, fewer rows)
+func is_wide(df) {
+    shape_info = shape(df)
+    rows = shape_info[0]
+    cols = shape_info[1]
+
+    # Heuristic: wide if more columns than rows
+    return cols > rows
+}
+
+# Check if DataFrame is in long format (fewer columns, many rows)
+func is_long(df) {
+    shape_info = shape(df)
+    rows = shape_info[0]
+    cols = shape_info[1]
+
+    # Heuristic: long if more rows than columns by significant margin
+    return rows > (cols * 2)
 }
 
 print("DataFrame module loaded - tabular data with graph governance and lambda support")

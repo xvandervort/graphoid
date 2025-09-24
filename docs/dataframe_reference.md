@@ -84,6 +84,27 @@ Export DataFrame to CSV format.
 csv_output = df.to_csv(employees)
 ```
 
+### `shape(df)` 🆕
+Get DataFrame dimensions as [rows, columns].
+```glang
+dimensions = df.shape(employees)
+print("Shape: [" + dimensions[0].to_string() + ", " + dimensions[1].to_string() + "]")
+# Output: Shape: [4, 3]
+```
+
+### `describe(df)` 🆕
+Get comprehensive statistical summary of all numeric columns.
+```glang
+stats_summary = df.describe(employees)
+# Returns: {
+#   "salary": { "count": 4, "mean": 78750, "min": 65000, "max": 95000, "range": 30000 }
+# }
+
+# Access specific column statistics
+salary_stats = stats_summary["salary"]
+print("Average salary: $" + salary_stats["mean"].to_string())
+```
+
 ## Column Operations
 
 ### `select(df, column_names)`
@@ -205,6 +226,71 @@ eng_avg_salary = dept_summary["Engineering"]["salary"]
 eng_count = dept_summary["Engineering"]["name"]
 ```
 
+## Data Reshaping Operations
+
+### `melt(df, id_vars, value_vars, var_name, value_name)` 🆕
+Transform wide DataFrame to long format.
+```glang
+# Wide format data
+quarterly_sales = df.from_column_data({
+    "product": ["Widget", "Gadget", "Tool"],
+    "Q1": [10000, 15000, 8000],
+    "Q2": [12000, 18000, 9000]
+})
+
+# Melt to long format
+long_sales = df.melt(
+    quarterly_sales,
+    ["product"],           # id_vars: columns to keep
+    ["Q1", "Q2"],         # value_vars: columns to melt
+    "quarter",            # var_name: name for variable column
+    "revenue"             # value_name: name for value column
+)
+
+# Result structure:
+# product | quarter | revenue
+# Widget  | Q1      | 10000
+# Widget  | Q2      | 12000
+# Gadget  | Q1      | 15000
+# ...
+```
+
+### `pivot(df, index_col, columns_col, values_col)` 🆕
+Transform long DataFrame to wide format.
+```glang
+# Long format data
+long_data = df.from_column_data({
+    "product": ["Widget", "Widget", "Gadget", "Gadget"],
+    "quarter": ["Q1", "Q2", "Q1", "Q2"],
+    "revenue": [10000, 12000, 15000, 18000]
+})
+
+# Pivot to wide format
+wide_data = df.pivot(long_data, "product", "quarter", "revenue")
+
+# Result structure:
+# product | Q1    | Q2
+# Widget  | 10000 | 12000
+# Gadget  | 15000 | 18000
+```
+
+### `transpose(df)` 🆕
+Swap rows and columns.
+```glang
+transposed = df.transpose(employees)
+# Columns become rows, rows become columns
+```
+
+### Format Detection
+```glang
+# Check data format
+is_wide_format = df.is_wide(quarterly_sales)    # true if cols > rows
+is_long_format = df.is_long(long_sales)         # true if rows > cols * 2
+
+# Get dimensions
+dimensions = df.shape(employees)                 # [rows, cols]
+```
+
 ## Advanced Analytics Examples
 
 ### Business Intelligence Workflows
@@ -286,11 +372,15 @@ print("Position range: $" + portfolio_stats["range"].to_string())
 | pandas | Glang DataFrame | Notes |
 |--------|----------------|--------|
 | `df['column']` | `df["column"]` | Same syntax |
+| `df.shape` | `df.shape(df)` | Returns [rows, cols] |
+| `df.describe()` | `df.describe(df)` | Statistical summary for all numeric columns |
 | `df.loc[df['col'] > 5]` | `df.filter_by(df, "col", x => x > 5)` | Lambda-powered filtering |
 | `df['col'].apply(func)` | `df.transform_column(df, "col", func)` | Direct lambda application |
-| `df.describe()` | `df.compute_basic_stats(df, "col")` | Statistical summary |
 | `df.groupby('col').sum()` | `df.group_by(df, "col", "target", "sum")` | Group and aggregate |
 | `df.head(n)` | `df.head(df, n)` | First n rows |
+| `df.melt()` | `df.melt(df, id_vars, value_vars, var_name, value_name)` | Wide to long format |
+| `df.pivot()` | `df.pivot(df, index_col, columns_col, values_col)` | Long to wide format |
+| `df.T` | `df.transpose(df)` | Transpose rows/columns |
 
 ## Graph Architecture Benefits
 

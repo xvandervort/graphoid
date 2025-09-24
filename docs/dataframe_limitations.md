@@ -10,9 +10,11 @@ Our pure Glang DataFrame implementation (`stdlib/dataframe.gr`) now supports:
    - `from_records(records, columns)` - Create from list of row maps
    - `from_csv(csv_text, has_headers)` - Import from CSV text
 
-### 2. **Basic Operations**
+### 2. **Basic Operations & Inspection**
    - `add_row(df, row_data)` - Add row with map-like syntax
    - `info(df)` - Display DataFrame structure and row count
+   - **🆕 `shape(df)`** - Get dimensions as [rows, cols] array
+   - **🆕 `describe(df)`** - Comprehensive statistical summary of all numeric columns
    - `head(df, n)` - Get first n rows
    - `to_csv(df)` - Export to CSV format
 
@@ -51,17 +53,39 @@ Our pure Glang DataFrame implementation (`stdlib/dataframe.gr`) now supports:
    df.normalize_column(employees, "salary", x => x / 1000)  # Convert to thousands
    ```
 
-## Major Missing Features ❌
+### 8. **Data Reshaping & Transformations** 🆕
+   **Essential pandas-like reshaping operations now available:**
+   ```glang
+   # Wide to long format (melt)
+   long_data = df.melt(wide_df, ["id"], ["Q1", "Q2"], "quarter", "value")
 
-### 1. **Advanced Group By**
+   # Long to wide format (pivot)
+   wide_data = df.pivot(long_df, "product", "quarter", "revenue")
+
+   # Transpose DataFrame
+   transposed = df.transpose(df)
+
+   # Format detection
+   is_wide = df.is_wide(df)     # cols > rows
+   is_long = df.is_long(df)     # rows > cols * 2
+   ```
+
+## Remaining Missing Features ❌
+
+### 1. ~~**Advanced Group By**~~ **✅ IMPLEMENTED**
+   - ✅ `group_by()` - Single aggregation per group
+   - ✅ `group_by_agg()` - Multiple aggregations per group
+   - ✅ `group_by_dataframes()` - Return sub-DataFrames
+   - ✅ Multi-group operations supported
+
+### 2. **Standard Deviation & Advanced Statistics**
 ```python
-# Pandas
-df.groupby(['category', 'region']).agg({
-    'sales': ['sum', 'mean', 'std'],
-    'quantity': 'sum'
-})
+# Still missing
+df.std()       # Standard deviation
+df.var()       # Variance
+df.corr()      # Correlation matrix
 ```
-**Blocker**: Needs `map.keys()` method to iterate over groups
+**Blocker**: Need `sqrt()` function for standard deviation calculation
 
 ### 2. **Multi-Index Support**
 ```python
@@ -79,23 +103,18 @@ df.loc[df['price'] > 100, ['name', 'quantity']]
 ```
 **Blocker**: Needs better indexing syntax in parser
 
-### 4. **Pivot/Reshape**
-```python
-# Pandas
-df.pivot_table(values='sales', index='date', columns='product')
-df.melt(id_vars=['date'], value_vars=['A', 'B'])
-```
-**Complexity**: Requires sophisticated data restructuring
+### 4. ~~**Pivot/Reshape**~~ **✅ IMPLEMENTED**
+   - ✅ `melt()` - Wide to long format transformation
+   - ✅ `pivot()` - Long to wide format transformation
+   - ✅ `transpose()` - Swap rows and columns
+   - ✅ Format detection: `is_wide()`, `is_long()`
 
-### 5. **Statistical Operations**
-```python
-# Pandas
-df.describe()  # Summary statistics
-df.std()       # Standard deviation
-df.corr()      # Correlation matrix
-df.quantile([0.25, 0.5, 0.75])
-```
-**Effort**: Needs math functions (sqrt for std dev)
+### 5. ~~**Statistical Operations**~~ **✅ MOSTLY IMPLEMENTED**
+   - ✅ `describe()` - Complete statistical summary (count, mean, min, max, range)
+   - ✅ `compute_basic_stats()` - Per-column comprehensive statistics
+   - ✅ `aggregate()` - Built-in operations: sum, mean, min, max, count
+   - ❌ `std()`, `var()` - Need `sqrt()` function
+   - ❌ `corr()` - Correlation matrix (complex but doable)
 
 ### 6. **Time Series**
 ```python
