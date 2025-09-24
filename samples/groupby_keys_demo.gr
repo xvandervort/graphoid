@@ -1,0 +1,36 @@
+#!/usr/bin/env glang
+
+# Demonstrate map.keys() enabling proper group_by
+
+print("Map keys enabling group_by functionality")
+
+# Sample data grouped by department
+groups = {
+    "Engineering": ["Alice", "Charlie"],
+    "Sales": ["Bob", "David"],
+    "Marketing": ["Eve"]
+}
+
+print("Groups: " + groups.to_string())
+
+# Use map.keys() to iterate through all groups
+print("Department summaries:")
+dept_keys = groups.keys()
+for dept in dept_keys {
+    members = groups[dept]
+    count = members.size()
+    print(dept + " has " + count.to_string() + " employees: " + members.to_string())
+}
+
+# Demonstrate aggregation across groups
+print("Total employees by department:")
+total_employees = 0
+for dept in dept_keys {
+    dept_count = groups[dept].size()
+    total_employees = total_employees + dept_count
+    print(dept + ": " + dept_count.to_string())
+}
+print("Total: " + total_employees.to_string())
+
+# This shows how map.keys() enables proper group_by operations
+print("✅ map.keys() enables full DataFrame group_by functionality!")

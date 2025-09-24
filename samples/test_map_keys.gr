@@ -1,0 +1,28 @@
+#!/usr/bin/env glang
+
+# Test if maps have keys() method
+
+print("=== Testing Map Keys Method ===")
+
+# Create a test map
+data = {
+    "name": "Alice",
+    "age": 30,
+    "department": "Engineering"
+}
+
+print("Map: " + data.to_string())
+
+# Test the keys() method
+keys = data.keys()
+print("Keys: " + keys.to_string())
+print("Keys type: " + keys.get_type())
+
+# Test iterating over keys
+print("Iterating over keys:")
+for key in keys {
+    value = data[key]
+    print("  " + key + ": " + value.to_string())
+}
+
+print("✅ Map keys() method works!")

@@ -56,32 +56,8 @@ func from_column_data(column_data) {
     # column_data is a map where keys are column names, values are lists
     # Example: { "name": ["Alice", "Bob"], "age": [25, 30] }
 
-    # Extract column names - this demonstrates variable keys!
-    columns = []
-
-    # Note: In future versions, we'll have map.keys() method
-    # For now, check for common column patterns
-    if column_data.has_key("name") {
-        columns.append("name")
-    }
-    if column_data.has_key("age") {
-        columns.append("age")
-    }
-    if column_data.has_key("department") {
-        columns.append("department")
-    }
-    if column_data.has_key("score") {
-        columns.append("score")
-    }
-    if column_data.has_key("product") {
-        columns.append("product")
-    }
-    if column_data.has_key("price") {
-        columns.append("price")
-    }
-    if column_data.has_key("quantity") {
-        columns.append("quantity")
-    }
+    # Extract column names using map.keys() method
+    columns = column_data.keys()  # Much cleaner with keys() method!
 
     df = create(columns)
 
@@ -328,11 +304,109 @@ func aggregate(df, column, operation) {
 
 # Group by column and aggregate (simplified version)
 func group_by(df, group_column, agg_column, operation) {
-    # For now, return a simplified aggregation result
-    # Full implementation requires map.keys() method
+    # Proper group_by implementation using map.keys() method
+    groups = {}
+    columns = df["_columns"]
 
-    # Calculate aggregate for entire column as placeholder
-    return aggregate(df, agg_column, operation)
+    # Group rows by the group_column value
+    for i in [].upto(df["_row_count"] - 1) {
+        group_value = df[group_column][i]
+        group_key = group_value.to_string()
+
+        # Initialize group if it doesn't exist
+        if !groups.has_key(group_key) {
+            groups[group_key] = []
+        }
+
+        # Add row to group
+        row = {}
+        for col in columns {
+            col_var = col  # Variable key for consistency
+            row[col_var] = df[col][i]
+        }
+        groups[group_key].append(row)
+    }
+
+    # Apply aggregation to each group
+    result = {}
+    group_keys = groups.keys()  # Using map.keys() method!
+
+    for group_key in group_keys {
+        group_rows = groups[group_key]
+
+        # Create temporary DataFrame for this group
+        group_df = create(columns)
+        for row in group_rows {
+            add_row(group_df, row)
+        }
+
+        # Calculate aggregate for this group
+        agg_result = aggregate(group_df, agg_column, operation)
+        result[group_key] = agg_result
+    }
+
+    return result
+}
+
+# Group by column and return sub-DataFrames for each group
+func group_by_dataframes(df, group_column) {
+    # Returns a map where keys are group values, values are DataFrames
+    groups = {}
+    columns = df["_columns"]
+
+    # Group rows by the group_column value
+    for i in [].upto(df["_row_count"] - 1) {
+        group_value = df[group_column][i]
+        group_key = group_value.to_string()
+
+        # Initialize group DataFrame if it doesn't exist
+        if !groups.has_key(group_key) {
+            groups[group_key] = create(columns)
+        }
+
+        # Add row to group DataFrame
+        row = {}
+        for col in columns {
+            col_name = col  # Variable key for clean syntax
+            row[col_name] = df[col][i]
+        }
+        add_row(groups[group_key], row)
+    }
+
+    return groups
+}
+
+# Multiple aggregations on groups - pandas-style functionality
+func group_by_agg(df, group_column, agg_operations) {
+    # agg_operations is a map: { "column": "operation", ... }
+    # Example: { "salary": "mean", "count": "count", "age": "max" }
+
+    group_dfs = group_by_dataframes(df, group_column)
+    group_keys = group_dfs.keys()  # Using map.keys() method!
+
+    result = {}
+
+    for group_key in group_keys {
+        group_df = group_dfs[group_key]
+        group_result = {}
+
+        # Apply each aggregation operation
+        agg_cols = agg_operations.keys()  # Using map.keys() again!
+        for agg_col in agg_cols {
+            operation = agg_operations[agg_col]
+
+            if operation == "count" {
+                group_result[agg_col] = group_df["_row_count"]
+            } else {
+                agg_value = aggregate(group_df, agg_col, operation)
+                group_result[agg_col] = agg_value
+            }
+        }
+
+        result[group_key] = group_result
+    }
+
+    return result
 }
 
 # Display DataFrame info

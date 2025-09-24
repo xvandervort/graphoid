@@ -1,0 +1,17 @@
+#!/usr/bin/env glang
+
+# Simple test of map keys method
+
+data = { "name": "Alice", "age": 30, "department": "Engineering" }
+
+print("Testing map keys method:")
+keys = data.keys()
+print("Keys: " + keys.to_string())
+
+print("Iterating over keys:")
+for key in keys {
+    value = data[key]
+    print(key + ": " + value.to_string())
+}
+
+print("Map keys method works!")
