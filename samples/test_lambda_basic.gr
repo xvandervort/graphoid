@@ -1,0 +1,22 @@
+#!/usr/bin/env glang
+
+# Test basic lambda functionality
+
+print("Testing lambda expressions")
+
+# Single parameter lambda
+double = x => x * 2
+result1 = double(5)
+print("double(5) = " + result1.to_string())
+
+# Multiple parameter lambda
+add = (x, y) => x + y
+result2 = add(3, 4)
+print("add(3, 4) = " + result2.to_string())
+
+# Lambda with string operations
+greet = name => "Hello, " + name + "!"
+result3 = greet("Alice")
+print("greet(Alice) = " + result3)
+
+print("Basic lambda expressions work!")

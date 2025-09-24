@@ -1,0 +1,42 @@
+#!/usr/bin/env glang
+
+# Test lambdas as parameters to operations
+
+print("Testing lambdas as parameters")
+
+# Test if we can pass lambdas to custom functions
+func apply_operation(value, operation) {
+    return operation(value)
+}
+
+# Test with different lambdas
+double = x => x * 2
+square = x => x * x
+increment = x => x + 1
+
+result1 = apply_operation(5, double)
+print("apply_operation(5, double) = " + result1.to_string())
+
+result2 = apply_operation(4, square)
+print("apply_operation(4, square) = " + result2.to_string())
+
+result3 = apply_operation(10, increment)
+print("apply_operation(10, increment) = " + result3.to_string())
+
+# Test with list operations - can we pass custom lambdas?
+func apply_to_list(lst, operation) {
+    result = []
+    for item in lst {
+        result.append(operation(item))
+    }
+    return result
+}
+
+numbers = [1, 2, 3, 4, 5]
+doubled = apply_to_list(numbers, double)
+print("Doubled list: " + doubled.to_string())
+
+squared = apply_to_list(numbers, square)
+print("Squared list: " + squared.to_string())
+
+print("✅ Lambdas can be passed as parameters!")

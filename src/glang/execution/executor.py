@@ -1128,35 +1128,59 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"map() takes 1 argument, got {len(args)}", position)
             
-            if not isinstance(args[0], StringValue):
-                from .errors import ArgumentError
-                raise ArgumentError(f"map() argument must be a string naming a transformation", position)
-            
-            transform_name = args[0].value
-            
-            # Import transformation registry
-            from .transformations import transformation_registry
-            transform_func = transformation_registry.get_transformation(transform_name)
-            
-            if not transform_func:
-                from .errors import ArgumentError
-                available = ", ".join(sorted(transformation_registry.transformations.keys()))
-                raise ArgumentError(
-                    f"Unknown transformation '{transform_name}'. Available: {available}", 
-                    position
-                )
-            
-            # Apply transformation to each element
-            result_elements = []
-            for element in target.elements:
-                try:
-                    transformed = transform_func(element)
-                    result_elements.append(transformed)
-                except ValueError as e:
-                    raise RuntimeError(
-                        f"Transformation '{transform_name}' failed: {e}",
+            # Check if argument is a string (built-in transformation) or a lambda
+            if isinstance(args[0], StringValue):
+                # Built-in transformation using string name
+                transform_name = args[0].value
+
+                # Import transformation registry
+                from .transformations import transformation_registry
+                transform_func = transformation_registry.get_transformation(transform_name)
+
+                if not transform_func:
+                    from .errors import ArgumentError
+                    available = ", ".join(sorted(transformation_registry.transformations.keys()))
+                    raise ArgumentError(
+                        f"Unknown transformation '{transform_name}'. Available: {available}",
                         position
                     )
+
+                # Apply built-in transformation to each element
+                result_elements = []
+                for element in target.elements:
+                    try:
+                        transformed = transform_func(element)
+                        result_elements.append(transformed)
+                    except Exception as e:
+                        raise RuntimeError(f"Transformation '{transform_name}' failed: {str(e)}", position)
+
+            elif hasattr(args[0], 'parameters') and hasattr(args[0], 'body'):
+                # Custom lambda function
+                from .values import LambdaValue
+                lambda_func = args[0]
+
+                if not isinstance(lambda_func, LambdaValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"map() argument must be a string transformation name or a lambda function", position)
+
+                # Verify lambda has exactly one parameter
+                if len(lambda_func.parameters) != 1:
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"map() lambda must have exactly 1 parameter, got {len(lambda_func.parameters)}", position)
+
+                # Apply lambda to each element
+                result_elements = []
+                for element in target.elements:
+                    try:
+                        # Call the lambda with current element
+                        transformed = self.call_function(lambda_func, [element], position)
+                        result_elements.append(transformed)
+                    except Exception as e:
+                        raise RuntimeError(f"Lambda transformation failed: {str(e)}", position)
+
+            else:
+                from .errors import ArgumentError
+                raise ArgumentError(f"map() argument must be a string transformation name or a lambda function", position)
             
             # Infer constraint from first result element if any
             new_constraint = None
@@ -1173,35 +1197,61 @@ class ASTExecutor(BaseASTVisitor):
                 from .errors import ArgumentError
                 raise ArgumentError(f"filter() takes 1 argument, got {len(args)}", position)
             
-            if not isinstance(args[0], StringValue):
-                from .errors import ArgumentError
-                raise ArgumentError(f"filter() argument must be a string naming a predicate", position)
-            
-            predicate_name = args[0].value
-            
-            # Import transformation registry
-            from .transformations import transformation_registry
-            predicate_func = transformation_registry.get_predicate(predicate_name)
-            
-            if not predicate_func:
-                from .errors import ArgumentError
-                available = ", ".join(sorted(transformation_registry.predicates.keys()))
-                raise ArgumentError(
-                    f"Unknown predicate '{predicate_name}'. Available: {available}", 
-                    position
-                )
-            
-            # Filter elements using predicate
-            result_elements = []
-            for element in target.elements:
-                try:
-                    if predicate_func(element):
-                        result_elements.append(element)
-                except Exception as e:
-                    raise RuntimeError(
-                        f"Predicate '{predicate_name}' failed: {e}",
+            # Check if argument is a string (built-in predicate) or a lambda
+            if isinstance(args[0], StringValue):
+                # Built-in predicate using string name
+                predicate_name = args[0].value
+
+                # Import transformation registry
+                from .transformations import transformation_registry
+                predicate_func = transformation_registry.get_predicate(predicate_name)
+
+                if not predicate_func:
+                    from .errors import ArgumentError
+                    available = ", ".join(sorted(transformation_registry.predicates.keys()))
+                    raise ArgumentError(
+                        f"Unknown predicate '{predicate_name}'. Available: {available}",
                         position
                     )
+
+                # Filter elements using built-in predicate
+                result_elements = []
+                for element in target.elements:
+                    try:
+                        if predicate_func(element):
+                            result_elements.append(element)
+                    except Exception as e:
+                        raise RuntimeError(f"Predicate '{predicate_name}' failed: {str(e)}", position)
+
+            elif hasattr(args[0], 'parameters') and hasattr(args[0], 'body'):
+                # Custom lambda function
+                from .values import LambdaValue
+                lambda_func = args[0]
+
+                if not isinstance(lambda_func, LambdaValue):
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"filter() argument must be a string predicate name or a lambda function", position)
+
+                # Verify lambda has exactly one parameter
+                if len(lambda_func.parameters) != 1:
+                    from .errors import ArgumentError
+                    raise ArgumentError(f"filter() lambda must have exactly 1 parameter, got {len(lambda_func.parameters)}", position)
+
+                # Filter elements using lambda
+                result_elements = []
+                for element in target.elements:
+                    try:
+                        # Call the lambda with current element
+                        result = self.call_function(lambda_func, [element], position)
+                        # Check if result is truthy
+                        if result.to_python():  # Convert to Python boolean
+                            result_elements.append(element)
+                    except Exception as e:
+                        raise RuntimeError(f"Lambda predicate failed: {str(e)}", position)
+
+            else:
+                from .errors import ArgumentError
+                raise ArgumentError(f"filter() argument must be a string predicate name or a lambda function", position)
             
             # Maintain original constraint
             return ListValue(result_elements, target.constraint, position)
