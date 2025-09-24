@@ -34,6 +34,49 @@ Transform Glang from a practical programming language into a revolutionary platf
 - REPL environment
 - 70% test coverage
 
+### 📍 INFRASTRUCTURE: Rust Migration Plan (Q2-Q4 2025)
+**Goal**: Transition Glang from Python to Rust for performance, system integration, and self-hosting
+**Strategy**: Parallel development with gradual transition to minimize risk
+**Priority**: **FOUNDATIONAL** - Enables multiple roadmap goals
+
+> **See**: [RUST_MIGRATION_PLAN.md](./RUST_MIGRATION_PLAN.md) for comprehensive implementation details
+
+#### Why Rust Migration is Critical
+- **Performance Requirements**: v1.0 success criteria targets "within 10x of Python" - Rust provides 10-100x improvement
+- **System Integration**: Phase 1.2 standard library needs true system calls (file I/O, networking, processes)
+- **Self-Hosting Path**: Phase 2.4 self-hosting architecture requires systems language foundation
+- **Distributed Computing**: Phase 4 distributed systems need Rust's performance and safety guarantees
+- **Production Readiness**: Real-world applications require compiled performance, not just interpreted convenience
+
+#### Migration Strategy: Parallel Development
+```
+Timeline: 8-10 months
+Approach: Implement new features in Python first → Port immediately to Rust → Cross-validate → Enhance
+
+Month 1-3:    Rust interpreter foundation (core language parity)
+Month 4-5:    Standard library without Python dependencies
+Month 6-7:    Bytecode compiler + performance optimizations
+Month 8-10:   Production readiness, JIT compilation path
+```
+
+#### Execution Modes in Final Implementation
+- **Interpreter Mode** (default): Interactive REPL, development, debugging - same experience as current Python
+- **Compiled Mode** (production): 10-100x performance through bytecode compilation
+- **Future JIT Mode**: Hot path compilation for computational workloads
+
+#### Integration with Existing Roadmap
+- **Phase 1 (Production Readiness)**: Rust migration runs parallel to standard library completion
+- **Phase 2 (Graph Foundation)**: True graph structures implemented in high-performance Rust
+- **Phase 3-4 (Advanced Features)**: Self-aware and distributed systems require Rust foundation
+
+#### Risk Mitigation
+- **Zero User Disruption**: Python version continues stable during migration
+- **Continuous Validation**: Both implementations tested against identical requirements
+- **Gradual Adoption**: Users migrate when ready, not forced
+- **Fallback Plan**: Python development continues if Rust migration faces blockers
+
+**Next Action**: Begin Phase 0 (Month 1) with Rust project bootstrap after current Phase 1 priorities complete
+
 ### ✅ FOUNDATIONAL PRIORITY #1: True Graph Architecture (COMPLETED)
 **Goal**: Transform Glang from simulated graph language to TRUE graph language
 
@@ -508,15 +551,18 @@ The following documents have been superseded by this roadmap:
     - **Methods Added**: Index finding, substring extraction, string repetition, and padding
     - **Integration**: Semantic analyzer updated to recognize new methods
     - **Note**: Removed redundant `char_at()` method since strings already support indexing syntax `text[0]`
-17. **Design tree/graph data structures** (enables true DOM processing)
-18. **Implement package manager** (glang-package command)
+17. ✅ **COMPLETED: Rust migration plan formalized** - Comprehensive parallel development strategy documented
+18. **Design tree/graph data structures** (enables true DOM processing)
+19. **Implement package manager** (glang-package command)
+20. **Begin Rust project bootstrap** (after Phase 1 priorities complete)
 
 ### Q1 2025
 1. Finish standard library modules
-2. Build performance benchmarking suite  
+2. Build performance benchmarking suite
 3. Implement basic packaging system (glang-package commands)
 4. Create VS Code extension prototype
 5. Begin Phase 2 design review
+6. **RUST MIGRATION**: Bootstrap parallel development infrastructure (Month 1 of migration plan)
 
 ---
 
