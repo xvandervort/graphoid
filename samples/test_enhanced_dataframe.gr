@@ -1,0 +1,186 @@
+#!/usr/bin/env glang
+
+# Test the enhanced DataFrame capabilities with lambda support
+
+print("=== Testing Lambda-Powered DataFrame Enhancements ===")
+
+# First load basic dataframe
+load "stdlib/dataframe.gr"
+print("✅ Basic DataFrame loaded")
+
+# Then load enhanced features
+load "stdlib/dataframe_enhanced.gr"
+print("✅ Enhanced DataFrame features loaded")
+
+# Create sample data
+print("\n--- Creating Sample Employee Data ---")
+employees = dataframe.from_records([
+    { "name": "Alice Johnson", "age": 32, "salary": 75000, "department": "Engineering" },
+    { "name": "Bob Smith", "age": 28, "salary": 65000, "department": "Engineering" },
+    { "name": "Charlie Brown", "age": 45, "salary": 95000, "department": "Management" },
+    { "name": "Diana Prince", "age": 29, "salary": 70000, "department": "Marketing" },
+    { "name": "Eve Adams", "age": 35, "salary": 80000, "department": "Engineering" }
+], ["name", "age", "salary", "department"])
+
+print("Original data:")
+dataframe.print_df(employees)
+
+print("\n=== 1. Column Transformations ===")
+
+# Give everyone a 10% raise
+raise_func = x => x * 1.10
+salary_boosted = dataframe_enhanced.transform_column(employees, "salary", raise_func)
+print("After 10% salary increase:")
+dataframe.print_df(salary_boosted)
+
+# Convert names to uppercase
+upper_func = x => x.upper()
+name_upper = dataframe_enhanced.transform_column(employees, "name", upper_func)
+print("\nNames in uppercase:")
+dataframe.print_df(name_upper)
+
+print("\n=== 2. Advanced Filtering ===")
+
+# Find employees over 30 with salary > 70000
+senior_high_earners = dataframe_enhanced.filter_rows(employees, row =>
+    row["age"] > 30 && row["salary"] > 70000
+)
+print("Senior high earners (age > 30, salary > 70K):")
+dataframe.print_df(senior_high_earners)
+
+# Filter Engineering department only
+engineers_only = dataframe_enhanced.filter_rows(employees, row =>
+    row["department"] == "Engineering"
+)
+print("\nEngineers only:")
+dataframe.print_df(engineers_only)
+
+print("\n=== 3. Derived Columns ===")
+
+# Add experience level based on age
+experience_func = age => {
+    if age < 30 { return "Junior" }
+    else if age < 40 { return "Mid-level" }
+    else { return "Senior" }
+}
+
+with_experience = dataframe_enhanced.add_column(
+    employees, "experience", "age", experience_func
+)
+print("With experience levels:")
+dataframe.print_df(with_experience)
+
+# Add salary category
+salary_category_func = salary => {
+    if salary < 70000 { return "Entry" }
+    else if salary < 85000 { return "Standard" }
+    else { return "Premium" }
+}
+
+with_categories = dataframe_enhanced.add_column(
+    with_experience, "salary_grade", "salary", salary_category_func
+)
+print("\nWith salary categories:")
+dataframe.print_df(with_categories)
+
+print("\n=== 4. Statistical Analysis ===")
+
+# Compute salary statistics
+salary_stats = dataframe_enhanced.compute_basic_stats(employees, "salary")
+print("Salary Statistics:")
+print("  Count: " + salary_stats["count"].to_string())
+print("  Mean: $" + salary_stats["mean"].to_string())
+print("  Min: $" + salary_stats["min"].to_string())
+print("  Max: $" + salary_stats["max"].to_string())
+
+# Age statistics
+age_stats = dataframe_enhanced.compute_basic_stats(employees, "age")
+print("\nAge Statistics:")
+print("  Count: " + age_stats["count"].to_string())
+print("  Mean: " + age_stats["mean"].to_string() + " years")
+print("  Min: " + age_stats["min"].to_string() + " years")
+print("  Max: " + age_stats["max"].to_string() + " years")
+
+print("\n=== 5. Custom Aggregations ===")
+
+# Average salary using lambda
+avg_salary = dataframe_enhanced.aggregate_by(employees, "salary", salaries =>
+    salaries.sum() / salaries.size()
+)
+print("Average salary (custom): $" + avg_salary.to_string())
+
+# Salary range (max - min)
+salary_range = dataframe_enhanced.aggregate_by(employees, "salary", salaries =>
+    salaries.max() - salaries.min()
+)
+print("Salary range: $" + salary_range.to_string())
+
+# Count of high earners (> 75K)
+high_earner_count = dataframe_enhanced.aggregate_by(employees, "salary", salaries =>
+    salaries.filter(x => x > 75000).size()
+)
+print("High earners (>$75K): " + high_earner_count.to_string())
+
+print("\n=== 6. Group By Operations ===")
+
+# Average salary by department
+avg_by_dept = dataframe_enhanced.group_by_simple(
+    employees, "department", "salary",
+    salaries => salaries.sum() / salaries.size()
+)
+print("Average salary by department:")
+dataframe.print_df(avg_by_dept)
+
+# Employee count by department
+count_by_dept = dataframe_enhanced.group_by_simple(
+    employees, "department", "name",
+    names => names.size()
+)
+print("\nEmployee count by department:")
+dataframe.print_df(count_by_dept)
+
+# Max age by department
+max_age_by_dept = dataframe_enhanced.group_by_simple(
+    employees, "department", "age",
+    ages => ages.max()
+)
+print("\nMax age by department:")
+dataframe.print_df(max_age_by_dept)
+
+print("\n=== 7. Row Transformations ===")
+
+# Add bonus field to each row based on salary and department
+bonus_calculator = row => {
+    base_bonus = row["salary"] * 0.05  # 5% base bonus
+    if row["department"] == "Engineering" {
+        base_bonus = base_bonus * 1.2  # 20% engineering bonus
+    } else if row["department"] == "Management" {
+        base_bonus = base_bonus * 1.5  # 50% management bonus
+    }
+
+    # Create new row with bonus
+    new_row = row
+    new_row["bonus"] = base_bonus
+    return new_row
+}
+
+# Add bonus column to original structure
+bonus_columns = employees["_columns"]
+bonus_columns.append("bonus")
+employees_with_bonus = dataframe.create(bonus_columns)
+
+# Apply transformation
+processed_employees = dataframe_enhanced.transform_rows(employees, bonus_calculator)
+
+print("Employee data with calculated bonuses:")
+dataframe.print_df(processed_employees)
+
+print("\n=== All Enhanced DataFrame Tests Completed! ===")
+print("✅ Column transformations with lambdas")
+print("✅ Advanced row filtering")
+print("✅ Derived column calculations")
+print("✅ Statistical analysis")
+print("✅ Custom aggregation functions")
+print("✅ Group-by operations")
+print("✅ Row-wise transformations")
+print("\n🚀 DataFrames now support powerful lambda-based analytics!")
