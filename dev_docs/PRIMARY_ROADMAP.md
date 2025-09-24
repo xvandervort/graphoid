@@ -451,15 +451,20 @@ Month 8-10:   Production readiness, JIT compilation path
 3. **Performance**: Profile and optimize critical paths
 
 ### Medium Priority
-1. **Byte Primitive Type**: Add `byte` type for binary data processing
+1. **Module Alias System**: Automatic aliases for standard library modules
+   - `alias 'stats'` in statistics module should auto-create stats.function() access
+   - `alias 'df'` in dataframe module for df.create() convenience
+   - Eliminates verbose `import "module" as alias` syntax
+   - **Priority**: Medium-Low (nice syntax improvement)
+2. **Byte Primitive Type**: Add `byte` type for binary data processing
    - Binary file operations (images, executables, network packets)
    - Explicit encoding/decoding control for string conversions
    - Network protocol implementation support
    - Cryptographic operations and byte-level manipulation
    - **Note**: Not needed for current string enhancements - those work better at character level
-2. **Documentation**: Complete language reference and tutorials
-3. **Tooling**: Build debugger and profiler
-4. **Platform Support**: Ensure Windows/Mac/Linux compatibility
+3. **Documentation**: Complete language reference and tutorials
+4. **Tooling**: Build debugger and profiler
+5. **Platform Support**: Ensure Windows/Mac/Linux compatibility
 
 ### Low Priority (Philosophical Purity)
 1. **Custom Number System**: Replace Python float/int with GlangNumber

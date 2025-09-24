@@ -78,14 +78,16 @@ Our pure Glang DataFrame implementation (`stdlib/dataframe.gr`) now supports:
    - ✅ `group_by_dataframes()` - Return sub-DataFrames
    - ✅ Multi-group operations supported
 
-### 2. **Standard Deviation & Advanced Statistics**
-```python
-# Still missing
-df.std()       # Standard deviation
-df.var()       # Variance
-df.corr()      # Correlation matrix
+### 2. ~~**Standard Deviation & Advanced Statistics**~~ **✅ IMPLEMENTED**
+```glang
+# Now available via statistics module
+load "stdlib/statistics.gr"
+std_dev = std(column_data)         # Standard deviation
+variance = variance(column_data)   # Variance
+corr_coeff = correlation(col1, col2)  # Correlation coefficient
+stats = describe(column_data)      # Complete statistical summary
 ```
-**Blocker**: Need `sqrt()` function for standard deviation calculation
+**✅ RESOLVED**: Full statistics module created with all advanced statistical functions
 
 ### 2. **Multi-Index Support**
 ```python
