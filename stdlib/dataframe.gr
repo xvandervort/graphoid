@@ -503,4 +503,51 @@ func _define_dataframe_rules() {
     return rules
 }
 
-print("DataFrame module loaded - tabular data with graph governance")
+# Lambda-powered column transformation
+func transform_column(df, column, transform_func) {
+    if !df.has_key(column) {
+        return df
+    }
+
+    col_data = df[column]
+    transformed = col_data.map(transform_func)
+    df[column] = transformed
+    return df
+}
+
+# Compute basic statistics for a column
+func compute_basic_stats(df, column) {
+    col_data = df[column].filter(x => x != none)
+    if col_data.size() == 0 {
+        return { "count": 0, "mean": none, "min": none, "max": none, "range": none }
+    }
+
+    count = col_data.size()
+    total = col_data.sum()
+    mean = total / count
+    min_val = col_data.min()
+    max_val = col_data.max()
+    range_val = max_val - min_val
+
+    return {
+        "count": count,
+        "mean": mean,
+        "min": min_val,
+        "max": max_val,
+        "range": range_val
+    }
+}
+
+# Normalize column values using custom lambda
+func normalize_column(df, column, normalize_func) {
+    if !df.has_key(column) {
+        return df
+    }
+
+    col_data = df[column]
+    normalized = col_data.map(normalize_func)
+    df[column] = normalized
+    return df
+}
+
+print("DataFrame module loaded - tabular data with graph governance and lambda support")

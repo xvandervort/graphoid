@@ -33,26 +33,29 @@ A DataFrame is a graph structure with five key governance rules:
 - Columns accessed by name
 - Consistent with tabular data expectations
 
-## Pure Glang Implementation
+## Pure Glang Implementation with Lambda Analytics
 
-The DataFrame module (`stdlib/df.gr`) is implemented entirely in Glang, demonstrating that DataFrames don't require special runtime support:
+The DataFrame module (`stdlib/dataframe.gr`) is implemented entirely in Glang, demonstrating that DataFrames don't require special runtime support. Recent enhancements add lambda-powered analytics:
 
 ```glang
-import "df" as dataframes
+import "dataframe" as df
 
-# Create a DataFrame - just a map with governance rules
-frame = dataframes.create(["name", "age", "score"])
+# Create a DataFrame - just a graph with governance rules
+employees = df.from_column_data({
+    "name": ["Alice", "Bob", "Charlie"],
+    "salary": [75000, 65000, 95000],
+    "department": ["Engineering", "Engineering", "Management"]
+})
 
-# Add rows - governance ensures all columns present
-row = {}
-row["name"] = "Alice"
-row["age"] = 30
-row["score"] = 95
-dataframes.add_row(frame, row)
+# Lambda-powered transformations preserve governance
+df.transform_column(employees, "salary", x => x * 1.10)  # 10% raise across all rows
 
-# Operations preserve governance
-subset = dataframes.select(frame, ["name", "score"])  # Still tabular
-high_scores = dataframes.filter_positive(frame, "score")  # Still rectangular
+# Advanced analytics with custom functions
+high_earners = df.filter_by(employees, "salary", x => x > 80000)
+stats = df.compute_basic_stats(employees, "salary")
+
+# Group operations using graph traversal
+dept_totals = df.group_by(employees, "department", "salary", "sum")
 ```
 
 ## Graph Structure View
@@ -78,10 +81,17 @@ DataFrame Graph Structure:
 
 DataFrame operations are graph transformations that preserve governance:
 
+### Traditional Operations:
 - **Select**: Creates subgraph with specific column edges
 - **Filter**: Creates subgraph with specific row edges
 - **Aggregate**: Traverses column edges to compute values
-- **Join**: Merges graphs while maintaining tabular structure
+- **Group By**: Partitions graph into subgraphs by shared values
+
+### Lambda-Powered Operations:
+- **Transform Column**: Applies lambda to each node in a column subgraph
+- **Filter By**: Uses lambda predicates to select subgraph nodes
+- **Statistics**: Traverses column graphs to compute comprehensive metrics
+- **Custom Analytics**: Lambda functions enable arbitrary graph traversals
 
 ## Benefits of This Approach
 
@@ -112,13 +122,23 @@ See `samples/dataframe_demo.gr` for a complete example:
 glang samples/dataframe_demo.gr
 ```
 
-## Future Enhancements
+## Current Lambda Capabilities
 
-As Glang evolves, DataFrames will gain additional capabilities:
+Recent enhancements have unlocked powerful analytics:
+
+### ✅ **Implemented**:
+- **Custom column transformations**: `df.transform_column(df, "price", x => x * 1.1)`
+- **Lambda filtering**: `df.filter_by(df, "age", x => x > 21 && x < 65)`
+- **Statistical analysis**: `df.compute_basic_stats(df, "revenue")`
+- **Complex aggregations**: Group operations with `map.keys()` support
+- **Data validation**: `df.filter_by(df, "email", x => x.contains("@"))`
+
+### 🚀 **Future Enhancements**:
 - Native graph syntax for DataFrame operations
 - Automatic type inference for columns
 - Parallel processing through graph traversal
 - Distributed DataFrames across multiple nodes
+- Lambda-based joins and complex transformations
 
 ## Key Takeaway
 

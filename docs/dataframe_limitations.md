@@ -1,30 +1,55 @@
-# DataFrame Limitations vs Pandas
+# DataFrame Capabilities and Comparison vs Pandas
 
 ## Current Capabilities ✅
 
-Our pure Glang DataFrame implementation (`stdlib/df.gr`) currently supports:
+Our pure Glang DataFrame implementation (`stdlib/dataframe.gr`) now supports:
 
-1. **Basic Operations**
-   - Create DataFrames with named columns
-   - Add rows with map-like syntax
-   - Row count and column access
-   - Head operation (first n rows)
+### 1. **DataFrame Creation**
+   - `create(columns)` - Create empty DataFrame with specified columns
+   - `from_column_data(column_data)` - Create from map of column arrays
+   - `from_records(records, columns)` - Create from list of row maps
+   - `from_csv(csv_text, has_headers)` - Import from CSV text
 
-2. **Filtering**
-   - `filter_positive()` - values > 0
-   - `filter_by_value()` - exact match
-   - `filter_greater_than()` - threshold comparison
+### 2. **Basic Operations**
+   - `add_row(df, row_data)` - Add row with map-like syntax
+   - `info(df)` - Display DataFrame structure and row count
+   - `head(df, n)` - Get first n rows
+   - `to_csv(df)` - Export to CSV format
 
-3. **Aggregation**
-   - `sum_column()` - column sum
-   - `avg_column()` - column average
-   - `count_by()` - frequency counts
-   - `get_unique()` - distinct values
+### 3. **Column Operations**
+   - `select(df, column_names)` - Select specific columns
+   - **🆕 `transform_column(df, column, lambda_func)`** - Transform column with custom lambda
+   - **🆕 `normalize_column(df, column, lambda_func)`** - Normalize column values with lambda
 
-4. **Transformations**
-   - `select()` - column subset
-   - `sort_by()` - sort by column (ascending/descending)
-   - `inner_join()` - join two DataFrames on common column
+### 4. **Filtering & Selection**
+   - `filter(df, column, predicate)` - Built-in predicates: "positive", "negative", "non_empty", "truthy"
+   - **🆕 `filter_by(df, column, lambda_func)`** - Filter with custom lambda functions
+
+### 5. **Statistics & Aggregation**
+   - `aggregate(df, column, operation)` - Built-in operations: "sum", "mean", "min", "max", "count"
+   - **🆕 `compute_basic_stats(df, column)`** - Complete statistical summary (count, mean, min, max, range)
+
+### 6. **Advanced Group Operations**
+   - **✅ `group_by(df, group_col, agg_col, operation)`** - Group and aggregate (uses `map.keys()`)
+   - **✅ `group_by_dataframes(df, group_column)`** - Return sub-DataFrames for each group
+   - **✅ `group_by_agg(df, group_col, agg_operations)`** - Multiple aggregations per group
+
+### 7. **Lambda-Powered Analytics** 🚀
+   **NEW**: Full lambda support enables pandas-like custom transformations:
+   ```glang
+   # Custom column transformations
+   df.transform_column(employees, "salary", x => x * 1.10)  # 10% raise
+
+   # Complex filtering with lambdas
+   filtered = df.filter_by(employees, "salary", x => x > 75000)
+
+   # Statistical analysis
+   stats = df.compute_basic_stats(employees, "salary")
+   # Returns: { "count": 5, "mean": 78000, "min": 65000, "max": 95000, "range": 30000 }
+
+   # Custom normalization
+   df.normalize_column(employees, "salary", x => x / 1000)  # Convert to thousands
+   ```
 
 ## Major Missing Features ❌
 
@@ -115,39 +140,42 @@ df1.merge(df2, how='outer', on=['id', 'date'])
 ```
 **Complexity**: More sophisticated join logic needed
 
-## Language-Level Blockers
+## Language-Level Issues - RESOLVED! ✅
 
-Several missing features are blocked by Glang language limitations:
+Recent enhancements have fixed most language-level blockers:
 
-1. **No `map.keys()` method** - Can't iterate over map keys
-   - Blocks: Proper group_by implementation
-   - Workaround: Track keys separately
+1. ~~**No `map.keys()` method**~~ **✅ FIXED**
+   - ✅ `map.keys()` is available and working
+   - ✅ Powers proper `group_by()` implementation
+   - ✅ Enables advanced group operations
 
-2. ~~**Limited map literal syntax** - Can't use variables as keys in literals~~ **FIXED**
-   - ✅ Variables and expressions can now be used as keys: `{ variable: value }`
-   - ✅ Dynamic map construction now works: `{ prefix + "_id": 123 }`
+2. ~~**Limited map literal syntax**~~ **✅ FIXED**
+   - ✅ Variables and expressions can be used as keys: `{ variable: value }`
+   - ✅ Dynamic map construction works: `{ prefix + "_id": 123 }`
 
-3. **No lambda parameters in map/filter** - Can't pass custom functions easily
-   - Blocks: Flexible transformations
-   - Workaround: Named predicates only
+3. ~~**No lambda parameters in map/filter**~~ **✅ FIXED**
+   - ✅ Full lambda support: `df.filter_by(df, "salary", x => x > 80000)`
+   - ✅ Custom transformations: `df.transform_column(df, "price", x => x * 1.1)`
+   - ✅ Complex analytics: `salaries.map(x => x > threshold && x < limit)`
 
-4. **No multi-dimensional indexing** - `df[1:5, 2:4]` not possible
-   - Blocks: Matrix-like operations
-   - Workaround: Sequential operations
+4. ~~**Multi-dimensional indexing**~~ **✅ NOT A BUG**
+   - ✅ Glang uses column-first access by design: `df["column"][index]`
+   - ✅ Functional operations replace matrix syntax: `df.select()`, `df.filter()`
+   - ✅ Intentional design choice, not a limitation
 
-5. **No operator overloading** - Can't use `df1 + df2`
+5. **Operator overloading** - Can't use `df1 + df2`
    - Blocks: Intuitive mathematical operations
-   - Workaround: Explicit method calls
+   - Workaround: Explicit method calls (`df.merge()`, etc.)
 
-## What's Most Important?
+## What's Most Important Now?
 
-For practical data analysis in Glang, the priorities should be:
+With the major blockers resolved, priorities for enhanced DataFrame capabilities:
 
-1. **Fix `map.keys()`** - Unblocks group_by and many operations
-2. **Add standard deviation** - Essential for statistics
-3. **Improve CSV handling** - Parse types, not just strings
-4. **Add `describe()` method** - Quick statistical summary
-5. **Implement left join** - Common data operation
+1. **✅ Statistical analysis** - `compute_basic_stats()` provides comprehensive metrics
+2. **Add standard deviation** - Need `sqrt()` function for full statistical suite
+3. **Improve CSV type parsing** - Auto-detect numbers vs strings
+4. **Implement left/outer joins** - More flexible data combining
+5. **Add pivot operations** - Reshape data for different analyses
 
 ## Philosophical Note
 
