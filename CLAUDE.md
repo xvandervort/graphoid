@@ -12,13 +12,11 @@ Glang aims to be:
 2. **Then a Graph Language** - With true graph structures including nodes, edges, and traversal
 3. **Finally a Revolutionary Platform** - Enabling self-aware, self-mutating, distributed graph systems
 
-### Core Features (Implemented)
-- **Complete Function System** - Functions, lambdas, closures, and recursion
-- **Strong Type System** - With optional type inference and type constraints
-- **Graph-Based Collections** - Lists, maps, data nodes, and binary trees with true graph foundation
-- **Method-Based Design** - Everything uses methods: `list.append()`, `string.upper()`, `num.abs()`
-- **File Loading System** - Modular programming with `.gr` files
-- **Clean AST Architecture** - Reliable execution with excellent error messages
+### Core Architecture
+- **Graph-Based Function Discovery** - Functions stored as nodes, calls use graph traversal
+- **Method-Based Collections** - Everything uses methods: `list.append()`, `string.upper()`, `num.abs()`
+- **Optional Type System** - Types when needed, inference when obvious
+- **Behavior-Driven Data** - Collections with automatic value transformations
 
 ### Design Principles:
 - **Practical First** - Must be useful for real-world applications before adding advanced features
@@ -27,88 +25,23 @@ Glang aims to be:
 - **Intuitive Syntax** - Natural programming constructs that feel familiar
 - **Developer Experience** - Excellent error messages, REPL environment, and reflection capabilities
 
-### Architectural Breakthrough (September 2025)
-**ACHIEVED**: True graph-based data structures are now implemented! All collections are built on genuine graph foundations:
-- **✅ Edges**: Explicit relationships between nodes with metadata (EdgeMetadata system)
-- **✅ Node Awareness**: GraphNodes with edge tracking and neighbor access
-- **✅ Graph Traversal**: Real pathfinding and connectivity analysis (binary tree traversals)
-- **✅ Edge Governance**: Rule-based validation system for graph operations
+### Current Status (January 2025)
+**BREAKTHROUGH COMPLETE**: Glang now has true graph-based function discovery system. Functions are stored as graph nodes and calls use graph traversal instead of variable lookup. This transforms Glang from a simulated graph language to a genuinely graph-theoretic programming platform.
 
-**Binary Trees** demonstrate the power of this architecture - they're real graph structures with nodes, edges, and governance, not simulated tree behavior. This transforms Glang from a container-based language to a genuinely graph-theoretic programming platform.
+## Current Development Focus
 
-## Recent Changes (September 2025)
+### Next Priorities
+1. **Tree & Graph Data Structures** - Enable pure Glang DOM/XML processing
+2. **Statistics Module** - Mathematical capabilities for data analysis
+3. **Testing Framework** - Quality assurance beyond basic assertions
+4. **Rust Migration Planning** - Parallel development strategy
 
-### 🚧 IN PROGRESS: Edge Governance System (December 2025)
-**MULTI-WEEK PROJECT: Implementing safe graph operations**
-
-- **🎯 GOAL**: Add Layer 3 (Control) to existing graph architecture for safe edge operations
-- **⚠️ PROBLEM SOLVED**: Current edge system allows dangerous operations (cycles, cross-contamination)
-- **🏗️ ARCHITECTURE**: Building on five-layer graph vision (Data, Behavior, **Control**, Metadata, System Boundary)
-- **📋 CURRENT FOCUS**: Practical implementation for binary trees and DataFrames
-
-**🗓️ Progress Tracking (8-week timeline):**
-- **Week 1**: ✅ **COMPLETED** - Basic control layer + essential rules (`no_list_cycles`, `same_structure_only`)
-  - ✅ `ControlLayer` class with validation framework
-  - ✅ Two fundamental rules: cycle prevention & cross-structure protection
-  - ✅ Integration with `GraphNode.add_edge_to()`
-  - ✅ Edge inspection methods: `get_edges()`, `get_edge_count()`, `can_add_edge()`
-  - ✅ Language integration: all methods work from Glang code
-  - ✅ **VERIFICATION**: All tests pass - dangerous operations correctly blocked!
-- **Week 2**: ✅ **COMPLETED** - Enhanced inspection tools + rule configuration helpers
-  - ✅ Control layer access from Glang: `get_active_rules()`, `disable_rule()`, `enable_rule()`
-  - ✅ Graph visualization methods: `get_graph_summary()`, `visualize_structure()` (text/dot/summary formats)
-  - ✅ Rule configuration helpers: `configure_for_safe_mode()`, `configure_for_experimental_mode()`
-  - ✅ Enhanced `can_add_edge()` returns detailed reason strings for failures
-  - ✅ **VERIFICATION**: All 1324 tests pass - comprehensive edge governance system operational!
-- **Week 3-4**: ✅ **COMPLETED** - Binary tree implementation with tree-specific rules
-  - ✅ `BinaryTreeValue` class with complete BST operations (insert, search, traversals)
-  - ✅ Tree-specific governance rules: `max_children_two`, `tree_hierarchy`, `no_tree_cycles`
-  - ✅ Integration with control layer and AST execution system
-  - ✅ **VERIFICATION**: All 20 tree tests pass + 1344 total tests passing - true graph-based trees operational!
-- **Week 5-7**: ⏳ DataFrame foundation with structure rules
-- **Week 8**: ⏳ Testing, polish, documentation
-
-**📋 IMPLEMENTATION EVIDENCE**: See design in `dev_docs/EDGE_GOVERNANCE_DESIGN.md`
-**🔬 KEY PRINCIPLE**: Strict by default, explicit opt-out for power users
-**🎯 PRACTICAL FOCUS**: Binary trees first, then DataFrames - no user-exposed edge manipulation
-
-**This establishes Glang as the first language with intrinsic multi-layer graph governance for safe graph programming.**
-
----
-
-### ✅ FOUNDATIONAL ARCHITECTURE BREAKTHROUGH COMPLETE (September 2025)
-**THE MOST TRANSFORMATIVE ACHIEVEMENT IN GLANG'S DEVELOPMENT**
-
-- **🎉 CRITICAL BREAKTHROUGH ACHIEVED**: Implemented true graph-based function discovery system
-- **🚀 REVOLUTIONARY IMPACT**: **Glang is now truly graph-based** - real graph traversal, not simulation
-- **✅ CORE FUNCTIONALITY PROVEN**: Functions can call other functions within and across modules using graph traversal
-- **🏗️ IMPLEMENTATION COMPLETE**: Functions stored as graph nodes with proper connectivity and scope relationships
-- **🔬 THEORETICAL FOUNDATION SOLID**: Graph-based function discovery makes Glang genuinely graph-theoretic
-- **📈 DEVELOPMENT UNBLOCKED**: All other development can now proceed on solid graph foundation
-- **🌟 TRANSFORMATION ACHIEVED**: Glang is now a "revolutionary true graph language", not a simulation
-
-**📋 IMPLEMENTATION EVIDENCE**: See working call graph system in `src/glang/execution/call_graph.py`
-**🧪 VERIFICATION**: All intra-module and cross-module function calls work correctly
-**🎯 ARCHITECTURAL SUCCESS**: `executor.py:3549` uses `call_graph.find_function()` for pure graph traversal
-
-**This breakthrough establishes Glang as a genuinely graph-theoretic programming language with a solid foundation for advanced graph features.**
-
----
-
-### ✅ Logical Operators & Parser Issues Complete
-- **COMPLETE**: Added `and`/`or` logical operators with operator synonyms `&&`/`||`
-- **Features**: Proper truthiness rules, short-circuit evaluation, correct precedence parsing
-- **Syntax**: `if a and b { ... }` or `if a && b { ... }`
-- **Multi-line Support**: Complex expressions with line breaks now work correctly
-- **✅ ALL CRITICAL PARSER ISSUES RESOLVED (September 2025)**:
-  - **Logical Operator Precedence**: Fixed - expressions like `a == 1 or b == 2` now parse correctly
-  - **Map Variable Key Access**: Fixed - `map[variable_key]` syntax now works
-  - **Variable Scoping**: Fixed - proper lexical scoping allows variable reuse in different scopes
-
-### ✅ Bitcoin Price Tracker Success
-- **Demonstrated**: Real-world web scraping capabilities using HTTP requests and string parsing
-- **Achievement**: Successfully extracts current Bitcoin price ($115,411.29) from CoinMarketCap
-- **Identified Needs**: HTML parsing library for standard library, parser precedence fixes
+### Recent Achievements
+See [COMPLETED_MILESTONES.md](dev_docs/COMPLETED_MILESTONES.md) for detailed development history including:
+- True graph-based function discovery system
+- 80% self-hosting (network/HTML processing mostly pure Glang)
+- SQL query builder module
+- String processing enhancements
 
 ## Repository Structure
 
@@ -772,32 +705,12 @@ Glang uses a clean, modern architecture:
 - **Standard Library in Glang**: Core functionality implemented in the language, not the host runtime
 - **Dogfooding**: Use Glang extensively to validate its expressiveness and identify missing features
 
-### Current Implementation Status  
-- ✅ Modern lexer and AST parser
-- ✅ Complete semantic analysis with symbol tables
-- ✅ Type-safe execution engine
-- ✅ **Complete function system** with declarations, calls, and returns
-- ✅ **Lambda expressions** with `x => x * 2` syntax
-- ✅ File loading system with .gr format
-- ✅ Type inference for variable declarations
-- ✅ Method calls with type constraint enforcement
-- ✅ Index access and assignment for lists, strings, and maps
-- ✅ Data nodes with key-value semantics and type constraints
-- ✅ Maps as collections of data nodes with Ruby hash-like syntax
-- ✅ Functional programming operations: map, filter, each with built-in transformations
-- ✅ Control flow structures: if/else, while, for-in, break/continue with proper nesting
-- ✅ **Logical operators** with operator synonyms: `and`/`&&` and `or`/`||` with proper truthiness and short-circuiting
-- ✅ **Precision context blocks** with language-level numeric precision control (precision N { ... })
-- ✅ **Configuration blocks** with explicit behavior control and scoped settings (configure { ... } { ... })
-- ✅ CLI program execution with shebang support and command-line arguments
-- ✅ Mathematical methods (abs, sqrt, log, pow, rounding) for numbers
-- ✅ Type casting system (to_string, to_num, to_bool) for all basic types
-- ✅ **File handle I/O** with boundary capability semantics (auto-close on EOF for reads, manual control for writes)
-- ✅ Standard library foundation with math constants module (stdlib/math.gr)
-- ✅ **JSON module** with encode, decode, pretty printing, and validation (json.encode, json.decode, json.is_valid)
-- ✅ **Time module** with single Time type, UTC timestamps, and full type casting (Time.now, Time.from_components, time.to_num, string.to_time)
-- ✅ **Intrinsic behavior system** where lists/maps have built-in behaviors that auto-apply to all values (GraphContainer mixin)
-- ✅ **Comprehensive test suite** (1205+ tests, 67% coverage)
+### Implementation Status
+**Core Language**: Complete - Functions, types, collections, control flow, file I/O
+**Standard Library**: Extensive - Math, JSON, Time, HTML/Network processing (80% pure Glang)
+**Graph Architecture**: Breakthrough complete - True graph-based function discovery
+**Quality**: 1345+ tests passing, 66% coverage
+**Self-Hosting**: 80% pure Glang (only network I/O still requires Python)
 
 ### Development Guidelines
 - **AST-first development** - All new features should extend the AST system
@@ -805,114 +718,13 @@ Glang uses a clean, modern architecture:
 - **Comprehensive testing** - New features require full test coverage  
 - **Clean error messages** - Users should understand exactly what went wrong
 
-## Future Vision: The Path to Revolutionary Graph Computing
+## Future Vision
 
-**For detailed roadmap and development phases, see [`dev_docs/PRIMARY_ROADMAP.md`](dev_docs/PRIMARY_ROADMAP.md)**
+**For detailed development roadmap, see [`dev_docs/PRIMARY_ROADMAP.md`](dev_docs/PRIMARY_ROADMAP.md)**
 
-### Near-Term Priorities (Q1-Q2 2025)
+Transform Glang from a practical programming language into a **platform for living, self-aware computational systems** that can:
+- Understand their own structure through graph introspection
+- Safely modify themselves with governance rules
+- Distribute transparently across networks
+- Evolve and adapt to changing requirements
 
-**COMPLETED PRIORITIES:**
-- **✅ FOUNDATIONAL CALL GRAPH ARCHITECTURE**: 🔥 **REVOLUTIONARY BREAKTHROUGH** - Implemented true graph-based function discovery system replacing variable-based lookup. Functions now stored as graph nodes with proper connectivity. Intra-module and cross-module function calls work correctly via graph traversal (`call_graph.find_function()`). This transforms Glang from a simulated graph language to a genuinely graph-theoretic programming language.
-- **✅ Fixed Logical Operator Precedence**: Successfully implemented proper parser precedence with `parse_logical_or` → `parse_logical_and` → `parse_comparison`. Complex expressions like `a == 1 or b == 2 and c > 3` now parse correctly without requiring parentheses. Also added short-circuit evaluation for performance.
-- **✅ Map Variable Key Access**: The `map[variable_key]` syntax now works correctly (was previously reporting "Key must be a string literal" error).
-- **✅ Variable Scoping**: Fixed global variable conflict issue. Variables can now be reused in different loop scopes without "Variable already declared" errors. Implemented proper scoped symbol table with `enter_scope()`/`exit_scope()`.
-- **✅ Line Continuation**: Fixed multi-line logical expression parsing. Complex expressions like `a or b or\n   c or d` now parse correctly by skipping newlines within expressions.
-
-**ALL CRITICAL PARSER ISSUES RESOLVED** 🎉
-The Bitcoin tracker and cryptocurrency analytics experiments that identified these issues should now work without workarounds.
-
-**Test Suite Status**: 1280/1280 tests passing (100% success rate) ✅
-- All tests pass including complex graph-based function calls and CSV module functionality
-- All critical parsing issues from Bitcoin analytics experiments are fully resolved
-- Call graph architecture proven through comprehensive test coverage
-
-**Make Glang Practical** - Standard libraries for real-world use:
-- **✅ I/O Library**: File operations, file handle I/O with auto-close semantics, user input, directory management
-- **✅ Time Library**: Single Time type with UTC timestamps and full type casting
-- **✅ Logical Operators**: `and`/`&&` and `or`/`||` with proper truthiness and short-circuiting (basic support complete, precedence needs fix)
-- **✅ Behavior System**: Composable transformations for custom node types (Python API complete)
-- **✅ DataFrame Missing Data Handling**: Forward/backward fill behaviors integrated with DataFrame columns via behavior system (January 2025)
-- **🚧 Network Library**: ✅ URL operations (pure Glang), ❌ HTTP client (needs implementation), ❌ Email notifications (needs implementation)
-- **⏳ Database Connectivity**: SQLite, PostgreSQL, MySQL support
-- **⏳ System Library**: OS interaction, processes
-- **⏳ HTML Parsing Library**: Standard library for web scraping and HTML processing (identified during Bitcoin tracker development)
-- **⏳ Native Behavior Syntax**: `value: type with [behaviors...]` language integration
-- **⏳ R-Style Named Initialization**: `[red = 1, green = 2, blue = 3]` syntax for inline element naming (cleaner than method chaining)
-
-**REMAINING DATAFRAME PRIORITIES (January 2025):**
-- **🔄 CSV Type Auto-Detection**: Auto-detect numbers vs strings during CSV import for better data types
-- **🔄 DataFrame Join Operations**: Implement left/outer joins for `df.merge()` operations
-- **🔄 Row-Level DataFrame Operations**: Enable `df.row[1].sum()` syntax and row iteration (`for row in df.rows { ... }`)
-
-### Medium-Term Goals (Q2-Q3 2025)
-**Build True Graph Foundation** - Transform containers into real graphs:
-- **Native Behavior Integration**: `with [behaviors...]` syntax in AST/parser/execution
-- **Data Graphs for Statistics**: DataFrames as graph structures with attached behaviors
-- **Enhanced Binary Data Processing**: Hexadecimal literals, fixed-size lists, format detection, image processing
-- **Graph Architecture**: Nodes + edges with metadata, not just containers
-- **Node Awareness**: Nodes know their container and can access siblings
-- **Graph Traversal**: Real pathfinding, connectivity analysis
-- **Anonymous Functions**: Function references with `.call()` method
-- **Behavior-Aware Graphs**: True graphs with behaviors attached to specific nodes
-
-### Long-Term Vision (Q4 2025 and Beyond)
-**Revolutionary Graph Features** - What makes Glang unique:
-
-#### Self-Aware Data Structures
-```glang
-# Future: Hashes that act like classes
-statistics = {
-    'data': [85.4, 67.3, 92.1],
-    'calc_average': func() {
-        # This function can access sibling 'data'
-        total = sum(this.sibling('data'))
-        return total / this.sibling('data').length()
-    }
-}
-average = statistics['calc_average'].call()
-```
-
-#### Self-Mutating Graphs with Governance
-```glang
-# Future: Graphs that safely modify their own structure
-ecosystem = {
-    __control__: {
-        'max_nodes': 10000,
-        'mutation_rate': 100,  # nodes per second
-        'enforce_limits': func(operation) { ... }
-    },
-    methods: {
-        'evolve': func() {
-            # Add/remove species based on survival
-            # All mutations go through __control__
-        }
-    },
-    species: { ... }  # Mutable data region
-}
-```
-
-#### Distributed Graph Systems
-```glang
-# Future: Graphs spanning multiple machines
-distributed_system = {
-    __control__: {
-        'node_id': 'server_1',
-        'peers': ['server_2', 'server_3'],
-        'consensus': func(operation) { ... }
-    },
-    # Graph operations work transparently across network
-}
-```
-
-### Ultimate Goal
-Transform Glang from a programming language into a **platform for living, self-aware computational systems** that can:
-- Understand their own structure
-- Safely modify themselves
-- Distribute across networks
-- Govern their own evolution
-
-This vision positions Glang as uniquely powerful for:
-- Artificial Intelligence systems
-- Smart contracts and blockchain
-- Complex adaptive simulations
-- Self-organizing distributed systems
