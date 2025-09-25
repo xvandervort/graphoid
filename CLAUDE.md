@@ -831,12 +831,18 @@ The Bitcoin tracker and cryptocurrency analytics experiments that identified the
 - **✅ Time Library**: Single Time type with UTC timestamps and full type casting
 - **✅ Logical Operators**: `and`/`&&` and `or`/`||` with proper truthiness and short-circuiting (basic support complete, precedence needs fix)
 - **✅ Behavior System**: Composable transformations for custom node types (Python API complete)
+- **✅ DataFrame Missing Data Handling**: Forward/backward fill behaviors integrated with DataFrame columns via behavior system (January 2025)
 - **🚧 Network Library**: ✅ URL operations (pure Glang), ❌ HTTP client (needs implementation), ❌ Email notifications (needs implementation)
 - **⏳ Database Connectivity**: SQLite, PostgreSQL, MySQL support
 - **⏳ System Library**: OS interaction, processes
 - **⏳ HTML Parsing Library**: Standard library for web scraping and HTML processing (identified during Bitcoin tracker development)
 - **⏳ Native Behavior Syntax**: `value: type with [behaviors...]` language integration
 - **⏳ R-Style Named Initialization**: `[red = 1, green = 2, blue = 3]` syntax for inline element naming (cleaner than method chaining)
+
+**REMAINING DATAFRAME PRIORITIES (January 2025):**
+- **🔄 CSV Type Auto-Detection**: Auto-detect numbers vs strings during CSV import for better data types
+- **🔄 DataFrame Join Operations**: Implement left/outer joins for `df.merge()` operations
+- **🔄 Row-Level DataFrame Operations**: Enable `df.row[1].sum()` syntax and row iteration (`for row in df.rows { ... }`)
 
 ### Medium-Term Goals (Q2-Q3 2025)
 **Build True Graph Foundation** - Transform containers into real graphs:

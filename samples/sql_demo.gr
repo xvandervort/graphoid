@@ -1,0 +1,78 @@
+# SQL Query Builder Demo - Pure Glang implementation
+# Shows how to build SQL queries using lazy collection methods
+
+import "sql" as q
+
+# Basic table query
+users = q.Table("users")
+print("Basic table:")
+print(q.to_sql(users))
+print("")
+
+# Simple filter
+active_users = q.filter(users, "active = true")
+print("With filter:")
+print(q.to_sql(active_users))
+print("")
+
+# Multiple filters (they chain)
+active = q.filter(users, "active = true")
+admins = q.filter(active, "role = 'admin'")
+print("Multiple filters:")
+print(q.to_sql(admins))
+print("")
+
+# With sorting
+active2 = q.filter(users, "active = true")
+recent_users = q.sort(active2, "created_at")
+print("With sorting:")
+print(q.to_sql(recent_users))
+print("")
+
+# Descending sort
+sorted_users = q.sort_desc(users, "score")
+top_users = q.limit(sorted_users, 10)
+print("Top 10 by score:")
+print(q.to_sql(top_users))
+print("")
+
+# Complex query - build step by step
+documents = q.Table("documents")
+reports = q.filter(documents, "type = 'report'")
+recent = q.filter(reports, "published > '2024-01-01'")
+sorted = q.sort_desc(recent, "publication_date")
+recent_reports = q.limit(sorted, 5)
+print("Complex query - recent reports:")
+print(q.to_sql(recent_reports))
+print("")
+
+# Using helper functions for conditions
+products = q.Table("products")
+filtered = q.filter(products, q.gt("price", 100))
+filtered2 = q.filter(filtered, q.like("name", "%Pro%"))
+expensive = q.sort(filtered2, "price")
+print("Using condition helpers:")
+print(q.to_sql(expensive))
+print("")
+
+# IN clause example
+orders = q.Table("orders")
+filtered_orders = q.filter(orders, q.in_list("status", ["pending", "processing", "shipped"]))
+pending = q.sort(filtered_orders, "created_at")
+print("IN clause:")
+print(q.to_sql(pending))
+print("")
+
+# The query is just a graph - you can keep building on it
+posts = q.Table("posts")
+base_query = q.filter(posts, "published = true")
+recent = q.limit(q.sort_desc(base_query, "created_at"), 10)
+popular = q.limit(q.sort_desc(base_query, "views"), 10)
+
+print("Same base, different queries:")
+print("Recent: " + q.to_sql(recent))
+print("Popular: " + q.to_sql(popular))
+print("")
+
+# Tables are lazy - nothing executes until to_sql()
+print("Queries are lazy - they build a graph that generates SQL on demand")
