@@ -21,16 +21,17 @@ The roadmap is organized around the **Rust migration timeline**:
 
 ### 1.1 Core Language Enhancements
 
-#### Tree & Graph Data Structures (HIGH PRIORITY)
+#### Tree & Graph Data Structures (HIGH PRIORITY - PURE GLANG)
 - **Tree Structure Implementation**
-  - `TreeNode` type with parent/child relationships
+  - `TreeNode` using maps for parent/child relationships
   - Tree traversal: `depth_first()`, `breadth_first()`, `find_path_to()`
   - Tree construction from nested data structures
 - **Graph Structure Enhancement**
-  - First-class edges with metadata (`Edge` type)
-  - Node awareness of graph context
-  - Graph algorithms: DFS, BFS, shortest path, cycle detection
+  - Adjacency list representation using maps
+  - Edge metadata and graph algorithms in pure Glang
+  - Graph operations: DFS, BFS, shortest path, cycle detection
 
+**Implementation**: Start with pure Glang, optimize performance bottlenecks later in Rust
 **Goal**: Enable 100% pure Glang HTML/XML/JSON processing
 
 #### Pattern Matching
