@@ -13,7 +13,7 @@ The Time module provides a single `Time` type for working with dates and times i
 ## Importing the Module
 
 ```glang
-import "time" as Time
+import "time"
 ```
 
 ## Creating Time Values
@@ -22,11 +22,11 @@ import "time" as Time
 
 ```glang
 # Get current time
-current = Time.now()
+current = time.now()
 print(current.to_string())  # "2025-01-15T14:30:00Z"
 
 # Get start of today (00:00:00 UTC)
-today = Time.today()
+today = time.today()
 print(today.to_string())    # "2025-01-15T00:00:00Z"
 ```
 
@@ -34,15 +34,15 @@ print(today.to_string())    # "2025-01-15T00:00:00Z"
 
 ```glang
 # Date only (defaults to 00:00:00 UTC)
-birthday = Time.from_components(1990, 12, 25)
+birthday = time.from_components(1990, 12, 25)
 print(birthday.to_string())  # "1990-12-25T00:00:00Z"
 
 # Full date and time
-meeting = Time.from_components(2025, 1, 15, 14, 30, 0)
+meeting = time.from_components(2025, 1, 15, 14, 30, 0)
 print(meeting.to_string())   # "2025-01-15T14:30:00Z"
 
 # Partial time specification
-lunch = Time.from_components(2025, 6, 15, 12, 30)  # seconds default to 0
+lunch = time.from_components(2025, 6, 15, 12, 30)  # seconds default to 0
 print(lunch.to_string())     # "2025-06-15T12:30:00Z"
 ```
 
@@ -50,11 +50,11 @@ print(lunch.to_string())     # "2025-06-15T12:30:00Z"
 
 ```glang
 # Parse ISO format strings
-parsed = Time.from_string("2025-01-15T14:30:00")
+parsed = time.from_string("2025-01-15T14:30:00")
 print(parsed.to_string())    # "2025-01-15T14:30:00Z"
 
 # With explicit Z suffix
-utc_time = Time.from_string("2025-01-15T14:30:00Z")
+utc_time = time.from_string("2025-01-15T14:30:00Z")
 print(utc_time.to_string())  # "2025-01-15T14:30:00Z"
 ```
 
@@ -63,9 +63,9 @@ print(utc_time.to_string())  # "2025-01-15T14:30:00Z"
 ### Basic Methods
 
 ```glang
-import "time" as Time
+import "time"
 
-t = Time.from_components(2025, 6, 15, 10, 30, 45)
+t = time.from_components(2025, 6, 15, 10, 30, 45)
 
 # Get type information (both syntaxes work)
 print(t.get_type())      # "time" - with parentheses
@@ -86,7 +86,7 @@ The Time module provides comprehensive type casting between time values, numbers
 
 ```glang
 # Convert time to Unix timestamp
-time_value = Time.from_components(2025, 1, 1, 0, 0, 0)
+time_value = time.from_components(2025, 1, 1, 0, 0, 0)
 timestamp = time_value.to_num()
 print(timestamp.to_string())  # "1735689600"
 ```
@@ -114,10 +114,10 @@ print(time_value.to_string())  # "2025-01-15T14:30:00Z"
 All casting operations maintain perfect consistency:
 
 ```glang
-import "time" as Time
+import "time"
 
 # Original time
-original = Time.from_components(2025, 6, 15, 10, 30, 45)
+original = time.from_components(2025, 6, 15, 10, 30, 45)
 
 # Round-trip through number
 number_trip = original.to_num().to_time()
@@ -134,10 +134,10 @@ print(original.to_string() == string_trip.to_string())  # true
 
 | Function | Description | Example |
 |----------|-------------|---------|
-| `Time.now()` | Get current time | `Time.now()` |
-| `Time.today()` | Get start of today (00:00:00 UTC) | `Time.today()` |
-| `Time.from_components(year, month, day, [hour], [minute], [second])` | Create time from date/time components | `Time.from_components(2025, 1, 15, 14, 30)` |
-| `Time.from_string(iso_string)` | Parse ISO format string | `Time.from_string("2025-01-15T14:30:00")` |
+| `time.now()` | Get current time | `time.now()` |
+| `time.today()` | Get start of today (00:00:00 UTC) | `time.today()` |
+| `time.from_components(year, month, day, [hour], [minute], [second])` | Create time from date/time components | `time.from_components(2025, 1, 15, 14, 30)` |
+| `time.from_string(iso_string)` | Parse ISO format string | `time.from_string("2025-01-15T14:30:00")` |
 
 ### Time Value Methods
 
@@ -160,20 +160,20 @@ print(original.to_string() == string_trip.to_string())  # true
 
 ```glang
 # Invalid date components
-result = Time.from_components(2025, 13, 35)  # Error: Invalid date/time
+result = time.from_components(2025, 13, 35)  # Error: Invalid date/time
 
 # Invalid string format
 result = "not-a-date".to_time()  # Error: Invalid time format
 
 # Wrong argument types
-result = Time.from_components("2025", 1, 1)  # Error: Year, month, and day must be numbers
+result = time.from_components("2025", 1, 1)  # Error: Year, month, and day must be numbers
 ```
 
 ### Method Argument Validation
 
 ```glang
-import "time" as Time
-t = Time.now()
+import "time"
+t = time.now()
 
 # All time methods take no arguments
 result = t.to_string("extra")  # Error: to_string() takes no arguments
@@ -185,10 +185,10 @@ result = t.to_num("extra")     # Error: to_num() takes no arguments
 ### Working with Timestamps
 
 ```glang
-import "time" as Time
+import "time"
 
 # Create a specific time
-event = Time.from_components(2025, 12, 31, 23, 59, 59)
+event = time.from_components(2025, 12, 31, 23, 59, 59)
 print("Event: " + event.to_string())
 
 # Convert to timestamp for storage/comparison
@@ -203,7 +203,7 @@ print("Retrieved: " + retrieved.to_string())
 ### Parsing User Input
 
 ```glang
-import "time" as Time
+import "time"
 
 # Parse different time formats (all converted to UTC)
 user_inputs = [
@@ -221,10 +221,10 @@ for input_str in user_inputs {
 ### Time Calculations
 
 ```glang
-import "time" as Time
+import "time"
 
 # Get current time and convert to timestamp for arithmetic
-now = Time.now()
+now = time.now()
 now_timestamp = now.to_num()
 
 # Add one hour (3600 seconds)

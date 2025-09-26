@@ -574,14 +574,14 @@ if numbers.filter("even").size() > 0 {
 ### Time Module
 ```glang
 # Import the time module
-import "time" as Time
+import "time"
 
 # Create time values
-current = Time.now()                            # Current time
-today = Time.today()                           # Start of today (00:00:00 UTC)
-birthday = Time.from_components(1990, 12, 25) # Date only (midnight UTC)
-meeting = Time.from_components(2025, 1, 15, 14, 30, 0) # Full date and time
-parsed = Time.from_string("2025-01-15T14:30:00") # Parse ISO format
+current = time.now()                            # Current time
+today = time.today()                           # Start of today (00:00:00 UTC)
+birthday = time.from_components(1990, 12, 25) # Date only (midnight UTC)
+meeting = time.from_components(2025, 1, 15, 14, 30, 0) # Full date and time
+parsed = time.from_string("2025-01-15T14:30:00") # Parse ISO format
 
 # Work with time values
 print("Current: " + current.to_string())      # ISO format: "2025-01-15T14:30:00Z"  
@@ -622,7 +622,7 @@ if debug {
 
 #### File Handle I/O
 ```glang
-import "io" as io
+import "io"
 
 # Read capabilities - auto-close on EOF
 read_handle = io.open("data.txt", "r")

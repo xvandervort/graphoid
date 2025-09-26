@@ -1,8 +1,8 @@
 # Working Bitcoin Price Tracker
 # Fetches Bitcoin price from CoinMarketCap and stores in CSV
 
-import "io" as io
-import "time" as time
+import "io"
+import "time"
 
 print("₿ Bitcoin Price Tracker")
 print("======================")

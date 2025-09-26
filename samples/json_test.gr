@@ -1,6 +1,6 @@
 # Test JSON functionality separately
 
-import "json" as json
+import "json"
 
 print("JSON Module Test")
 print("================")

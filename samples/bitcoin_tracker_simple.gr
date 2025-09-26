@@ -1,8 +1,8 @@
 # Simple Bitcoin Price Tracker - Test Version
 # Tests basic functionality without complex parsing
 
-import "io" as io
-import "time" as time
+import "io"
+import "time"
 
 print("₿ Simple Bitcoin Price Tracker Test")
 print("==================================")

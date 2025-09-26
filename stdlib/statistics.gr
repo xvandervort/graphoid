@@ -1,3 +1,6 @@
+module statistics
+alias stats
+
 func mean(values) {
     if values.size() == 0 {
         return none

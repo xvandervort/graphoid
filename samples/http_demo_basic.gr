@@ -1,7 +1,7 @@
 # Basic HTTP Client Demo
 # Demonstrates fundamental HTTP operations using Glang's HTTP module
 
-import "http" as http
+import "http"
 
 print("🌐 Basic HTTP Client Demo")
 print("========================")

@@ -1,6 +1,6 @@
 # Working Web Server with JSON API in Glang
 
-import "json" as json
+import "json"
 
 print("Glang Web Server with JSON API")
 print("===============================")

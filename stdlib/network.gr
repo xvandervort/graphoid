@@ -126,7 +126,7 @@ func is_valid_url(url) {
 }
 
 # HTTP operations - High-level API using built-in HTTP module
-import "http" as http
+import "http"
 
 func http_get(url) {
     if is_valid_url(url) == false {

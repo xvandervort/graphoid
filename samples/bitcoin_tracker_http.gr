@@ -1,12 +1,12 @@
 # Bitcoin Price Tracker - Enhanced with HTTP Module
 # Uses the new HTTP client module for robust data fetching and error handling
 
-import "http" as http
+import "http"
 import "html_parser" as html
-import "json" as json
+import "json"
 import "network" as network
-import "time" as time
-import "io" as io
+import "time"
+import "io"
 
 print("₿ Bitcoin Price Tracker (HTTP Module Edition)")
 print("============================================")

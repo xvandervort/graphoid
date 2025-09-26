@@ -360,7 +360,7 @@ if response["success"] {
 
 ```glang
 import "network" as net
-import "json" as json
+import "json"
 
 # REST API example
 func get_user_data(user_id) {
@@ -419,7 +419,7 @@ response = upload_data("https://httpbin.org/post", "file content here", "data.tx
 
 ```glang
 import "network" as net
-import "json" as json
+import "json"
 
 func get_bitcoin_price() {
     # Try API first
@@ -535,7 +535,7 @@ func reliable_request(url, max_retries) {
 ### 6. Rate Limiting
 
 ```glang
-import "time" as time
+import "time"
 
 func respectful_requests(urls) {
     for url in urls {
@@ -578,9 +578,9 @@ The network module works well with other Glang modules:
 
 ```glang
 import "network" as net
-import "json" as json
-import "io" as io
-import "time" as time
+import "json"
+import "io"
+import "time"
 
 # Complete example: Fetch data, parse JSON, save to file
 response = net.http_get("https://api.github.com/users/octocat")

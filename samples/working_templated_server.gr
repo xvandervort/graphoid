@@ -1,6 +1,6 @@
 # Working Templated Web Server in Glang
 
-import "json" as json
+import "json"
 
 print("Working Templated Web Server")
 print("============================")

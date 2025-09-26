@@ -17,21 +17,21 @@ Regular expressions in Glang are designed to complement the existing unified str
 ## Basic Usage
 
 ```glang
-import "regex" as regex
+import "regex"    # Can use as 're' or 'regex'
 
-# Basic pattern matching
+# Basic pattern matching (showing both usage patterns)
 pattern = "\\d{3}-\\d{3}-\\d{4}"
 text = "Call 555-123-4567 for help"
 
 # Check if pattern exists anywhere in text
-found = regex.search(pattern, text)  # true
+found = re.search(pattern, text)  # true
 
 # Validate entire text matches pattern
 phone = "555-123-4567"
 is_valid = regex.validate(pattern, phone)  # true
 
 # Check if pattern matches at start of text
-starts_with_phone = regex.match(pattern, text)  # false
+starts_with_phone = re.match(pattern, text)  # false
 ```
 
 ## Pattern Matching Functions
@@ -46,7 +46,7 @@ url_pattern = "https?://"
 text1 = "https://example.com"
 text2 = "Visit https://example.com"
 
-regex.match(url_pattern, text1)  # true
+re.match(url_pattern, text1)  # true
 regex.match(url_pattern, text2)  # false (doesn't start with pattern)
 ```
 
@@ -59,7 +59,7 @@ Tests if pattern is found **anywhere** in text.
 email_pattern = "\\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\\b"
 text = "Contact alice@example.com for support"
 
-regex.search(email_pattern, text)  # true
+re.search(email_pattern, text)  # true
 ```
 
 ### `validate(pattern, text, flags?)`
@@ -70,7 +70,7 @@ Tests if **entire text** matches pattern (full match).
 # Validate complete input
 date_pattern = "\\d{4}-\\d{2}-\\d{2}"
 
-regex.validate(date_pattern, "2025-01-15")        # true
+re.validate(date_pattern, "2025-01-15")        # true
 regex.validate(date_pattern, "2025-01-15 10:30")  # false (extra text)
 ```
 
@@ -85,7 +85,7 @@ Finds all non-overlapping matches of pattern in text.
 number_pattern = "\\d+"
 text = "Order 123 contains 45 items costing $67.89"
 
-numbers = regex.find_all(number_pattern, text)
+numbers = re.find_all(number_pattern, text)
 # Returns: ["123", "45", "67", "89"]
 ```
 
@@ -119,7 +119,7 @@ Replaces all occurrences of pattern with replacement text.
 number_pattern = "\\d+"
 text = "I have 42 apples and 17 oranges"
 
-result = regex.replace(number_pattern, "X", text)
+result = re.replace(number_pattern, "X", text)
 # Result: "I have X apples and X oranges"
 
 # Replacement with capture groups
@@ -135,11 +135,11 @@ result = regex.replace(email_pattern, "$1 at $2", text)
 Splits text using regex pattern as delimiter.
 
 ```glang
-# Split on multiple delimiters
+# Split on multiple delimiters (can use 're' or 'regex')
 delimiter_pattern = "[,;:|]"
 text = "apple,banana;orange:grape|kiwi"
 
-parts = regex.split(delimiter_pattern, text)
+parts = re.split(delimiter_pattern, text)
 # Returns: ["apple", "banana", "orange", "grape", "kiwi"]
 ```
 

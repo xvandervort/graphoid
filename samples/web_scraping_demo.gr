@@ -1,7 +1,7 @@
 # Web Scraping Demo with HTTP and HTML Parsing
 # Demonstrates combining HTTP client with HTML parsing for web scraping
 
-import "http" as http
+import "http"
 import "html_parser" as html
 import "network" as network
 

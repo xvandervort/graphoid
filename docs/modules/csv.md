@@ -141,7 +141,7 @@ print("Parsed " + parsed.size().to_string() + " rows")
 
 ```glang
 import "csv" as csv
-import "io" as io
+import "io"
 
 # Read CSV from file (assuming it exists)
 file_handle = io.open("data.csv", "r")
@@ -189,7 +189,7 @@ Planned improvements for future versions:
 
 ```glang
 import "csv" as csv
-import "json" as json
+import "json"
 
 # Convert CSV to JSON
 csv_data = "name,age\nAlice,25\nBob,30"

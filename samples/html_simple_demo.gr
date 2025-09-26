@@ -69,7 +69,7 @@ print("HTML: " + tagged_text)
 print("Text: " + clean_text)
 
 print("\n4. Find Email Addresses (Pure Glang with Regex):")
-import "regex" as re
+import "regex"    # Can use as 're' or 'regex'
 
 email_text = "Contact us at admin@example.com or support@glang.dev for help."
 email_pattern = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"

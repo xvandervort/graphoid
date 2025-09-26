@@ -21,20 +21,20 @@ The random module is designed to handle a wide range of randomization needs, fro
 ## Basic Usage
 
 ```glang
-import "random" as rand
+import "random"    # Can use as 'rand' or 'random'
 
-# Basic random numbers
+# Basic random numbers (showing both usage patterns)
 dice_roll = rand.randint(1, 6)                    # 1-6 inclusive
-probability = rand.random()                       # 0.0 to 1.0 (exclusive)
+probability = random.random()                     # 0.0 to 1.0 (exclusive)
 price = rand.uniform(10.0, 50.0)                 # 10.0 to 50.0 (exclusive)
 
 # Random choice from list
 colors = ["red", "green", "blue", "yellow"]
-chosen_color = rand.choice(colors)                # Pick one random color
+chosen_color = random.choice(colors)              # Pick one random color
 
 # Generate secure token for authentication
 auth_token = rand.secure_token(32)               # 64-character hex string
-session_id = rand.uuid4()                        # Random UUID
+session_id = random.uuid4()                      # Random UUID
 ```
 
 ## Core Random Functions
@@ -322,9 +322,9 @@ record_uuid = rand.uuid1()                      # Can be sorted by creation time
 ### Game Development
 
 ```glang
-import "random" as rand
+import "random"    # Can use as 'rand' or 'random'
 
-# Dice rolling system
+# Dice rolling system (can use either 'rand' or 'random')
 func roll_dice(sides) {
     return rand.randint(1, sides)
 }
@@ -337,14 +337,14 @@ func roll_multiple(count, sides) {
     return results
 }
 
-# Usage
+# Usage (showing both usage patterns)
 d6_roll = roll_dice(6)                          # Standard die
 d20_roll = roll_dice(20)                        # RPG die
 three_dice = roll_multiple(3, 6)                # Roll 3d6
 
 # Random encounter system
 encounters = ["goblin", "orc", "dragon", "treasure", "trap"]
-random_encounter = rand.choice(encounters)
+random_encounter = random.choice(encounters)     # Using full module name
 
 # Loot generation
 if rand.random() < 0.1 {                        # 10% chance
@@ -355,7 +355,7 @@ if rand.random() < 0.1 {                        # 10% chance
 ### Data Simulation
 
 ```glang
-import "random" as rand
+import "random"    # Can use as 'rand' or 'random'
 
 # Generate realistic test data
 func generate_person() {
@@ -383,7 +383,7 @@ for i = 0; i < 100; i = i + 1 {
 ### A/B Testing
 
 ```glang
-import "random" as rand
+import "random"    # Can use as 'rand' or 'random'
 
 # Reproducible A/B test assignment
 func assign_test_group(user_id) {
@@ -412,7 +412,7 @@ if user_group == "A" {
 ### Security Token Generation
 
 ```glang
-import "random" as rand
+import "random"    # Can use as 'rand' or 'random'
 
 # Generate various security tokens
 func generate_session_token() {
@@ -512,8 +512,8 @@ try {
 ### With Time Module
 
 ```glang
-import "random" as rand
-import "time" as time
+import "random"    # Can use as 'rand' or 'random'
+import "time"
 
 # Random delays
 func random_delay() {
@@ -530,8 +530,8 @@ random_time = base_time + random_offset
 ### With JSON Module
 
 ```glang
-import "random" as rand
-import "json" as json
+import "random"    # Can use as 'rand' or 'random'
+import "json"
 
 # Generate random data for APIs
 func generate_random_user() {

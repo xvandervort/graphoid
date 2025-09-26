@@ -2,9 +2,9 @@
 # Uses advanced HTML parsing and Unicode-aware string processing
 # Demonstrates the power of Glang's HTML parsing library
 
-import "io" as io
+import "io"
 import "html_parser" as html
-import "time" as time
+import "time"
 
 print("₿ Enhanced Bitcoin Price Tracker")
 print("=================================")

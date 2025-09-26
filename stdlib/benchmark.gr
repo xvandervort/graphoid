@@ -2,15 +2,15 @@
 # Provides performance measurement and comparison tools
 # Uses modern function parameter passing for flexible timing
 
-import "time" as Time
+import "time"
 
 # Simple timing measurement
 func start_timer() {
-    return Time.now()
+    return time.now()
 }
 
 func end_timer(start_time) {
-    end_time = Time.now()
+    end_time = time.now()
     duration = end_time.to_num() - start_time.to_num()
     return {
         "start_time": start_time.to_string(),

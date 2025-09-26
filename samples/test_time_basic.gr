@@ -1,23 +1,23 @@
-import "time" as Time
+import "time"
 
 print("=== New Single Time Type Test ===")
 
 # Test current time functions
 print("1. Current time functions:")
-current = Time.now()
+current = time.now()
 print("Current type: " + current.get_type())
 print("Current: " + current.to_string())
 
 # Test time creation from components
 print("2. Time creation:")
-birthday = Time.from_components(1990, 12, 25)
-meeting = Time.from_components(2025, 1, 15, 14, 30, 0)
+birthday = time.from_components(1990, 12, 25)
+meeting = time.from_components(2025, 1, 15, 14, 30, 0)
 print("Birthday: " + birthday.to_string())
 print("Meeting: " + meeting.to_string())
 
 # Test string creation
 print("3. String creation:")
-parsed = Time.from_string("2025-01-15T14:30:00")
+parsed = time.from_string("2025-01-15T14:30:00")
 print("Parsed: " + parsed.to_string())
 
 print("=== Test Complete ===")

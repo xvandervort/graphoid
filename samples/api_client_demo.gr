@@ -1,8 +1,8 @@
 # Advanced API Client Demo
 # Demonstrates real-world API interaction patterns using Glang's HTTP module
 
-import "http" as http
-import "json" as json
+import "http"
+import "json"
 
 print("🔗 Advanced API Client Demo")
 print("===========================")

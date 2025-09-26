@@ -538,8 +538,8 @@ iso_string = "2025-01-15T14:30:00"
 parsed_time = iso_string.to_time() # 2025-01-15T14:30:00Z
 
 # Time to Number (timestamp)
-import "time" as Time
-current = Time.now()
+import "time"
+current = time.now()
 timestamp = current.to_num()      # Unix timestamp
 
 # Time to String (ISO format) 
@@ -553,8 +553,8 @@ result = x.to_string().to_bool()  # true
 b = true.to_num().to_string()     # "1"
 
 # Time casting chains
-import "time" as Time
-now = Time.now()
+import "time"
+now = time.now()
 round_trip = now.to_num().to_time().to_string()  # Perfect consistency
 ```
 
@@ -936,9 +936,12 @@ load "config.gr"         # Variables become available directly
 
 ### Importing Modules
 ```glang
-# Import built-in modules
-import "io"               # Import I/O module as 'io'
-import "math" as calc     # Import with custom alias
+# Import built-in modules (clean syntax using module aliases)
+import "io"               # Import I/O module
+import "math"             # Can use as 'calc' or 'math'
+import "random"           # Can use as 'rand' or 'random'
+import "regex"            # Can use as 're' or 'regex'
+import "statistics"       # Can use as 'stats' or 'statistics'
 
 # Import .gr modules (with module declaration)
 import "my_library.gr"    # Uses alias from module file
@@ -1080,7 +1083,7 @@ json.is_valid(json_string)  # Check if valid JSON
 
 ### Importing Time Module
 ```glang
-import "time" as Time       # Import Time module
+import "time"       # Import Time module
 ```
 
 ### Working with Time Values
@@ -1423,7 +1426,7 @@ print(result)  # [1, 3, 5, 7, 9]
 ### Mathematical Calculations
 ```glang
 # Load mathematical constants
-load "stdlib/math.gr"
+import "math"           # Can use as 'calc'
 
 # Calculate various formulas
 radius = 7.5
@@ -1583,7 +1586,7 @@ The crypto module provides secure cryptographic operations for data protection a
 
 ### Import and Basic Usage
 ```glang
-import "crypto"
+import "crypto"    # Can use as 'crypto'
 
 # Convert string to bytes for crypto operations
 message = "Hello World"
@@ -1690,30 +1693,30 @@ The regex module provides powerful pattern matching and text processing capabili
 
 ### Import and Basic Usage
 ```glang
-import "regex"
+import "regex"     # Can use as 're'
 
-# Basic pattern matching
+# Basic pattern matching (can use 're' or 'regex')
 phone_pattern = "\\d{3}-\\d{3}-\\d{4}"
 text = "Call 555-123-4567 for help"
 
 # Check if pattern exists anywhere
-found = regex.search(phone_pattern, text)       # true
+found = re.search(phone_pattern, text)          # true
 
 # Validate entire text matches pattern
 phone = "555-123-4567"
 is_valid = regex.validate(phone_pattern, phone) # true
 
 # Check if pattern matches at start
-starts_with = regex.match(phone_pattern, text)  # false
+starts_with = re.match(phone_pattern, text)     # false
 ```
 
 ### Text Extraction
 ```glang
 import "regex"
 
-# Extract all numbers
+# Extract all numbers (can use 're' or 'regex')
 text = "Order 123 contains 45 items costing $67.89"
-numbers = regex.find_all("\\d+", text)
+numbers = re.find_all("\\d+", text)
 # Returns: ["123", "45", "67", "89"]
 
 # Extract with capture groups
@@ -1787,21 +1790,21 @@ The random module provides comprehensive random number generation, statistical d
 
 ### Import and Basic Usage
 ```glang
-import "random" as rand
+import "random"    # Can use as 'rand'
 
-# Basic random numbers
+# Basic random numbers (can use 'rand' or 'random')
 dice_roll = rand.randint(1, 6)                    # 1-6 inclusive
-probability = rand.random()                       # 0.0 to 1.0 (exclusive)
+probability = random.random()                     # 0.0 to 1.0 (exclusive)
 price = rand.uniform(10.0, 50.0)                 # 10.0 to 50.0 (exclusive)
 
 # Random choice from list
 colors = ["red", "green", "blue", "yellow"]
-chosen = rand.choice(colors)                      # Pick one random color
+chosen = random.choice(colors)                    # Pick one random color
 ```
 
 ### Statistical Distributions
 ```glang
-import "random" as rand
+import "random"    # Can use as 'rand'
 
 # Normal distribution (bell curve)
 height = rand.normal(170.0, 10.0)                # Mean=170cm, std=10cm
@@ -1817,7 +1820,7 @@ task_duration = rand.gamma(2.0, 3.0)             # Shape=2, Scale=3
 
 ### Random Sampling
 ```glang
-import "random" as rand
+import "random"    # Can use as 'rand'
 
 # Sample without replacement
 population = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -1835,7 +1838,7 @@ answer = rand.choice(responses)                  # Magic 8-ball
 
 ### Seeding for Reproducibility
 ```glang
-import "random" as rand
+import "random"    # Can use as 'rand'
 
 # Seed for reproducible results
 rand.seed(12345)
@@ -1852,7 +1855,7 @@ secure_value = rand.random()                     # Cryptographically secure
 
 ### Secure Random Generation
 ```glang
-import "random" as rand
+import "random"    # Can use as 'rand'
 
 # Always cryptographically secure (ignores seeding)
 secure_number = rand.secure_random()             # Secure float
@@ -1869,7 +1872,7 @@ record_id = rand.uuid1()                        # Time-based UUID
 
 ### Practical Examples
 ```glang
-import "random" as rand
+import "random"    # Can use as 'rand'
 
 # Game mechanics
 func roll_dice(sides) {

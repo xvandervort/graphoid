@@ -1,5 +1,6 @@
 # Mathematical constants and utilities
 module math
+alias calc
 
 # Primary mathematical constants
 pi = 3.141592653589793          # Pi - ratio of circle circumference to diameter

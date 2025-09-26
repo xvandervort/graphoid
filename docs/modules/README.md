@@ -9,9 +9,9 @@ This directory contains comprehensive documentation for all Glang standard libra
 #### [Time Module](time.md)
 Date and time operations with UTC timestamps and full type casting support.
 ```glang
-import "time" as Time
-current = Time.now()
-birthday = Time.from_components(1990, 12, 25)
+import "time"
+current = time.now()
+birthday = time.from_components(1990, 12, 25)
 ```
 
 #### [JSON Module](json.md) 
@@ -36,7 +36,7 @@ user_name = io.input("Enter name: ")
 #### [CSV Module](csv.md) ⭐ NEW
 Basic CSV parsing and generation with pure Glang implementation.
 ```glang
-import "csv" as csv
+import "csv"
 data = [["Alice", "25"], ["Bob", "30"]]
 csv_output = csv.generate(data, ["name", "age"], ",")
 parsed = csv.parse(csv_output, true, ",")
@@ -93,8 +93,8 @@ import "random" as rand
 number = rand.randint(1, 100)
 
 # Import time with conventional alias
-import "time" as Time
-now = Time.now()
+import "time"
+now = time.now()
 ```
 
 ### Error Handling
@@ -114,11 +114,11 @@ try {
 ```glang
 import "json"
 import "io" 
-import "time" as Time
+import "time"
 
 # Save timestamped data
 data = {
-    "timestamp": Time.now().to_string(),
+    "timestamp": time.now().to_string(),
     "events": ["login", "purchase", "logout"]
 }
 json_data = json.encode(data)

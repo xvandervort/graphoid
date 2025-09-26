@@ -60,7 +60,7 @@ Creates a file handle capability for incremental I/O. Returns a file handle obje
 - `"a"` - Append-only capability (manual close required)
 
 ```glang
-import "io" as io
+import "io"
 
 # Read handle - auto-closes when EOF reached
 read_handle = io.open("data.txt", "r")

@@ -2,6 +2,7 @@
 # Simplified version that directly exposes primitive functions
 
 module regex
+alias re
 
 # Core regex functions
 compile = _builtin_regex_compile
