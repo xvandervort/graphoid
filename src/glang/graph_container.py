@@ -123,6 +123,41 @@ class GraphContainer:
         self._behavior_names.clear()
         return NoneValue()
 
+    def add_mapping_rule(self, mapping: 'HashValue', default: Optional['GlangValue'] = None) -> 'NoneValue':
+        """Add a generic mapping behavior rule to this container.
+
+        Usage:
+            color_map = { "red": 1, "green": 2, "blue": 3 }
+            colors.add_mapping_rule(color_map)
+            colors.add_mapping_rule(color_map, 0)  # With default value
+
+        Args:
+            mapping: HashValue graph containing key->value mappings
+            default: Optional default value for unmapped keys
+        """
+        from .execution.values import NoneValue
+        from .behaviors import MappingBehavior
+
+        # Create a mapping behavior with the provided hash graph
+        behavior = MappingBehavior(mapping, default)
+
+        # Generate unique name for this mapping behavior
+        mapping_id = id(mapping)
+        behavior_name = f"mapping_{mapping_id}"
+
+        # Prevent duplicate mappings
+        if behavior_name in self._behavior_names:
+            return NoneValue()
+
+        # Add behavior to container
+        self._behaviors.append((behavior, ()))
+        self._behavior_names.add(behavior_name)
+
+        # Apply to all existing elements
+        self._apply_behaviors_to_existing()
+
+        return NoneValue()
+
     def _apply_behaviors(self, value: 'GlangValue') -> 'GlangValue':
         """Apply all behaviors to a single value."""
         result = value

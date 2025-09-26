@@ -346,6 +346,22 @@ temperatures.has_rule("nil_to_zero")        # true
 temperatures.get_rules()                     # ["nil_to_zero", "positive", "validate_range"]
 temperatures.remove_rule("positive")        # Remove specific behavior
 temperatures.clear_rules()                   # Remove all behaviors
+
+# Generic mapping behaviors - map any value to any other value
+color_map = { "red": 1, "green": 2, "blue": 3 }
+colors = ["red", "blue", "purple", "green"]
+colors.add_mapping_rule(color_map)          # Maps colors using the hash graph
+print(colors)                                # [1, 3, "purple", 2]
+
+# Mapping with default value for unmapped keys
+colors.add_mapping_rule(color_map, 0)       # Unmapped colors become 0
+print(colors)                                # [1, 3, 0, 2]
+
+# Employee to department mapping
+dept_map = { "walter": "HR", "james": "IT", "emily": "Admin" }
+employees = ["walter", "unknown", "james"]
+employees.add_mapping_rule(dept_map, "Unknown")  # Default for unmapped names
+print(employees)                             # ["HR", "Unknown", "IT"]
 ```
 
 #### Map Behaviors
@@ -366,21 +382,41 @@ config["min_threads"] = -10                 # Becomes 10 (positive), then clampe
 ```
 
 #### Standard Behaviors
-- **nil_to_zero** - Convert nil/none to 0
-- **nil_to_empty** - Convert nil/none to empty string
+- **none_to_zero** - Convert none to 0
+- **none_to_empty** - Convert none to empty string
 - **validate_range(min, max)** - Clamp numbers to range
-- **map_colors** - Map color names to numbers
+- **map_colors** - Map color names to numbers (deprecated - use add_mapping_rule instead)
 - **uppercase/lowercase** - String case conversion
 - **round_to_int** - Round numbers to integers
 - **positive** - Ensure numbers are positive
 
+#### Generic Mapping (NEW!)
+Create custom value mappings using hash graphs - replaces hardcoded behaviors like `map_colors`:
+
+```glang
+# Define your own mappings as hash graphs
+status_map = { "active": 1, "inactive": 0, "pending": 2 }
+user_statuses = ["active", "unknown", "inactive"]
+user_statuses.add_mapping_rule(status_map, -1)  # Default -1 for unmapped
+print(user_statuses)                             # [1, -1, 0]
+
+# Chain mappings for multi-stage transformations
+codes = ["a", "b", "c"]
+first_map = { "a": "alpha", "b": "beta", "c": "gamma" }
+second_map = { "alpha": 1, "beta": 2, "gamma": 3 }
+codes.add_mapping_rule(first_map)
+codes.add_mapping_rule(second_map)
+print(codes)                                     # [1, 2, 3]
+```
+
 #### Key Benefits
 - **Intrinsic to Data**: Behaviors are part of the container, not external processors
 - **Automatic Application**: Once attached, behaviors apply to all current and future values
-- **One-Step Process**: `list.add_rule("nil_to_zero")` - that's it!
+- **One-Step Process**: `list.add_rule("none_to_zero")` - that's it!
 - **Type-Safe**: Behaviors respect and work with type constraints
 - **Composable**: Multiple behaviors apply in order
 - **Graph Foundation**: Since lists and maps are graph structures, behaviors are inherited by all graph types
+- **User-Defined Mappings**: Create any mapping with `add_mapping_rule()` using hash graphs
 
 #### Future: Custom Behaviors
 ```glang

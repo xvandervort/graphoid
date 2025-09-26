@@ -43,8 +43,8 @@ class BackwardFillMarker(GlangValue):
 
 class Behavior:
     """A composable behavior that can transform or validate values."""
-    
-    def __init__(self, name: str, 
+
+    def __init__(self, name: str,
                  transform: Optional[Callable] = None,
                  validate: Optional[Callable] = None,
                  on_invalid: Optional[Callable] = None):
@@ -52,7 +52,7 @@ class Behavior:
         self.transform = transform
         self.validate = validate
         self.on_invalid = on_invalid
-    
+
     def apply(self, value: GlangValue, *args) -> GlangValue:
         """Apply this behavior to a value."""
         # First validate if we have a validator
@@ -63,11 +63,45 @@ class Behavior:
                     return self.on_invalid(value, *args)
                 else:
                     raise ValueError(f"Value {value.to_display_string()} failed validation for {self.name}")
-        
+
         # Then transform if we have a transformer
         if self.transform:
             return self.transform(value, *args)
-        
+
+        return value
+
+
+class MappingBehavior(Behavior):
+    """A behavior that maps values according to a user-defined mapping graph (HashValue)."""
+
+    def __init__(self, mapping: 'HashValue', default: Optional[GlangValue] = None):
+        """Initialize mapping behavior with a HashValue graph.
+
+        Args:
+            mapping: HashValue graph containing the mapping rules
+            default: Optional default value for unmapped keys
+        """
+        self.mapping = mapping
+        self.default = default
+        super().__init__("mapping", transform=self._transform)
+
+    def _transform(self, value: GlangValue) -> GlangValue:
+        """Transform value according to mapping graph."""
+        # Convert value to string key for hash lookup
+        key_str = value.to_display_string()
+
+        # Try to get mapped value from the hash graph
+        try:
+            mapped_value = self.mapping.get(key_str)
+            if mapped_value is not None and not isinstance(mapped_value, NoneValue):
+                return mapped_value
+        except:
+            pass
+
+        # Use default if provided, otherwise return original value
+        if self.default is not None:
+            return self.default
+
         return value
 
 

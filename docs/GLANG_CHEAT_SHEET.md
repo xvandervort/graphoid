@@ -360,6 +360,23 @@ list.clear_rules()                     # Remove all rules
 - `uppercase`/`lowercase` - String case
 - `validate_range(min, max)` - Clamp to range
 
+### Generic Mapping (NEW!)
+```glang
+# Create custom value mappings using hash graphs
+status_map = { "active": 1, "inactive": 0, "pending": 2 }
+statuses = ["active", "unknown", "inactive"]
+statuses.add_mapping_rule(status_map, -1)    # Default -1 for unmapped
+print(statuses)                              # [1, -1, 0]
+
+# Chain multiple mappings for complex transformations
+codes = ["a", "b", "c"]
+first_map = { "a": "alpha", "b": "beta", "c": "gamma" }
+second_map = { "alpha": 1, "beta": 2, "gamma": 3 }
+codes.add_mapping_rule(first_map)
+codes.add_mapping_rule(second_map)
+print(codes)                                 # [1, 2, 3]
+```
+
 ## 🧮 Mathematical Methods
 
 ### Number Methods

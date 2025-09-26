@@ -125,10 +125,104 @@ list.clear_rules()                          # Remove all behaviors
 ### String Transformation
 - `uppercase` - Convert strings to UPPERCASE
 - `lowercase` - Convert strings to lowercase
-- `map_colors` - Map color names to numbers (red→1, green→2, blue→3, etc.)
+- `map_colors` - Map color names to numbers (deprecated - use generic mapping instead)
 
 ### Validation
 - `validate_range(min, max)` - Clamp numbers to specified range
+
+## Generic Mapping Behaviors
+
+Create custom value mappings using hash graphs. This powerful feature replaces hardcoded behaviors like `map_colors` with user-defined mappings.
+
+### Basic Mapping
+
+```glang
+# Define a status mapping
+status_map = { "active": 1, "inactive": 0, "pending": 2 }
+user_statuses = ["active", "unknown", "inactive"]
+
+# Apply the mapping to the list
+user_statuses.add_mapping_rule(status_map)
+print(user_statuses)  # [1, "unknown", 0]
+```
+
+### Mapping with Default Values
+
+```glang
+# Provide a default value for unmapped keys
+user_statuses.add_mapping_rule(status_map, -1)  # Default -1 for unmapped
+print(user_statuses)  # [1, -1, 0]
+```
+
+### Multi-Stage Transformations
+
+```glang
+# Chain mappings for complex transformations
+codes = ["a", "b", "c"]
+
+# First mapping: letters to Greek names
+first_map = { "a": "alpha", "b": "beta", "c": "gamma" }
+codes.add_mapping_rule(first_map)
+print(codes)  # ["alpha", "beta", "gamma"]
+
+# Second mapping: Greek names to numbers
+second_map = { "alpha": 1, "beta": 2, "gamma": 3 }
+codes.add_mapping_rule(second_map)
+print(codes)  # [1, 2, 3]
+```
+
+### Hash Mapping
+
+```glang
+# Apply mappings to hash values
+config = { "env": "dev", "region": "us-west", "unknown": "weird" }
+
+env_mapping = { "dev": "development", "prod": "production", "staging": "staging" }
+config.add_mapping_rule(env_mapping, "unknown_environment")
+
+print(config["env"])     # "development" (mapped)
+print(config["region"])  # "us-west" (unchanged)
+print(config["unknown"]) # "unknown_environment" (default used)
+```
+
+### Practical Examples
+
+#### Color Code Mapping
+Replace the deprecated `map_colors` behavior:
+
+```glang
+# Old way (deprecated)
+colors.add_rule("map_colors")  # Limited to predefined colors
+
+# New way (flexible)
+color_map = { "red": 1, "green": 2, "blue": 3, "yellow": 4, "purple": 5 }
+colors.add_mapping_rule(color_map, 0)  # 0 for unknown colors
+```
+
+#### Grade Letter to Number
+```glang
+grades = ["A", "B", "C", "F", "A+"]
+grade_map = { "A+": 97, "A": 95, "B": 85, "C": 75, "D": 65, "F": 0 }
+grades.add_mapping_rule(grade_map, 50)  # 50 for unrecognized grades
+print(grades)  # [95, 85, 75, 0, 97]
+```
+
+#### Department Code Translation
+```glang
+employees = ["walter", "james", "unknown", "emily"]
+dept_map = { "walter": "HR", "james": "IT", "emily": "Admin" }
+employees.add_mapping_rule(dept_map, "Unassigned")
+print(employees)  # ["HR", "IT", "Unassigned", "Admin"]
+```
+
+### Key Benefits
+
+- **User-Defined**: Create any mapping you need using hash graphs
+- **Graph-Based**: Uses Glang's native HashValue graph structures
+- **Default Values**: Specify fallback values for unmapped keys
+- **Composable**: Chain multiple mappings for complex transformations
+- **Type-Safe**: Works with type constraints and other behaviors
+- **Replaces Hardcoded**: Eliminates need for predefined behaviors like `map_colors`
 
 ## Multiple Behaviors
 
@@ -249,3 +343,5 @@ The behavior system will be extended with:
 - Conditional behaviors based on context
 - Behavior composition and pipelines
 - Graph-specific behaviors for nodes and edges
+
+**Completed**: Generic mapping behaviors (available now!)
