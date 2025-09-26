@@ -447,10 +447,208 @@ print(numbers)  # [10, 20, 30] - original values preserved
 - **Error-Safe**: Failed functions don't break your data pipeline
 - **Graph-Native**: Uses Glang's function system directly
 
+## Conditional Behavior System
+
+Create context-aware behaviors that only apply when specific conditions are met. This powerful feature allows you to define behaviors that process different types of data differently.
+
+### Basic Conditional Behaviors
+
+```glang
+# Apply different transformations based on value type
+mixed_data = [42, "hello", -10, "WORLD", nil]
+
+# Define condition and transform functions
+func is_string(value) {
+    return value.get_type() == "string"
+}
+
+func to_upper(value) {
+    return value.upper()
+}
+
+# Apply conditional behavior - only strings get uppercased
+mixed_data.add_conditional_rule(is_string, to_upper)
+print(mixed_data)  # [42, "HELLO", -10, "WORLD", nil]
+```
+
+### Conditional Behaviors with Fallback
+
+```glang
+# Process numbers differently based on their sign
+numbers = [5, -3, 0, 15, -8]
+
+# Define condition and transform functions
+func is_negative(value) {
+    return value.get_type() == "number" and value < 0
+}
+
+func make_positive(value) {
+    return -value  # Convert to positive
+}
+
+func mark_zero(value) {
+    return 999  # Special marker for non-negative numbers
+}
+
+# Apply conditional with fallback
+numbers.add_conditional_rule(is_negative, make_positive, mark_zero)
+print(numbers)  # [999, 3, 999, 999, 8]
+```
+
+### Type-Specific Processing
+
+```glang
+# Clean and normalize mixed user input
+user_input = ["  Alice  ", 42, "BOB", nil, "charlie", 0]
+
+# String normalization
+func is_string(value) {
+    return value.get_type() == "string"
+}
+
+func normalize_string(value) {
+    return value.trim().title()  # Trim and capitalize
+}
+
+func default_string(value) {
+    return "Unknown"  # Default for non-strings
+}
+
+user_input.add_conditional_rule(is_string, normalize_string, default_string)
+print(user_input)  # ["Alice", "Unknown", "Bob", "Unknown", "Charlie", "Unknown"]
+```
+
+### Data Validation with Conditions
+
+```glang
+# Validate and clean sensor readings
+sensor_data = [98.6, -999, 102.1, nil, 150.5, 72.0]
+
+# Valid temperature range condition
+func is_valid_temp(value) {
+    if value.get_type() != "number" { return false }
+    return value >= 95 and value <= 105
+}
+
+func keep_temp(value) {
+    return value  # Keep valid temperatures
+}
+
+func replace_invalid(value) {
+    return 98.6  # Default normal temperature
+}
+
+sensor_data.add_conditional_rule(is_valid_temp, keep_temp, replace_invalid)
+print(sensor_data)  # [98.6, 98.6, 102.1, 98.6, 98.6, 98.6]
+```
+
+### Complex Business Logic
+
+```glang
+# Grade assignment based on score ranges
+scores = [95, 87, 76, 65, 45, 92]
+
+func is_excellent(value) {
+    return value >= 90
+}
+
+func assign_a_plus(value) {
+    return "A+"
+}
+
+func assign_default_grade(value) {
+    # Further processing for other ranges
+    if value >= 80 { return "A" }
+    if value >= 70 { return "B" }
+    if value >= 60 { return "C" }
+    return "F"
+}
+
+scores.add_conditional_rule(is_excellent, assign_a_plus, assign_default_grade)
+print(scores)  # ["A+", "A", "B", "C", "F", "A+"]
+```
+
+### Multiple Conditional Rules
+
+```glang
+# Chain multiple conditional behaviors for complex processing
+data = ["email@test.com", "not-email", "user@domain.org", "invalid"]
+
+# First rule: validate emails
+func is_email(value) {
+    return value.contains("@") and value.contains(".")
+}
+
+func keep_email(value) {
+    return value
+}
+
+func mark_invalid_email(value) {
+    return "INVALID_EMAIL"
+}
+
+data.add_conditional_rule(is_email, keep_email, mark_invalid_email)
+
+# Second rule: normalize valid emails
+func is_valid_email(value) {
+    return value != "INVALID_EMAIL"
+}
+
+func normalize_email(value) {
+    return value.lower()
+}
+
+data.add_conditional_rule(is_valid_email, normalize_email)
+print(data)  # ["email@test.com", "INVALID_EMAIL", "user@domain.org", "INVALID_EMAIL"]
+```
+
+### Key Benefits
+
+- **Context-Aware Processing**: Apply different logic based on value characteristics
+- **Type-Safe Operations**: Only process values that meet specific criteria
+- **Fallback Handling**: Define what happens when conditions aren't met
+- **Composable Logic**: Chain multiple conditional behaviors for complex workflows
+- **Error-Safe**: Failed conditions or transforms don't break your data pipeline
+- **Graph-Native**: Uses Glang's function system directly for maximum flexibility
+
+### API Reference
+
+```glang
+# Basic conditional rule
+container.add_conditional_rule(condition_func, transform_func)
+
+# Conditional rule with fallback
+container.add_conditional_rule(condition_func, transform_func, on_fail_func)
+```
+
+**Parameters:**
+- `condition_func`: Function that takes a value and returns boolean
+- `transform_func`: Function to apply when condition is true
+- `on_fail_func`: Optional function to apply when condition is false
+
+**Returns:** `nil` (behaviors modify the container in place)
+
+### Error Handling
+
+Conditional behaviors are designed to be robust:
+
+```glang
+# If condition function fails, value is left unchanged
+func risky_condition(value) {
+    return value.some_method_that_might_not_exist()
+}
+
+func safe_transform(value) {
+    return value.upper()
+}
+
+data.add_conditional_rule(risky_condition, safe_transform)
+# Values that cause condition to fail are left as-is
+```
+
 ## Future Enhancements
 
 The behavior system will be extended with:
-- Conditional behaviors based on context
 - Behavior composition and pipelines
 - Graph-specific behaviors for nodes and edges
 - Behavior inheritance in graph hierarchies
@@ -458,3 +656,4 @@ The behavior system will be extended with:
 **Completed**:
 - Generic mapping behaviors (available now!)
 - Custom function behaviors (available now!)
+- Conditional behavior system (available now!)

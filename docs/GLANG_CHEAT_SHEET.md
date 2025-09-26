@@ -398,6 +398,34 @@ sensor_data.add_custom_rule(normalize_temp)  # Custom function
 print(sensor_data)                           # [95, 95, 105]
 ```
 
+### Conditional Behaviors (NEW!)
+```glang
+# Apply behaviors only when conditions are met
+mixed_data = [42, "hello", -10, "WORLD"]
+
+# Define condition and transform functions
+func is_string(value) {
+    return value.get_type() == "string"
+}
+
+func to_upper(value) {
+    return value.upper()
+}
+
+# Only strings get uppercased
+mixed_data.add_conditional_rule(is_string, to_upper)
+print(mixed_data)                            # [42, "HELLO", -10, "WORLD"]
+
+# With fallback behavior
+func mark_non_string(value) {
+    return "NOT_STRING"
+}
+
+numbers = [1, "text", 3]
+numbers.add_conditional_rule(is_string, to_upper, mark_non_string)
+print(numbers)                               # ["NOT_STRING", "TEXT", "NOT_STRING"]
+```
+
 ## 🧮 Mathematical Methods
 
 ### Number Methods

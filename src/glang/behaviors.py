@@ -148,6 +148,86 @@ class CustomFunctionBehavior(Behavior):
             return value
 
 
+class ConditionalBehavior(Behavior):
+    """A behavior that applies transformations only when conditions are met."""
+
+    def __init__(self, condition_func: 'GlangValue', transform_func: 'GlangValue',
+                 on_fail: Optional['GlangValue'] = None):
+        """Initialize conditional behavior.
+
+        Args:
+            condition_func: Function that takes value and returns boolean
+            transform_func: Function to apply when condition is true
+            on_fail: Optional function to apply when condition is false
+        """
+        from .execution.values import FunctionValue, LambdaValue
+
+        # Validate condition function
+        if not isinstance(condition_func, (FunctionValue, LambdaValue)):
+            raise ValueError(f"Condition must be a function or lambda, got {condition_func.get_type()}")
+
+        # Validate transform function
+        if not isinstance(transform_func, (FunctionValue, LambdaValue)):
+            raise ValueError(f"Transform must be a function or lambda, got {transform_func.get_type()}")
+
+        # Validate on_fail function if provided
+        if on_fail is not None and not isinstance(on_fail, (FunctionValue, LambdaValue)):
+            raise ValueError(f"on_fail must be a function or lambda, got {on_fail.get_type()}")
+
+        self.condition_func = condition_func
+        self.transform_func = transform_func
+        self.on_fail = on_fail
+
+        # Generate unique name
+        condition_id = id(condition_func)
+        transform_id = id(transform_func)
+        super().__init__(f"conditional_{condition_id}_{transform_id}", transform=self._transform)
+
+    def _transform(self, value: GlangValue) -> GlangValue:
+        """Apply conditional transformation."""
+        from .execution.executor import ASTExecutor, ExecutionContext
+        from .semantic.symbol_table import SymbolTable
+        from .execution.values import BooleanValue
+
+        # Create execution context for function calls
+        symbol_table = SymbolTable()
+        context = ExecutionContext(symbol_table)
+        executor = ASTExecutor(context)
+
+        try:
+            # Evaluate condition
+            condition_result = executor.call_function(self.condition_func, [value])
+
+            # Check if condition is true
+            is_true = False
+            if isinstance(condition_result, BooleanValue):
+                is_true = condition_result.value
+            elif hasattr(condition_result, 'value'):
+                # Handle truthy/falsy values
+                if isinstance(condition_result.value, bool):
+                    is_true = condition_result.value
+                elif isinstance(condition_result.value, (int, float)):
+                    is_true = condition_result.value != 0
+                elif isinstance(condition_result.value, str):
+                    is_true = condition_result.value != ""
+                else:
+                    is_true = condition_result.value is not None
+
+            if is_true:
+                # Apply transform function
+                return executor.call_function(self.transform_func, [value])
+            else:
+                # Apply on_fail function if provided, otherwise return original value
+                if self.on_fail is not None:
+                    return executor.call_function(self.on_fail, [value])
+                else:
+                    return value
+
+        except Exception as e:
+            # If any function fails, return original value
+            return value
+
+
 class BehaviorRegistry:
     """Registry of standard behaviors."""
     

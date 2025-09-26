@@ -203,6 +203,57 @@ class GraphContainer:
 
         return NoneValue()
 
+    def add_conditional_rule(self, condition: 'GlangValue', transform: 'GlangValue',
+                           on_fail: Optional['GlangValue'] = None) -> 'NoneValue':
+        """Add a conditional behavior rule to this container.
+
+        Usage:
+            # Apply transformation only when condition is met
+            func is_string(value) { return value.get_type() == "string" }
+            func to_upper(value) { return value.upper() }
+            func to_zero(value) { return 0 }
+
+            data.add_conditional_rule(is_string, to_upper, to_zero)
+
+        Args:
+            condition: Function that takes a value and returns boolean
+            transform: Function to apply when condition is true
+            on_fail: Optional function to apply when condition is false
+        """
+        from .execution.values import NoneValue, FunctionValue, LambdaValue
+        from .behaviors import ConditionalBehavior
+
+        # Validate that condition and transform are functions
+        if not isinstance(condition, (FunctionValue, LambdaValue)):
+            raise ValueError(f"Condition must be a function or lambda, got {condition.get_type()}")
+
+        if not isinstance(transform, (FunctionValue, LambdaValue)):
+            raise ValueError(f"Transform must be a function or lambda, got {transform.get_type()}")
+
+        if on_fail is not None and not isinstance(on_fail, (FunctionValue, LambdaValue)):
+            raise ValueError(f"on_fail must be a function or lambda, got {on_fail.get_type()}")
+
+        # Create a conditional behavior
+        behavior = ConditionalBehavior(condition, transform, on_fail)
+
+        # Generate unique name for this conditional behavior
+        condition_id = id(condition)
+        transform_id = id(transform)
+        behavior_name = f"conditional_{condition_id}_{transform_id}"
+
+        # Prevent duplicate conditional behaviors (same objects)
+        if behavior_name in self._behavior_names:
+            return NoneValue()
+
+        # Add behavior to container
+        self._behaviors.append((behavior, ()))
+        self._behavior_names.add(behavior_name)
+
+        # Apply to all existing elements
+        self._apply_behaviors_to_existing()
+
+        return NoneValue()
+
     def _apply_behaviors(self, value: 'GlangValue') -> 'GlangValue':
         """Apply all behaviors to a single value."""
         result = value
