@@ -24,6 +24,7 @@ Glang aims to be:
 - **Self-Aware Data Structures** - Future: Collections that understand their own structure and relationships
 - **Intuitive Syntax** - Natural programming constructs that feel familiar
 - **Developer Experience** - Excellent error messages, REPL environment, and reflection capabilities
+- **KISS Principle** - Keep It Simple, Stupid! Glang despises unnecessary verbiage and redundant syntax
 
 ### Current Status (January 2025)
 **BREAKTHROUGH COMPLETE**: Glang now has true graph-based function discovery system. Functions are stored as graph nodes and calls use graph traversal instead of variable lookup. This transforms Glang from a simulated graph language to a genuinely graph-theoretic programming platform.
@@ -655,32 +656,32 @@ Glang provides powerful call graph introspection that lets you visualize and deb
 
 ```glang
 # Import the call graph module
-import "call_graph" as cg
+import "call_graph"
 
 # Basic information
-scope = cg.current_scope()               # Current scope name
-count = cg.count_functions()             # Total functions
-scopes = cg.list_scopes()                # All available scopes
-funcs = cg.get_reachable_functions()     # Functions you can call
+scope = call_graph.current_scope()               # Current scope name
+count = call_graph.count_functions()             # Total functions
+scopes = call_graph.list_scopes()                # All available scopes
+funcs = call_graph.get_reachable_functions()     # Functions you can call
 
 # Detailed function information
-info = cg.get_function_info("my_func")
+info = call_graph.get_function_info("my_func")
 print("Parameters: " + info["parameters"].to_string())
 print("Connected to: " + info["connected_functions"].to_string())
 
 # Path finding between functions
-path = cg.find_path("main", "helper")
+path = call_graph.find_path("main", "helper")
 if path != none {
     print("Path: " + path.to_string())   # Shows function connectivity
 }
 
 # Visualization in multiple formats
-text_viz = cg.visualize("text")          # Human-readable text
-dot_viz = cg.visualize("dot")            # Graphviz DOT format
-mermaid_viz = cg.visualize("mermaid")    # Mermaid diagram syntax
+text_viz = call_graph.visualize("text")          # Human-readable text
+dot_viz = call_graph.visualize("dot")            # Graphviz DOT format
+mermaid_viz = call_graph.visualize("mermaid")    # Mermaid diagram syntax
 
 # Focus on specific scope
-module_viz = cg.visualize_scope("MyModule")
+module_viz = call_graph.visualize_scope("MyModule")
 ```
 
 **REPL Debugging Example:**
@@ -689,15 +690,15 @@ glang> func main() { process() }
 glang> func process() { validate() }
 glang> func validate() { return true }
 
-glang> import "call_graph" as cg
-glang> cg.get_reachable_functions()
+glang> import "call_graph"
+glang> call_graph.get_reachable_functions()
 [main, process, validate]
 
-glang> path = cg.find_path("main", "validate")
+glang> path = call_graph.find_path("main", "validate")
 glang> path.to_string()
 [main, validate]
 
-glang> cg.visualize()
+glang> call_graph.visualize()
 ==================================================
 COMPLETE CALL GRAPH
 ==================================================
@@ -751,8 +752,35 @@ Glang uses a clean, modern architecture:
 ### Development Guidelines
 - **AST-first development** - All new features should extend the AST system
 - **Smart type inference** - Infer types from context to reduce boilerplate
-- **Comprehensive testing** - New features require full test coverage  
+- **Comprehensive testing** - New features require full test coverage
 - **Clean error messages** - Users should understand exactly what went wrong
+- **Clean import syntax** - NEVER use `import "module" as alias` - modules have built-in aliases that make this redundant
+
+### Import Philosophy
+
+**CRITICAL**: Glang follows the KISS principle religiously. The syntax `import "some_module" as "anything"` is almost always a bad choice because:
+
+1. **Modules have built-in aliases** - `import "random"` gives you both `random` and `rand`
+2. **Unnecessary verbiage** - Why write `import "math" as calc` when `import "math"` gives you `calc` automatically?
+3. **Violates KISS** - Glang despises redundant syntax that adds no value
+
+**Good Examples:**
+```glang
+import "random"      # Use rand.choice() or random.choice() - your choice!
+import "math"        # Use calc.sqrt() or math.sqrt() - both work!
+import "regex"       # Use re.match() or regex.match() - flexible!
+```
+
+**Bad Examples (avoid these patterns):**
+```glang
+import "random" as rand    # REDUNDANT - rand is already available!
+import "math" as calc      # REDUNDANT - calc is already available!
+import "regex" as re       # REDUNDANT - re is already available!
+```
+
+**When aliases ARE appropriate:**
+- Only when overriding with something MORE descriptive: `import "utils.gr" as tools`
+- Never for standard library modules - they already have perfect aliases
 
 ## Future Vision
 
