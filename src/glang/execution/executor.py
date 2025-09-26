@@ -5085,12 +5085,12 @@ class ASTExecutor(BaseASTVisitor):
         from .errors import MatchError
 
         # Evaluate the expression to match against
-        target_value = self.execute(node.expr)
+        target_value = self.execute(node.value)
 
-        # Try each arm in order
-        for arm in node.arms:
+        # Try each case in order
+        for case in node.cases:
             # Try to match pattern
-            bindings = self.match_pattern(arm.pattern, target_value)
+            bindings = self.match_pattern(case.pattern, target_value)
             if bindings is not None:
                 # Pattern matched! Save current variables and add bindings
                 saved_vars = {}
@@ -5104,7 +5104,7 @@ class ASTExecutor(BaseASTVisitor):
                         self.context.set_variable(var_name, var_value)
 
                     # Execute result expression with bindings
-                    result = self.execute(arm.result)
+                    result = self.execute(case.expression)
                     return result
                 finally:
                     # Restore original variables and remove pattern bindings
@@ -5135,17 +5135,26 @@ class ASTExecutor(BaseASTVisitor):
 
         elif type(pattern).__name__ == 'LiteralPattern':
             # Literal pattern must match exactly
-            if isinstance(pattern.value, SymbolValue):
+            # Pattern.value is now an Expression, so we need to execute it first
+            pattern_value = self.execute(pattern.value)
+
+            if isinstance(pattern_value, SymbolValue):
                 # Symbol pattern - check if value is SymbolValue with same name
-                if isinstance(value, SymbolValue) and value.name == pattern.value.name:
+                if isinstance(value, SymbolValue) and value.name == pattern_value.name:
                     return {}
                 return None
             else:
                 # Other literal patterns (numbers, strings, booleans)
-                if hasattr(value, 'value'):
-                    if value.value == pattern.value:
+                if hasattr(value, 'value') and hasattr(pattern_value, 'value'):
+                    if value.value == pattern_value.value:
                         return {}
-                elif value == pattern.value:
+                elif hasattr(value, 'value'):
+                    if value.value == pattern_value:
+                        return {}
+                elif hasattr(pattern_value, 'value'):
+                    if value == pattern_value.value:
+                        return {}
+                elif value == pattern_value:
                     return {}
                 return None
 

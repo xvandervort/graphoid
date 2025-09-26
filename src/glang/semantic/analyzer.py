@@ -350,10 +350,10 @@ class SemanticAnalyzer(BaseASTVisitor):
                     elif symbol.symbol_type == 'map':
                         return 'data'  # Map indexing returns data node
         elif isinstance(expr, MatchExpression):
-            # For match expressions, infer type from the first arm's result
-            # All arms should return the same type (this could be enforced later)
-            if expr.arms:
-                return self.infer_type_from_expression(expr.arms[0].result)
+            # For match expressions, infer type from the first case's result
+            # All cases should return the same type (this could be enforced later)
+            if expr.cases:
+                return self.infer_type_from_expression(expr.cases[0].expression)
 
         return None  # Cannot infer type
     
@@ -905,19 +905,19 @@ class SemanticAnalyzer(BaseASTVisitor):
     def visit_match_expression(self, node) -> None:
         """Analyze match expressions."""
         # Analyze the expression being matched
-        node.expr.accept(self)
+        node.value.accept(self)
 
-        # Analyze each match arm in its own scope
-        for arm in node.arms:
-            # Enter new scope for this match arm
+        # Analyze each match case in its own scope
+        for case in node.cases:
+            # Enter new scope for this match case
             self.symbol_table.enter_scope()
 
             try:
                 # Analyze pattern and register pattern variables in the new scope
-                pattern_vars, _ = self.analyze_pattern_bindings(arm.pattern)
+                pattern_vars, _ = self.analyze_pattern_bindings(case.pattern)
 
                 # Analyze result expression with pattern variables in scope
-                arm.result.accept(self)
+                case.expression.accept(self)
             finally:
                 # Exit the scope, automatically cleaning up pattern variables
                 self.symbol_table.exit_scope()

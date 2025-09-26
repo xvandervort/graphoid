@@ -178,6 +178,86 @@ class MapLiteral(Expression):
         return visitor.visit_map_literal(self)
 
 # =============================================================================
+# Pattern Matching Nodes
+# =============================================================================
+
+class Pattern(ASTNode):
+    """Base class for all patterns."""
+    pass
+
+@dataclass
+class LiteralPattern(Pattern):
+    """Literal pattern: 42, "hello", true, none"""
+    value: Expression  # The literal value to match
+    position: Optional[SourcePosition] = None
+
+    def accept(self, visitor):
+        return visitor.visit_literal_pattern(self)
+
+@dataclass
+class VariablePattern(Pattern):
+    """Variable pattern: x (captures any value)"""
+    name: str
+    position: Optional[SourcePosition] = None
+
+    def accept(self, visitor):
+        return visitor.visit_variable_pattern(self)
+
+@dataclass
+class WildcardPattern(Pattern):
+    """Wildcard pattern: _ (matches anything, doesn't bind)"""
+    position: Optional[SourcePosition] = None
+
+    def accept(self, visitor):
+        return visitor.visit_wildcard_pattern(self)
+
+@dataclass
+class ListPattern(Pattern):
+    """List pattern: [first, second, rest...]"""
+    elements: List[Pattern]  # Individual element patterns
+    rest_variable: Optional[str] = None  # Variable to capture remaining elements (if any)
+    position: Optional[SourcePosition] = None
+
+    def accept(self, visitor):
+        return visitor.visit_list_pattern(self)
+
+@dataclass
+class MapPattern(Pattern):
+    """Map pattern: {key: pattern, other: _}"""
+    pairs: List[Tuple[str, Pattern]]  # List of (key, pattern) pairs
+    position: Optional[SourcePosition] = None
+
+    def accept(self, visitor):
+        return visitor.visit_map_pattern(self)
+
+@dataclass
+class TypePattern(Pattern):
+    """Type pattern: x: string, n: num"""
+    variable: str  # Variable to bind to
+    type_name: str  # Expected type
+    position: Optional[SourcePosition] = None
+
+    def accept(self, visitor):
+        return visitor.visit_type_pattern(self)
+
+@dataclass
+class MatchCase:
+    """Single case in a match expression"""
+    pattern: Pattern
+    expression: Expression
+    position: Optional[SourcePosition] = None
+
+@dataclass
+class MatchExpression(Expression):
+    """Match expression: match value { pattern1 => expr1, pattern2 => expr2 }"""
+    value: Expression  # Expression to match against
+    cases: List[MatchCase]  # List of pattern cases
+    position: Optional[SourcePosition] = None
+
+    def accept(self, visitor):
+        return visitor.visit_match_expression(self)
+
+# =============================================================================
 # Statement Nodes - represent actions and declarations
 # =============================================================================
 
@@ -853,62 +933,3 @@ class BaseASTVisitor(ASTVisitor):
         return node
 
 
-# Pattern Matching AST Nodes
-
-class Pattern(ASTNode):
-    """Base class for all patterns in match expressions."""
-    pass
-
-@dataclass
-class MatchExpression(Expression):
-    """Match expression: match expr { pattern => result, ... }"""
-    expr: Expression
-    arms: List['MatchArm']
-    position: Optional[SourcePosition] = None
-
-    def accept(self, visitor):
-        return visitor.visit_match_expression(self)
-
-@dataclass
-class MatchArm:
-    """Single match arm: pattern => result"""
-    pattern: Pattern
-    result: Expression
-    guard: Optional[Expression] = None  # Future: for 'if' guards
-    position: Optional[SourcePosition] = None
-
-@dataclass
-class LiteralPattern(Pattern):
-    """Literal value pattern: 42, "hello", true, :ok"""
-    value: Any
-    position: Optional[SourcePosition] = None
-
-    def accept(self, visitor):
-        return visitor.visit_literal_pattern(self)
-
-@dataclass
-class VariablePattern(Pattern):
-    """Variable binding pattern: x, value, message"""
-    name: str
-    position: Optional[SourcePosition] = None
-
-    def accept(self, visitor):
-        return visitor.visit_variable_pattern(self)
-
-@dataclass
-class WildcardPattern(Pattern):
-    """Wildcard pattern: _"""
-    position: Optional[SourcePosition] = None
-
-    def accept(self, visitor):
-        return visitor.visit_wildcard_pattern(self)
-
-@dataclass
-class ListPattern(Pattern):
-    """List pattern: [], [a, b], [first, ...rest]"""
-    elements: List[Pattern]
-    rest_variable: Optional[str] = None  # For ...rest syntax
-    position: Optional[SourcePosition] = None
-
-    def accept(self, visitor):
-        return visitor.visit_list_pattern(self)

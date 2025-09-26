@@ -474,18 +474,18 @@ class ASTParser:
 
     def parse_match_expression(self) -> 'MatchExpression':
         """Parse match expression: match expr { pattern => result, ... }"""
-        from ..ast.nodes import MatchExpression, MatchArm
+        from ..ast.nodes import MatchExpression, MatchCase
 
         match_token = self.consume(TokenType.MATCH, "Expected 'match'")
         pos = SourcePosition(match_token.line, match_token.column)
 
         # Parse expression to match against
-        expr = self.parse_expression()
+        value = self.parse_expression()
 
-        # Parse match arms block
+        # Parse match cases block
         self.consume(TokenType.LBRACE, "Expected '{' after match expression")
 
-        arms = []
+        cases = []
         while not self.check(TokenType.RBRACE) and not self.is_at_end():
             # Skip newlines before pattern
             while self.check(TokenType.NEWLINE):
@@ -502,13 +502,13 @@ class ASTParser:
             self.consume(TokenType.ARROW, "Expected '=>' after pattern")
 
             # Parse result expression
-            result = self.parse_expression()
+            expression = self.parse_expression()
 
-            # Create match arm
-            arm = MatchArm(pattern=pattern, result=result, position=pos)
-            arms.append(arm)
+            # Create match case
+            case = MatchCase(pattern=pattern, expression=expression, position=pos)
+            cases.append(case)
 
-            # Optional comma between arms
+            # Optional comma between cases
             if self.check(TokenType.COMMA):
                 self.advance()
 
@@ -516,9 +516,9 @@ class ASTParser:
             while self.check(TokenType.NEWLINE):
                 self.advance()
 
-        self.consume(TokenType.RBRACE, "Expected '}' after match arms")
+        self.consume(TokenType.RBRACE, "Expected '}' after match cases")
 
-        return MatchExpression(expr=expr, arms=arms, position=pos)
+        return MatchExpression(value=value, cases=cases, position=pos)
 
     def parse_pattern(self) -> 'Pattern':
         """Parse a pattern for pattern matching."""
@@ -540,22 +540,28 @@ class ASTParser:
         # Literal patterns: numbers, strings, booleans
         if self.check(TokenType.NUMBER_LITERAL):
             token = self.advance()
-            value = float(token.value) if '.' in token.value else int(token.value)
+            from ..ast.nodes import NumberLiteral
+            value_num = float(token.value) if '.' in token.value else int(token.value)
             pos = SourcePosition(token.line, token.column)
-            return LiteralPattern(value=value, position=pos)
+            value_expr = NumberLiteral(value=value_num, position=pos)
+            return LiteralPattern(value=value_expr, position=pos)
 
         if self.check(TokenType.STRING_LITERAL):
             token = self.advance()
+            from ..ast.nodes import StringLiteral
             # Remove quotes and handle escape sequences
-            value = self.process_string_literal(token.value)
+            value_str = self.process_string_literal(token.value)
             pos = SourcePosition(token.line, token.column)
-            return LiteralPattern(value=value, position=pos)
+            value_expr = StringLiteral(value=value_str, position=pos)
+            return LiteralPattern(value=value_expr, position=pos)
 
         if self.match(TokenType.TRUE, TokenType.FALSE):
             token = self.previous()
-            value = token.type == TokenType.TRUE
+            from ..ast.nodes import BooleanLiteral
+            value_bool = token.type == TokenType.TRUE
             pos = SourcePosition(token.line, token.column)
-            return LiteralPattern(value=value, position=pos)
+            value_expr = BooleanLiteral(value=value_bool, position=pos)
+            return LiteralPattern(value=value_expr, position=pos)
 
         # Symbol pattern (for status symbols like :ok, :error)
         if self.check(TokenType.SYMBOL):
@@ -563,11 +569,11 @@ class ASTParser:
             symbol_name = token.value[1:] if token.value.startswith(':') else token.value
             # Validate it's a status symbol
             if symbol_name in ['ok', 'error', 'pending', 'success', 'failure', 'warning']:
-                from ..execution.values import SymbolValue
+                from ..ast.nodes import SymbolLiteral
                 pos = SourcePosition(token.line, token.column)
-                # Create a SymbolValue for pattern matching
-                symbol_value = SymbolValue(symbol_name, pos)
-                return LiteralPattern(value=symbol_value, position=pos)
+                # Create a SymbolLiteral for pattern matching
+                symbol_expr = SymbolLiteral(name=symbol_name, position=pos)
+                return LiteralPattern(value=symbol_expr, position=pos)
             else:
                 raise ParseError(f"Symbol '{token.value}' not allowed in patterns. Only status symbols (:ok, :error, :pending, :success, :failure, :warning) are permitted.", token)
 

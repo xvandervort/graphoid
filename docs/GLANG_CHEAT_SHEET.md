@@ -179,6 +179,84 @@ for item in items {
 }
 ```
 
+### Pattern Matching
+```glang
+# Basic match expression with literal patterns
+value = 42
+result = match value {
+    42 => "Found forty-two"
+    100 => "Found hundred"
+    _ => "Something else"
+}
+
+# String pattern matching
+greeting = "hello"
+response = match greeting {
+    "hello" => "Hi there!"
+    "goodbye" => "See you later!"
+    _ => "I don't understand"
+}
+
+# Variable patterns (capture and bind values)
+number = 123
+doubled = match number {
+    x => x * 2  # x captures the value (123), result is 246
+}
+
+# List pattern matching
+test_list = [1, 2, 3]
+result = match test_list {
+    [] => "Empty list"
+    [1, 2, 3] => "Found exact list"
+    [first, second] => "Two elements: " + first.to_string() + ", " + second.to_string()
+    _ => "Other list"
+}
+
+# Symbol pattern matching (status values)
+status = :ok
+message = match status {
+    :ok => "Operation successful"
+    :error => "Operation failed"
+    :pending => "Operation in progress"
+    _ => "Unknown status"
+}
+
+# Pattern matching with complex expressions
+value = 5
+base = 10
+result = match value {
+    1 => base + 1      # 11
+    5 => base * value  # 50
+    _ => 0
+}
+
+# Nested match expressions
+outer = 1
+inner = 2
+result = match outer {
+    1 => match inner {
+        2 => "One and Two"
+        _ => "One and Other"
+    }
+    _ => "Not One"
+}
+
+# Error handling with result tuples
+func safe_divide(a, b) {
+    if b == 0 {
+        return [:error, "Division by zero"]
+    }
+    return [:ok, a / b]
+}
+
+result = safe_divide(10, 2)
+message = match result {
+    [:ok, value] => "Result: " + value.to_string()
+    [:error, reason] => "Error: " + reason
+    _ => "Unknown result"
+}
+```
+
 ## ⚡ Functions & Lambda Expressions
 
 ### Function Declarations

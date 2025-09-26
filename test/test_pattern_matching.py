@@ -35,21 +35,24 @@ class TestPatternMatchingParsing:
 
         expr = self.parse_expression(code)
         assert expr.__class__.__name__ == "MatchExpression"
-        assert len(expr.arms) == 2
+        assert len(expr.cases) == 2
 
-        # Check first arm
-        arm1 = expr.arms[0]
-        assert arm1.pattern.__class__.__name__ == "LiteralPattern"
-        assert arm1.pattern.value == 42
-        assert arm1.result.__class__.__name__ == "StringLiteral"
-        assert arm1.result.value == "number"
+        # Check first case
+        case1 = expr.cases[0]
+        assert case1.pattern.__class__.__name__ == "LiteralPattern"
+        # Pattern value is now an Expression, so we need to check the nested value
+        assert case1.pattern.value.__class__.__name__ == "NumberLiteral"
+        assert case1.pattern.value.value == 42
+        assert case1.expression.__class__.__name__ == "StringLiteral"
+        assert case1.expression.value == "number"
 
-        # Check second arm
-        arm2 = expr.arms[1]
-        assert arm2.pattern.__class__.__name__ == "LiteralPattern"
-        assert arm2.pattern.value == "hello"
-        assert arm2.result.__class__.__name__ == "StringLiteral"
-        assert arm2.result.value == "string"
+        # Check second case
+        case2 = expr.cases[1]
+        assert case2.pattern.__class__.__name__ == "LiteralPattern"
+        assert case2.pattern.value.__class__.__name__ == "StringLiteral"
+        assert case2.pattern.value.value == "hello"
+        assert case2.expression.__class__.__name__ == "StringLiteral"
+        assert case2.expression.value == "string"
 
     def test_variable_pattern_parsing(self):
         """Test variable pattern parsing."""
@@ -58,9 +61,9 @@ class TestPatternMatchingParsing:
         }'''
 
         expr = self.parse_expression(code)
-        arm = expr.arms[0]
-        assert arm.pattern.__class__.__name__ == "VariablePattern"
-        assert arm.pattern.name == "x"
+        case = expr.cases[0]
+        assert case.pattern.__class__.__name__ == "VariablePattern"
+        assert case.pattern.name == "x"
 
     def test_wildcard_pattern_parsing(self):
         """Test wildcard pattern parsing."""
@@ -69,8 +72,8 @@ class TestPatternMatchingParsing:
         }'''
 
         expr = self.parse_expression(code)
-        arm = expr.arms[0]
-        assert arm.pattern.__class__.__name__ == "WildcardPattern"
+        case = expr.cases[0]
+        assert case.pattern.__class__.__name__ == "WildcardPattern"
 
     def test_list_pattern_parsing(self):
         """Test list pattern parsing."""
@@ -81,19 +84,19 @@ class TestPatternMatchingParsing:
 
         expr = self.parse_expression(code)
 
-        # Check first arm - list with variables
-        arm1 = expr.arms[0]
-        assert arm1.pattern.__class__.__name__ == "ListPattern"
-        assert len(arm1.pattern.elements) == 2
-        assert arm1.pattern.elements[0].__class__.__name__ == "VariablePattern"
-        assert arm1.pattern.elements[0].name == "x"
-        assert arm1.pattern.elements[1].__class__.__name__ == "VariablePattern"
-        assert arm1.pattern.elements[1].name == "y"
+        # Check first case - list with variables
+        case1 = expr.cases[0]
+        assert case1.pattern.__class__.__name__ == "ListPattern"
+        assert len(case1.pattern.elements) == 2
+        assert case1.pattern.elements[0].__class__.__name__ == "VariablePattern"
+        assert case1.pattern.elements[0].name == "x"
+        assert case1.pattern.elements[1].__class__.__name__ == "VariablePattern"
+        assert case1.pattern.elements[1].name == "y"
 
-        # Check second arm - empty list
-        arm2 = expr.arms[1]
-        assert arm2.pattern.__class__.__name__ == "ListPattern"
-        assert len(arm2.pattern.elements) == 0
+        # Check second case - empty list
+        case2 = expr.cases[1]
+        assert case2.pattern.__class__.__name__ == "ListPattern"
+        assert len(case2.pattern.elements) == 0
 
     def test_symbol_pattern_parsing(self):
         """Test symbol pattern parsing."""
@@ -104,17 +107,18 @@ class TestPatternMatchingParsing:
 
         expr = self.parse_expression(code)
 
-        # Check first arm - :ok symbol
-        arm1 = expr.arms[0]
-        assert arm1.pattern.__class__.__name__ == "LiteralPattern"
-        assert isinstance(arm1.pattern.value, SymbolValue)
-        assert arm1.pattern.value.name == "ok"
+        # Check first case - :ok symbol
+        case1 = expr.cases[0]
+        assert case1.pattern.__class__.__name__ == "LiteralPattern"
+        # Pattern value is now a SymbolLiteral expression
+        assert case1.pattern.value.__class__.__name__ == "SymbolLiteral"
+        assert case1.pattern.value.name == "ok"
 
-        # Check second arm - :error symbol
-        arm2 = expr.arms[1]
-        assert arm2.pattern.__class__.__name__ == "LiteralPattern"
-        assert isinstance(arm2.pattern.value, SymbolValue)
-        assert arm2.pattern.value.name == "error"
+        # Check second case - :error symbol
+        case2 = expr.cases[1]
+        assert case2.pattern.__class__.__name__ == "LiteralPattern"
+        assert case2.pattern.value.__class__.__name__ == "SymbolLiteral"
+        assert case2.pattern.value.name == "error"
 
 
 class TestPatternMatchingExecution:
