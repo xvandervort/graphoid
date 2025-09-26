@@ -1156,7 +1156,22 @@ string text = decoded["text"].value()   # String "hello"
 bool flag = decoded["flag"].value()     # Boolean true
 ```
 
-## 🛠️ REPL Commands
+## 🛠️ REPL (Interactive Shell)
+
+### Starting the REPL
+```bash
+# Start the interactive REPL
+glang
+
+# Or using Python module
+python -m glang.repl
+```
+
+The REPL provides an interactive environment for testing Glang code with features like:
+- Command history (↑/↓ arrow keys)
+- Tab completion for variables and methods
+- Real-time variable inspection
+- File loading and execution
 
 ### Essential Commands
 ```
@@ -1176,6 +1191,15 @@ bool flag = decoded["flag"].value()     # Boolean true
 ```
 /stats                   # Show session statistics
 /clear                   # Clear all variables
+```
+
+### Development Tools
+```bash
+# Check self-hosting progress (how much Glang is written in Glang vs Python)
+glang tools/self_hosting_metrics.gr
+
+# Or run from REPL
+/load tools/self_hosting_metrics.gr
 ```
 
 ## 💡 Quick Examples

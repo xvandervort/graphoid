@@ -84,84 +84,84 @@ class TestIOPathOperations:
         assert parts_list.elements[0].value == ""
         assert parts_list.elements[1].value == "document.txt"
     
-    def test_get_basename(self):
+    def test_basename(self):
         """Test getting basename (filename) from path."""
         result = self.session.execute_statement('full_path = "/home/user/document.txt"')
         assert result.success
         
-        result = self.session.execute_statement('basename = io.get_basename(full_path)')
+        result = self.session.execute_statement('basename = io.basename(full_path)')
         assert result.success
         
         result = self.session.execute_statement('basename')
         assert result.success
         assert result.value.value == "document.txt"
     
-    def test_get_basename_no_directory(self):
+    def test_basename_no_directory(self):
         """Test getting basename from filename only."""
         result = self.session.execute_statement('filename = "document.txt"')
         assert result.success
         
-        result = self.session.execute_statement('basename = io.get_basename(filename)')
+        result = self.session.execute_statement('basename = io.basename(filename)')
         assert result.success
         
         result = self.session.execute_statement('basename')
         assert result.success
         assert result.value.value == "document.txt"
     
-    def test_get_dirname(self):
+    def test_dirname(self):
         """Test getting directory name from path."""
         result = self.session.execute_statement('full_path = "/home/user/document.txt"')
         assert result.success
         
-        result = self.session.execute_statement('dirname = io.get_dirname(full_path)')
+        result = self.session.execute_statement('dirname = io.dirname(full_path)')
         assert result.success
         
         result = self.session.execute_statement('dirname')
         assert result.success
         assert result.value.value == "/home/user"
     
-    def test_get_dirname_no_directory(self):
+    def test_dirname_no_directory(self):
         """Test getting directory from filename only."""
         result = self.session.execute_statement('filename = "document.txt"')
         assert result.success
         
-        result = self.session.execute_statement('dirname = io.get_dirname(filename)')
+        result = self.session.execute_statement('dirname = io.dirname(filename)')
         assert result.success
         
         result = self.session.execute_statement('dirname')
         assert result.success
         assert result.value.value == ""
     
-    def test_get_extension(self):
+    def test_extension(self):
         """Test getting file extension."""
         result = self.session.execute_statement('filename = "document.txt"')
         assert result.success
         
-        result = self.session.execute_statement('ext = io.get_extension(filename)')
+        result = self.session.execute_statement('ext = io.extension(filename)')
         assert result.success
         
         result = self.session.execute_statement('ext')
         assert result.success
         assert result.value.value == ".txt"
     
-    def test_get_extension_no_extension(self):
+    def test_extension_no_extension(self):
         """Test getting extension from file without extension."""
         result = self.session.execute_statement('filename = "document"')
         assert result.success
         
-        result = self.session.execute_statement('ext = io.get_extension(filename)')
+        result = self.session.execute_statement('ext = io.extension(filename)')
         assert result.success
         
         result = self.session.execute_statement('ext')
         assert result.success
         assert result.value.value == ""
     
-    def test_get_extension_multiple_dots(self):
+    def test_extension_multiple_dots(self):
         """Test getting extension with multiple dots."""
         result = self.session.execute_statement('filename = "archive.tar.gz"')
         assert result.success
         
-        result = self.session.execute_statement('ext = io.get_extension(filename)')
+        result = self.session.execute_statement('ext = io.extension(filename)')
         assert result.success
         
         result = self.session.execute_statement('ext')
@@ -215,13 +215,13 @@ class TestIOPathOperations:
         assert result.success
         
         # Extract components
-        result = self.session.execute_statement('dirname = io.get_dirname(full_path)')
+        result = self.session.execute_statement('dirname = io.dirname(full_path)')
         assert result.success
         
-        result = self.session.execute_statement('basename = io.get_basename(full_path)')
+        result = self.session.execute_statement('basename = io.basename(full_path)')
         assert result.success
         
-        result = self.session.execute_statement('extension = io.get_extension(full_path)')
+        result = self.session.execute_statement('extension = io.extension(full_path)')
         assert result.success
         
         # Verify results
@@ -252,15 +252,15 @@ class TestIOPathOperations:
         assert not result.success
         assert "expects string" in str(result.error)
         
-        result = self.session.execute_statement('bad_basename = io.get_basename(123)')
+        result = self.session.execute_statement('bad_basename = io.basename(123)')
         assert not result.success
         assert "expects string" in str(result.error)
         
-        result = self.session.execute_statement('bad_dirname = io.get_dirname(123)')
+        result = self.session.execute_statement('bad_dirname = io.dirname(123)')
         assert not result.success
         assert "expects string" in str(result.error)
         
-        result = self.session.execute_statement('bad_ext = io.get_extension(123)')
+        result = self.session.execute_statement('bad_ext = io.extension(123)')
         assert not result.success
         assert "expects string" in str(result.error)
         

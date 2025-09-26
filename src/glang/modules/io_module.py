@@ -672,15 +672,15 @@ class IOModule:
             raise RuntimeError(f"Error splitting path: {str(e)}", position)
     
     @staticmethod
-    def get_basename(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+    def basename(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
         """Get the filename component of a path (without directory).
-        
+
         Usage in Glang:
-            filename = io.get_basename("/home/user/document.txt")  # "document.txt"
+            filename = io.basename("/home/user/document.txt")  # "document.txt"
         """
         if not isinstance(filepath, StringValue):
             raise RuntimeError(
-                f"io.get_basename expects string filepath, got {filepath.get_type()}",
+                f"io.basename expects string filepath, got {filepath.get_type()}",
                 position
             )
         
@@ -692,15 +692,15 @@ class IOModule:
             raise RuntimeError(f"Error getting basename: {str(e)}", position)
     
     @staticmethod
-    def get_dirname(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+    def dirname(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
         """Get the directory component of a path (without filename).
-        
+
         Usage in Glang:
-            dirname = io.get_dirname("/home/user/document.txt")  # "/home/user"
+            dirname = io.dirname("/home/user/document.txt")  # "/home/user"
         """
         if not isinstance(filepath, StringValue):
             raise RuntimeError(
-                f"io.get_dirname expects string filepath, got {filepath.get_type()}",
+                f"io.dirname expects string filepath, got {filepath.get_type()}",
                 position
             )
         
@@ -712,15 +712,15 @@ class IOModule:
             raise RuntimeError(f"Error getting dirname: {str(e)}", position)
     
     @staticmethod
-    def get_extension(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+    def extension(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
         """Get the file extension from a path.
-        
+
         Usage in Glang:
-            ext = io.get_extension("document.txt")  # ".txt"
+            ext = io.extension("document.txt")  # ".txt"
         """
         if not isinstance(filepath, StringValue):
             raise RuntimeError(
-                f"io.get_extension expects string filepath, got {filepath.get_type()}",
+                f"io.extension expects string filepath, got {filepath.get_type()}",
                 position
             )
         
@@ -751,6 +751,290 @@ class IOModule:
         except Exception as e:
             raise RuntimeError(f"Error resolving path: {str(e)}", position)
     
+    @staticmethod
+    def list_dir_recursive(path: GlangValue = None, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Recursively list all files in a directory tree.
+
+        Usage in Glang:
+            all_files = io.list_dir_recursive("src")   # List all files in src/ recursively
+            all_files = io.list_dir_recursive()        # List all files from current dir
+
+        Returns a list of relative file paths.
+        """
+        import os
+
+        if path is None:
+            dir_path = "."
+        elif isinstance(path, StringValue):
+            dir_path = path.value
+        else:
+            raise RuntimeError(
+                f"io.list_dir_recursive expects string path or no argument, got {path.get_type()}",
+                position
+            )
+
+        try:
+            all_files = []
+            for root, dirs, files in os.walk(dir_path):
+                for file in files:
+                    # Get relative path from the starting directory
+                    full_path = os.path.join(root, file)
+                    if dir_path == ".":
+                        relative_path = full_path
+                    else:
+                        relative_path = os.path.relpath(full_path, dir_path)
+                        relative_path = os.path.join(dir_path, relative_path)
+                    all_files.append(relative_path)
+
+            # Convert to list of StringValues
+            glang_files = [StringValue(file_path, position) for file_path in sorted(all_files)]
+            return ListValue(glang_files, position)
+        except FileNotFoundError:
+            raise RuntimeError(f"Directory not found: {dir_path}", position)
+        except PermissionError:
+            raise RuntimeError(f"Permission denied: {dir_path}", position)
+        except Exception as e:
+            raise RuntimeError(f"Error traversing directory {dir_path}: {str(e)}", position)
+
+    @staticmethod
+    def find_files(path: GlangValue, pattern: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Find files matching a pattern recursively.
+
+        Usage in Glang:
+            py_files = io.find_files("src", "*.py")      # Find all Python files
+            gr_files = io.find_files(".", "*.gr")        # Find all Glang files
+
+        Pattern supports wildcards: * for any characters, ? for single character
+        """
+        import os
+        import fnmatch
+
+        if not isinstance(path, StringValue):
+            raise RuntimeError(
+                f"io.find_files expects string path, got {path.get_type()}",
+                position
+            )
+
+        if not isinstance(pattern, StringValue):
+            raise RuntimeError(
+                f"io.find_files expects string pattern, got {pattern.get_type()}",
+                position
+            )
+
+        dir_path = path.value
+        file_pattern = pattern.value
+
+        try:
+            matching_files = []
+            for root, dirs, files in os.walk(dir_path):
+                for file in files:
+                    if fnmatch.fnmatch(file, file_pattern):
+                        full_path = os.path.join(root, file)
+                        if dir_path == ".":
+                            relative_path = full_path
+                        else:
+                            relative_path = os.path.relpath(full_path, dir_path)
+                            relative_path = os.path.join(dir_path, relative_path)
+                        matching_files.append(relative_path)
+
+            # Convert to list of StringValues
+            glang_files = [StringValue(file_path, position) for file_path in sorted(matching_files)]
+            return ListValue(glang_files, position)
+        except FileNotFoundError:
+            raise RuntimeError(f"Directory not found: {dir_path}", position)
+        except PermissionError:
+            raise RuntimeError(f"Permission denied: {dir_path}", position)
+        except Exception as e:
+            raise RuntimeError(f"Error finding files in {dir_path}: {str(e)}", position)
+
+    @staticmethod
+    def count_lines_recursive(path: GlangValue, extension: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Count total lines in all files with given extension recursively.
+
+        Usage in Glang:
+            python_lines = io.count_lines_recursive("src", "py")
+            glang_lines = io.count_lines_recursive("stdlib", "gr")
+
+        Only counts non-empty, non-comment lines (lines starting with #).
+        """
+        if not isinstance(path, StringValue):
+            raise RuntimeError(
+                f"io.count_lines_recursive expects string path, got {path.get_type()}",
+                position
+            )
+
+        if not isinstance(extension, StringValue):
+            raise RuntimeError(
+                f"io.count_lines_recursive expects string extension, got {extension.get_type()}",
+                position
+            )
+
+        import os
+        dir_path = path.value
+        file_extension = extension.value
+
+        try:
+            total_lines = 0
+
+            for root, dirs, files in os.walk(dir_path):
+                for file in files:
+                    if file.endswith(f".{file_extension}"):
+                        file_path = os.path.join(root, file)
+                        try:
+                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                for line in f:
+                                    stripped = line.strip()
+                                    if stripped and not stripped.startswith('#'):
+                                        total_lines += 1
+                        except (UnicodeDecodeError, PermissionError):
+                            # Skip files we can't read
+                            continue
+
+            return NumberValue(total_lines, position)
+        except Exception as e:
+            raise RuntimeError(f"Error counting lines in {dir_path}: {str(e)}", position)
+
+    @staticmethod
+    def safe_read_file(filepath: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Safely read a file, returning [:ok, content] or [:error, message].
+
+        Usage in Glang:
+            result = io.safe_read_file("data.txt")
+            if result[0] == ":ok" {
+                content = result[1]
+            } else {
+                error_msg = result[1]
+            }
+        """
+        if not isinstance(filepath, StringValue):
+            error_msg = f"io.safe_read_file expects string filepath, got {filepath.get_type()}"
+            return ListValue([
+                StringValue(":error", position),
+                StringValue(error_msg, position)
+            ], position)
+
+        try:
+            filesystem = get_filesystem()
+            content = filesystem.read_text_file(filepath.value)
+            return ListValue([
+                StringValue(":ok", position),
+                StringValue(content, position)
+            ], position)
+        except FileNotFoundError:
+            return ListValue([
+                StringValue(":error", position),
+                StringValue(f"File not found: {filepath.value}", position)
+            ], position)
+        except PermissionError:
+            return ListValue([
+                StringValue(":error", position),
+                StringValue(f"Permission denied: {filepath.value}", position)
+            ], position)
+        except Exception as e:
+            return ListValue([
+                StringValue(":error", position),
+                StringValue(f"Error reading file: {str(e)}", position)
+            ], position)
+
+    @staticmethod
+    def safe_write_file(filepath: GlangValue, content: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Safely write to a file, returning [:ok] or [:error, message].
+
+        Usage in Glang:
+            result = io.safe_write_file("output.txt", "Hello World")
+            if result[0] == ":ok" {
+                print("Write successful")
+            } else {
+                print("Write failed: " + result[1])
+            }
+        """
+        if not isinstance(filepath, StringValue):
+            error_msg = f"io.safe_write_file expects string filepath, got {filepath.get_type()}"
+            return ListValue([
+                StringValue(":error", position),
+                StringValue(error_msg, position)
+            ], position)
+
+        try:
+            # Convert content to string
+            if isinstance(content, StringValue):
+                content_str = content.value
+            else:
+                content_str = content.to_display_string()
+
+            filesystem = get_filesystem()
+
+            # Create parent directories if they don't exist
+            parent_dir = filesystem.get_dirname(filepath.value)
+            if parent_dir and not filesystem.file_exists(parent_dir):
+                filesystem.create_directory(parent_dir, parents=True)
+
+            filesystem.write_text_file(filepath.value, content_str)
+            return ListValue([
+                StringValue(":ok", position)
+            ], position)
+        except PermissionError:
+            return ListValue([
+                StringValue(":error", position),
+                StringValue(f"Permission denied: {filepath.value}", position)
+            ], position)
+        except Exception as e:
+            return ListValue([
+                StringValue(":error", position),
+                StringValue(f"Error writing file: {str(e)}", position)
+            ], position)
+
+    @staticmethod
+    def safe_list_dir(path: GlangValue = None, position: Optional[SourcePosition] = None) -> GlangValue:
+        """Safely list directory contents, returning [:ok, files] or [:error, message].
+
+        Usage in Glang:
+            result = io.safe_list_dir("src")
+            if result[0] == ":ok" {
+                files = result[1]
+                for file in files {
+                    print(file)
+                }
+            } else {
+                print("Error: " + result[1])
+            }
+        """
+        if path is None:
+            dir_path = "."
+        elif isinstance(path, StringValue):
+            dir_path = path.value
+        else:
+            error_msg = f"io.safe_list_dir expects string path or no argument, got {path.get_type()}"
+            return ListValue([
+                StringValue(":error", position),
+                StringValue(error_msg, position)
+            ], position)
+
+        try:
+            filesystem = get_filesystem()
+            entries = filesystem.list_directory(dir_path)
+            glang_entries = [StringValue(entry, position) for entry in sorted(entries)]
+            file_list = ListValue(glang_entries, position)
+            return ListValue([
+                StringValue(":ok", position),
+                file_list
+            ], position)
+        except FileNotFoundError:
+            return ListValue([
+                StringValue(":error", position),
+                StringValue(f"Directory not found: {dir_path}", position)
+            ], position)
+        except PermissionError:
+            return ListValue([
+                StringValue(":error", position),
+                StringValue(f"Permission denied: {dir_path}", position)
+            ], position)
+        except Exception as e:
+            return ListValue([
+                StringValue(":error", position),
+                StringValue(f"Error listing directory: {str(e)}", position)
+            ], position)
+
     @staticmethod
     def http_get(url: GlangValue, position: Optional[SourcePosition] = None) -> GlangValue:
         """Make an HTTP GET request using Glang's network interface.
@@ -912,11 +1196,19 @@ def create_io_module_namespace():
             'read_lines': IOModule.read_lines,
             'write_lines': IOModule.write_lines,
 
+            # Safe file operations (Result-style error handling)
+            'safe_read_file': IOModule.safe_read_file,
+            'safe_write_file': IOModule.safe_write_file,
+            'safe_list_dir': IOModule.safe_list_dir,
+
             # File system operations
             'exists': IOModule.exists,
             'is_file': IOModule.is_file,
             'is_dir': IOModule.is_dir,
             'list_dir': IOModule.list_dir,
+            'list_dir_recursive': IOModule.list_dir_recursive,
+            'find_files': IOModule.find_files,
+            'count_lines_recursive': IOModule.count_lines_recursive,
             'make_dir': IOModule.make_dir,
             'remove_file': IOModule.remove_file,
             'remove_dir': IOModule.remove_dir,
@@ -927,9 +1219,9 @@ def create_io_module_namespace():
             # Path operations
             'join_path': IOModule.join_path,
             'split_path': IOModule.split_path,
-            'get_basename': IOModule.get_basename,
-            'get_dirname': IOModule.get_dirname,
-            'get_extension': IOModule.get_extension,
+            'basename': IOModule.basename,
+            'dirname': IOModule.dirname,
+            'extension': IOModule.extension,
             'resolve_path': IOModule.resolve_path,
 
             # Network operations

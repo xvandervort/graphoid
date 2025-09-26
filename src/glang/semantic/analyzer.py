@@ -218,9 +218,9 @@ class SemanticAnalyzer(BaseASTVisitor):
                         'list_dir': 'list',
                         'join_path': 'string',     # Joins paths into single string
                         'split_path': 'list',      # Splits path into [dir, filename]
-                        'get_basename': 'string',  # Gets filename component
-                        'get_dirname': 'string',   # Gets directory component
-                        'get_extension': 'string', # Gets file extension
+                        'basename': 'string',  # Gets filename component
+                        'dirname': 'string',   # Gets directory component
+                        'extension': 'string', # Gets file extension
                         'resolve_path': 'string',  # Resolves to absolute path
                         'input': 'string'
                     }

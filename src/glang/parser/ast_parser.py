@@ -917,14 +917,22 @@ class ASTParser:
         
         return expr
     
+    def parse_unary_operator(self) -> Expression:
+        """Parse unary not operator keyword."""
+        # This is called when 'not' keyword is encountered
+        operator_token = self.previous()  # Should be the 'not' token
+        expr = self.parse_unary()  # Right associative
+        pos = SourcePosition(operator_token.line, operator_token.column)
+        return UnaryOperation("not", expr, pos)
+
     def parse_unary(self) -> Expression:
-        """Parse unary operators: -, !"""
+        """Parse unary operators: -, !, not"""
         if self.match(TokenType.MINUS) or self.match(TokenType.NOT):
             operator_token = self.previous()
             expr = self.parse_unary()  # Right associative
             pos = SourcePosition(operator_token.line, operator_token.column)
             return UnaryOperation(operator_token.value, expr, pos)
-        
+
         return self.parse_method_call()
     
     def parse_method_call(self) -> Expression:

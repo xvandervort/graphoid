@@ -421,39 +421,39 @@ print("Directory: " + dir)
 print("Filename: " + file)
 ```
 
-### get_basename(path)
+### basename(path)
 Returns the filename component of a path.
 
 ```glang
-filename = io.get_basename("/home/user/documents/report.pdf")
+filename = io.basename("/home/user/documents/report.pdf")
 # Returns "report.pdf"
 
-name = io.get_basename("data/processed/results.csv")
+name = io.basename("data/processed/results.csv")
 # Returns "results.csv"
 ```
 
-### get_dirname(path)
+### dirname(path)
 Returns the directory component of a path.
 
 ```glang
-directory = io.get_dirname("/home/user/documents/report.pdf")
+directory = io.dirname("/home/user/documents/report.pdf")
 # Returns "/home/user/documents"
 
-dir = io.get_dirname("data/processed/results.csv")
+dir = io.dirname("data/processed/results.csv")
 # Returns "data/processed"
 ```
 
-### get_extension(path)
+### extension(path)
 Returns the file extension (including the dot).
 
 ```glang
-ext = io.get_extension("document.pdf")
+ext = io.extension("document.pdf")
 # Returns ".pdf"
 
-ext = io.get_extension("archive.tar.gz")
+ext = io.extension("archive.tar.gz")
 # Returns ".gz"
 
-ext = io.get_extension("README")
+ext = io.extension("README")
 # Returns "" (no extension)
 ```
 
@@ -596,7 +596,7 @@ func scan_directory(path, extension) {
     for file in files {
         full_path = io.join_path(path, file)
         if io.is_file(full_path) {
-            if io.get_extension(file) == extension {
+            if io.extension(file) == extension {
                 matching.append(full_path)
             }
         }
