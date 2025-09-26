@@ -11,10 +11,10 @@ from glang.execution.graph_values import ListValue, HashValue
 class TestBasicBehaviors:
     """Test individual behaviors."""
     
-    def test_nil_to_zero(self):
+    def test_none_to_zero(self):
         """Test nil to zero conversion."""
         registry = BehaviorRegistry()
-        behavior = registry.get("nil_to_zero")
+        behavior = registry.get("none_to_zero")
         
         # Nil becomes 0
         result = behavior.apply(NoneValue())
@@ -95,7 +95,7 @@ class TestBehaviorPipeline:
     def test_pipeline_composition(self):
         """Test applying multiple behaviors in sequence."""
         pipeline = BehaviorPipeline()
-        pipeline.add("nil_to_zero")
+        pipeline.add("none_to_zero")
         pipeline.add("validate_range", 0, 100)
         pipeline.add("round_to_int")
         
@@ -114,7 +114,7 @@ class TestBehaviorPipeline:
     def test_pipeline_on_list(self):
         """Test applying pipeline to all list elements."""
         pipeline = BehaviorPipeline()
-        pipeline.add("nil_to_zero")
+        pipeline.add("none_to_zero")
         pipeline.add("validate_range", 0, 100)
         
         # Create list with mixed values
@@ -137,7 +137,7 @@ class TestBehaviorPipeline:
     def test_pipeline_on_hash(self):
         """Test applying pipeline to specific hash values."""
         pipeline = BehaviorPipeline()
-        pipeline.add("nil_to_zero")
+        pipeline.add("none_to_zero")
         pipeline.add("validate_range", 1024, 65535)
         
         # Create hash - HashValue expects list of tuples
@@ -229,7 +229,7 @@ class TestPracticalExamples:
         """Test medical data with multiple validations."""
         # Create pipeline for temperature readings
         temp_pipeline = BehaviorPipeline()
-        temp_pipeline.add("nil_to_zero")  # Missing readings become 0
+        temp_pipeline.add("none_to_zero")  # Missing readings become 0
         temp_pipeline.add("validate_range", 95.0, 105.0)  # Normal body temp range
         temp_pipeline.add("round_to_int")  # Round for display
         
@@ -254,7 +254,7 @@ class TestPracticalExamples:
         # Create pipeline for config values
         config_pipeline = BehaviorPipeline()
         config_pipeline.add("lowercase")  # Normalize to lowercase
-        config_pipeline.add("nil_to_empty")  # Nil becomes empty string
+        config_pipeline.add("none_to_empty")  # Nil becomes empty string
         
         # Mock config hash
         config_values = ListValue([

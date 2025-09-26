@@ -7,15 +7,15 @@ print("")
 
 # Basic behavior demonstration
 print("1. Basic Nil Handling:")
-temperatures = [98.6, nil, 102.5, nil, 99.1]
+temperatures = [98.6, none, 102.5, none, 99.1]
 print("Original temperatures: " + temperatures.to_string())
 
-# Attach nil_to_zero behavior to the list itself
-temperatures.add_rule("nil_to_zero")
-print("After nil_to_zero rule: " + temperatures.to_string())
+# Attach none_to_zero behavior to the list itself
+temperatures.add_rule("none_to_zero")
+print("After none_to_zero rule: " + temperatures.to_string())
 
-# All future nils are automatically transformed
-temperatures.append(nil)
+# All future nones are automatically transformed
+temperatures.append(none)
 temperatures.append(103.2)
 print("After appending nil and 103.2: " + temperatures.to_string())
 print("")
@@ -26,7 +26,7 @@ sensor_readings = [23.7, -100, 200, 75.3]
 print("Raw sensor readings: " + sensor_readings.to_string())
 
 # Add multiple behaviors - they compose
-sensor_readings.add_rule("nil_to_zero")
+sensor_readings.add_rule("none_to_zero")
 sensor_readings.add_rule("validate_range", -50, 150)  # Temperature sensor range
 sensor_readings.add_rule("round_to_int")
 print("After validation rules: " + sensor_readings.to_string())
@@ -48,7 +48,7 @@ config = {
 print("Original config: " + config.to_string())
 
 # Behaviors work on hashes too
-config.add_rule("nil_to_zero")
+config.add_rule("none_to_zero")
 config.add_rule("positive")  # Negative values become positive
 config.add_rule("validate_range", 1, 65535)  # Valid port range
 config.add_rule("round_to_int")
@@ -56,7 +56,7 @@ config.add_rule("round_to_int")
 print("After applying rules: " + config.to_string())
 
 # Add new values - they're automatically processed
-config["max_connections"] = nil  # Becomes 0
+config["max_connections"] = none  # Becomes 0
 config["min_threads"] = -10  # Becomes 10
 config["debug_port"] = 70000  # Clamped to 65535
 print("After adding new values: " + config.to_string())
@@ -65,10 +65,10 @@ print("")
 # Query and manage behaviors
 print("4. Behavior Management:")
 test_list = [1, 2, 3]
-test_list.add_rule("nil_to_zero")
+test_list.add_rule("none_to_zero")
 test_list.add_rule("positive")
 
-print("Has nil_to_zero rule: " + test_list.has_rule("nil_to_zero").to_string())
+print("Has none_to_zero rule: " + test_list.has_rule("none_to_zero").to_string())
 print("Has uppercase rule: " + test_list.has_rule("uppercase").to_string())
 print("Current rules: " + test_list.get_rules().to_string())
 
@@ -81,10 +81,10 @@ print("")
 
 # Medical data example
 print("5. Medical Data Processing:")
-blood_pressure = [120, 85, nil, 250, 45, nil]
+blood_pressure = [120, 85, none, 250, 45, none]
 print("Raw BP readings: " + blood_pressure.to_string())
 
-blood_pressure.add_rule("nil_to_zero")
+blood_pressure.add_rule("none_to_zero")
 blood_pressure.add_rule("validate_range", 60, 200)  # Reasonable BP range
 print("Validated BP readings: " + blood_pressure.to_string())
 print("")

@@ -14,7 +14,7 @@ class TestBehaviorIntegration:
         
         # Parse the code with behavior syntax
         parser = ASTParser()
-        code = 'num temperature with [nil_to_zero, validate_range(95, 105)] = 110'
+        code = 'num temperature with [none_to_zero, validate_range(95, 105)] = 110'
         ast = parser.parse(code)
         
         # Semantic analysis
@@ -47,7 +47,7 @@ class TestBehaviorIntegration:
         from glang.behaviors import BehaviorPipeline
         
         pipeline = BehaviorPipeline()
-        pipeline.add("nil_to_zero")
+        pipeline.add("none_to_zero")
         pipeline.add("validate_range", 0, 100)
         
         result = pipeline.apply(nil_literal)
@@ -70,7 +70,7 @@ class TestBehaviorIntegration:
         
         # Create pipeline
         pipeline = BehaviorPipeline()
-        pipeline.add("nil_to_zero")
+        pipeline.add("none_to_zero")
         pipeline.add("validate_range", 50, 100)
         
         # Apply to list
@@ -129,7 +129,7 @@ class TestBehaviorIntegration:
         # Use in pipeline
         pipeline = BehaviorPipeline(registry)
         pipeline.add("double")
-        pipeline.add("nil_to_zero")  # This should still work from standard registry
+        pipeline.add("none_to_zero")  # This should still work from standard registry
         
         result = pipeline.apply(NumberValue(21))
         assert result.value == 42, f"Expected 42, got {result.value}"

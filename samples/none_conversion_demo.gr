@@ -1,0 +1,114 @@
+#!/usr/bin/env glang
+
+# Configurable None Conversion Demo
+# Shows how none values can be gracefully converted to other types
+# based on user-configurable policies instead of throwing errors
+
+print("=== Configurable None Conversion Demo ===")
+print("")
+
+# Test current default behavior
+print("1. Default None Conversion Behavior:")
+test_value = none
+print("Test value: " + test_value.inspect())
+
+# These should work gracefully with default configuration
+string_result = test_value.to_string()
+number_result = test_value.to_number()
+bool_result = test_value.to_bool()
+
+print("none.to_string(): '" + string_result + "' (empty string)")
+print("none.to_number(): " + number_result.to_string() + " (zero)")
+print("none.to_bool(): " + bool_result.to_string() + " (false)")
+print("")
+
+# Demonstrate practical usage
+print("2. Practical Usage - Data Processing:")
+data_points = [42, none, 17, none, 23]
+print("Raw data: " + data_points.to_string())
+
+# Process data gracefully without errors
+processed = []
+for value in data_points {
+    if value.type() == "none" {
+        # Convert none to number for calculations
+        processed.append(value.to_number())
+    } else {
+        processed.append(value)
+    }
+}
+print("Processed data: " + processed.to_string())
+print("")
+
+# Calculate mean including none values (now converted to 0)
+total = 0
+for value in processed {
+    total = total + value
+}
+mean = total / processed.size()
+print("Mean (including none as 0): " + mean.to_string())
+print("")
+
+# Demonstrate string processing with none
+print("3. String Processing with None:")
+names = ["Alice", none, "Bob", none, "Charlie"]
+print("Names list: " + names.to_string())
+
+# Build greeting without errors
+greetings = []
+for name in names {
+    if name.type() == "none" {
+        # Convert none to string gracefully
+        greeting = "Hello, " + name.to_string() + "(unknown)!"
+    } else {
+        greeting = "Hello, " + name + "!"
+    }
+    greetings.append(greeting)
+}
+
+print("Greetings:")
+for greeting in greetings {
+    print("  " + greeting)
+}
+print("")
+
+# Demonstrate configuration scenarios
+print("4. Domain-Specific None Handling:")
+print("")
+
+print("Financial Context (none = error for money):")
+# In financial contexts, none might need explicit handling
+price = none
+print("Product price: " + price.inspect())
+# price.to_number() would still work but with extra care in real apps
+safe_price = price.to_number()  # 0 with current config
+print("Safe price (with current config): $" + safe_price.to_string())
+print("")
+
+print("Medical Context (none = 0 for missing readings):")
+# Medical readings where none represents missing data
+temperature = none
+print("Patient temperature: " + temperature.inspect())
+safe_temp = temperature.to_number()  # 0 - safe default
+print("Safe temperature reading: " + safe_temp.to_string() + "°F")
+print("")
+
+print("Text Processing (none = empty string):")
+# Text fields where none means missing text
+description = none
+print("Product description: " + description.inspect())
+safe_desc = description.to_string()  # "" - empty string
+display_desc = safe_desc == "" ? "[No description]" : safe_desc
+print("Display description: " + display_desc)
+print("")
+
+print("=== Summary ===")
+print("None conversion policies prevent disruptive errors while")
+print("allowing different domains to handle missing data appropriately:")
+print("- Financial: Explicit handling required (but conversion still works)")
+print("- Medical: None becomes 0 for safe calculations")
+print("- Text: None becomes empty string for clean display")
+print("- Boolean: None becomes false for logical operations")
+print("")
+print("This makes none a 'cooperative' value that adapts to context")
+print("rather than a 'dangerous' value that breaks operations!")

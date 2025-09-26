@@ -81,17 +81,19 @@ class BehaviorRegistry:
     def _register_standard_behaviors(self):
         """Register the standard library of behaviors."""
         
-        # NilToZero - converts nil to 0
-        self.behaviors["nil_to_zero"] = Behavior(
-            "nil_to_zero",
+        # NoneToZero - converts none to 0
+        none_to_zero_behavior = Behavior(
+            "none_to_zero",
             transform=lambda value: NumberValue(0) if isinstance(value, NoneValue) else value
         )
-        
-        # NilToEmpty - converts nil to empty string
-        self.behaviors["nil_to_empty"] = Behavior(
-            "nil_to_empty", 
+        self.behaviors["none_to_zero"] = none_to_zero_behavior
+
+        # NoneToEmpty - converts none to empty string
+        none_to_empty_behavior = Behavior(
+            "none_to_empty",
             transform=lambda value: StringValue("") if isinstance(value, NoneValue) else value
         )
+        self.behaviors["none_to_empty"] = none_to_empty_behavior
         
         # ValidateRange - clamps numbers to a range
         def validate_range(value: GlangValue, min_val: float, max_val: float) -> bool:

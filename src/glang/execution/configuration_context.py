@@ -53,6 +53,11 @@ class ConfigurationContext:
         'auto_flatten': False,        # Don't auto-flatten nested lists
         'case_sensitive': True,       # String operations are case-sensitive
         'zero_division': 'error',     # Error on division by zero (vs 'infinity' or 'none')
+        'none_conversions': {         # Configurable none conversion behaviors
+            'to_string': 'empty_string',    # none.to_string() → ""
+            'to_number': 'zero',            # none.to_number() → 0
+            'to_bool': 'false'              # none.to_bool() → false
+        }
     }
 
     # Valid configuration keys and their types
@@ -65,6 +70,7 @@ class ConfigurationContext:
         'auto_flatten': bool,
         'case_sensitive': bool,
         'zero_division': str,
+        'none_conversions': dict,
     }
 
     def __init__(self):
@@ -163,6 +169,33 @@ class ConfigurationContext:
         """
         return self.get_setting('zero_division', 'error')
 
+    def get_none_conversion(self, conversion_type: str) -> str:
+        """
+        Get none conversion behavior for a specific type conversion.
+
+        Args:
+            conversion_type: Type of conversion ('to_string', 'to_number', 'to_bool')
+
+        Returns:
+            The conversion behavior string
+        """
+        none_conversions = self.get_setting('none_conversions', {})
+        return none_conversions.get(conversion_type, 'error')
+
+    def set_none_conversion(self, conversion_type: str, behavior: str) -> None:
+        """
+        Set none conversion behavior for a specific type conversion.
+
+        Args:
+            conversion_type: Type of conversion ('to_string', 'to_number', 'to_bool')
+            behavior: The behavior to set ('empty_string', 'zero', 'false', 'error', etc.)
+        """
+        # Get current none conversions or create new dict
+        current_layer = self._stack[-1]
+        none_conversions = current_layer.get('none_conversions', {}).copy()
+        none_conversions[conversion_type] = behavior
+        current_layer.set('none_conversions', none_conversions)
+
     def _normalize_key(self, key: str) -> str:
         """
         Normalize configuration keys (handle aliases).
@@ -257,3 +290,43 @@ class ConfigurationContext:
         """String representation for debugging."""
         layers = [f"{layer.scope_name}: {layer.settings}" for layer in self._stack]
         return f"ConfigurationContext({' -> '.join(layers)})"
+
+
+# Global instance for convenience access
+_global_context = ConfigurationContext()
+
+
+def get_current_context() -> ConfigurationContext:
+    """Get the current configuration context."""
+    return _global_context
+
+# Alias for backward compatibility
+def get_current_config() -> ConfigurationContext:
+    """Get the current configuration context (alias)."""
+    return _global_context
+
+
+def push_config(config_dict: Dict[str, Any], scope_name: str = "block") -> None:
+    """Push configuration settings onto the global context."""
+    _global_context.push_configuration(config_dict, scope_name)
+
+
+def pop_config() -> None:
+    """Pop the latest configuration from the global context."""
+    _global_context.pop_configuration()
+
+
+def get_setting(key: str, default: Any = None) -> Any:
+    """Get a setting from the current configuration context."""
+    return _global_context.get_setting(key, default)
+
+
+def is_enabled(setting: str) -> bool:
+    """Check if a boolean setting is enabled in the current context."""
+    return _global_context.is_enabled(setting)
+
+
+def set_global_none_conversions(**conversions) -> None:
+    """Convenience function to set none conversion behaviors."""
+    for conversion_type, behavior in conversions.items():
+        _global_context.set_none_conversion(conversion_type, behavior)

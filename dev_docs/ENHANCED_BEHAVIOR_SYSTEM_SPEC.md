@@ -24,7 +24,46 @@ temperatures.clear_rules()
 
 ## Enhancement Priorities
 
-### 1. **CRITICAL BUG FIX: nil → none References**
+### 1. **✅ CRITICAL BUG FIX: nil → none References** (COMPLETED)
+
+**Problem**: Throughout the behavior system, references used `nil` instead of Glang's actual `none` keyword.
+
+**Solution**: Global find/replace completed across entire codebase - all behavior references now correctly use `none_to_zero`, `none_to_empty`, etc.
+
+### 2. **Configurable None Conversion Behaviors**
+
+**Problem**: `none.to_string()`, `none.to_number()`, etc. currently throw disruptive errors instead of gracefully handling conversions.
+
+**Solution**: User-configurable none conversion policies that make none a "cooperative" value rather than a "dangerous" one.
+
+```glang
+# Default configuration (graceful defaults)
+configure {
+    none_conversions: {
+        to_string: "empty_string",    # none.to_string() → ""
+        to_number: "zero",            # none.to_number() → 0
+        to_bool: "false"              # none.to_bool() → false
+    }
+}
+
+# Domain-specific configurations
+# Financial context (explicit handling)
+configure { none_conversions: { to_number: "error" } }
+
+# Text processing context
+configure { none_conversions: { to_string: "none_literal" } }  # → "none"
+
+# Medical context (safe defaults)
+configure { none_conversions: { to_number: "zero", to_string: "empty_string" } }
+```
+
+**Benefits**:
+- **Graceful Degradation**: No disruptive exceptions for reasonable operations
+- **Context Awareness**: Different domains can configure appropriate none handling
+- **User Control**: Explicit choice between error-throwing and graceful conversion
+- **Backward Compatible**: Can still configure error-throwing behavior when needed
+
+### 3. **ORIGINAL BUG FIX: nil → none References** (MOVED TO COMPLETED)
 
 **Problem**: Throughout the behavior system, references use `nil` instead of Glang's actual `none` keyword.
 
@@ -46,7 +85,7 @@ temperatures.add_rule("none_to_zero")    # ✅ Proper Glang syntax
 
 **Action Required**: Global find/replace of "nil_to_zero" → "none_to_zero" and "nil_to_empty" → "none_to_empty"
 
-### 2. **Generic Mapping Behavior System**
+### 3. **Generic Mapping Behavior System**
 
 **Problem**: Current `map_colors` behavior is too specific and inflexible.
 
@@ -87,7 +126,7 @@ ascii_chars.add_mapping_rule({
 - Support for `default` key as fallback value
 - Works with any data types (string→number, string→string, etc.)
 
-### 3. **Custom Function Behaviors**
+### 4. **Custom Function Behaviors**
 
 **Capability**: Attach user-defined functions as behaviors.
 
@@ -121,7 +160,7 @@ emails.add_custom_rule(validate_email)
 - Functions must take single parameter and return transformed value
 - Support both named functions and lambda expressions
 
-### 4. **Conditional Behavior System**
+### 5. **Conditional Behavior System**
 
 **Capability**: Apply behaviors only when specific conditions are met.
 
@@ -151,7 +190,7 @@ financial_data.add_conditional_rule(
 - Optional `on_fail` parameter for handling condition failures
 - Conditions return boolean, transforms return new value
 
-### 5. **Ruleset System (Declarative Bundle Application)**
+### 6. **Ruleset System (Declarative Bundle Application)**
 
 **Capability**: Create reusable behavior bundles with clean declarative syntax.
 
@@ -220,11 +259,12 @@ parent_dataset.add_rules(data_cleaning)
 
 ## Implementation Order
 
-1. **Fix nil→none references** (critical bug - affects all behavior code)
-2. **Generic mapping system** (replaces overly specific map_colors)
-3. **Custom function behaviors** (user-defined transformations)
-4. **Conditional behaviors** (context-aware rule application)
-5. **Ruleset system** (declarative bundle interface)
+1. ✅ **Fix nil→none references** (critical bug - affects all behavior code) - **COMPLETED**
+2. ✅ **Configurable none conversion behaviors** (graceful none handling) - **COMPLETED**
+3. **Generic mapping system** (replaces overly specific map_colors)
+4. **Custom function behaviors** (user-defined transformations)
+5. **Conditional behaviors** (context-aware rule application)
+6. **Ruleset system** (declarative bundle interface)
 
 ## Backward Compatibility
 

@@ -1,7 +1,3 @@
-#!/usr/bin/env glang
-
-module statistics
-
 func mean(values) {
     if values.size() == 0 {
         return none
@@ -26,21 +22,9 @@ func variance(values) {
     return sum_squares / (values.size() - 1)
 }
 
-func std(values) {
-    var_value = variance(values)
-    if var_value == 0 {
-        return 0
-    }
-    return var_value.sqrt()
-}
-
-func std_dev(values) {
-    return std(values)
-}
-
 func population_variance(values) {
     if values.size() == 0 {
-        return none
+        return 0
     }
     avg = mean(values)
     sum_squares = 0
@@ -51,12 +35,24 @@ func population_variance(values) {
     return sum_squares / values.size()
 }
 
+func std(values) {
+    var_value = variance(values)
+    if var_value == 0 {
+        return 0
+    }
+    return var_value.sqrt()
+}
+
 func population_std(values) {
     var_value = population_variance(values)
     if var_value == 0 {
         return 0
     }
     return var_value.sqrt()
+}
+
+func std_dev(values) {
+    return std(values)
 }
 
 func min_value(values) {
@@ -93,386 +89,43 @@ func range_value(values) {
 }
 
 func covariance(values1, values2) {
-    if values1.size() != values2.size() || values1.size() <= 1 {
+    if values1.size() != values2.size() {
+        return none
+    }
+    if values1.size() <= 1 {
         return none
     }
     mean1 = mean(values1)
     mean2 = mean(values2)
     sum_products = 0
     n = values1.size()
-    for i in values1.upto(n - 1) {
+    i = 0
+    while i < n {
         diff1 = values1[i] - mean1
         diff2 = values2[i] - mean2
         sum_products = sum_products + (diff1 * diff2)
+        i = i + 1
     }
     return sum_products / (n - 1)
 }
 
 func correlation(values1, values2) {
-    if values1.size() != values2.size() || values1.size() <= 1 {
+    if values1.size() != values2.size() {
+        return none
+    }
+    if values1.size() <= 1 {
         return none
     }
     cov = covariance(values1, values2)
     std1 = std(values1)
     std2 = std(values2)
-    if std1 == 0 || std2 == 0 {
+    if std1 == 0 {
+        return none
+    }
+    if std2 == 0 {
         return none
     }
     return cov / (std1 * std2)
-}
-
-func median(values) {
-    if values.size() == 0 {
-        return none
-    }
-    sorted_values = values.sort()
-    n = sorted_values.size()
-    if n % 2 == 1 {
-        # Odd number of elements - return middle element
-        return sorted_values[n / 2]
-    } else {
-        # Even number of elements - return average of two middle elements
-        mid1 = sorted_values[n / 2 - 1]
-        mid2 = sorted_values[n / 2]
-        return (mid1 + mid2) / 2
-    }
-}
-
-func percentile(values, p) {
-    if values.size() == 0 {
-        return none
-    }
-    if p < 0 || p > 100 {
-        return none
-    }
-    sorted_values = values.sort()
-    n = sorted_values.size()
-
-    # Convert percentile to 0-1 range
-    rank = (p / 100) * (n - 1)
-
-    # Get the lower index
-    lower_index = rank.floor()
-    upper_index = lower_index + 1
-
-    # If rank is exactly an integer, return that element
-    if rank == lower_index {
-        return sorted_values[lower_index]
-    }
-
-    # Linear interpolation between adjacent elements
-    if upper_index >= n {
-        return sorted_values[lower_index]
-    }
-
-    weight = rank - lower_index
-    lower_value = sorted_values[lower_index]
-    upper_value = sorted_values[upper_index]
-
-    return lower_value + weight * (upper_value - lower_value)
-}
-
-func quantile(values, q) {
-    # Alias for percentile with 0-1 input range
-    return percentile(values, q * 100)
-}
-
-func quartile(values, q) {
-    if q < 1 || q > 3 {
-        return none
-    }
-    if q == 1 {
-        return percentile(values, 25)
-    }
-    if q == 2 {
-        return percentile(values, 50)
-    }
-    if q == 3 {
-        return percentile(values, 75)
-    }
-}
-
-func interquartile_range(values) {
-    if values.size() < 4 {
-        return none
-    }
-    q1 = quartile(values, 1)
-    q3 = quartile(values, 3)
-    if q1 == none || q3 == none {
-        return none
-    }
-    return q3 - q1
-}
-
-func mode(values) {
-    if values.size() == 0 {
-        return none
-    }
-
-    # Count frequencies of each value
-    frequencies = {}
-    for value in values {
-        # Use string representation as key for consistent map behavior
-        key = value.to_string()
-        if frequencies.has_key(key) {
-            frequencies[key] = frequencies[key] + 1
-        } else {
-            frequencies[key] = 1
-        }
-    }
-
-    # Find the maximum frequency
-    max_frequency = 0
-    for key in frequencies.keys() {
-        freq = frequencies[key]
-        if freq > max_frequency {
-            max_frequency = freq
-        }
-    }
-
-    # Collect all values with maximum frequency
-    modes = []
-    for i in values.upto(values.size() - 1) {
-        value = values[i]
-        key = value.to_string()
-        if frequencies[key] == max_frequency {
-            # Check if we already added this value to avoid duplicates
-            found = false
-            for mode_val in modes {
-                if mode_val.to_string() == key {
-                    found = true
-                    break
-                }
-            }
-            if !found {
-                modes.append(value)
-            }
-        }
-    }
-
-    # Return the mode(s)
-    if modes.size() == 1 {
-        return modes[0]
-    } else {
-        # Multiple modes - return all of them as a list
-        return modes
-    }
-}
-
-func z_score(values) {
-    if values.size() <= 1 {
-        return none
-    }
-
-    avg = mean(values)
-    std_dev_val = std(values)
-
-    if std_dev_val == 0 {
-        # All values are the same, z-scores are undefined
-        return none
-    }
-
-    z_scores = []
-    for value in values {
-        z = (value - avg) / std_dev_val
-        z_scores.append(z)
-    }
-
-    return z_scores
-}
-
-func outliers(values, threshold) {
-    # Default threshold of 2 standard deviations if not specified
-    if threshold == none {
-        threshold = 2
-    }
-
-    z_scores = z_score(values)
-    if z_scores == none {
-        return []
-    }
-
-    outlier_values = []
-    outlier_indices = []
-
-    for i in values.upto(values.size() - 1) {
-        z = z_scores[i]
-        if z.abs() > threshold {
-            outlier_values.append(values[i])
-            outlier_indices.append(i)
-        }
-    }
-
-    # Return both the outlier values and their indices
-    return {
-        "values": outlier_values,
-        "indices": outlier_indices,
-        "count": outlier_values.size()
-    }
-}
-
-func skewness(values) {
-    if values.size() < 3 {
-        return none
-    }
-
-    avg = mean(values)
-    std_dev_val = std(values)
-
-    if std_dev_val == 0 {
-        return none
-    }
-
-    # Calculate third moment (sum of cubed deviations)
-    sum_cubed_deviations = 0
-    n = values.size()
-
-    for value in values {
-        deviation = value - avg
-        sum_cubed_deviations = sum_cubed_deviations + (deviation * deviation * deviation)
-    }
-
-    # Sample skewness formula: (n / ((n-1)(n-2))) * (sum of cubed z-scores)
-    skew = (n / ((n - 1) * (n - 2))) * (sum_cubed_deviations / (std_dev_val * std_dev_val * std_dev_val))
-
-    return skew
-}
-
-func kurtosis(values) {
-    if values.size() < 4 {
-        return none
-    }
-
-    avg = mean(values)
-    std_dev_val = std(values)
-
-    if std_dev_val == 0 {
-        return none
-    }
-
-    # Calculate fourth moment (sum of fourth powers of deviations)
-    sum_fourth_deviations = 0
-    n = values.size()
-
-    for value in values {
-        deviation = value - avg
-        fourth_power = deviation * deviation * deviation * deviation
-        sum_fourth_deviations = sum_fourth_deviations + fourth_power
-    }
-
-    # Sample kurtosis formula (excess kurtosis - subtract 3 for normal distribution)
-    variance_val = std_dev_val * std_dev_val
-    fourth_moment = sum_fourth_deviations / n
-    kurt = (fourth_moment / (variance_val * variance_val)) - 3
-
-    # Apply sample correction
-    n_factor = (n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))
-    correction = 3 * (n - 1) * (n - 1) / ((n - 2) * (n - 3))
-
-    return n_factor * kurt + correction
-}
-
-func geometric_mean(values) {
-    if values.size() == 0 {
-        return none
-    }
-
-    # Check for non-positive values (geometric mean requires positive values)
-    for value in values {
-        if value <= 0 {
-            return none
-        }
-    }
-
-    # Calculate product of all values
-    product = 1
-    for value in values {
-        product = product * value
-    }
-
-    # Take nth root
-    n = values.size()
-    return product.pow(1.0 / n)
-}
-
-func harmonic_mean(values) {
-    if values.size() == 0 {
-        return none
-    }
-
-    # Check for zero values (harmonic mean undefined for zero)
-    for value in values {
-        if value == 0 {
-            return none
-        }
-    }
-
-    # Calculate sum of reciprocals
-    sum_reciprocals = 0
-    for value in values {
-        sum_reciprocals = sum_reciprocals + (1.0 / value)
-    }
-
-    # Harmonic mean = n / sum of reciprocals
-    return values.size() / sum_reciprocals
-}
-
-func standard_error(values) {
-    if values.size() <= 1 {
-        return none
-    }
-
-    std_dev_val = std(values)
-    n = values.size()
-
-    return std_dev_val / n.sqrt()
-}
-
-func confidence_interval(values, confidence) {
-    # Default confidence level of 95% if not specified
-    if confidence == none {
-        confidence = 0.95
-    }
-
-    if values.size() <= 1 {
-        return none
-    }
-
-    avg = mean(values)
-    se = standard_error(values)
-
-    if se == none {
-        return none
-    }
-
-    # Critical value approximation for normal distribution
-    # This is a simplified approach - for small samples, t-distribution would be more accurate
-    alpha = 1 - confidence
-    z_critical = 1.96  # Approximation for 95% confidence
-
-    if confidence > 0.99 {
-        z_critical = 2.576  # 99%
-    } else if confidence > 0.98 {
-        z_critical = 2.326  # 98%
-    } else if confidence > 0.95 {
-        z_critical = 1.96   # 95%
-    } else if confidence > 0.90 {
-        z_critical = 1.645  # 90%
-    } else {
-        z_critical = 1.96   # Default to 95%
-    }
-
-    margin_of_error = z_critical * se
-    lower_bound = avg - margin_of_error
-    upper_bound = avg + margin_of_error
-
-    return {
-        "mean": avg,
-        "confidence_level": confidence,
-        "margin_of_error": margin_of_error,
-        "lower_bound": lower_bound,
-        "upper_bound": upper_bound
-    }
 }
 
 func describe(values) {
@@ -483,8 +136,7 @@ func describe(values) {
             "std": none,
             "min": none,
             "max": none,
-            "range": none,
-            "median": none
+            "range": none
         }
     }
     return {
@@ -493,7 +145,6 @@ func describe(values) {
         "std": std(values),
         "min": min_value(values),
         "max": max_value(values),
-        "range": range_value(values),
-        "median": median(values)
+        "range": range_value(values)
     }
 }

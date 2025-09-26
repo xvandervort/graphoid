@@ -17,8 +17,8 @@ class TestIntrinsicListBehaviors:
         # Create list with some nil values
         lst = ListValue([NumberValue(5), NoneValue(), NumberValue(10)])
 
-        # Add nil_to_zero behavior
-        lst.add_rule(StringValue("nil_to_zero"))
+        # Add none_to_zero behavior
+        lst.add_rule(StringValue("none_to_zero"))
 
         # Existing elements should be transformed
         assert lst.elements[0].value == 5
@@ -34,14 +34,14 @@ class TestIntrinsicListBehaviors:
         lst = ListValue([NumberValue(5), NoneValue()])
 
         # Add behavior using symbol
-        lst.add_rule(SymbolValue("nil_to_zero"))
+        lst.add_rule(SymbolValue("none_to_zero"))
 
         # Should work same as string
         assert lst.elements[1].value == 0
 
         # Verify it's the same behavior
-        assert lst.has_rule(StringValue("nil_to_zero")).value == True
-        assert lst.has_rule(SymbolValue("nil_to_zero")).value == True
+        assert lst.has_rule(StringValue("none_to_zero")).value == True
+        assert lst.has_rule(SymbolValue("none_to_zero")).value == True
 
     def test_list_validate_range_behavior(self):
         """Test range validation behavior with parameters."""
@@ -64,7 +64,7 @@ class TestIntrinsicListBehaviors:
         lst = ListValue([NoneValue(), NumberValue(-50)])
 
         # Add two behaviors
-        lst.add_rule(StringValue("nil_to_zero"))
+        lst.add_rule(StringValue("none_to_zero"))
         lst.add_rule(StringValue("positive"))
 
         # nil -> 0 -> 0 (already positive)
@@ -77,10 +77,10 @@ class TestIntrinsicListBehaviors:
         lst = ListValue([NoneValue()])
 
         # Add and then remove behavior
-        lst.add_rule(StringValue("nil_to_zero"))
+        lst.add_rule(StringValue("none_to_zero"))
         assert lst.elements[0].value == 0
 
-        removed = lst.remove_rule(StringValue("nil_to_zero"))
+        removed = lst.remove_rule(StringValue("none_to_zero"))
         assert removed.value == True
 
         # New nils should not be transformed
@@ -96,13 +96,13 @@ class TestIntrinsicListBehaviors:
         assert len(rules.elements) == 0
 
         # Add some rules
-        lst.add_rule(StringValue("nil_to_zero"))
+        lst.add_rule(StringValue("none_to_zero"))
         lst.add_rule(StringValue("positive"))
 
         rules = lst.get_rules()
         assert len(rules.elements) == 2
         # Rules should be sorted alphabetically
-        assert rules.elements[0].value == "nil_to_zero"
+        assert rules.elements[0].value == "none_to_zero"
         assert rules.elements[1].value == "positive"
 
     def test_list_clear_rules(self):
@@ -122,8 +122,8 @@ class TestIntrinsicListBehaviors:
         """Test that duplicate rules are silently ignored."""
         lst = ListValue([])
 
-        lst.add_rule(StringValue("nil_to_zero"))
-        lst.add_rule(StringValue("nil_to_zero"))  # Duplicate
+        lst.add_rule(StringValue("none_to_zero"))
+        lst.add_rule(StringValue("none_to_zero"))  # Duplicate
 
         rules = lst.get_rules()
         assert len(rules.elements) == 1  # Only one instance
@@ -146,13 +146,13 @@ class TestIntrinsicListBehaviors:
 class TestIntrinsicHashBehaviors:
     """Test behavior support built into HashValue."""
 
-    def test_hash_add_rule_nil_to_zero(self):
-        """Test adding nil_to_zero behavior to hash."""
+    def test_hash_add_rule_none_to_zero(self):
+        """Test adding none_to_zero behavior to hash."""
         # Create hash with nil value
         hash_val = HashValue([("count", NoneValue()), ("total", NumberValue(100))])
 
         # Add behavior
-        hash_val.add_rule(StringValue("nil_to_zero"))
+        hash_val.add_rule(StringValue("none_to_zero"))
 
         # Existing nil should be transformed
         assert hash_val.get("count").value == 0
@@ -194,7 +194,7 @@ class TestIntrinsicHashBehaviors:
         hash_val = HashValue([])
 
         # Add multiple rules
-        hash_val.add_rule(StringValue("nil_to_zero"))
+        hash_val.add_rule(StringValue("none_to_zero"))
         hash_val.add_rule(StringValue("positive"))
 
         rules = hash_val.get_rules()
@@ -215,8 +215,8 @@ class TestBehaviorInteraction:
         # List constrained to numbers
         lst = ListValue([], constraint="num")
 
-        # Add nil_to_zero behavior
-        lst.add_rule(StringValue("nil_to_zero"))
+        # Add none_to_zero behavior
+        lst.add_rule(StringValue("none_to_zero"))
 
         # nil -> 0 satisfies num constraint
         lst.append(NoneValue())

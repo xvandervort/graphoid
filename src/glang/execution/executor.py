@@ -642,6 +642,8 @@ class ASTExecutor(BaseASTVisitor):
             return self._dispatch_file_method(target, method_name, args, position)
         elif target_type == "node":
             return self._dispatch_node_method(target, method_name, args, position)
+        elif target_type == "none":
+            return self._dispatch_none_method(target, method_name, args, position)
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, target_type, position)
@@ -870,7 +872,8 @@ class ASTExecutor(BaseASTVisitor):
             'data': ['key', 'value', 'can_accept', 'node'],
             'map': ['node', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop', 'can_accept', 'to_string', 'to_bool', 'names', 'has_names', 'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule', 'count_edges', 'count_nodes'] + behavior_methods,
             'node': ['neighbors', 'value', 'container', 'id', 'has_neighbor', 'path_to', 'distance_to', 'edges'],
-            'time': ['get_type', 'to_string', 'to_num']
+            'time': ['get_type', 'to_string', 'to_num'],
+            'none': ['to_string', 'to_number', 'to_num', 'to_bool']
         }
 
         # Get basic methods for this type
@@ -2841,7 +2844,50 @@ class ASTExecutor(BaseASTVisitor):
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "bool", position)
-    
+
+    def _dispatch_none_method(self, target, method_name: str,
+                             args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
+        """Handle none method calls."""
+        from .values import NoneValue
+
+        if not isinstance(target, NoneValue):
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, "none", position)
+
+        # Type conversion methods
+        if method_name == "to_string":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_string() takes no arguments, got {len(args)}", position)
+            return target.to_string()
+
+        elif method_name == "to_number":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_number() takes no arguments, got {len(args)}", position)
+            return target.to_number()
+
+        elif method_name == "to_num":
+            # Alias for to_number
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_num() takes no arguments, got {len(args)}", position)
+            return target.to_num()
+
+        elif method_name == "to_bool":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"to_bool() takes no arguments, got {len(args)}", position)
+            return target.to_bool()
+
+        # Check if it's a universal method
+        elif method_name in ['freeze', 'is_frozen', 'contains_frozen']:
+            return self._dispatch_universal_method(target, method_name, args, position)
+
+        else:
+            from .errors import MethodNotFoundError
+            raise MethodNotFoundError(method_name, "none", position)
+
     def _dispatch_data_method(self, target: DataValue, method_name: str,
                              args: List[GlangValue], position: Optional[SourcePosition]) -> Any:
         """Handle data node method calls."""

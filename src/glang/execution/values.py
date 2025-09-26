@@ -1008,18 +1008,68 @@ class NoneValue(GlangValue):
     def __hash__(self) -> int:
         return hash("none")
 
-    # Safe propagation - none operations return none
-    def to_string(self) -> 'NoneValue':
-        """Convert none to string - returns none."""
-        return NoneValue(self.position)
+    # Configurable conversion methods
+    def to_string(self) -> 'StringValue':
+        """Convert none to string based on configuration."""
+        try:
+            from .configuration_context import get_current_config
+            config = get_current_config()
+            behavior = config.get_none_conversion('to_string')
 
-    def to_num(self) -> 'NoneValue':
-        """Convert none to number - returns none."""
-        return NoneValue(self.position)
+            if behavior == 'empty_string':
+                return StringValue("")
+            elif behavior == 'none_literal':
+                return StringValue("none")
+            elif behavior == 'error':
+                raise RuntimeError("Cannot convert none to string (configure none_conversions.to_string to allow)")
+            else:
+                # Default to empty string for unknown behaviors
+                return StringValue("")
+        except ImportError:
+            # Fallback if configuration system not available
+            return StringValue("")
+
+    def to_number(self) -> 'NumberValue':
+        """Convert none to number based on configuration."""
+        try:
+            from .configuration_context import get_current_config
+            config = get_current_config()
+            behavior = config.get_none_conversion('to_number')
+
+            if behavior == 'zero':
+                return NumberValue(0)
+            elif behavior == 'error':
+                raise RuntimeError("Cannot convert none to number (configure none_conversions.to_number to allow)")
+            else:
+                # Default to zero for unknown behaviors
+                return NumberValue(0)
+        except ImportError:
+            # Fallback if configuration system not available
+            return NumberValue(0)
+
+    def to_num(self) -> 'NumberValue':
+        """Alias for to_number()."""
+        return self.to_number()
 
     def to_bool(self) -> 'BooleanValue':
-        """Convert none to boolean - returns false for truthiness."""
-        return BooleanValue(False, self.position)
+        """Convert none to boolean based on configuration."""
+        try:
+            from .configuration_context import get_current_config
+            config = get_current_config()
+            behavior = config.get_none_conversion('to_bool')
+
+            if behavior == 'false':
+                return BooleanValue(False)
+            elif behavior == 'true':
+                return BooleanValue(True)
+            elif behavior == 'error':
+                raise RuntimeError("Cannot convert none to boolean (configure none_conversions.to_bool to allow)")
+            else:
+                # Default to false for unknown behaviors
+                return BooleanValue(False)
+        except ImportError:
+            # Fallback if configuration system not available
+            return BooleanValue(False)
 
     # Arithmetic operations return none
     def negate(self) -> 'NoneValue':

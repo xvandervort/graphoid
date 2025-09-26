@@ -13,7 +13,7 @@ class TestBehaviorParsing:
         parser = ASTParser()
         
         # Simple behavior list
-        code = 'num temp with [nil_to_zero, round_to_int] = 98.6'
+        code = 'num temp with [none_to_zero, round_to_int] = 98.6'
         result = parser.parse(code)
         
         assert isinstance(result, VariableDeclaration)
@@ -22,21 +22,21 @@ class TestBehaviorParsing:
         assert result.behaviors is not None
         assert isinstance(result.behaviors, BehaviorList)
         assert len(result.behaviors.behaviors) == 2
-        assert result.behaviors.behaviors[0] == "nil_to_zero"
+        assert result.behaviors.behaviors[0] == "none_to_zero"
         assert result.behaviors.behaviors[1] == "round_to_int"
     
     def test_parse_behavior_with_arguments(self):
         """Test parsing behavior calls with arguments."""
         parser = ASTParser()
         
-        code = 'num score with [nil_to_zero, validate_range(0, 100)] = 85'
+        code = 'num score with [none_to_zero, validate_range(0, 100)] = 85'
         result = parser.parse(code)
         
         assert isinstance(result, VariableDeclaration)
         assert result.behaviors is not None
         behaviors = result.behaviors.behaviors
         assert len(behaviors) == 2
-        assert behaviors[0] == "nil_to_zero"
+        assert behaviors[0] == "none_to_zero"
         
         # Second behavior should be a BehaviorCall
         assert isinstance(behaviors[1], BehaviorCall)
@@ -47,7 +47,7 @@ class TestBehaviorParsing:
         """Test parsing behavior list with mix of simple names and calls."""
         parser = ASTParser()
         
-        code = 'list<num> readings with [nil_to_zero, validate_range(95, 105), round_to_int] = [98.6, 99.2]'
+        code = 'list<num> readings with [none_to_zero, validate_range(95, 105), round_to_int] = [98.6, 99.2]'
         result = parser.parse(code)
         
         assert isinstance(result, VariableDeclaration)
@@ -57,7 +57,7 @@ class TestBehaviorParsing:
         
         behaviors = result.behaviors.behaviors
         assert len(behaviors) == 3
-        assert behaviors[0] == "nil_to_zero"
+        assert behaviors[0] == "none_to_zero"
         assert isinstance(behaviors[1], BehaviorCall)
         assert behaviors[1].name == "validate_range"
         assert behaviors[2] == "round_to_int"
@@ -104,15 +104,15 @@ class TestBehaviorParsing:
         
         # Missing closing bracket in behavior list
         with pytest.raises(ParseError):
-            parser.parse('num temp with [nil_to_zero = 98.6')
+            parser.parse('num temp with [none_to_zero = 98.6')
         
         # Missing opening bracket  
         with pytest.raises(ParseError):
-            parser.parse('num temp with nil_to_zero] = 98.6')
+            parser.parse('num temp with none_to_zero] = 98.6')
         
         # Missing comma between behaviors
         with pytest.raises(ParseError):
-            parser.parse('num temp with [nil_to_zero round_to_int] = 98.6')
+            parser.parse('num temp with [none_to_zero round_to_int] = 98.6')
     
     def test_parse_complex_nested_expression(self):
         """Test parsing behavior with complex nested expressions as arguments."""
@@ -135,16 +135,16 @@ class TestBehaviorParsing:
         
         test_cases = [
             # Basic types with behaviors
-            'num x with [nil_to_zero] = 0',
+            'num x with [none_to_zero] = 0',
             'string s with [uppercase] = "hello"',
-            'bool flag with [nil_to_zero] = true',
+            'bool flag with [none_to_zero] = true',
             
             # Constrained types with behaviors
-            'list<num> scores with [nil_to_zero, validate_range(0, 100)] = [95, 87]',
+            'list<num> scores with [none_to_zero, validate_range(0, 100)] = [95, 87]',
             'map<string> config with [env_normalize] = {"key": "value"}',
             
             # Multiple behaviors with various argument patterns
-            'num temp with [nil_to_zero, validate_range(95, 105), round_to_int] = 98.6',
+            'num temp with [none_to_zero, validate_range(95, 105), round_to_int] = 98.6',
         ]
         
         for code in test_cases:

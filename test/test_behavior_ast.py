@@ -38,8 +38,8 @@ class TestBehaviorASTNodes:
         pos = SourcePosition(1, 10)
         
         # Simple behavior call with no arguments
-        call1 = BehaviorCall("nil_to_zero", [], pos)
-        assert call1.name == "nil_to_zero"
+        call1 = BehaviorCall("none_to_zero", [], pos)
+        assert call1.name == "none_to_zero"
         assert call1.arguments == []
         assert call1.position == pos
         
@@ -70,14 +70,14 @@ class TestBehaviorASTNodes:
         
         # Mix of string behaviors and BehaviorCall
         behaviors = [
-            "nil_to_zero",
+            "none_to_zero",
             BehaviorCall("validate_range", [NumberLiteral(0), NumberLiteral(100)]),
             "round_to_int"
         ]
         
         behavior_list = BehaviorList(behaviors, pos)
         assert len(behavior_list.behaviors) == 3
-        assert behavior_list.behaviors[0] == "nil_to_zero"
+        assert behavior_list.behaviors[0] == "none_to_zero"
         assert isinstance(behavior_list.behaviors[1], BehaviorCall)
         assert behavior_list.behaviors[2] == "round_to_int"
         assert behavior_list.position == pos
@@ -87,7 +87,7 @@ class TestBehaviorASTNodes:
         visitor = MockVisitor()
         pos = SourcePosition(1, 15)
         
-        behaviors = ["nil_to_zero", "round_to_int"]
+        behaviors = ["none_to_zero", "round_to_int"]
         behavior_list = BehaviorList(behaviors, pos)
         
         result = behavior_list.accept(visitor)
@@ -100,7 +100,7 @@ class TestBehaviorASTNodes:
         pos = SourcePosition(2, 1)
         
         # Create behavior list
-        behaviors = BehaviorList(["nil_to_zero", "positive"], pos)
+        behaviors = BehaviorList(["none_to_zero", "positive"], pos)
         
         # Create variable declaration with behaviors
         var_decl = VariableDeclaration(
@@ -138,7 +138,7 @@ class TestBehaviorASTNodes:
         visitor = MockVisitor()
         pos = SourcePosition(2, 1)
         
-        behaviors = BehaviorList(["nil_to_zero"], pos)
+        behaviors = BehaviorList(["none_to_zero"], pos)
         var_decl = VariableDeclaration(
             var_type="num",
             name="score",
@@ -158,7 +158,7 @@ class TestBehaviorASTNodes:
         
         # Create complex behavior list with calls and simple names
         behaviors = [
-            "nil_to_zero",
+            "none_to_zero",
             BehaviorCall("validate_range", [
                 NumberLiteral(95.0, pos),
                 NumberLiteral(105.0, pos)
@@ -171,7 +171,7 @@ class TestBehaviorASTNodes:
         
         # Verify structure
         assert len(behavior_list.behaviors) == 4
-        assert behavior_list.behaviors[0] == "nil_to_zero"
+        assert behavior_list.behaviors[0] == "none_to_zero"
         
         validate_call = behavior_list.behaviors[1]
         assert isinstance(validate_call, BehaviorCall)
