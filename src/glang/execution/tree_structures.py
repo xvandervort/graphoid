@@ -195,6 +195,14 @@ class BinaryTreeValue(GlangValue, GraphContainer):
         """Get the number of nodes in the tree."""
         return NumberValue(self.graph.size, self.position)
 
+    def first(self) -> GlangValue:
+        """Get the first element of the tree (returns none - no meaningful first/last in trees)."""
+        return NoneValue(self.position)
+
+    def last(self) -> GlangValue:
+        """Get the last element of the tree (returns none - no meaningful first/last in trees)."""
+        return NoneValue(self.position)
+
     def empty(self) -> BooleanValue:
         """Check if the tree is empty."""
         return BooleanValue(self.graph.size == 0, self.position)

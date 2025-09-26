@@ -3442,9 +3442,11 @@ class ASTExecutor(BaseASTVisitor):
             # Get the first key from insertion order
             first_key = keys[0]
             first_value = target.get(first_key)
-            # Return a new map containing just the first key-value pair
+
+            # Create a new map containing just this key-value pair
             from .graph_values import MapValue
-            return MapValue([(first_key, first_value)], target.constraint, position)
+            first_map = MapValue([(first_key, first_value)], position=position)
+            return first_map
 
         elif method_name == "last":
             if len(args) != 0:
@@ -3460,9 +3462,11 @@ class ASTExecutor(BaseASTVisitor):
             # Get the last key from insertion order
             last_key = keys[-1]
             last_value = target.get(last_key)
-            # Return a new map containing just the last key-value pair
+
+            # Create a new map containing just this key-value pair
             from .graph_values import MapValue
-            return MapValue([(last_key, last_value)], target.constraint, position)
+            last_map = MapValue([(last_key, last_value)], position=position)
+            return last_map
 
         else:
             from .errors import MethodNotFoundError

@@ -710,6 +710,90 @@ def process_data(data) {
 }
 ```
 
+## 🔗 Universal Graph Methods
+
+### first() and last() Methods (Available on All Graph Types)
+```glang
+# LISTS: Return element at index 0 and -1
+numbers = [10, 20, 30, 40, 50]
+numbers.first()           # 10 (first element)
+numbers.last()            # 50 (last element)
+
+# Empty lists return none
+empty = []
+empty.first()             # none
+empty.last()              # none
+
+# MAPS: Return map units (single key-value pairs) in insertion order
+config = {"host": "localhost", "port": 8080, "debug": true}
+first_unit = config.first()    # {"host": "localhost"} (first inserted key-value)
+last_unit = config.last()      # {"debug": true} (last inserted key-value)
+
+# Access values through the returned map units
+value = first_unit["host"]      # "localhost"
+debug_flag = last_unit["debug"] # true
+
+# Empty maps return none
+empty_map = {}
+empty_map.first()         # none
+empty_map.last()          # none
+
+# TREES: Return none (no meaningful first/last ordering)
+# tree.first()            # none (when tree syntax is implemented)
+# tree.last()             # none
+
+# Works with and without parentheses (zero-argument methods)
+numbers.first()           # With parentheses
+numbers.first             # Without parentheses (same result)
+
+### Practical Benefits
+```glang
+# Map units preserve key-value relationships
+config = {"timeout": 30, "retries": 3, "debug": false}
+first_setting = config.first()  # {"timeout": 30}
+
+# Easy to work with the unit as a whole
+settings_backup = {}
+settings_backup.update(first_setting)  # Copy the first setting
+
+# Or extract just the value when needed
+timeout_value = first_setting["timeout"]  # 30
+
+# Consistent API across all graph types
+for item in [my_list, my_map, my_tree] {
+    first_element = item.first()
+    if first_element != none {
+        print("Found first element: " + first_element.to_string())
+    }
+}
+```
+
+### Insertion Order Preservation
+```glang
+# Maps preserve insertion order for first()/last()
+ordered = {}
+ordered["alpha"] = 1      # First inserted
+ordered["beta"] = 2       # Middle
+ordered["gamma"] = 3      # Last inserted
+
+ordered.first()           # 1 (alpha's value)
+ordered.last()            # 3 (gamma's value)
+```
+
+### Consistent API Across Graph Types
+```glang
+# All graph types support the same interface
+data_structures = [
+    [1, 2, 3],                    # list
+    {"a": 1, "b": 2, "c": 3}      # map
+]
+
+for structure in data_structures {
+    first_item = structure.first()    # Works on any graph type
+    last_item = structure.last()      # Consistent behavior
+}
+```
+
 ## 🔢 Operators & Comparisons
 
 ### Arithmetic

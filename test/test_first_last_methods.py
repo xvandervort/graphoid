@@ -3,7 +3,7 @@ Test first() and last() universal graph methods.
 
 These methods should work on all graph types with appropriate semantics:
 - Lists: first/last elements by index
-- Maps: first/last inserted key-value pairs as maps
+- Maps: first/last inserted values (not key-value pairs)
 - Trees: return none (no meaningful first/last)
 - Empty collections: return none safely
 """
@@ -117,10 +117,10 @@ class TestMapFirstLast:
         """)
         result = context.variables["result"]
         assert isinstance(result, MapValue)
-        # Should be a map with just the first key-value pair
-        keys = result.keys()
-        assert len(keys) == 1
-        assert keys[0] == "host"
+        # Should contain only the first inserted key-value pair
+        result_keys = result.keys()
+        assert len(result_keys) == 1
+        assert result_keys[0] == "host"
         assert result.get("host").value == "localhost"
 
     def test_map_last_basic(self):
@@ -131,11 +131,11 @@ class TestMapFirstLast:
         """)
         result = context.variables["result"]
         assert isinstance(result, MapValue)
-        # Should be a map with just the last key-value pair
-        keys = result.keys()
-        assert len(keys) == 1
-        assert keys[0] == "debug"
-        assert result.get("debug").value == True
+        # Should contain only the last inserted key-value pair
+        result_keys = result.keys()
+        assert len(result_keys) == 1
+        assert result_keys[0] == "debug"
+        assert result.get("debug").value is True
 
     def test_map_single_element(self):
         """Test first() and last() on single-element map."""
@@ -149,7 +149,7 @@ class TestMapFirstLast:
         assert isinstance(first, MapValue)
         assert isinstance(last, MapValue)
 
-        # Both should have the same single key-value pair
+        # Both should return the same single key-value pair
         first_keys = first.keys()
         last_keys = last.keys()
         assert len(first_keys) == 1
@@ -184,14 +184,14 @@ class TestMapFirstLast:
         first = context.variables["first_result"]
         last = context.variables["last_result"]
 
-        # First should be "third" (first inserted)
+        # First should contain the first inserted key-value pair
         assert isinstance(first, MapValue)
         first_keys = first.keys()
         assert len(first_keys) == 1
         assert first_keys[0] == "third"
         assert first.get("third").value == 3
 
-        # Last should be "second" (last inserted)
+        # Last should contain the last inserted key-value pair
         assert isinstance(last, MapValue)
         last_keys = last.keys()
         assert len(last_keys) == 1
@@ -199,7 +199,7 @@ class TestMapFirstLast:
         assert last.get("second").value == 2
 
     def test_map_result_type(self):
-        """Test that first() and last() return proper map type, not data type."""
+        """Test that first() and last() return actual values, not maps."""
         context = execute_glang_code("""
         config = {"name": "test", "value": 42}
         first_result = config.first()
@@ -208,11 +208,17 @@ class TestMapFirstLast:
         first = context.variables["first_result"]
         last = context.variables["last_result"]
 
-        # Both should be MapValue, not DataValue
+        # Should return map units containing single key-value pairs
         assert isinstance(first, MapValue)
         assert isinstance(last, MapValue)
-        assert first.get_type() == "map"
-        assert last.get_type() == "map"
+        first_keys = first.keys()
+        last_keys = last.keys()
+        assert len(first_keys) == 1
+        assert len(last_keys) == 1
+        assert first_keys[0] == "name"
+        assert last_keys[0] == "value"
+        assert first.get("name").value == "test"
+        assert last.get("value").value == 42
 
 class TestTreeFirstLast:
     """Test first() and last() methods on trees (should return none)."""
@@ -274,43 +280,53 @@ class TestUniversalBehavior:
         first = context.variables["first_result"]
         last = context.variables["last_result"]
 
-        # Should return maps containing the list values
+        # Should return map units containing the list values
         assert isinstance(first, MapValue)
         assert isinstance(last, MapValue)
-
         first_keys = first.keys()
         last_keys = last.keys()
         assert len(first_keys) == 1
         assert len(last_keys) == 1
         assert first_keys[0] == "numbers"
         assert last_keys[0] == "letters"
+        # The values should be the actual lists
+        numbers_list = first.get("numbers")
+        letters_list = last.get("letters")
+        assert isinstance(numbers_list, ListValue)
+        assert isinstance(letters_list, ListValue)
+        assert len(numbers_list.elements) == 3
+        assert len(letters_list.elements) == 3
+        assert numbers_list.elements[0].value == 1
+        assert letters_list.elements[0].value == "a"
 
 class TestChaining:
     """Test that first() and last() work with method chaining."""
 
     def test_first_on_map_result(self):
-        """Test calling methods on the result of first()."""
+        """Test that first() returns a value that can be used directly."""
         context = execute_glang_code("""
         config = {"host": "localhost", "port": 8080}
         first_result = config.first()
-        keys_result = first_result.keys()
         """)
-        keys = context.variables["keys_result"]
-        assert isinstance(keys, ListValue)
-        assert len(keys.elements) == 1
-        assert keys.elements[0].value == "host"
+        first = context.variables["first_result"]
+        assert isinstance(first, MapValue)
+        first_keys = first.keys()
+        assert len(first_keys) == 1
+        assert first_keys[0] == "host"
+        assert first.get("host").value == "localhost"
 
     def test_last_on_map_result(self):
-        """Test calling methods on the result of last()."""
+        """Test that last() returns a value that can be used directly."""
         context = execute_glang_code("""
         config = {"host": "localhost", "port": 8080}
         last_result = config.last()
-        keys_result = last_result.keys()
         """)
-        keys = context.variables["keys_result"]
-        assert isinstance(keys, ListValue)
-        assert len(keys.elements) == 1
-        assert keys.elements[0].value == "port"
+        last = context.variables["last_result"]
+        assert isinstance(last, MapValue)
+        last_keys = last.keys()
+        assert len(last_keys) == 1
+        assert last_keys[0] == "port"
+        assert last.get("port").value == 8080
 
 if __name__ == "__main__":
     pytest.main([__file__])

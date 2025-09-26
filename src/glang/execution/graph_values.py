@@ -191,6 +191,18 @@ class ListValue(GlangValue, GraphContainer):
         from .values import NumberValue
         return NumberValue(self.size(), self.position)
 
+    def first(self) -> GlangValue:
+        """Get the first element of the list (index 0)."""
+        if len(self.graph) == 0:
+            return NoneValue(self.position)
+        return self.graph.get_at_index(0)
+
+    def last(self) -> GlangValue:
+        """Get the last element of the list (index -1)."""
+        if len(self.graph) == 0:
+            return NoneValue(self.position)
+        return self.graph.get_at_index(-1)
+
     def is_empty(self) -> bool:
         """Check if list is empty."""
         return len(self.graph) == 0
@@ -684,6 +696,7 @@ class MapValue(GlangValue, GraphContainer):
         """Universal size method for method dispatch."""
         from .values import NumberValue
         return NumberValue(self.size(), self.position)
+
 
     def universal_inspect(self) -> 'StringValue':
         """Map-specific inspection showing constraint and size."""
