@@ -105,6 +105,49 @@ class MappingBehavior(Behavior):
         return value
 
 
+class CustomFunctionBehavior(Behavior):
+    """A behavior that applies a user-defined function to values."""
+
+    def __init__(self, function_value: 'GlangValue'):
+        """Initialize custom function behavior.
+
+        Args:
+            function_value: Either a FunctionValue or LambdaValue that takes one parameter
+        """
+        from .execution.values import FunctionValue, LambdaValue
+
+        if not isinstance(function_value, (FunctionValue, LambdaValue)):
+            raise ValueError(f"Custom behavior must be a function or lambda, got {function_value.get_type()}")
+
+        self.function = function_value
+        # Generate unique name based on function
+        if hasattr(function_value, 'name'):
+            function_name = function_value.name
+        else:
+            function_name = f"lambda_{id(function_value)}"
+
+        super().__init__(f"custom_{function_name}", transform=self._transform)
+
+    def _transform(self, value: GlangValue) -> GlangValue:
+        """Transform value using the custom function."""
+        from .execution.executor import ASTExecutor, ExecutionContext
+        from .semantic.symbol_table import SymbolTable
+
+        # Create execution context for function call
+        symbol_table = SymbolTable()
+        context = ExecutionContext(symbol_table)
+        executor = ASTExecutor(context)
+
+        try:
+            # Call the function with the value as argument
+            result = executor.call_function(self.function, [value])
+            return result
+        except Exception as e:
+            # If function fails, return original value
+            # In production, might want to log this error
+            return value
+
+
 class BehaviorRegistry:
     """Registry of standard behaviors."""
     

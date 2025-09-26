@@ -158,6 +158,51 @@ class GraphContainer:
 
         return NoneValue()
 
+    def add_custom_rule(self, function: 'GlangValue') -> 'NoneValue':
+        """Add a custom function behavior rule to this container.
+
+        Usage:
+            # With named function
+            func normalize(value) {
+                if value < 0 { return 0 }
+                if value > 100 { return 100 }
+                return value
+            }
+            numbers.add_custom_rule(normalize)
+
+            # With lambda (future syntax)
+            numbers.add_custom_rule(x => x * 2)
+
+        Args:
+            function: A FunctionValue or LambdaValue that takes one parameter
+        """
+        from .execution.values import NoneValue, FunctionValue, LambdaValue
+        from .behaviors import CustomFunctionBehavior
+
+        # Validate that it's a function
+        if not isinstance(function, (FunctionValue, LambdaValue)):
+            raise ValueError(f"Custom rule must be a function or lambda, got {function.get_type()}")
+
+        # Create a custom function behavior
+        behavior = CustomFunctionBehavior(function)
+
+        # Generate unique name for this custom behavior
+        function_id = id(function)
+        behavior_name = f"custom_{function_id}"
+
+        # Prevent duplicate functions (same object)
+        if behavior_name in self._behavior_names:
+            return NoneValue()
+
+        # Add behavior to container
+        self._behaviors.append((behavior, ()))
+        self._behavior_names.add(behavior_name)
+
+        # Apply to all existing elements
+        self._apply_behaviors_to_existing()
+
+        return NoneValue()
+
     def _apply_behaviors(self, value: 'GlangValue') -> 'GlangValue':
         """Apply all behaviors to a single value."""
         result = value

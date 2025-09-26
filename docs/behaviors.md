@@ -335,13 +335,126 @@ prices.append(nil)      # Would need nil_to_zero first
 - Removing behaviors doesn't undo previous transformations
 - Behaviors are lightweight - just function calls during mutations
 
+## Custom Function Behaviors
+
+Create custom behaviors using your own Glang functions. This powerful feature allows you to define any transformation logic you need.
+
+### Basic Custom Functions
+
+```glang
+# Define a temperature normalization function
+func normalize_temp(value) {
+    if value < 95 { return 95 }
+    if value > 105 { return 105 }
+    return value
+}
+
+# Attach the function as a behavior
+temperatures = [85, 98.6, 110, 102]
+temperatures.add_custom_rule(normalize_temp)
+print(temperatures)  # [95, 98.6, 105, 102]
+```
+
+### Lambda Functions (Future)
+
+```glang
+# Future: Lambda expressions as behaviors
+scores.add_custom_rule(x => x > 100 ? 100 : x)  # Cap scores at 100
+```
+
+### Practical Examples
+
+#### Data Validation
+```glang
+# Email validation function
+func validate_email(value) {
+    if value.contains("@") and value.contains(".") {
+        return value
+    }
+    return "invalid@example.com"
+}
+
+emails = ["user@example.com", "invalid-email", "admin@company.org"]
+emails.add_custom_rule(validate_email)
+print(emails)  # ["user@example.com", "invalid@example.com", "admin@company.org"]
+```
+
+#### Mathematical Transformations
+```glang
+# Custom mathematical function
+func apply_discount(price) {
+    discount_rate = 0.15  # 15% discount
+    discounted = price * (1 - discount_rate)
+    return discounted
+}
+
+prices = [100, 250, 50]
+prices.add_custom_rule(apply_discount)
+print(prices)  # [85, 212.5, 42.5]
+```
+
+#### Complex Business Logic
+```glang
+# Grade calculation with custom logic
+func calculate_final_grade(raw_score) {
+    # Apply curve and grade boundaries
+    curved = raw_score + 5  # 5 point curve
+
+    if curved >= 90 { return "A" }
+    if curved >= 80 { return "B" }
+    if curved >= 70 { return "C" }
+    if curved >= 60 { return "D" }
+    return "F"
+}
+
+scores = [85, 92, 67, 78]
+scores.add_custom_rule(calculate_final_grade)
+print(scores)  # ["A", "A", "C", "B"]
+```
+
+### Combining Custom Functions with Standard Behaviors
+
+```glang
+# Use custom functions with standard behaviors
+sensor_data = [none, -5.2, 150, 98.6]
+
+# First handle missing data, then apply custom logic
+sensor_data.add_rule("none_to_zero")     # none -> 0
+sensor_data.add_custom_rule(normalize_temp)  # Apply custom function
+print(sensor_data)  # [95, 95, 105, 98.6]
+```
+
+### Error Handling
+
+Custom functions that fail gracefully - if your function throws an error, the original value is preserved:
+
+```glang
+# Function that might fail
+func risky_transform(value) {
+    return value / 0  # Division by zero
+}
+
+numbers = [10, 20, 30]
+numbers.add_custom_rule(risky_transform)
+print(numbers)  # [10, 20, 30] - original values preserved
+```
+
+### Key Benefits
+
+- **Unlimited Flexibility**: Define any transformation logic you need
+- **Type-Safe**: Works with Glang's type system and constraints
+- **Composable**: Chain with standard behaviors and other custom functions
+- **Error-Safe**: Failed functions don't break your data pipeline
+- **Graph-Native**: Uses Glang's function system directly
+
 ## Future Enhancements
 
 The behavior system will be extended with:
-- Custom behaviors defined in Glang functions
-- Behavior inheritance in graph hierarchies
 - Conditional behaviors based on context
 - Behavior composition and pipelines
 - Graph-specific behaviors for nodes and edges
+- Behavior inheritance in graph hierarchies
 
-**Completed**: Generic mapping behaviors (available now!)
+**Completed**:
+- Generic mapping behaviors (available now!)
+- Custom function behaviors (available now!)

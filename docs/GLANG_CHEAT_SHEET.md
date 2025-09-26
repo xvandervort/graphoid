@@ -377,6 +377,27 @@ codes.add_mapping_rule(second_map)
 print(codes)                                 # [1, 2, 3]
 ```
 
+### Custom Function Behaviors (NEW!)
+```glang
+# Define custom transformation functions
+func normalize_temp(value) {
+    if value < 95 { return 95 }
+    if value > 105 { return 105 }
+    return value
+}
+
+# Attach function as behavior
+temperatures = [85, 98.6, 110]
+temperatures.add_custom_rule(normalize_temp)
+print(temperatures)                          # [95, 98.6, 105]
+
+# Combine with standard behaviors
+sensor_data = [none, -5, 150]
+sensor_data.add_rule("none_to_zero")         # Standard behavior
+sensor_data.add_custom_rule(normalize_temp)  # Custom function
+print(sensor_data)                           # [95, 95, 105]
+```
+
 ## 🧮 Mathematical Methods
 
 ### Number Methods
