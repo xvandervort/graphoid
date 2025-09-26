@@ -254,6 +254,34 @@ class GraphContainer:
 
         return NoneValue()
 
+    def add_rules(self, ruleset: 'GlangValue') -> 'NoneValue':
+        """Add multiple behavior rules from a ruleset to this container.
+
+        Usage:
+            # Create a reusable ruleset
+            data_cleaning = Rules[
+                "none_to_zero",
+                "positive",
+                "validate_range", 0, 100
+            ]
+
+            # Apply the entire ruleset at once
+            my_list.add_rules(data_cleaning)
+
+        Args:
+            ruleset: A RulesetValue containing multiple behavior rules
+        """
+        from .execution.values import NoneValue
+        from .behaviors import RulesetValue
+
+        if not isinstance(ruleset, RulesetValue):
+            raise ValueError(f"add_rules requires a ruleset, got {ruleset.get_type()}")
+
+        # Apply all rules in the ruleset to this container
+        ruleset.ruleset.apply_to_container(self)
+
+        return NoneValue()
+
     def _apply_behaviors(self, value: 'GlangValue') -> 'GlangValue':
         """Apply all behaviors to a single value."""
         result = value

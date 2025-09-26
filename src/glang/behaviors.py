@@ -448,8 +448,172 @@ class BehaviorPipeline:
         return NoneValue()
 
 
+class Ruleset:
+    """A collection of behaviors that can be applied as a bundle to containers.
+
+    Provides declarative syntax for creating reusable behavior bundles:
+
+    data_cleaning = Rules[
+        :none_to_zero,
+        :validate_range[min: 60, max: 200],
+        :positive_only,
+        custom_sanitizer()
+    ]
+    """
+
+    def __init__(self, rules: List[str] = None):
+        """Initialize ruleset with optional list of rule specifications.
+
+        Args:
+            rules: List of rule specifications (strings, symbols, functions)
+        """
+        self.rules: List[dict] = []
+        self.name = f"ruleset_{id(self)}"
+
+        if rules:
+            for rule in rules:
+                self.add_rule(rule)
+
+    def add_rule(self, rule_spec) -> 'NoneValue':
+        """Add a rule to this ruleset.
+
+        Args:
+            rule_spec: Rule specification (string, symbol, function, or dict with parameters)
+        """
+        from .execution.values import StringValue, SymbolValue, FunctionValue, LambdaValue, NoneValue
+
+        rule_info = {}
+
+        if isinstance(rule_spec, StringValue):
+            # String rule like "none_to_zero"
+            rule_info = {
+                'type': 'string',
+                'name': rule_spec.value,
+                'args': []
+            }
+        elif isinstance(rule_spec, SymbolValue):
+            # Symbol rule like :none_to_zero
+            rule_info = {
+                'type': 'symbol',
+                'name': rule_spec.name,
+                'args': []
+            }
+        elif isinstance(rule_spec, (FunctionValue, LambdaValue)):
+            # Custom function rule
+            rule_info = {
+                'type': 'function',
+                'function': rule_spec,
+                'args': []
+            }
+        elif isinstance(rule_spec, dict):
+            # Rule with parameters like {'name': 'validate_range', 'args': [60, 200]}
+            rule_info = rule_spec
+        else:
+            raise ValueError(f"Invalid rule specification: {rule_spec}")
+
+        self.rules.append(rule_info)
+        return NoneValue()
+
+    def get_rules(self) -> 'ListValue':
+        """Get list of all rules in this ruleset."""
+        from .execution.values import StringValue
+        from .execution.graph_values import ListValue
+
+        rule_names = []
+        for rule in self.rules:
+            if rule['type'] in ['string', 'symbol']:
+                rule_names.append(StringValue(rule['name']))
+            elif rule['type'] == 'function':
+                func_name = getattr(rule['function'], 'name', 'lambda')
+                rule_names.append(StringValue(f"custom_{func_name}"))
+
+        return ListValue(rule_names, "string")
+
+    def apply_to_container(self, container) -> 'NoneValue':
+        """Apply all rules in this ruleset to a container.
+
+        Args:
+            container: GraphContainer (ListValue, HashValue, etc.) to apply rules to
+        """
+        from .execution.values import StringValue, SymbolValue, NoneValue
+
+        for rule in self.rules:
+            if rule['type'] == 'string':
+                # Standard string rule
+                container.add_rule(StringValue(rule['name']), *rule.get('args', []))
+            elif rule['type'] == 'symbol':
+                # Symbol rule
+                container.add_rule(SymbolValue(rule['name']), *rule.get('args', []))
+            elif rule['type'] == 'function':
+                # Custom function rule
+                container.add_custom_rule(rule['function'])
+            elif rule['type'] == 'mapping':
+                # Mapping rule
+                container.add_mapping_rule(rule['mapping'], rule.get('default'))
+            elif rule['type'] == 'conditional':
+                # Conditional rule
+                container.add_conditional_rule(
+                    rule['condition'],
+                    rule['transform'],
+                    rule.get('on_fail')
+                )
+
+        return NoneValue()
+
+    def size(self) -> int:
+        """Get number of rules in this ruleset."""
+        return len(self.rules)
+
+    def to_display_string(self) -> str:
+        """Get display representation of this ruleset."""
+        rule_count = len(self.rules)
+        return f"Ruleset[{rule_count} rules]"
+
+
+class RulesetValue(GlangValue):
+    """Glang value wrapper for Ruleset objects."""
+
+    def __init__(self, ruleset: Ruleset):
+        super().__init__()
+        self.ruleset = ruleset
+
+    def get_type(self) -> str:
+        return "ruleset"
+
+    def to_display_string(self) -> str:
+        return self.ruleset.to_display_string()
+
+    def to_python(self) -> Ruleset:
+        return self.ruleset
+
+    def add_rule(self, rule_spec) -> 'NoneValue':
+        """Add a rule to this ruleset."""
+        return self.ruleset.add_rule(rule_spec)
+
+    def get_rules(self) -> 'ListValue':
+        """Get list of all rules in this ruleset."""
+        return self.ruleset.get_rules()
+
+    def size(self) -> 'NumberValue':
+        """Get number of rules in this ruleset."""
+        return NumberValue(self.ruleset.size())
+
+
 def create_behavior(name: str, transform: Optional[Callable] = None,
                    validate: Optional[Callable] = None,
                    on_invalid: Optional[Callable] = None) -> Behavior:
     """Helper function to create a behavior."""
     return Behavior(name, transform, validate, on_invalid)
+
+
+def create_ruleset(rules: List = None) -> RulesetValue:
+    """Helper function to create a ruleset.
+
+    Args:
+        rules: List of rule specifications
+
+    Returns:
+        RulesetValue containing the ruleset
+    """
+    ruleset = Ruleset(rules)
+    return RulesetValue(ruleset)

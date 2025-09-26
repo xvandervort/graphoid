@@ -426,6 +426,37 @@ numbers.add_conditional_rule(is_string, to_upper, mark_non_string)
 print(numbers)                               # ["NOT_STRING", "TEXT", "NOT_STRING"]
 ```
 
+### Ruleset System (NEW!)
+```glang
+# Create reusable behavior bundles with clean syntax
+data_cleaning = Rules[
+    "none_to_zero",
+    "positive",
+    "round_to_int"
+]
+
+# Apply to multiple datasets efficiently
+temperatures = [98.6, none, -102.5]
+blood_pressure = [120, none, -80]
+heart_rate = [75, none, -60]
+
+temperatures.add_rules(data_cleaning)
+blood_pressure.add_rules(data_cleaning)
+heart_rate.add_rules(data_cleaning)
+
+# Domain-specific rulesets
+medical_validation = Rules[
+    "none_to_zero",
+    "validate_range", 60, 200
+]
+
+financial_cleaning = Rules[
+    "none_to_zero",
+    "positive",
+    "validate_range", 0, 1000000
+]
+```
+
 ## 🧮 Mathematical Methods
 
 ### Number Methods

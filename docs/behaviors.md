@@ -646,6 +646,208 @@ data.add_conditional_rule(risky_condition, safe_transform)
 # Values that cause condition to fail are left as-is
 ```
 
+## Ruleset System (Declarative Bundle Application)
+
+Create reusable behavior bundles with clean declarative syntax. The ruleset system allows you to define collections of behaviors once and apply them to multiple containers efficiently.
+
+### Basic Ruleset Creation
+
+```glang
+# Create a data cleaning ruleset directly
+data_cleaning_rules = [
+    "none_to_zero",
+    "positive",
+    "round_to_int"
+]
+
+data_cleaning = Rules[data_cleaning_rules]
+
+# Apply to multiple datasets
+temperatures = [98.6, none, -102.5, 72.1]
+blood_pressure = [120, none, -80, 140]
+heart_rate = [75, none, -60, 85]
+
+# Apply the same ruleset to all containers
+temperatures.add_rules(data_cleaning)
+blood_pressure.add_rules(data_cleaning)
+heart_rate.add_rules(data_cleaning)
+
+print(temperatures)    # [98.6, 0, 102.5, 72] - cleaned data
+print(blood_pressure)  # [120, 0, 80, 140] - cleaned data
+print(heart_rate)      # [75, 0, 60, 85] - cleaned data
+```
+
+### Medical Validation Ruleset
+
+```glang
+# Create specialized rulesets for different domains
+medical_validation = Rules[
+    "none_to_zero",
+    "positive",
+    "validate_range", 60, 200  # Valid vital sign range
+]
+
+# Apply to all medical datasets
+systolic_pressure.add_rules(medical_validation)
+diastolic_pressure.add_rules(medical_validation)
+pulse_rate.add_rules(medical_validation)
+```
+
+### Financial Data Processing
+
+```glang
+# Financial data requires specific validation
+financial_rules = Rules[
+    "none_to_zero",
+    "positive",
+    "round_to_int",  # Round to cents
+    "validate_range", 0, 1000000  # Reasonable financial range
+]
+
+# Apply to financial datasets
+prices = [19.99, none, -5.50, 1500000]
+revenues = [100000, none, -500, 250000]
+
+prices.add_rules(financial_rules)
+revenues.add_rules(financial_rules)
+
+print(prices)    # [20, 0, 6, 1000000] - cleaned financial data
+print(revenues)  # [100000, 0, 500, 250000] - cleaned financial data
+```
+
+### Combining Different Rule Types
+
+```glang
+# Rulesets can contain different types of behaviors
+complex_cleaning = Rules[
+    "none_to_zero",           # Standard behavior
+    "positive"                # Another standard behavior
+]
+
+# Add custom function to existing ruleset
+func normalize_temperature(value) {
+    if value < 95 { return 95 }
+    if value > 105 { return 105 }
+    return value
+}
+
+# You can add more rules to existing rulesets
+complex_cleaning.add_rule(normalize_temperature)
+
+# Apply the enhanced ruleset
+sensor_data.add_rules(complex_cleaning)
+```
+
+### Ruleset Management
+
+```glang
+# Query ruleset information
+ruleset = Rules["none_to_zero", "positive"]
+
+print("Ruleset size: " + ruleset.size().to_string())     # "Ruleset size: 2"
+print("Rules: " + ruleset.get_rules().to_string())       # List of rule names
+
+# Add more rules dynamically
+ruleset.add_rule("round_to_int")
+print("New size: " + ruleset.size().to_string())         # "New size: 3"
+```
+
+### Domain-Specific Rulesets
+
+```glang
+# Environmental monitoring ruleset
+environmental_monitoring = Rules[
+    "none_to_zero",
+    "validate_range", -50, 150,  # Temperature range in Celsius
+    "positive"                   # For humidity, pressure readings
+]
+
+# Web scraping data cleanup
+web_scraping_cleanup = Rules[
+    "none_to_empty",            # Convert none to empty string
+    "uppercase",                # Normalize text case
+    "validate_range", 0, 1000   # Reasonable numeric ranges
+]
+
+# Apply to appropriate datasets
+temperature_sensors.add_rules(environmental_monitoring)
+humidity_sensors.add_rules(environmental_monitoring)
+
+scraped_titles.add_rules(web_scraping_cleanup)
+scraped_descriptions.add_rules(web_scraping_cleanup)
+```
+
+### Efficiency Benefits
+
+```glang
+# Instead of applying rules individually:
+data.add_rule("none_to_zero")
+data.add_rule("positive")
+data.add_rule("round_to_int")
+data.add_rule("validate_range", 0, 100)
+
+# Use rulesets for better performance and reusability:
+data_rules = Rules[
+    "none_to_zero",
+    "positive",
+    "round_to_int",
+    "validate_range", 0, 100
+]
+
+data.add_rules(data_rules)  # Single call applies all rules efficiently
+```
+
+### Key Benefits
+
+- **Declarative Syntax**: Define behavior collections cleanly and clearly
+- **Reusability**: Create once, apply to multiple containers
+- **Efficiency**: Bundle application is more performant than individual rule addition
+- **Organization**: Group related behaviors logically by domain or purpose
+- **Maintainability**: Update ruleset definitions in one place
+- **Composability**: Combine with existing behavior system seamlessly
+
+### API Reference
+
+```glang
+# Create ruleset from rule list
+ruleset = Rules[rule_list]
+
+# Apply ruleset to container
+container.add_rules(ruleset)
+
+# Manage ruleset contents
+ruleset.add_rule(rule_spec)
+ruleset.get_rules()
+ruleset.size()
+```
+
+**Parameters:**
+- `rule_list`: Array of rule specifications (strings, symbols, functions)
+- `rule_spec`: Individual rule specification to add to ruleset
+
+**Returns:** Ruleset operations return appropriate values (NoneValue for mutations, data for queries)
+
+### Integration with Other Behavior Types
+
+Rulesets work seamlessly with all behavior types:
+
+```glang
+# Mix standard behaviors, custom functions, mappings, and conditionals
+comprehensive_ruleset = Rules[
+    "none_to_zero",           # Standard behavior
+    "positive"                # Standard behavior
+]
+
+# Add custom function
+comprehensive_ruleset.add_rule(custom_validator)
+
+# Add mapping behavior (when implemented)
+comprehensive_ruleset.add_rule(color_mapping)
+
+# Apply everything at once
+mixed_data.add_rules(comprehensive_ruleset)
+```
+
 ## Future Enhancements
 
 The behavior system will be extended with:
@@ -657,3 +859,4 @@ The behavior system will be extended with:
 - Generic mapping behaviors (available now!)
 - Custom function behaviors (available now!)
 - Conditional behavior system (available now!)
+- Ruleset system (available now!)
