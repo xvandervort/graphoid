@@ -21,6 +21,15 @@ The roadmap is organized around the **Rust migration timeline**:
 
 ### 1.1 Core Language Enhancements
 
+#### Universal Graph Methods - first() / last() (EXPERIMENTAL)
+- **Universal Implementation**: All graph types inherit `first()` and `last()` methods
+- **Type-Specific Behavior**:
+  - Lists: `first()` → index 0, `last()` → index -1
+  - Maps: `first()` → first inserted, `last()` → last inserted
+  - Trees/Graphs: Return `none` (no meaningful first/last)
+- **Benefits**: Consistent API, no runtime errors, predictable behavior
+- **Documentation**: Clear guidance on which types return meaningful values
+
 #### Tree & Graph Data Structures (HIGH PRIORITY - PURE GLANG)
 - **Tree Structure Implementation**
   - `TreeNode` using maps for parent/child relationships

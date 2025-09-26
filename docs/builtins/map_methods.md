@@ -144,6 +144,46 @@ Checks if the map is empty.
 { "key": "value" }.empty()  # Returns false
 ```
 
+### first()
+Returns a new map containing only the first inserted key-value pair. Returns `none` for empty maps. This is a universal graph method available on all graph types.
+```glang
+config = { "host": "localhost", "port": 8080, "debug": true }
+config.first()  # Returns { "host": "localhost" }
+
+# Result is a proper map
+first_entry = config.first()
+first_entry.type()     # Returns "map"
+first_entry.keys()     # Returns ["host"]
+first_entry["host"]    # Returns "localhost"
+
+# Single entry map
+{ "only": "value" }.first()  # Returns { "only": "value" }
+
+# Empty map
+{}.first()  # Returns none
+```
+
+### last()
+Returns a new map containing only the last inserted key-value pair. Returns `none` for empty maps. This is a universal graph method available on all graph types.
+```glang
+config = { "host": "localhost", "port": 8080, "debug": true }
+config.last()   # Returns { "debug": true }
+
+# Respects insertion order
+settings = {}
+settings["first"] = 1    # First insertion
+settings["second"] = 2   # Second insertion
+settings["third"] = 3    # Last insertion
+
+settings.last()  # Returns { "third": 3 }
+
+# Single entry map
+{ "only": "value" }.last()   # Returns { "only": "value" }
+
+# Empty map
+{}.last()   # Returns none
+```
+
 ### count_values(value)
 Counts occurrences of a specific value in the map.
 ```glang

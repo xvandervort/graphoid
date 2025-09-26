@@ -683,6 +683,7 @@ class SemanticAnalyzer(BaseASTVisitor):
                 'types', 'coerce_to_constraint', 'index_of', 'count', 'min', 'max', 'sum', 'sort',
                 'map', 'filter', 'each', 'select', 'reject',
                 'generate', 'upto', 'from_function',
+                'first', 'last',
                 'to_string', 'to_bool',
                 'add_edge', 'connected_to', 'to_graph', 'edges', 'can_add_edge',
                 'count_edges', 'count_nodes', 'graph_summary', 'visualize_structure', 'visualize', 'view',
@@ -707,6 +708,7 @@ class SemanticAnalyzer(BaseASTVisitor):
             'data': {'key', 'value', 'node'} | universal_methods,
             'map': {
                 'node', 'set', 'has_key', 'count_values', 'keys', 'values', 'remove', 'empty', 'merge', 'push', 'pop',
+                'first', 'last',
                 'to_string', 'to_bool', 'can_accept',
                 'add_edge', 'get_connected_keys', 'get_edges', 'can_add_edge',
                 'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule',
@@ -718,6 +720,7 @@ class SemanticAnalyzer(BaseASTVisitor):
             'tree': {
                 'insert', 'search', 'size', 'empty', 'height',
                 'in_order', 'pre_order', 'post_order',
+                'first', 'last',
                 'to_string', 'to_bool',
                 'get_active_rules', 'get_rule_status', 'disable_rule', 'enable_rule',
                 'get_graph_summary', 'visualize_structure'

@@ -43,6 +43,11 @@ numbers[0] = 99           # Set
 numbers.append(6)         # Add to end
 numbers.size()            # Get length: 6
 
+# Boundary access (universal graph methods)
+numbers.first()           # Get first element: 99
+numbers.last()            # Get last element: 6
+[].first()                # Returns none (empty list)
+
 # Element naming (R vector style)
 heights = [165, 180, 175].set_names(["alice", "bob", "charlie"])
 heights["alice"]           # Get by name: 165 (same as heights[0])
@@ -76,6 +81,11 @@ settings.get("theme")     # Get data node
 settings.has_key("debug") # Check existence: true
 settings.keys()           # Get all keys as list
 settings.values()         # Get all values as list
+
+# Boundary access (universal graph methods - respects insertion order)
+settings.first()          # Get first inserted: { "theme": "light" }
+settings.last()           # Get last inserted: { "debug": true }
+{}.first()                # Returns none (empty map)
 
 # Element naming (for additional metadata)
 config = { "host": "localhost", "port": 8080 }.set_names(["server", "connection"])

@@ -63,6 +63,40 @@ tree.insert(42)
 print(tree.empty())  # false
 ```
 
+### `first()` -> `none`
+Always returns `none` for trees. Trees have no meaningful concept of "first" element since they are hierarchical structures organized by value relationships rather than insertion order. This is a universal graph method available on all graph types.
+
+```glang
+tree = tree{}
+tree.insert(10)
+tree.insert(5)
+tree.insert(15)
+
+result = tree.first()  # Always returns none
+print(result == none)  # true
+
+# Use in_order() for sorted access instead
+sorted_values = tree.in_order()  # [5, 10, 15]
+first_value = sorted_values.first()  # 5
+```
+
+### `last()` -> `none`
+Always returns `none` for trees. Trees have no meaningful concept of "last" element since they are hierarchical structures organized by value relationships rather than insertion order. This is a universal graph method available on all graph types.
+
+```glang
+tree = tree{}
+tree.insert(10)
+tree.insert(5)
+tree.insert(15)
+
+result = tree.last()   # Always returns none
+print(result == none)  # true
+
+# Use in_order() for sorted access instead
+sorted_values = tree.in_order()   # [5, 10, 15]
+last_value = sorted_values.last()  # 15
+```
+
 ### `height()` -> `num`
 Get the height of the tree (maximum depth from root to leaf).
 

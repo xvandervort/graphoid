@@ -90,6 +90,40 @@ Checks if the list is empty.
 [1, 2, 3].empty()  # Returns false
 ```
 
+### first()
+Returns the first element in the list. Returns `none` for empty lists. This is a universal graph method available on all graph types.
+```glang
+items = [10, 20, 30, 40]
+items.first()  # Returns 10
+
+# Single element
+[42].first()   # Returns 42
+
+# Empty list
+[].first()     # Returns none
+
+# Works with any element type
+mixed = [1, "hello", true]
+mixed.first()  # Returns 1
+```
+
+### last()
+Returns the last element in the list. Returns `none` for empty lists. This is a universal graph method available on all graph types.
+```glang
+items = [10, 20, 30, 40]
+items.last()   # Returns 40
+
+# Single element
+[42].last()    # Returns 42
+
+# Empty list
+[].last()      # Returns none
+
+# Works with any element type
+mixed = [1, "hello", true]
+mixed.last()   # Returns true
+```
+
 ## Type Constraints
 
 ### constraint()

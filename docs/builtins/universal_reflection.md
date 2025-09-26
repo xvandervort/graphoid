@@ -63,7 +63,8 @@ config.inspect()
 Returns the size of the value. The meaning varies by type:
 - **Strings**: Number of characters
 - **Lists**: Number of elements
-- **Hashes**: Number of key-value pairs
+- **Maps**: Number of key-value pairs
+- **Trees**: Number of nodes
 - **Numbers, Booleans**: Always returns 1 (atomic values)
 - **Data Nodes**: Always returns 1 (single key-value pair)
 
@@ -71,9 +72,22 @@ Returns the size of the value. The meaning varies by type:
 "hello".size()           # Returns 5
 [1, 2, 3, 4].size()     # Returns 4
 { "a": 1, "b": 2 }.size()  # Returns 2
+tree{}.size()           # Returns 0 (empty tree)
 42.size()               # Returns 1
 true.size()             # Returns 1
 ```
+
+## Universal Graph Methods
+
+All graph types (lists, maps, trees) support universal boundary access methods:
+
+### first()
+Returns the first element, key-value pair, or `none` based on the graph type. Available on all graph structures.
+
+### last()
+Returns the last element, key-value pair, or `none` based on the graph type. Available on all graph structures.
+
+See [Universal Graph Methods](universal_graph_methods.md) for complete documentation on these methods, including type-specific behavior and usage patterns.
 
 ## Advanced Reflection Patterns
 

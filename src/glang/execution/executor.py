@@ -1857,6 +1857,26 @@ class ASTExecutor(BaseASTVisitor):
 
             return ListValue(generated, constraint, position)
 
+        elif method_name == "first":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"first() takes no arguments, got {len(args)}", position)
+
+            # Return first element or none if empty
+            if len(target.elements) == 0:
+                return NoneValue(position)
+            return target.elements[0]
+
+        elif method_name == "last":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"last() takes no arguments, got {len(args)}", position)
+
+            # Return last element or none if empty
+            if len(target.elements) == 0:
+                return NoneValue(position)
+            return target.elements[-1]
+
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "list", position)
@@ -3408,6 +3428,42 @@ class ASTExecutor(BaseASTVisitor):
             result = target.visualize_structure(format_arg.value)
             return StringValue(result, position)
 
+        elif method_name == "first":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"first() takes no arguments, got {len(args)}", position)
+
+            # Return first inserted key-value pair or none if empty
+            keys = target.keys()
+            if len(keys) == 0:
+                from .values import NoneValue
+                return NoneValue(position)
+
+            # Get the first key from insertion order
+            first_key = keys[0]
+            first_value = target.get(first_key)
+            # Return a new map containing just the first key-value pair
+            from .graph_values import MapValue
+            return MapValue([(first_key, first_value)], target.constraint, position)
+
+        elif method_name == "last":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"last() takes no arguments, got {len(args)}", position)
+
+            # Return last inserted key-value pair or none if empty
+            keys = target.keys()
+            if len(keys) == 0:
+                from .values import NoneValue
+                return NoneValue(position)
+
+            # Get the last key from insertion order
+            last_key = keys[-1]
+            last_value = target.get(last_key)
+            # Return a new map containing just the last key-value pair
+            from .graph_values import MapValue
+            return MapValue([(last_key, last_value)], target.constraint, position)
+
         else:
             from .errors import MethodNotFoundError
             raise MethodNotFoundError(method_name, "map", position)
@@ -3558,6 +3614,24 @@ class ASTExecutor(BaseASTVisitor):
                 raise ArgumentError(f"to_bool() takes no arguments, got {len(args)}", position)
             # Tree is truthy if it has nodes
             return BooleanValue(not target.empty().value, position)
+
+        elif method_name == "first":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"first() takes no arguments, got {len(args)}", position)
+
+            # Trees don't have a meaningful "first" - return none
+            from .values import NoneValue
+            return NoneValue(position)
+
+        elif method_name == "last":
+            if len(args) != 0:
+                from .errors import ArgumentError
+                raise ArgumentError(f"last() takes no arguments, got {len(args)}", position)
+
+            # Trees don't have a meaningful "last" - return none
+            from .values import NoneValue
+            return NoneValue(position)
 
         else:
             from .errors import MethodNotFoundError
