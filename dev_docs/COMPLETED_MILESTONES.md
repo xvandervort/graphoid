@@ -60,6 +60,18 @@
 
 ### ✅ Advanced Language Features
 
+#### Pattern Matching System (January 2025)
+**Elegant functional programming feature with zero ceremony**:
+- **Explicit Match Expressions** - Traditional `match value { pattern => result }` syntax
+- **Implicit Pattern Functions** - Clean syntax without `match` keyword: `func f(n) { 0 => 1; x => x * 2 }`
+- **Automatic Fallthrough** - Unmatched patterns return `none` instead of errors (practical default)
+- **Variable Capture** - Pattern variables bind input values for use in expressions
+- **Recursion Support** - Perfect for recursive algorithms (factorial, fibonacci, etc.)
+- **Implementation**: Parser lookahead detection, AST wrapping, MatchError catching
+- **Documentation**: Two comprehensive guides (pattern_matching.md, functions.md)
+- **Testing**: 30 tests covering parsing, execution, fallthrough, recursion
+- **Innovation**: Combines functional language elegance with practical fallthrough semantics
+
 #### String Processing Enhancements (January 2025)
 - **Quote character handling** - Fixed lexer to properly handle `"\""` in strings
 - **Essential string methods** - Added `index_of`, `substring`, `repeat`, `pad_left`, `pad_right`, `last_index_of`

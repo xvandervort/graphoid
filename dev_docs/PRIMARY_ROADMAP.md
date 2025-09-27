@@ -78,11 +78,13 @@ The roadmap is organized around the **Rust migration timeline**:
 - **Code Formatting Tool** (glfmt): Text processing in pure Glang
 - **Macro System**: Metaprogramming capabilities
 
-### 1.3 Enhanced Behavior System
-- **Custom Value Mappings**: User-defined conversions
-- **Function-Based Behaviors**: Attach custom functions to data
-- **Conditional Behaviors**: Context-aware rule application
-- **Behavior Inheritance**: Parent-to-child behavior propagation
+#### ✅ Enhanced Behavior System (COMPLETED)
+- **Custom Value Mappings**: ✅ User-defined conversions with `add_mapping_rule()`
+- **Function-Based Behaviors**: ✅ Attach custom functions to data with `add_custom_rule()`
+- **Conditional Behaviors**: ✅ Context-aware rule application with `add_conditional_rule()`
+- **Behavior Inheritance**: ⏸️ Deferred to Phase 4 (advanced graph systems)
+
+**Status**: Complete implementation with 37 tests passing - Full behavior system API ready
 
 ## Phase 2: Rust Migration (Q2-Q4 2025)
 
@@ -157,7 +159,7 @@ The roadmap is organized around the **Rust migration timeline**:
 1. ✅ **Tree/Graph Data Structures** - Complete - Enables pure Glang DOM processing
 2. ✅ **Statistics Module** - Complete - Comprehensive mathematical capabilities for data analysis
 3. ⏸️ **Testing Framework** - Deferred pending language design (requires lazy evaluation, graph literals)
-4. **Enhanced Behavior System** - Custom value mappings and function-based behaviors
+4. ✅ **Enhanced Behavior System** - Complete - Full API with mappings, custom functions, and conditional behaviors
 5. **Rust Migration Bootstrap** - Begin parallel development
 
 ## Long-Term Vision
