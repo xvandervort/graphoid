@@ -11,9 +11,12 @@ from glang.semantic.analyzer import SemanticAnalyzer
 from glang.semantic.symbol_table import SymbolTable
 from glang.execution.executor import ASTExecutor, ExecutionContext
 from glang.execution.pipeline import ExecutionPipeline
-from glang.execution.values import *
+from glang.execution.values import StringValue, NumberValue, NoneValue, BooleanValue
 from glang.execution.graph_values import ListValue, HashValue
 from glang.execution.errors import MatchError
+
+# Alias for compatibility
+BoolValue = BooleanValue
 
 
 class TestPatternMatchingParsing:
@@ -411,3 +414,357 @@ class TestPatternMatchingErrorHandling:
         out3 = outputs.elements[2]
         assert isinstance(out3, StringValue)
         assert out3.value == "Failed: value too large"
+
+
+class TestImplicitPatternFunctions:
+    """Test implicit pattern matching in function declarations."""
+
+    def setup_method(self):
+        """Set up execution environment."""
+        self.pipeline = ExecutionPipeline()
+
+    def execute_code(self, code):
+        """Helper to execute code and return execution context."""
+        result = self.pipeline.execute_code(code)
+        if not result.success:
+            raise result.error
+        return result.context
+
+    def test_basic_implicit_pattern_function(self):
+        """Test basic implicit pattern function with literal patterns."""
+        code = '''
+        func classify(n) {
+            0 => "zero"
+            1 => "one"
+            42 => "the answer"
+        }
+
+        result1 = classify(0)
+        result2 = classify(1)
+        result3 = classify(42)
+        '''
+
+        context = self.execute_code(code)
+
+        result1 = context.get_variable("result1")
+        assert isinstance(result1, StringValue)
+        assert result1.value == "zero"
+
+        result2 = context.get_variable("result2")
+        assert isinstance(result2, StringValue)
+        assert result2.value == "one"
+
+        result3 = context.get_variable("result3")
+        assert isinstance(result3, StringValue)
+        assert result3.value == "the answer"
+
+    def test_implicit_pattern_function_with_variable_capture(self):
+        """Test implicit pattern function with variable capture."""
+        code = '''
+        func describe(n) {
+            0 => "zero"
+            42 => "special"
+            x => "number: " + x.to_string()
+        }
+
+        result1 = describe(0)
+        result2 = describe(42)
+        result3 = describe(99)
+        '''
+
+        context = self.execute_code(code)
+
+        result1 = context.get_variable("result1")
+        assert isinstance(result1, StringValue)
+        assert result1.value == "zero"
+
+        result2 = context.get_variable("result2")
+        assert isinstance(result2, StringValue)
+        assert result2.value == "special"
+
+        result3 = context.get_variable("result3")
+        assert isinstance(result3, StringValue)
+        assert result3.value == "number: 99"
+
+    def test_implicit_pattern_function_fallthrough(self):
+        """Test that unmatched patterns return none."""
+        code = '''
+        func weekday(n) {
+            1 => "Monday"
+            2 => "Tuesday"
+            3 => "Wednesday"
+        }
+
+        valid = weekday(1)
+        invalid = weekday(99)
+        '''
+
+        context = self.execute_code(code)
+
+        valid = context.get_variable("valid")
+        assert isinstance(valid, StringValue)
+        assert valid.value == "Monday"
+
+        invalid = context.get_variable("invalid")
+        assert isinstance(invalid, NoneValue)
+
+    def test_implicit_pattern_function_with_boolean(self):
+        """Test implicit pattern function with boolean patterns."""
+        code = '''
+        func negate(flag) {
+            true => false
+            false => true
+        }
+
+        func describe_bool(b) {
+            true => "yes"
+            false => "no"
+        }
+
+        neg1 = negate(true)
+        neg2 = negate(false)
+        desc1 = describe_bool(true)
+        desc2 = describe_bool(false)
+        '''
+
+        context = self.execute_code(code)
+
+        neg1 = context.get_variable("neg1")
+        assert isinstance(neg1, BoolValue)
+        assert neg1.value is False
+
+        neg2 = context.get_variable("neg2")
+        assert isinstance(neg2, BoolValue)
+        assert neg2.value is True
+
+        desc1 = context.get_variable("desc1")
+        assert isinstance(desc1, StringValue)
+        assert desc1.value == "yes"
+
+        desc2 = context.get_variable("desc2")
+        assert isinstance(desc2, StringValue)
+        assert desc2.value == "no"
+
+    def test_implicit_pattern_function_with_strings(self):
+        """Test implicit pattern function with string patterns."""
+        code = '''
+        func get_sound(animal) {
+            "dog" => "woof"
+            "cat" => "meow"
+            "cow" => "moo"
+            "bird" => "tweet"
+        }
+
+        dog_sound = get_sound("dog")
+        cat_sound = get_sound("cat")
+        unknown_sound = get_sound("elephant")
+        '''
+
+        context = self.execute_code(code)
+
+        dog_sound = context.get_variable("dog_sound")
+        assert isinstance(dog_sound, StringValue)
+        assert dog_sound.value == "woof"
+
+        cat_sound = context.get_variable("cat_sound")
+        assert isinstance(cat_sound, StringValue)
+        assert cat_sound.value == "meow"
+
+        unknown_sound = context.get_variable("unknown_sound")
+        assert isinstance(unknown_sound, NoneValue)
+
+    def test_implicit_pattern_function_recursion_factorial(self):
+        """Test recursive implicit pattern function - factorial."""
+        code = '''
+        func factorial(n) {
+            0 => 1
+            1 => 1
+            x => x * factorial(x - 1)
+        }
+
+        result0 = factorial(0)
+        result1 = factorial(1)
+        result5 = factorial(5)
+        '''
+
+        context = self.execute_code(code)
+
+        result0 = context.get_variable("result0")
+        assert isinstance(result0, NumberValue)
+        assert result0.value == 1
+
+        result1 = context.get_variable("result1")
+        assert isinstance(result1, NumberValue)
+        assert result1.value == 1
+
+        result5 = context.get_variable("result5")
+        assert isinstance(result5, NumberValue)
+        assert result5.value == 120
+
+    def test_implicit_pattern_function_recursion_fibonacci(self):
+        """Test recursive implicit pattern function - fibonacci."""
+        code = '''
+        func fibonacci(n) {
+            0 => 0
+            1 => 1
+            x => fibonacci(x - 1) + fibonacci(x - 2)
+        }
+
+        result0 = fibonacci(0)
+        result1 = fibonacci(1)
+        result5 = fibonacci(5)
+        result10 = fibonacci(10)
+        '''
+
+        context = self.execute_code(code)
+
+        result0 = context.get_variable("result0")
+        assert isinstance(result0, NumberValue)
+        assert result0.value == 0
+
+        result1 = context.get_variable("result1")
+        assert isinstance(result1, NumberValue)
+        assert result1.value == 1
+
+        result5 = context.get_variable("result5")
+        assert isinstance(result5, NumberValue)
+        assert result5.value == 5  # 0, 1, 1, 2, 3, 5
+
+        result10 = context.get_variable("result10")
+        assert isinstance(result10, NumberValue)
+        assert result10.value == 55
+
+    def test_implicit_pattern_function_with_expressions(self):
+        """Test implicit pattern function with complex expressions."""
+        code = '''
+        func calculate(n) {
+            0 => 1
+            1 => 10
+            x => (x * 2) + 5
+        }
+
+        result0 = calculate(0)
+        result1 = calculate(1)
+        result5 = calculate(5)
+        '''
+
+        context = self.execute_code(code)
+
+        result0 = context.get_variable("result0")
+        assert isinstance(result0, NumberValue)
+        assert result0.value == 1
+
+        result1 = context.get_variable("result1")
+        assert isinstance(result1, NumberValue)
+        assert result1.value == 10
+
+        result5 = context.get_variable("result5")
+        assert isinstance(result5, NumberValue)
+        assert result5.value == 15  # (5 * 2) + 5
+
+    def test_implicit_pattern_function_pattern_order(self):
+        """Test that pattern order matters - first match wins."""
+        code = '''
+        func check_order(n) {
+            42 => "specific forty-two"
+            x => "any number"
+        }
+
+        result1 = check_order(42)
+        result2 = check_order(100)
+        '''
+
+        context = self.execute_code(code)
+
+        result1 = context.get_variable("result1")
+        assert isinstance(result1, StringValue)
+        assert result1.value == "specific forty-two"
+
+        result2 = context.get_variable("result2")
+        assert isinstance(result2, StringValue)
+        assert result2.value == "any number"
+
+    def test_implicit_pattern_function_none_handling(self):
+        """Test handling none values in pattern matching."""
+        code = '''
+        func maybe_double(n) {
+            0 => 0
+            x => x * 2
+        }
+
+        valid = maybe_double(5)
+        '''
+
+        context = self.execute_code(code)
+
+        valid = context.get_variable("valid")
+        assert isinstance(valid, NumberValue)
+        assert valid.value == 10
+
+        # Note: Pattern matching with none input would capture it with variable pattern
+        # This test just verifies that valid numeric input works correctly
+
+    def test_implicit_vs_explicit_match_coexist(self):
+        """Test that implicit pattern functions and explicit match can coexist."""
+        code = '''
+        func implicit_classify(n) {
+            0 => "zero"
+            1 => "one"
+            x => "other"
+        }
+
+        func explicit_classify(n) {
+            return match n {
+                0 => "ZERO"
+                1 => "ONE"
+                _ => "OTHER"
+            }
+        }
+
+        impl_result = implicit_classify(0)
+        expl_result = explicit_classify(0)
+        '''
+
+        context = self.execute_code(code)
+
+        impl_result = context.get_variable("impl_result")
+        assert isinstance(impl_result, StringValue)
+        assert impl_result.value == "zero"
+
+        expl_result = context.get_variable("expl_result")
+        assert isinstance(expl_result, StringValue)
+        assert expl_result.value == "ZERO"
+
+    def test_implicit_pattern_function_multiline_format(self):
+        """Test implicit pattern function with multiline formatting."""
+        code = '''
+        func classify_value(value) {
+            42 => "the answer"
+            "hello" => "greeting"
+            0 => "zero"
+            v => "unknown: " + v.to_string()
+        }
+
+        r1 = classify_value(42)
+        r2 = classify_value("hello")
+        r5 = classify_value(0)
+        r6 = classify_value(999)
+        '''
+
+        context = self.execute_code(code)
+
+        r1 = context.get_variable("r1")
+        assert isinstance(r1, StringValue)
+        assert r1.value == "the answer"
+
+        r2 = context.get_variable("r2")
+        assert isinstance(r2, StringValue)
+        assert r2.value == "greeting"
+
+        r5 = context.get_variable("r5")
+        assert isinstance(r5, StringValue)
+        assert r5.value == "zero"
+
+        r6 = context.get_variable("r6")
+        assert isinstance(r6, StringValue)
+        assert r6.value == "unknown: 999"

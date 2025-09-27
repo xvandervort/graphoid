@@ -2,6 +2,10 @@
 
 *A quick reference for the Glang programming language*
 
+**For Comprehensive Guides:**
+- 📚 [Functions Guide](language_features/functions.md) - Complete function documentation
+- 🎯 [Pattern Matching Guide](language_features/pattern_matching.md) - In-depth pattern matching
+
 ## 📝 Variable Declarations
 
 ```glang
@@ -180,6 +184,8 @@ for item in items {
 ```
 
 ### Pattern Matching
+
+#### Explicit Match Expressions
 ```glang
 # Basic match expression with literal patterns
 value = 42
@@ -202,7 +208,60 @@ number = 123
 doubled = match number {
     x => x * 2  # x captures the value (123), result is 246
 }
+```
 
+#### Elegant Pattern Functions (Recommended)
+```glang
+# Function with implicit pattern matching (no 'match' keyword needed)
+func factorial(n) {
+    0 => 1
+    1 => 1
+    x => x * factorial(x - 1)
+}
+
+# Animal sounds with automatic fallthrough (returns none if no match)
+func get_sound(animal) {
+    "dog" => "woof"
+    "cat" => "meow"
+    "cow" => "moo"
+    # No explicit wildcard needed - unmatched values return none
+}
+
+print(get_sound("dog"))    # "woof"
+result = get_sound("elephant")
+if result == none {
+    print("Unknown animal sound")
+}
+
+# Number classifier
+func classify_number(n) {
+    0 => "zero"
+    1 => "one"
+    42 => "the answer"
+    x => "number: " + x.to_string()  # Variable capture
+}
+
+# Type-based processor
+func process_value(value) {
+    42 => "Special number"
+    "hello" => "Greeting"
+    true => "Boolean true"
+    false => "Boolean false"
+    x => "Other: " + x.to_string()
+}
+
+# Works seamlessly with recursion
+func fibonacci(n) {
+    0 => 0
+    1 => 1
+    x => fibonacci(x - 1) + fibonacci(x - 2)
+}
+
+print("Fibonacci 8: " + fibonacci(8).to_string())  # 21
+```
+
+#### Advanced Pattern Matching
+```glang
 # List pattern matching
 test_list = [1, 2, 3]
 result = match test_list {
@@ -221,26 +280,6 @@ message = match status {
     _ => "Unknown status"
 }
 
-# Pattern matching with complex expressions
-value = 5
-base = 10
-result = match value {
-    1 => base + 1      # 11
-    5 => base * value  # 50
-    _ => 0
-}
-
-# Nested match expressions
-outer = 1
-inner = 2
-result = match outer {
-    1 => match inner {
-        2 => "One and Two"
-        _ => "One and Other"
-    }
-    _ => "Not One"
-}
-
 # Error handling with result tuples
 func safe_divide(a, b) {
     if b == 0 {
@@ -256,6 +295,13 @@ message = match result {
     _ => "Unknown result"
 }
 ```
+
+#### Pattern Function Benefits
+- **No explicit `match` keyword** - cleaner syntax
+- **Automatic fallthrough** - unmatched patterns return `none` instead of errors
+- **Perfect for functional programming** - elegant recursive functions
+- **Variable capture** - use any identifier to bind the input value
+- **Mixed with regular functions** - can combine with explicit `match` expressions
 
 ## ⚡ Functions & Lambda Expressions
 

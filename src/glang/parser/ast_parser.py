@@ -637,35 +637,163 @@ class ASTParser:
     def parse_function_declaration(self) -> FunctionDeclaration:
         """Parse function declaration: func name(param1, param2) { body }"""
         from ..ast.nodes import FunctionDeclaration
-        
+
         func_token = self.consume(TokenType.FUNC, "Expected 'func'")
         pos = SourcePosition(func_token.line, func_token.column)
-        
+
         # Parse function name
         name_token = self.consume(TokenType.IDENTIFIER, "Expected function name")
         name = name_token.value
-        
+
         # Parse parameters: (param1, param2, ...)
         self.consume(TokenType.LPAREN, "Expected '(' after function name")
-        
+
         parameters = []
         if not self.check(TokenType.RPAREN):
             # Parse first parameter
             param_token = self.consume(TokenType.IDENTIFIER, "Expected parameter name")
             parameters.append(param_token.value)
-            
+
             # Parse additional parameters
             while self.match(TokenType.COMMA):
                 param_token = self.consume(TokenType.IDENTIFIER, "Expected parameter name")
                 parameters.append(param_token.value)
-        
+
         self.consume(TokenType.RPAREN, "Expected ')' after parameters")
-        
-        # Parse function body
-        body = self.parse_block()
-        
+
+        # Parse function body - check if it's pattern matching syntax
+        body = self.parse_function_body(parameters)
+
         return FunctionDeclaration(name=name, parameters=parameters, body=body, position=pos)
-    
+
+    def parse_function_body(self, parameters):
+        """Parse function body, detecting pattern matching syntax."""
+        from ..ast.nodes import Block, ReturnStatement, MatchExpression, MatchCase, VariableRef
+
+        # Parse opening brace
+        brace_token = self.consume(TokenType.LBRACE, "Expected '{'")
+        pos = SourcePosition(brace_token.line, brace_token.column)
+
+        # Skip leading newlines
+        while self.match(TokenType.NEWLINE):
+            pass
+
+        # Look ahead to see if this looks like pattern matching syntax
+        if self.is_pattern_function_body():
+            # Parse as pattern matching function
+            cases = []
+
+            while not self.check(TokenType.RBRACE) and not self.is_at_end():
+                # Skip newlines
+                while self.check(TokenType.NEWLINE):
+                    self.advance()
+
+                if self.check(TokenType.RBRACE):
+                    break
+
+                # Parse pattern
+                pattern = self.parse_pattern()
+
+                # Parse arrow
+                self.consume(TokenType.ARROW, "Expected '=>' after pattern")
+
+                # Parse result expression
+                expression = self.parse_expression()
+
+                # Create match case
+                case = MatchCase(pattern=pattern, expression=expression, position=pos)
+                cases.append(case)
+
+                # Optional comma between cases
+                if self.check(TokenType.COMMA):
+                    self.advance()
+
+                # Skip newlines after comma
+                while self.check(TokenType.NEWLINE):
+                    self.advance()
+
+            # Consume closing brace
+            self.consume(TokenType.RBRACE, "Expected '}' after pattern cases")
+
+            # Create match expression based on first parameter (for now, single parameter functions)
+            if len(parameters) == 1:
+                param_ref = VariableRef(name=parameters[0], position=pos)
+                match_expr = MatchExpression(value=param_ref, cases=cases, position=pos)
+                return_stmt = ReturnStatement(value=match_expr, position=pos)
+                return Block(statements=[return_stmt], position=pos)
+            else:
+                raise ParseError("Pattern matching functions currently support only single parameters", brace_token)
+        else:
+            # Parse as regular function body
+            return self.parse_block_content(pos)
+
+    def is_pattern_function_body(self):
+        """Look ahead to determine if function body uses pattern matching syntax."""
+        # Save current position
+        saved_pos = self.current
+
+        try:
+            # Skip newlines
+            while self.check(TokenType.NEWLINE):
+                self.advance()
+
+            # If we hit the closing brace immediately, it's not pattern matching
+            if self.check(TokenType.RBRACE):
+                return False
+
+            # Look for pattern => expression syntax
+            # Check for simple patterns: number, string, identifier (including _)
+            is_pattern_start = (
+                self.check(TokenType.NUMBER_LITERAL) or
+                self.check(TokenType.STRING_LITERAL) or
+                self.check(TokenType.TRUE) or
+                self.check(TokenType.FALSE) or
+                (self.check(TokenType.IDENTIFIER) and self.peek().value == "_") or
+                (self.check(TokenType.IDENTIFIER) and not self.is_keyword(self.peek().value))
+            )
+
+            if is_pattern_start:
+                # Skip the pattern token
+                self.advance()
+
+                # Skip any whitespace/newlines
+                while self.check(TokenType.NEWLINE):
+                    self.advance()
+
+                # Check for arrow token
+                if self.check(TokenType.ARROW):
+                    return True
+
+            return False
+        finally:
+            # Restore position
+            self.current = saved_pos
+
+    def is_keyword(self, value):
+        """Check if a value is a keyword that would start a statement."""
+        keywords = {'return', 'if', 'while', 'for', 'print', 'let', 'var', 'func'}
+        return value in keywords
+
+    def parse_block_content(self, pos):
+        """Parse regular block content starting from current position."""
+        from ..ast.nodes import Block
+
+        statements = []
+
+        while not self.check(TokenType.RBRACE) and not self.is_at_end():
+            # Parse statement
+            stmt = self.parse_statement()
+            statements.append(stmt)
+
+            # Skip trailing newlines and semicolons
+            while self.match(TokenType.NEWLINE, TokenType.SEMICOLON):
+                pass
+
+        # Parse closing brace
+        self.consume(TokenType.RBRACE, "Expected '}'")
+
+        return Block(statements=statements, position=pos)
+
     def parse_return_statement(self) -> ReturnStatement:
         """Parse return statement: return [expression]"""
         from ..ast.nodes import ReturnStatement

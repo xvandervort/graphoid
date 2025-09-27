@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
 from glang.ast.nodes import *
 from glang.semantic.symbol_table import SymbolTable
 from .values import *
-from .errors import RuntimeError, VariableNotFoundError, TypeConstraintError
+from .errors import RuntimeError, VariableNotFoundError, TypeConstraintError, MatchError
 from .stack_trace import get_stack_collector, create_enhanced_error_trace, push_execution_frame, pop_execution_frame, update_frame_variables
 # Graph-based ListValue and HashValue are now the primary implementations
 from .graph_values import ListValue, HashValue
@@ -5002,6 +5002,10 @@ class ASTExecutor(BaseASTVisitor):
                     return NoneValue()
                 except ReturnException as ret:
                     return ret.value if ret.value is not None else NoneValue()
+                except MatchError:
+                    # Pattern matching functions return none for fallthrough
+                    from .values import NoneValue
+                    return NoneValue()
 
             finally:
                 # Pop stack frame

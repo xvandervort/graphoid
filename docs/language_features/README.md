@@ -4,6 +4,25 @@ This directory contains comprehensive documentation for Glang's advanced languag
 
 ## Available Features
 
+### [Functions](functions.md) ✅ **NEW**
+Comprehensive guide to Glang's powerful function system including traditional declarations, lambdas, closures, and recursion.
+
+- **Function declarations** with multiple parameters
+- **Lambda expressions** for concise anonymous functions
+- **Closures** that capture surrounding scope
+- **Recursion** for self-referential algorithms
+- **Pattern matching functions** for elegant value dispatch
+- **Higher-order functions** as first-class values
+
+### [Pattern Matching](pattern_matching.md) ✅ **NEW**
+Elegant functional programming feature bringing expressive pattern-based control flow to Glang.
+
+- **Implicit pattern functions** without `match` keyword ceremony
+- **Automatic fallthrough** returning `none` for unmatched patterns
+- **Multiple pattern types** (literals, variables, lists, guards)
+- **Explicit match expressions** for complex matching needs
+- **Best practices** and common patterns
+
 ### [Precision Context Blocks](precision_blocks.md)
 Revolutionary language-level numeric precision control that allows you to specify exact decimal places for calculations within a specific scope.
 
