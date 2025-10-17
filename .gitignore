@@ -60,3 +60,5 @@ tmp/*
 logs/
 bitcoin_prices.csv
 data/*
+dev_docs/archive/*
+dev_docs/scratch/*
