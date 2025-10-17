@@ -1,0 +1,5 @@
+numbers = [1, 2, 3, 4, 5, 6]
+evens = numbers.filter(:even)
+odds = numbers.reject(:even)
+print("Evens: " + evens.to_string())
+print("Odds: " + odds.to_string())

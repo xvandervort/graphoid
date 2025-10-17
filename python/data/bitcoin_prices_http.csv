@@ -1,0 +1,2 @@
+timestamp,price_usd,source,method,quality,response_time
+2025-09-23T22:55:25Z,112146,CoinGecko API,http_module,high,< 5s
