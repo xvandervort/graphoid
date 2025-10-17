@@ -63,13 +63,151 @@ impl Lexer {
             ']' => TokenType::RightBracket,
             ',' => TokenType::Comma,
             '.' => {
-                // Check if this is a number like .5
-                if self.peek().is_ascii_digit() {
-                    self.current -= 1;
-                    self.column -= 1;
-                    return self.number();
+                // Check for element-wise operators
+                let next_ch = self.peek();
+                match next_ch {
+                    '+' => {
+                        self.advance();
+                        return Ok(Token::new(
+                            TokenType::DotPlus,
+                            ".+".to_string(),
+                            start_line,
+                            start_column,
+                        ));
+                    }
+                    '-' => {
+                        self.advance();
+                        return Ok(Token::new(
+                            TokenType::DotMinus,
+                            ".-".to_string(),
+                            start_line,
+                            start_column,
+                        ));
+                    }
+                    '*' => {
+                        self.advance();
+                        return Ok(Token::new(
+                            TokenType::DotStar,
+                            ".*".to_string(),
+                            start_line,
+                            start_column,
+                        ));
+                    }
+                    '/' => {
+                        self.advance();
+                        // Check for .//
+                        if self.peek() == '/' {
+                            self.advance();
+                            return Ok(Token::new(
+                                TokenType::DotSlashSlash,
+                                ".//".to_string(),
+                                start_line,
+                                start_column,
+                            ));
+                        }
+                        return Ok(Token::new(
+                            TokenType::DotSlash,
+                            "./".to_string(),
+                            start_line,
+                            start_column,
+                        ));
+                    }
+                    '%' => {
+                        self.advance();
+                        return Ok(Token::new(
+                            TokenType::DotPercent,
+                            ".%".to_string(),
+                            start_line,
+                            start_column,
+                        ));
+                    }
+                    '^' => {
+                        self.advance();
+                        return Ok(Token::new(
+                            TokenType::DotCaret,
+                            ".^".to_string(),
+                            start_line,
+                            start_column,
+                        ));
+                    }
+                    '=' => {
+                        self.advance();
+                        if self.peek() == '=' {
+                            self.advance();
+                            return Ok(Token::new(
+                                TokenType::DotEqualEqual,
+                                ".==".to_string(),
+                                start_line,
+                                start_column,
+                            ));
+                        }
+                        // Just .= is not valid, backtrack
+                        self.current -= 1;
+                        self.column -= 1;
+                        TokenType::Dot
+                    }
+                    '!' => {
+                        self.advance();
+                        if self.peek() == '=' {
+                            self.advance();
+                            return Ok(Token::new(
+                                TokenType::DotBangEqual,
+                                ".!=".to_string(),
+                                start_line,
+                                start_column,
+                            ));
+                        }
+                        // Just .! is not valid, backtrack
+                        self.current -= 1;
+                        self.column -= 1;
+                        TokenType::Dot
+                    }
+                    '<' => {
+                        self.advance();
+                        // Check for .<=
+                        if self.peek() == '=' {
+                            self.advance();
+                            return Ok(Token::new(
+                                TokenType::DotLessEqual,
+                                ".<=".to_string(),
+                                start_line,
+                                start_column,
+                            ));
+                        }
+                        return Ok(Token::new(
+                            TokenType::DotLess,
+                            ".<".to_string(),
+                            start_line,
+                            start_column,
+                        ));
+                    }
+                    '>' => {
+                        self.advance();
+                        // Check for .>=
+                        if self.peek() == '=' {
+                            self.advance();
+                            return Ok(Token::new(
+                                TokenType::DotGreaterEqual,
+                                ".>=".to_string(),
+                                start_line,
+                                start_column,
+                            ));
+                        }
+                        return Ok(Token::new(
+                            TokenType::DotGreater,
+                            ".>".to_string(),
+                            start_line,
+                            start_column,
+                        ));
+                    }
+                    // Check if this is a number like .5
+                    _ if next_ch.is_ascii_digit() => {
+                        self.current -= 1;
+                        self.column -= 1;
+                        return self.number();
+                    }
+                    _ => TokenType::Dot
                 }
-                TokenType::Dot
             }
             ':' => {
                 // Could be : or :symbol
@@ -103,14 +241,8 @@ impl Lexer {
                 } else if self.match_char('~') {
                     TokenType::RegexNoMatch
                 } else {
-                    return Err(GraphoidError::SyntaxError {
-                        message: format!("Unexpected character: {}", ch),
-                        position: SourcePosition {
-                            line: start_line,
-                            column: start_column,
-                            file: None,
-                        },
-                    });
+                    // Standalone ! for mutation operators (e.g., sort!())
+                    TokenType::Bang
                 }
             }
             '<' => {
@@ -142,21 +274,32 @@ impl Lexer {
                 }
             }
 
-            // Division or comment
+            // Division and integer division
             '/' => {
                 if self.peek() == '/' {
-                    // Single-line comment
-                    self.skip_line_comment();
-                    self.skip_whitespace_except_newline();
-                    return self.next_token();
+                    // Integer division //
+                    self.advance();
+                    return Ok(Token::new(
+                        TokenType::SlashSlash,
+                        "//".to_string(),
+                        start_line,
+                        start_column,
+                    ));
                 } else if self.peek() == '*' {
-                    // Multi-line comment
+                    // Multi-line comment /* */
                     self.skip_block_comment()?;
                     self.skip_whitespace_except_newline();
                     return self.next_token();
                 } else {
                     TokenType::Slash
                 }
+            }
+
+            // Single-line comments
+            '#' => {
+                self.skip_line_comment();
+                self.skip_whitespace_except_newline();
+                return self.next_token();
             }
 
             // Strings
@@ -258,9 +401,7 @@ impl Lexer {
     }
 
     fn skip_line_comment(&mut self) {
-        // Skip the second /
-        self.advance();
-
+        // Skip until newline (# has already been consumed)
         while !self.is_at_end() && self.peek() != '\n' {
             self.advance();
         }
@@ -407,7 +548,9 @@ impl Lexer {
             // Keywords
             "func" => TokenType::Func,
             "if" => TokenType::If,
+            "then" => TokenType::Then,
             "else" => TokenType::Else,
+            "unless" => TokenType::Unless,
             "while" => TokenType::While,
             "for" => TokenType::For,
             "in" => TokenType::In,

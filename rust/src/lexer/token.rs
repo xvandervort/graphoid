@@ -15,7 +15,9 @@ pub enum TokenType {
     Identifier(String),
     Func,
     If,
+    Then,
     Else,
+    Unless,
     While,
     For,
     In,
@@ -56,10 +58,12 @@ pub enum TokenType {
     Minus,
     Star,
     Slash,
+    SlashSlash,      // // (integer division)
     Percent,
     Caret,
     Equal,
     EqualEqual,
+    Bang,            // ! (for mutation operators like sort!())
     BangEqual,
     Less,
     LessEqual,
@@ -72,6 +76,21 @@ pub enum TokenType {
     Pipe,            // |
     AmpersandAmpersand, // &&
     PipePipe,        // ||
+
+    // Element-wise operators (dot-prefix)
+    DotPlus,         // .+
+    DotMinus,        // .-
+    DotStar,         // .*
+    DotSlash,        // ./
+    DotSlashSlash,   // .//
+    DotPercent,      // .%
+    DotCaret,        // .^
+    DotEqualEqual,   // .==
+    DotBangEqual,    // .!=
+    DotLess,         // .<
+    DotLessEqual,    // .<=
+    DotGreater,      // .>
+    DotGreaterEqual, // .>=
 
     // Delimiters
     LeftParen,
