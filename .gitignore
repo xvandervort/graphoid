@@ -46,6 +46,11 @@ MANIFEST
 .dmypy.json
 dmypy.json
 
+# Rust
+rust/target/
+**/*.rs.bk
+*.pdb
+
 # Claude
 .claude/
 .coverage

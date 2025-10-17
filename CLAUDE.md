@@ -2,793 +2,564 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
 ## Project Overview
 
-**Glang** is a general-purpose programming language with revolutionary graph-theoretic features, designed to be both practically useful and conceptually powerful.
-
-### Current Vision (Updated January 2025)
-Glang aims to be:
-1. **A Practical Language First** - Complete with I/O, networking, databases, and standard library
-2. **Then a Graph Language** - With true graph structures including nodes, edges, and traversal
-3. **Finally a Revolutionary Platform** - Enabling self-aware, self-mutating, distributed graph systems
-
-### Core Architecture
-- **Graph-Based Function Discovery** - Functions stored as nodes, calls use graph traversal
-- **Method-Based Collections** - Everything uses methods: `list.append()`, `string.upper()`, `num.abs()`
-- **Optional Type System** - Types when needed, inference when obvious
-- **Behavior-Driven Data** - Collections with automatic value transformations
-
-### Design Principles:
-- **Practical First** - Must be useful for real-world applications before adding advanced features
-- **Graph-Theoretic Foundation** - All data will eventually be conceptualized as graphs with nodes and edges
-- **Self-Aware Data Structures** - Future: Collections that understand their own structure and relationships
-- **Intuitive Syntax** - Natural programming constructs that feel familiar
-- **Developer Experience** - Excellent error messages, REPL environment, and reflection capabilities
-- **KISS Principle** - Keep It Simple, Stupid! Glang despises unnecessary verbiage and redundant syntax
+**Graphoid** is a revolutionary graph-theoretic programming language where **everything is a graph**. Unlike traditional languages that bolt graphs onto the side, Graphoid makes graphs the fundamental abstraction at every level: data structures, variable storage, and even the runtime environment itself.
 
 ### Current Status (January 2025)
-**BREAKTHROUGH COMPLETE**: Glang now has true graph-based function discovery system. Functions are stored as graph nodes and calls use graph traversal instead of variable lookup. This transforms Glang from a simulated graph language to a genuinely graph-theoretic programming platform.
 
-## Current Development Focus
+**FRESH START - RUST IMPLEMENTATION UNDERWAY**
 
-### Next Priorities
-1. **Tree & Graph Data Structures** - Enable pure Glang DOM/XML processing
-2. **Statistics Module** - Mathematical capabilities for data analysis
-3. **Testing Framework** - Quality assurance beyond basic assertions
-4. **Rust Migration Planning** - Parallel development strategy
+The project is undergoing a **clean-slate Rust implementation** to build a production-ready, high-performance language from the ground up.
 
-### Recent Achievements
-See [COMPLETED_MILESTONES.md](dev_docs/COMPLETED_MILESTONES.md) for detailed development history including:
-- True graph-based function discovery system
-- 80% self-hosting (network/HTML processing mostly pure Glang)
-- SQL query builder module
-- String processing enhancements
+- ✅ **Phase 0 Complete** - Project structure, dependencies, error types, CLI/REPL skeleton
+- 🔜 **Phase 1 Starting** - Lexer (tokenization) implementation
+- 📋 **14-Phase Roadmap** - Complete path to production-ready language with professional tooling
+- 📚 **Comprehensive Specifications** - Language spec, architecture design, production tooling all documented
+
+**Python Implementation**: The Python implementation in `python/` serves as a **reference prototype** demonstrating language concepts. The Rust implementation in `rust/` is the **production target**.
+
+---
+
+## Core Philosophy: Everything is a Graph
+
+Graphoid is built on three levels of graph abstraction:
+
+### Level 1: Data Structures as Graphs
+- A list `[1, 2, 3]` is internally `Node(1) → Node(2) → Node(3)`
+- Trees are graphs with hierarchical constraints
+- Maps are graphs with key→value edges
+- No artificial boundary between "graph" and "non-graph" data
+
+### Level 2: Variable Storage as Graphs (Meta-Graph)
+- Variables are nodes in a meta-graph
+- Variable assignment creates edges between name nodes and value nodes
+- The namespace itself IS a graph that can be inspected and manipulated
+
+### Level 3: Runtime Environment as Graphs
+- Function calls use graph traversal
+- Functions are nodes in a call graph
+- Modules are subgraphs with import/export edges
+
+---
+
+## Design Principles
+
+- **KISS Principle** - Keep It Simple, Stupid! Graphoid despises unnecessary verbiage
+- **Practical First** - Must be useful for real-world applications
+- **Graph-Theoretic Foundation** - Graphs are fundamental, not bolted-on
+- **Self-Aware Data Structures** - Collections understand their own structure
+- **Developer Experience** - Excellent error messages, rich tooling, great docs
+- **Behavior-Driven Testing** - RSpec-style testing built into the language
+- **No Semantic Markers** - All code fully implemented with real enforcement
+- **No Method Proliferation** - One method with parameters beats many similar methods
+- **Dogfooding** - Use Graphoid extensively to validate its expressiveness
+
+---
 
 ## Repository Structure
 
-- `src/glang/` - Main language package
-  - `ast/` - Abstract syntax tree nodes and visitor pattern
-  - `lexer/` - Modern tokenizer for language lexing
-  - `parser/` - AST parser for building typed syntax trees
-  - `semantic/` - Semantic analysis and type checking
-  - `execution/` - AST execution engine with type-safe runtime
-  - `files/` - File loading/saving system for .gr programs
-  - `repl/` - Modern REPL implementation
-  - `cli.py` - Command-line interface
-- `test/` - Comprehensive test suite (230+ tests with growing coverage)
-- `stdlib/` - Standard library modules written in Glang
-- `samples/` - Example programs and demonstrations
-- `docs/` - **User-facing documentation ONLY** (language cheat sheet, module references)
-- `dev_docs/` - Internal development documents: design, planning, architecture (NOT for users)
+```
+/home/irv/work/grang/
+├── CLAUDE.md                    # This file - guidance for Claude Code
+├── README.md                    # Project readme
+├── rust/                        # 🎯 ACTIVE DEVELOPMENT - Rust implementation
+│   ├── src/                     # Source code
+│   │   ├── lib.rs               # Library root
+│   │   ├── main.rs              # CLI & REPL
+│   │   ├── error.rs             # Error types (complete)
+│   │   ├── lexer/               # Tokenization (Phase 1 - next)
+│   │   ├── parser/              # AST parsing (Phase 2)
+│   │   ├── ast/                 # Syntax tree nodes (Phase 2)
+│   │   ├── execution/           # Execution engine (Phase 3)
+│   │   ├── values/              # Value system (Phase 3)
+│   │   └── graph/               # Graph types & rules (Phase 6)
+│   ├── tests/                   # Rust tests
+│   │   ├── unit/                # Unit tests
+│   │   └── integration/         # Integration tests
+│   ├── benches/                 # Performance benchmarks
+│   ├── examples/                # Example programs
+│   ├── Cargo.toml               # Rust dependencies
+│   └── README.md                # Rust-specific readme
+├── python/                      # Python prototype (reference only)
+│   ├── src/glang/               # Python implementation
+│   ├── test/                    # Python tests
+│   ├── stdlib/                  # Standard library in .gr files
+│   └── samples/                 # Example .gr programs
+├── dev_docs/                    # 📋 DEVELOPMENT DOCUMENTATION
+│   ├── LANGUAGE_SPECIFICATION.md           # Canonical language spec
+│   ├── RUST_IMPLEMENTATION_ROADMAP.md      # 14-phase implementation plan
+│   ├── ARCHITECTURE_DESIGN.md              # Internal architecture decisions
+│   ├── PRODUCTION_TOOLING_SPECIFICATION.md # Testing, debugging, packaging
+│   ├── PRODUCTION_TOOLING_SUMMARY.md       # Tooling executive summary
+│   └── TESTING_FRAMEWORK_COMPARISON.md     # RSpec-style vs traditional
+└── docs/                        # 📖 USER DOCUMENTATION (future)
+```
 
 ### Documentation Organization Rules
-**IMPORTANT**: NEVER place documentation files (.md) in the root directory!
-- Root directory: Only README.md and CLAUDE.md belong here
-- User documentation: Always goes in `docs/`
-- Development/design docs: Always goes in `dev_docs/`
 
-## Development Setup
+**CRITICAL**: NEVER place documentation files (.md) in the root directory!
 
-This project uses a Python virtual environment. Make sure it's activated before running commands:
+- **Root directory**: Only README.md and CLAUDE.md belong here
+- **User documentation**: Always goes in `docs/` (user-facing guides, tutorials, API references)
+- **Development docs**: Always goes in `dev_docs/` (architecture, design decisions, roadmaps)
+
+---
+
+## Current Development: Rust Implementation
+
+### Where We Are Now
+
+**Phase 0: ✅ COMPLETE** (January 2025)
+- Rust project structure created
+- All dependencies configured (thiserror, regex, chrono, serde, crypto, etc.)
+- Error types with source position tracking
+- CLI and REPL skeleton functional
+- `cargo build` and `cargo test` working
+
+**Phase 1: 🔜 STARTING NEXT** - Lexer (Tokenization)
+- Define all token types
+- Implement tokenizer with position tracking
+- Handle comments, strings, numbers, symbols, regex literals
+- Write 20+ tests
+
+### Development Commands
 
 ```bash
-# Activate virtual environment (if not already activated)
-source .venv/bin/activate  # On Linux/Mac
-# or
-.venv\Scripts\activate     # On Windows
+# Rust implementation (ACTIVE)
+cd rust
 
-# Install glang package in development mode (required for running glang programs)
-pip install -e ".[dev]"
-```
-
-## Development Commands
-
-```bash
-# Run the REPL (with full navigation: ↑/↓ history, tab completion)
-python -m glang.repl
-# or after installation:
-glang
-
-# Execute a .gr file directly
-python -m glang.cli path/to/file.gr
-
-# Quick demo (scripted)
-echo -e "string name = \"Alice\"\\nname\\n/namespace\\n/exit" | glang
+# Build
+~/.cargo/bin/cargo build
 
 # Run tests
+~/.cargo/bin/cargo test --lib
+
+# Run REPL
+~/.cargo/bin/cargo run
+
+# Execute a .gr file
+~/.cargo/bin/cargo run -- path/to/file.gr
+
+# Run with release optimizations
+~/.cargo/bin/cargo build --release
+```
+
+### Python Reference Implementation
+
+```bash
+# Python prototype (reference only)
+cd python
+
+# Activate virtual environment
+source ../.venv/bin/activate
+
+# Run Python REPL
+python -m glang.repl
+
+# Execute a .gr file
+python -m glang.cli samples/demo.gr
+
+# Run Python tests
 pytest test/
-
-# Install in development mode with all dependencies
-pip install -e ".[dev]"
-
-# Code formatting
-black src/ test/
-
-# Type checking
-mypy src/
-
-# Demonstrate the language
-echo -e "string greeting = \"Hello World\"\nlist items = [1, 2, 3]\ndata user = { \"name\": \"Alice\" }\nmap config = { \"host\": \"localhost\", \"port\": 8080 }\nitems.append(4)\nconfig[\"debug\"] = true\n/namespace\n/exit" | glang
 ```
 
-## REPL Commands
+---
 
-### Basic Commands
-- `/help` or `/h` - Show help information
-- `/version` or `/ver` - Show version information  
-- `/exit` or `/x` - Exit the REPL
+## Key Language Features
 
-### File Operations
-- `/load <file>` - Load and execute a .gr file
-- `/save <file>` - Save current session to .gr file
-- `/run <file>` - Run .gr file in fresh session
+### RSpec-Style Testing (Built-In!)
 
-### Session Management
-- `/namespace` or `/ns` - Show all current variables
-- `/stats` - Show session statistics
-- `/clear` - Clear all variables
+Graphoid includes a **behavior-driven testing framework** inspired by RSpec:
 
-## Language Syntax
+```graphoid
+# In calculator.spec.gr
+import "spec"
 
-### Variable Declarations
-```glang
-# Optional type declarations (types can be omitted when obvious)
-name = "Alice"         # Infers string type from string literal
-age = 25               # Infers num type from numeric literal
-active = true          # Infers bool type from boolean literal
-items = [1, 2, 3]      # Infers list type from list literal
+describe "Calculator" {
+    describe "add" {
+        it "adds two positive numbers" {
+            result = calculator.add(2, 3)
+            expect(result).to_equal(5)
+        }
 
-# Explicit types when needed (for clarity or constraints)
-string username = "Bob"
-num max_age = 100
-bool is_valid = false
-
-# Type-constrained lists (explicit type required for constraints)
-list<num> scores = [95, 87, 92]
-list<string> names = ["alice", "bob", "charlie"]
-list<bool> flags = [true, false, true]
-
-# Binary trees (type inferred from usage or explicit constraints)
-my_tree = tree{}                   # Infers tree type from literal
-tree<num> numbers = tree{}         # Explicit constraint for homogeneous trees
-tree<string> words = tree{}        # String-only binary search tree
-
-# Data nodes (type inferred from literal)
-user = { "name": "Alice" }           # Infers data type
-data<num> score = { "final": 95 }    # Explicit constraint
-
-# Maps (type inferred from literal)
-config = { "host": "localhost", "port": 8080, "debug": true }  # Infers map type
-map<string> settings = { "theme": "dark", "lang": "en" }       # Explicit constraint
-```
-
-### Advanced Operations
-```glang
-# Index access
-items[0]           # Get first element from list
-items[-1]          # Get last element (if supported)
-config["host"]     # Get data node from map: { "host": "localhost" }
-
-# Index assignment  
-items[0] = 99      # Set first element in list
-scores[1] = 100    # Update element
-config["port"] = 9000  # Create/update data node in map
-
-# Method calls
-items.append(4)    # Add element to list
-names.append("dave") # Type-checked append
-config.get("host") # Get data node: { "host": "localhost" }
-config.has_key("debug")  # Check if key exists: true/false
-config.count_values("localhost")  # Count occurrences: 1
-
-# Zero-argument methods: parentheses are optional
-size = items.size()    # With parentheses  
-size = items.size      # Without parentheses (property-like access)
-
-# Data node operations
-user.key()         # Get key: "name"
-user.value()       # Get value: "Alice"
-
-# List generator methods
-nums = []
-sequence = nums.generate(1, 10, 2)    # [1, 3, 5, 7, 9]
-count = nums.upto(5)                  # [0, 1, 2, 3, 4, 5]
-squares = nums.from_function(4, x => x * x)  # [0, 1, 4, 9]
-
-# Functional programming operations (new!)
-numbers = [1, 2, 3, 4, 5]
-numbers.map("double")        # [2, 4, 6, 8, 10]
-numbers.filter("even")       # [2, 4]
-numbers.filter("positive")   # [1, 2, 3, 4, 5]
-numbers.select("odd")        # [1, 3, 5] (alias for filter)
-numbers.reject("even")       # [1, 3, 5] (opposite of filter)
-
-# String transformations
-names = ["alice", "bob"]
-names.map("upper")           # ["ALICE", "BOB"]
-names.map("lower")           # ["alice", "bob"]
-
-# Type conversions
-nums = [1, 2, 3]
-nums.map("to_string")        # ["1", "2", "3"]
-strings = ["1", "2", "3"]
-strings.map("to_num")        # [1, 2, 3]
-
-# Chaining operations
-numbers.filter("positive").map("double").filter("even")
-names.map("upper").each("print")  # Print each uppercase name
-```
-
-#### Available Transformations for map()
-**Numeric:** `double`, `square`, `negate`, `increment`/`inc`, `decrement`/`dec`  
-**String:** `upper`/`up`, `lower`/`down`, `trim`, `reverse`  
-**Type Conversion:** `to_string`/`str`, `to_num`/`num`, `to_bool`/`bool`
-
-#### Available Predicates for filter()
-**Numeric:** `positive`/`pos`, `negative`/`neg`, `zero`, `even`, `odd`  
-**String/Collection:** `empty`, `non_empty`, `uppercase`, `lowercase`, `alphabetic`/`alpha`, `numeric`/`digit`  
-**Type Checks:** `is_string`/`string`, `is_number`/`number`, `is_bool`/`boolean`, `is_list`/`list`  
-**General:** `truthy`, `falsy`
-
-### Enhanced String Methods - Unified Interface
-
-Glang provides powerful string processing methods with a clean, unified interface that eliminates the need for regular expressions in most cases:
-
-```glang
-text = "Hello World 123! Contact support@example.com or call 555-1234"
-
-# Basic string checks
-text.starts_with("Hello")                   # Check if text starts with prefix: true
-text.ends_with("1234")                      # Check if text ends with suffix: true
-
-# Unified contains() method - single method with mode parameter
-text.contains("any", "digits")              # Check if text contains any digits: true
-text.contains("all", "letters", "digits")   # Check if text has both letters and digits: true  
-text.contains("only", "letters", "spaces")  # Check if text contains only letters and spaces: false
-text.contains("World")                       # Backward compatibility: substring search: true
-
-# Unified extract() method - single method with pattern parameter
-numbers = text.extract("numbers")           # Extract all numbers: ["123", "555", "1234"]
-words = text.extract("words")               # Extract all words: ["Hello", "World", "Contact", ...]
-emails = text.extract("emails")             # Extract email addresses: ["support@example.com"]
-
-# Unified count() method - single method with pattern parameter  
-digit_count = text.count("digits")          # Count digits in text: 10
-word_count = text.count("words")            # Count words in text: 8
-at_count = text.count_chars("@")            # Count specific characters: 1
-
-# Find first occurrence
-first_digit_pos = text.find_first("digits") # Position of first digit: 12
-first_space_pos = text.find_first_char(" ") # Position of first space: 5
-
-# Simple validation methods
-email = "user@example.com"
-email.is_email()                            # true - valid email format
-"123.45".is_number()                        # true - valid number
-"https://example.com".is_url()              # true - valid URL
-
-# Enhanced splitting
-mixed = "apple,banana;orange|grape"
-fruits = mixed.split_on_any(",;|")          # ["apple", "banana", "orange", "grape"]
-```
-
-#### Pattern Types Supported
-**Character Types:** `digits`/`numbers`, `letters`, `uppercase`, `lowercase`, `spaces`/`whitespace`, `punctuation`, `symbols`, `alphanumeric`  
-**Content Types:** `words`, `emails` (for extraction)
-
-#### Key Benefits
-1. **No Regex Required:** Handle 90% of string processing without learning regular expressions
-2. **Unified Interface:** Learn `method(mode, pattern...)` instead of dozens of method names  
-3. **Semantic & Readable:** `text.contains("any", "digits")` is clearer than regex patterns
-4. **Backward Compatible:** Old `contains("substring")` still works alongside new interface
-5. **Extensible:** New patterns can be added without creating new methods
-
-### Functions and Lambdas
-
-```glang
-# Function declarations
-func greet(name) {
-    return "Hello, " + name + "!"
-}
-
-func add(x, y) {
-    return x + y
-}
-
-# Function calls
-message = greet("World")      # "Hello, World!"
-result = add(15, 27)          # 42
-
-# Lambda expressions
-double = x => x * 2
-multiply = (x, y) => x * y
-
-# Using lambdas
-result = double(5)            # 10
-product = multiply(7, 8)      # 56
-
-# Recursive functions
-func fibonacci(n) {
-    if n <= 1 {
-        return n
-    }
-    return fibonacci(n - 1) + fibonacci(n - 2)
-}
-```
-
-### Intrinsic Behavior System (NEW!)
-
-Glang provides a powerful **intrinsic behavior system** where data structures (lists, maps, and future graphs) can have behaviors attached that automatically apply to all values during operations:
-
-```glang
-# Create a list with automatic nil handling
-temperatures = [98.6, nil, 102.5]
-temperatures.add_rule("nil_to_zero")        # Attach behavior to the list itself
-
-# The nil is immediately transformed to 0
-print(temperatures)                         # [98.6, 0, 102.5]
-
-# All future nils are automatically transformed
-temperatures.append(nil)                    # Becomes 0 automatically
-print(temperatures)                         # [98.6, 0, 102.5, 0]
-
-# Add range validation behavior
-temperatures.add_rule("validate_range", 95, 105)  # Clamp to normal body temp
-
-# Existing and new values are clamped
-temperatures.append(110)                    # Automatically clamped to 105
-print(temperatures)                         # [98.6, 0, 102.5, 0, 105]
-
-# Symbol syntax (coming soon with parser support)
-temperatures.add_rule(:positive)            # Cleaner syntax with symbols
-
-# Query and manage behaviors
-temperatures.has_rule("nil_to_zero")        # true
-temperatures.get_rules()                     # ["nil_to_zero", "positive", "validate_range"]
-temperatures.remove_rule("positive")        # Remove specific behavior
-temperatures.clear_rules()                   # Remove all behaviors
-
-# Generic mapping behaviors - map any value to any other value
-color_map = { "red": 1, "green": 2, "blue": 3 }
-colors = ["red", "blue", "purple", "green"]
-colors.add_mapping_rule(color_map)          # Maps colors using the hash graph
-print(colors)                                # [1, 3, "purple", 2]
-
-# Mapping with default value for unmapped keys
-colors.add_mapping_rule(color_map, 0)       # Unmapped colors become 0
-print(colors)                                # [1, 3, 0, 2]
-
-# Employee to department mapping
-dept_map = { "walter": "HR", "james": "IT", "emily": "Admin" }
-employees = ["walter", "unknown", "james"]
-employees.add_mapping_rule(dept_map, "Unknown")  # Default for unmapped names
-print(employees)                             # ["HR", "Unknown", "IT"]
-```
-
-#### Map Behaviors
-```glang
-# Behaviors work on maps too
-config = { "timeout": nil, "retries": -5, "port": 9999 }
-config.add_rule("nil_to_zero")              # nil values become 0
-config.add_rule("positive")                 # negative values become positive
-config.add_rule("validate_range", 1, 9000)  # clamp port numbers
-
-print(config["timeout"])                    # 0 (was nil)
-print(config["retries"])                    # 5 (was -5)
-print(config["port"])                        # 9000 (was 9999, clamped)
-
-# New values are automatically processed
-config["max_connections"] = nil             # Becomes 0
-config["min_threads"] = -10                 # Becomes 10 (positive), then clamped to 10
-```
-
-#### Standard Behaviors
-- **none_to_zero** - Convert none to 0
-- **none_to_empty** - Convert none to empty string
-- **validate_range(min, max)** - Clamp numbers to range
-- **map_colors** - Map color names to numbers (deprecated - use add_mapping_rule instead)
-- **uppercase/lowercase** - String case conversion
-- **round_to_int** - Round numbers to integers
-- **positive** - Ensure numbers are positive
-
-#### Generic Mapping (NEW!)
-Create custom value mappings using hash graphs - replaces hardcoded behaviors like `map_colors`:
-
-```glang
-# Define your own mappings as hash graphs
-status_map = { "active": 1, "inactive": 0, "pending": 2 }
-user_statuses = ["active", "unknown", "inactive"]
-user_statuses.add_mapping_rule(status_map, -1)  # Default -1 for unmapped
-print(user_statuses)                             # [1, -1, 0]
-
-# Chain mappings for multi-stage transformations
-codes = ["a", "b", "c"]
-first_map = { "a": "alpha", "b": "beta", "c": "gamma" }
-second_map = { "alpha": 1, "beta": 2, "gamma": 3 }
-codes.add_mapping_rule(first_map)
-codes.add_mapping_rule(second_map)
-print(codes)                                     # [1, 2, 3]
-```
-
-#### Key Benefits
-- **Intrinsic to Data**: Behaviors are part of the container, not external processors
-- **Automatic Application**: Once attached, behaviors apply to all current and future values
-- **One-Step Process**: `list.add_rule("none_to_zero")` - that's it!
-- **Type-Safe**: Behaviors respect and work with type constraints
-- **Composable**: Multiple behaviors apply in order
-- **Graph Foundation**: Since lists and maps are graph structures, behaviors are inherited by all graph types
-- **User-Defined Mappings**: Create any mapping with `add_mapping_rule()` using hash graphs
-
-#### Future: Custom Behaviors
-```glang
-# Future syntax for custom behaviors (not yet implemented)
-func normalize_temperature(value) {
-    if value < 95 { return 95 }
-    if value > 105 { return 105 }
-    return value
-}
-
-temperatures.add_rule(:normalize_temperature)  # Use custom function as behavior
-```
-
-### Control Flow
-
-```glang
-# If statements
-if condition {
-    # execute when true
-}
-
-# If-else statements
-if condition {
-    # execute when true
-} else {
-    # execute when false
-}
-
-# Logical operators (NEW!)
-if a and b {          # Both must be true
-    # execute when both true
-}
-
-if a or b {           # Either can be true
-    # execute when at least one true
-}
-
-# Operator synonyms also supported
-if a && b {           # Same as 'and'
-    # && is synonym for 'and'
-}
-
-if a || b {           # Same as 'or'
-    # || is synonym for 'or'
-}
-
-# Truthiness rules for logical operators:
-# - Booleans: true/false
-# - Numbers: 0 is false, non-zero is true
-# - Strings: empty string is false, non-empty is true
-# - Lists: empty list is false, non-empty is true
-# - Maps: empty map is false, non-empty is true
-
-# KNOWN LIMITATION: Complex chained expressions need parentheses
-# This will be fixed in the next language update
-if (a == 1) or (b == 2) {     # Recommended: use parentheses for now
-    # Complex expressions need explicit grouping
-}
-
-# Precision context blocks - Decimal Places Control (NEW!)
-precision 0 {
-    # Integer arithmetic - no decimal points
-    pi = 3.14159265358979323846  # Result: 3 (integer)
-    area = pi * 10 * 10          # Result: 300 (integer)
-}
-
-precision 2 {
-    # Financial calculations with 2 decimal places  
-    price = 19.99
-    tax = price * 0.085          # Result: 1.70 (exactly 2 decimal places)
-    total = price + tax          # Result: 21.69 (exactly 2 decimal places)
-}
-
-precision 5 {
-    # Scientific calculations with 5 decimal places
-    pi = 3.14159265358979323846  # Result: 3.14159 (5 decimal places)
-    circumference = 2 * pi * 10  # Result: 62.83180 (5 decimal places)
-}
-
-# Nested precision contexts
-precision 3 {
-    outer_value = 22.0 / 7.0     # Result: 3.143 (3 decimal places)
-
-    precision 1 {
-        inner_value = 22.0 / 7.0 # Result: 3.1 (1 decimal place)
+        it "handles negative numbers" {
+            expect(calculator.add(-2, -3)).to_equal(-5)
+        }
     }
 
-    back_value = 22.0 / 7.0      # Result: 3.143 (3 decimal places restored)
-}
-
-# Configuration blocks - Behavior Control (NEW!)
-# File-level configuration (applies to entire file)
-configure { skip_none: false, decimal_places: 2 }
-
-# Block-level configuration with explicit behavior control
-configure { skip_none: true } {
-    # All operations in this block skip none values
-    data = [1, 2, none, 4]
-    result = data.mean()         # Result: 2.33 (none skipped)
-}
-
-configure { strict_types: true } {
-    # No implicit type conversions allowed
-    # result = "5" + 3           # Error: cannot add string and number
-}
-
-# Multiple configuration settings
-configure {
-    skip_none: false,            # Error on none values
-    decimal_places: 2,           # Exactly 2 decimal places
-    strict_types: true           # No implicit conversions
-} {
-    # All operations use these explicit behaviors
-    financial_calculation = 19.99 * 0.085  # Result: 1.70 (exactly)
-}
-
-# While loops
-while condition {
-    # loop body
-}
-
-# For-in loops
-for item in items {
-    # process each item
-}
-
-# Break and continue
-for item in items {
-    if item == 5 {
-        break      # exit loop
-    }
-    if item % 2 == 0 {
-        continue   # skip to next iteration
-    }
-    print(item)
-}
-
-# Nested control structures
-for row in matrix {
-    for item in row {
-        if item > threshold {
-            result.append(item)
+    context "when dividing by zero" {
+        it "raises an error" {
+            expect(func() {
+                calculator.divide(10, 0)
+            }).to_raise("RuntimeError")
         }
     }
 }
-
-# Control flow with functional operations
-if numbers.filter("even").size() > 0 {
-    processed = numbers.map("double")
-} else {
-    processed = numbers.map("negate")
-}
 ```
 
-### Time Module
-```glang
-# Import the time module
-import "time"
+**Command**: `graphoid spec` (once implemented)
 
-# Create time values
-current = time.now()                            # Current time
-today = time.today()                           # Start of today (00:00:00 UTC)
-birthday = time.from_components(1990, 12, 25) # Date only (midnight UTC)
-meeting = time.from_components(2025, 1, 15, 14, 30, 0) # Full date and time
-parsed = time.from_string("2025-01-15T14:30:00") # Parse ISO format
+**Features**:
+- Natural language expectations: `expect().to_equal()`, `expect().to_be_truthy()`
+- Hierarchical organization: `describe`, `context`, `it`
+- Hooks: `before_all`, `after_all`, `before_each`, `after_each`
+- Shared examples: `it_behaves_like "a collection"`
+- Table-driven tests with `where` blocks
+- Mocking and stubbing
 
-# Work with time values
-print("Current: " + current.to_string())      # ISO format: "2025-01-15T14:30:00Z"  
-print("Type: " + current.get_type())          # "time"
+See `dev_docs/PRODUCTION_TOOLING_SPECIFICATION.md` for complete details.
 
-# Method calls work with or without parentheses (for zero-argument methods)
-iso_format = current.to_string()              # With parentheses
-iso_format = current.to_string                # Without parentheses (more elegant)
-type_name = current.get_type                  # Property-like access
+### Graph-Based Collections
 
-# Type casting - time values can be cast to/from numbers and strings
-timestamp = current.to_num()                  # Convert to Unix timestamp (number)
-time_from_num = timestamp.to_time()           # Convert number back to time
-time_from_str = "2025-01-15T14:30:00".to_time() # Parse string to time
+```graphoid
+# Lists are linked graphs
+items = [1, 2, 3]
+items.append(4)
 
-# All casting maintains round-trip consistency
-original_str = current.to_string()
-round_trip = current.to_num().to_time().to_string()
-print("Consistent: " + (original_str == round_trip).to_string()) # "true"
+# Maps are hash graphs
+config = {"host": "localhost", "port": 8080}
+config["debug"] = true
+
+# Trees are constrained graphs
+numbers = tree{}
+numbers.insert(5)
+numbers.insert(3)
+numbers.insert(7)
+
+# Graphs are... graphs!
+my_graph = graph { type: :dag }
+my_graph.add_node("A", 100)
+my_graph.add_edge("A", "B", "depends_on")
 ```
 
-### File Operations
+### Intrinsic Behavior System
 
-#### File Loading
-```glang
-# Load another .gr file (language-level)
-load "config.gr"     # Variables from config.gr are now available
+Data structures can have behaviors that automatically transform values:
 
-# Example config.gr:
-# debug = true
-# max_items = 100
+```graphoid
+# Automatic nil handling
+temperatures = [98.6, none, 102.5]
+temperatures.add_rule("none_to_zero")
+print(temperatures)  # [98.6, 0, 102.5]
 
-# After loading, use variables directly:
-if debug {
-    print("Debug mode enabled")
-}
+# Range validation
+temperatures.add_rule("validate_range", 95, 105)
+temperatures.append(110)  # Automatically clamped to 105
+
+# Custom mappings
+color_map = {"red": 1, "green": 2, "blue": 3}
+colors = ["red", "blue", "purple"]
+colors.add_mapping_rule(color_map, 0)  # Default 0 for unmapped
+print(colors)  # [1, 3, 0]
 ```
 
-#### File Handle I/O
-```glang
-import "io"
+### Functional Programming
 
-# Read capabilities - auto-close on EOF
-read_handle = io.open("data.txt", "r")
-content = read_handle.read()        # Reads all content, auto-closes
-# read_handle.read()                # Error: capability exhausted
+```graphoid
+numbers = [1, 2, 3, 4, 5]
 
-# Write capabilities - manual control  
-write_handle = io.open("output.txt", "w")
-write_handle.write("Line 1\n")
-write_handle.write("Line 2\n") 
-write_handle.close()                # Must manually close
+# Named transformations
+numbers.map("double")          # [2, 4, 6, 8, 10]
+numbers.map("square")          # [1, 4, 9, 16, 25]
 
-# Incremental processing
-input = io.open("large_file.txt", "r")
-output = io.open("processed.txt", "w")
+# Named predicates
+numbers.filter("even")         # [2, 4]
+numbers.filter("positive")     # [1, 2, 3, 4, 5]
+numbers.reject("even")         # [1, 3, 5]
 
-while true {
-    line = input.read_line()
-    if line == "" {                 # EOF reached, auto-closed
-        break
+# Chaining
+numbers.filter("positive").map("double").reject("even")
+
+# Lambdas
+numbers.map(x => x * 3)
+numbers.filter(x => x > 10)
+```
+
+### Optional Type System
+
+```graphoid
+# Type inference (recommended)
+name = "Alice"              # Infers string
+age = 25                    # Infers num
+items = [1, 2, 3]           # Infers list
+
+# Explicit types when needed
+string username = "Bob"
+num max_age = 100
+list<num> scores = [95, 87, 92]
+tree<string> words = tree{}
+```
+
+### Graph Rules
+
+```graphoid
+# Built-in rules
+my_tree.add_rule("no_cycles")
+my_tree.add_rule("single_root")
+my_tree.add_rule("max_children_2")  # Binary tree
+
+# User-defined rules
+func validate_positive_values(graph) {
+    for node in graph.nodes() {
+        if node.value() < 0 {
+            return false
+        }
     }
-    output.write(line.upper() + "\n")
-}
-output.close()
-```
-
-### Call Graph Debugging and Introspection
-
-Glang provides powerful call graph introspection that lets you visualize and debug function relationships in real-time:
-
-```glang
-# Import the call graph module
-import "call_graph"
-
-# Basic information
-scope = call_graph.current_scope()               # Current scope name
-count = call_graph.count_functions()             # Total functions
-scopes = call_graph.list_scopes()                # All available scopes
-funcs = call_graph.get_reachable_functions()     # Functions you can call
-
-# Detailed function information
-info = call_graph.get_function_info("my_func")
-print("Parameters: " + info["parameters"].to_string())
-print("Connected to: " + info["connected_functions"].to_string())
-
-# Path finding between functions
-path = call_graph.find_path("main", "helper")
-if path != none {
-    print("Path: " + path.to_string())   # Shows function connectivity
+    return true
 }
 
-# Visualization in multiple formats
-text_viz = call_graph.visualize("text")          # Human-readable text
-dot_viz = call_graph.visualize("dot")            # Graphviz DOT format
-mermaid_viz = call_graph.visualize("mermaid")    # Mermaid diagram syntax
-
-# Focus on specific scope
-module_viz = call_graph.visualize_scope("MyModule")
+my_graph.add_rule(validate_positive_values)
 ```
 
-**REPL Debugging Example:**
-```glang
-glang> func main() { process() }
-glang> func process() { validate() }
-glang> func validate() { return true }
+---
 
-glang> import "call_graph"
-glang> call_graph.get_reachable_functions()
-[main, process, validate]
+## Production Tooling
 
-glang> path = call_graph.find_path("main", "validate")
-glang> path.to_string()
-[main, validate]
+Graphoid includes **professional-grade tooling** from day one:
 
-glang> call_graph.visualize()
-==================================================
-COMPLETE CALL GRAPH
-==================================================
+### 1. Testing Framework (Phase 12)
+- **RSpec-style** behavior-driven testing
+- Command: `graphoid spec`
+- File extension: `.spec.gr`
+- Natural language expectations
+- Hierarchical organization
+- Mocking, stubbing, property-based testing
 
-[global]
-  main
-    → process
-    → validate
-  process
-    → main
-    → validate
-  validate
-    → main
-    → process
+### 2. Debugger (Phase 13)
+- Breakpoints: `debug.break()`, `debug.break_if()`
+- Interactive debug REPL
+- Variable and stack inspection
+- Step-through execution
+- Performance profiling
+- Graph visualization
+- VSCode integration via DAP
+
+### 3. Package Manager (Phase 14)
+- Package manifest: `graphoid.toml`
+- Lock files: `graphoid.lock`
+- SemVer version constraints
+- **Graph-based dependency resolution** (dogfooding!)
+- Commands: `graphoid new`, `graphoid install`, `graphoid publish`
+- Registry: packages.graphoid.org
+
+---
+
+## Implementation Roadmap
+
+See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 14-phase plan:
+
+| Phase | Focus | Duration | Status |
+|-------|-------|----------|--------|
+| 0 | Project Setup | 1-2 days | ✅ COMPLETE |
+| 1 | Lexer | 3-5 days | 🔜 NEXT |
+| 2 | Parser & AST | 5-7 days | 🔲 Pending |
+| 3 | Value System & Basic Execution | 5-7 days | 🔲 Pending |
+| 4 | Functions & Lambdas | 4-6 days | 🔲 Pending |
+| 5 | Collections & Methods | 7-10 days | 🔲 Pending |
+| 6 | Graph Types & Rules | 10-14 days | 🔲 Pending |
+| 7 | Behavior System | 5-7 days | 🔲 Pending |
+| 8 | Module System | 4-6 days | 🔲 Pending |
+| 9 | Native Stdlib Modules | 14-21 days | 🔲 Pending |
+| 10 | Pure Graphoid Stdlib | 10-14 days | 🔲 Pending |
+| 11 | Advanced Features | 14-21 days | 🔲 Pending |
+| 12 | Testing Framework | 7-10 days | 🔲 Pending |
+| 13 | Debugger | 10-14 days | 🔲 Pending |
+| 14 | Package Manager | 14-21 days | 🔲 Pending |
+
+**Milestones**:
+- **MVP** (Phases 0-5): 6-8 weeks - Basic language works
+- **Feature Complete** (Phases 0-11): 12-16 weeks - All language features
+- **Production Tools** (Phases 0-14): 16-22 weeks - Testing, debugging, packaging
+- **Production Ready**: 24-28 weeks - Optimized, documented, polished
+
+---
+
+## Key Documents
+
+### Essential Reading
+
+1. **`dev_docs/LANGUAGE_SPECIFICATION.md`** (1780 lines)
+   - Canonical language specification
+   - Complete syntax and semantics
+   - Type system, collections, graph rules
+   - Built-in testing framework (RSpec-style)
+   - Standard library reference
+
+2. **`dev_docs/RUST_IMPLEMENTATION_ROADMAP.md`** (1840 lines)
+   - 14-phase implementation plan
+   - Copy-paste-ready code for each phase
+   - Success criteria and timelines
+   - Testing strategy
+
+3. **`dev_docs/ARCHITECTURE_DESIGN.md`** (detailed architecture)
+   - Two-tier value system (Simple vs Graph-backed)
+   - Five-layer graph architecture
+   - Rule validation context
+   - Node identity strategy
+   - Critical implementation decisions
+
+4. **`dev_docs/PRODUCTION_TOOLING_SPECIFICATION.md`** (60+ pages)
+   - RSpec-style testing framework
+   - Interactive debugger
+   - Package manager (Cargo-inspired)
+   - Complete API references
+
+5. **`dev_docs/PRODUCTION_TOOLING_SUMMARY.md`**
+   - Executive summary of tooling
+   - Comparison with other languages
+   - FAQ and migration path
+
+6. **`dev_docs/TESTING_FRAMEWORK_COMPARISON.md`**
+   - Before/after comparison of testing styles
+   - Why RSpec-style wins
+   - Migration examples
+
+### Quick Reference
+
+- Phase 0 complete: ✅ Project setup done
+- Phase 1 next: 🔜 Implement lexer/tokenizer
+- Command: `cd rust && cargo build`
+- Tests: `cargo test --lib`
+- REPL: `cargo run`
+
+---
+
+## Development Guidelines
+
+### Code Quality Standards
+
+- **Idiomatic Rust** - Follow Rust best practices
+- **Zero warnings** - `cargo build` must be clean
+- **Test coverage** - 80%+ for core features
+- **Documentation** - All public APIs documented
+- **Error messages** - Rich, helpful, with source positions
+
+### Testing Strategy
+
+- **Unit tests** - In `tests/unit/` for individual components
+- **Integration tests** - In `tests/integration/` for workflows
+- **Property-based tests** - For algorithmic correctness
+- **Regression tests** - For every bug fix
+
+### Git Workflow
+
+- **Frequent commits** - After each passing test suite
+- **Clear messages** - Descriptive commit messages
+- **Feature branches** - For major work
+- **No semantic markers** - All code fully implemented
+
+### Implementation Priorities
+
+1. **Correctness** - Get it right first
+2. **Clarity** - Write readable, maintainable code
+3. **Performance** - Profile before optimizing
+4. **Polish** - Excellent error messages and UX
+
+---
+
+## Common Patterns
+
+### Type Inference First
+
+```graphoid
+# ✅ GOOD - Let type inference work
+name = "Alice"
+items = [1, 2, 3]
+
+# ❌ BAD - Unnecessary type annotations
+string name = "Alice"
+list items = [1, 2, 3]
+
+# ✅ GOOD - Use explicit types for constraints
+list<num> scores = [95, 87, 92]
 ```
 
-The call graph system gives you unprecedented visibility into your program's structure, making debugging complex function relationships much easier. See [Call Graph Debugging Guide](docs/call_graph_debugging.md) for complete documentation.
+### No Import Aliases for Stdlib
 
-## Architecture Notes
+```graphoid
+# ✅ GOOD - Built-in aliases work automatically
+import "random"     # Both random.choice() and rand.choice() work
+import "statistics" # Both statistics.mean() and stats.mean() work
 
-### Modern AST-Based Design
-
-Glang uses a clean, modern architecture:
-
-1. **Lexical Analysis**: Modern tokenizer with position tracking and comprehensive token types
-
-2. **AST Parsing**: Recursive descent parser builds properly typed abstract syntax trees
-
-3. **Semantic Analysis**: Type checking, symbol table management, and error detection
-
-4. **Execution**: AST visitor pattern with type-safe runtime values
-
-5. **File System**: Modular loading system with .gr file format
-
-### Development Philosophy
-- **Minimal Boilerplate**: Type declarations optional when obvious from context
-- **Clear Error Messages**: Comprehensive error reporting with source positions
-- **Extensible Design**: Clean visitor pattern allows easy language extensions
-- **Testing Focus**: 230+ tests with comprehensive coverage ensure reliability
-- **Self-Hosting Vision**: Write as much of Glang as possible in Glang itself
-- **Standard Library in Glang**: Core functionality implemented in the language, not the host runtime
-- **Dogfooding**: Use Glang extensively to validate its expressiveness and identify missing features
-
-### Implementation Status
-**Core Language**: Complete - Functions, types, collections, control flow, file I/O
-**Standard Library**: Extensive - Math, JSON, Time, HTML/Network processing (80% pure Glang)
-**Graph Architecture**: Breakthrough complete - True graph-based function discovery
-**Quality**: 1345+ tests passing, 66% coverage
-**Self-Hosting**: 80% pure Glang (only network I/O still requires Python)
-
-### Development Guidelines
-- **AST-first development** - All new features should extend the AST system
-- **Smart type inference** - Infer types from context to reduce boilerplate
-- **Comprehensive testing** - New features require full test coverage
-- **Clean error messages** - Users should understand exactly what went wrong
-- **Clean import syntax** - NEVER use `import "module" as alias` - modules have built-in aliases that make this redundant
-
-### Import Philosophy
-
-**CRITICAL**: Glang follows the KISS principle religiously. The syntax `import "some_module" as "anything"` is almost always a bad choice because:
-
-1. **Modules have built-in aliases** - `import "random"` gives you both `random` and `rand`
-2. **Unnecessary verbiage** - Why write `import "math" as calc` when `import "math"` gives you `calc` automatically?
-3. **Violates KISS** - Glang despises redundant syntax that adds no value
-
-**Good Examples:**
-```glang
-import "random"      # Use rand.choice() or random.choice() - your choice!
-import "math"        # Use calc.sqrt() or math.sqrt() - both work!
-import "regex"       # Use re.match() or regex.match() - flexible!
+# ❌ BAD - Redundant aliases
+import "random" as rand        # rand is already available!
+import "statistics" as stats   # stats is already available!
 ```
 
-**Bad Examples (avoid these patterns):**
-```glang
-import "random" as rand    # REDUNDANT - rand is already available!
-import "math" as calc      # REDUNDANT - calc is already available!
-import "regex" as re       # REDUNDANT - re is already available!
+### One Method with Parameters
+
+```graphoid
+# ✅ GOOD - One method, parameter controls behavior
+io.print("message", false)     # No newline
+list.remove(element, :all)     # Remove all occurrences
+
+# ❌ BAD - Method proliferation
+io.print_nonewline("message")
+list.remove_all(element)
 ```
 
-**When aliases ARE appropriate:**
-- Only when overriding with something MORE descriptive: `import "utils.gr" as tools`
-- Never for standard library modules - they already have perfect aliases
+---
 
-## Future Vision
+## FAQ
 
-**For detailed development roadmap, see [`dev_docs/PRIMARY_ROADMAP.md`](dev_docs/PRIMARY_ROADMAP.md)**
+### Why Rust instead of staying with Python?
 
-Transform Glang from a practical programming language into a **platform for living, self-aware computational systems** that can:
-- Understand their own structure through graph introspection
-- Safely modify themselves with governance rules
-- Distribute transparently across networks
-- Evolve and adapt to changing requirements
+**Performance, safety, and production-readiness**. Python was great for prototyping, but Rust gives us:
+- 100x+ performance
+- Memory safety without GC
+- Fearless concurrency
+- Better error messages
+- Zero-cost abstractions
 
+### What happens to the Python implementation?
+
+It becomes a **reference implementation** demonstrating language concepts. The Rust implementation is the production target, but Python helps us understand what works.
+
+### How long until Graphoid is usable?
+
+- **MVP (basic language)**: 6-8 weeks from now
+- **Feature complete**: 12-16 weeks
+- **Production ready** (with tooling): 24-28 weeks
+
+### Can I use Graphoid today?
+
+The Python prototype works for experimentation. The Rust implementation will be production-ready in ~6 months.
+
+### What makes Graphoid different from other languages?
+
+1. **Everything is a graph** - Not bolted on, fundamental
+2. **Intrinsic behaviors** - Data structures transform values automatically
+3. **RSpec-style testing** - Built into the language
+4. **Graph-based package manager** - Dependency resolution uses graph algorithms
+5. **Self-aware collections** - Data understands its own structure
+
+---
+
+## Next Steps
+
+### For Contributors
+
+1. Read `dev_docs/LANGUAGE_SPECIFICATION.md` to understand the language
+2. Read `dev_docs/ARCHITECTURE_DESIGN.md` to understand the design
+3. Start with Phase 1 (Lexer) in `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md`
+4. Write tests first (TDD)
+5. Keep `cargo build` warning-free
+
+### For This Session
+
+**START HERE**: Begin Phase 1 - Lexer implementation
+
+1. Read Phase 1 section in roadmap
+2. Define token types in `rust/src/lexer/token.rs`
+3. Implement lexer in `rust/src/lexer/mod.rs`
+4. Write 20+ tests in `rust/tests/unit/lexer_tests.rs`
+5. Ensure all tests pass and build is clean
+
+---
+
+**Questions?** Check the specs first, then ask!
+
+**Remember**: Graphoid is about making graphs **fundamental**, not optional. Every design decision should reinforce this vision.
