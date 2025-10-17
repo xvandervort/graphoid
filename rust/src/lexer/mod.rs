@@ -49,11 +49,22 @@ impl Lexer {
     }
 
     fn next_token(&mut self) -> Result<Token> {
-        let start_line = self.line;
-        let start_column = self.column;
-        let ch = self.advance();
+        loop {
+            // Check if we're at end before advancing
+            if self.is_at_end() {
+                return Ok(Token::new(
+                    TokenType::Eof,
+                    String::new(),
+                    self.line,
+                    self.column,
+                ));
+            }
 
-        let token_type = match ch {
+            let start_line = self.line;
+            let start_column = self.column;
+            let ch = self.advance();
+
+            let token_type = match ch {
             // Single character tokens
             '(' => TokenType::LeftParen,
             ')' => TokenType::RightParen,
@@ -289,7 +300,7 @@ impl Lexer {
                     // Multi-line comment /* */
                     self.skip_block_comment()?;
                     self.skip_whitespace_except_newline();
-                    return self.next_token();
+                    continue; // Loop back to get next token
                 } else {
                     TokenType::Slash
                 }
@@ -299,7 +310,7 @@ impl Lexer {
             '#' => {
                 self.skip_line_comment();
                 self.skip_whitespace_except_newline();
-                return self.next_token();
+                continue; // Loop back to get next token
             }
 
             // Strings
@@ -344,12 +355,13 @@ impl Lexer {
             }
         };
 
-        Ok(Token::new(
-            token_type,
-            ch.to_string(),
-            start_line,
-            start_column,
-        ))
+            return Ok(Token::new(
+                token_type,
+                ch.to_string(),
+                start_line,
+                start_column,
+            ));
+        } // End of loop
     }
 
     // Helper methods
