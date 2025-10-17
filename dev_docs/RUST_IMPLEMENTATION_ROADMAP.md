@@ -1,8 +1,10 @@
 # Graphoid/Glang: Rust Implementation Roadmap
 
-**Version**: 1.0
+**Version**: 2.0
 **Last Updated**: January 2025
-**Status**: Fresh implementation starting from clean slate
+**Status**: Phase 0 complete, Phase 1 partially complete (lexer updated with new tokens)
+
+**⚠️ IMPORTANT**: This roadmap has been significantly updated based on new language features. See [archived updates document](archive/sessions/2025-01-roadmap-updates/ROADMAP_UPDATES_FOR_NEW_FEATURES.md) for complete details of changes.
 
 This roadmap provides a step-by-step plan for implementing Graphoid/Glang in Rust, following the canonical [Language Specification](LANGUAGE_SPECIFICATION.md).
 
@@ -24,6 +26,56 @@ This roadmap provides a step-by-step plan for implementing Graphoid/Glang in Rus
 
 ### Reference Implementation
 The old Python implementation in `src/glang/` serves as a reference for behavior, but we're not bound by its architecture. The Rust implementation should be idiomatic and leverage Rust's strengths.
+
+### Test-Driven Development (TDD)
+**CRITICAL**: ALL development MUST follow TDD principles:
+- Write tests BEFORE implementation (Red → Green → Refactor)
+- Both unit tests (Rust) and integration tests (.gr files)
+- Every feature tested in BOTH REPL and CLI modes
+- Minimum test counts specified for each phase
+
+---
+
+## Major Updates (January 2025)
+
+This roadmap has been significantly expanded based on 10 new language features added to the specification:
+
+1. **Inline Conditionals** - `if-then-else` expressions, suffix `if`/`unless`
+2. **Mutation Operators** - Dual-version methods (`sort()` / `sort!()`)
+3. **Graph Querying** - 5-level system from simple navigation to pattern matching DSL
+4. **Integer Division** - `//` operator
+5. **Element-wise Operations** - `.* .+ .^ ./ .//` etc. for vectorized operations
+6. **Freeze Model** - Deep/shallow freeze with control rules
+7. **Project Structure** - `graphoid.toml` manifest system
+8. **REPL/CLI Parity** - Strict consistency requirements
+9. **Error Handling** - Configurable modes (`strict`, `lenient`, `collect`)
+10. **Graph Indexing** - `graph["node_id"]` consistency with hash/list
+
+### Key Changes to Roadmap
+
+**New Phase Added**:
+- **Phase 6a**: Standard Graph Types Library (pure Graphoid) - 5-7 days
+  - Implement BST, DAG, Heap, AVL, Trie in pure Graphoid
+  - Dogfooding the language to build language features
+  - Used for testing the graph query system
+
+**Documentation Milestones**:
+- After Phase 5: Basic syntax and collections samples (2-3 days)
+- After Phase 6: Graph programming guide (3-4 days)
+- After Phase 8: Multi-file project guide (2-3 days)
+- After Phase 11: Complete reference (4-5 days)
+
+**Timeline Increases**:
+- Phase 1: +1 day (new tokens: `then`, `unless`, `//`, `!`, element-wise operators)
+- Phase 2: +2 days (inline conditionals, try/catch, configure blocks)
+- Phase 3: +2 days (configuration stack, error modes)
+- Phase 5: +3 days (mutation operator convention doubles method surface area)
+- Phase 6: +7 days (5-level graph querying is the "make or break" feature)
+- Phase 7: +1 day (freeze control rules)
+- Phase 8: +2 days (graphoid.toml support)
+- Phase 11: +3 days (sophisticated configuration system)
+
+**See**: [ROADMAP_UPDATES_FOR_NEW_FEATURES.md](archive/sessions/2025-01-roadmap-updates/ROADMAP_UPDATES_FOR_NEW_FEATURES.md) for complete details.
 
 ---
 
@@ -316,8 +368,23 @@ See `dev_docs/` for development documentation and `docs/` for user documentation
 
 ## Phase 1: Lexer (Tokenization)
 
-**Duration**: 3-5 days
+**Duration**: 4-6 days (+1 day for new language features)
+**Status**: 🟡 PARTIALLY COMPLETE - Lexer implementation updated with new tokens
 **Goal**: Convert source code into tokens
+
+**✅ COMPLETED**:
+- Comment syntax changed from `//` to `#` (single-line)
+- `//` now tokenizes as integer division (`SlashSlash`)
+- Added `then` and `unless` keywords
+- Added `!` token for mutation operators (`Bang`)
+- Added all element-wise operators: `.+`, `.-`, `.*`, `./`, `.//`, `.%`, `.^`, `.==`, `.!=`, `.<`, `.<=`, `.>`, `.>=`
+- Lexer tests passing with new tokens
+
+**🔲 TODO**:
+- Complete lexer test coverage (currently basic tests only)
+- Add error handling tests (invalid input, edge cases)
+- Reach 20+ comprehensive tests
+- Add tests for `try`, `catch`, `finally`, `raise` keywords (Phase 3 feature)
 
 ### Tasks
 
@@ -1759,33 +1826,52 @@ See detailed implementation in next section...
 
 ## Timeline Estimates
 
-### Minimal Viable Product (MVP)
-**6-8 weeks** - Basic language without graph features
-- Phases 0-5 complete
+**NOTE**: These estimates have been revised based on 10 new language features, standard graph types library, and documentation milestones.
+
+### Basic Language (Updated)
+**8-11 weeks** - Basic language with collections (+2-3 weeks from original)
+- Phases 0-5 complete (with mutation operators)
+- Documentation Milestone 1: Basic samples
 - Can run simple programs
 - Basic REPL works
+- **WHY LONGER**: Mutation operator convention doubles method surface area
 
-### Feature Complete
-**12-16 weeks** - Full language specification
+### Feature Complete (Updated)
+**18-23 weeks** - Full language specification (+6-7 weeks from original)
 - Phases 0-11 complete
-- Graph types working
-- Stdlib mostly complete
+- Phase 6a: Standard graph types (BST, DAG, Heap, AVL, Trie) in pure Graphoid
+- 5-level graph querying system
+- Error handling with configurable modes
+- Documentation Milestones 1-4 complete
+- **WHY LONGER**: Graph querying is massive (+7 days), freeze model is complex, error handling is sophisticated
 
-### Production Tools Complete
-**16-22 weeks** - Professional tooling added
+### Production Tools Complete (Updated)
+**22-29 weeks** - Professional tooling added (+6-7 weeks from original)
 - Phases 0-14 complete
-- Testing framework operational
+- Testing framework operational (RSpec-style)
 - Debugger functional
 - Package manager working
+- **WHY LONGER**: More features to test, REPL/CLI parity for everything
 
-### Production Ready
-**24-28 weeks** - Optimized, polished, and professional
+### Production Ready (Updated)
+**30-37 weeks** - Optimized, polished, and professional (+6-9 weeks from original)
 - All phases complete
 - Performance tuning done
-- Comprehensive testing
-- Full documentation
+- Comprehensive testing (500+ tests)
+- Full documentation with samples
 - Examples and tutorials
 - Package registry live
+
+### Comparison
+
+| Milestone | Old Estimate | New Estimate | Increase |
+|-----------|-------------|--------------|----------|
+| Basic Language | 6-8 weeks | 8-11 weeks | +2-3 weeks |
+| Feature Complete | 12-16 weeks | 18-23 weeks | +6-7 weeks |
+| Production Tools | 16-22 weeks | 22-29 weeks | +6-7 weeks |
+| **Production Ready** | **24-28 weeks** | **30-37 weeks** | **+6-9 weeks** |
+
+**We're building this right, not fast.**
 
 ---
 
@@ -1824,17 +1910,30 @@ See detailed implementation in next section...
 
 ## Next Steps
 
-1. **Review this roadmap** - Ensure alignment with goals
+1. **Review this roadmap** - Ensure alignment with goals ✅
 2. **Set up development environment** - Phase 0 ✅ COMPLETE
-3. **Start with lexer** - Phase 1 ← START HERE NEXT
-4. **Regular check-ins** - Weekly progress reviews
-5. **Adjust as needed** - Roadmap is flexible
+3. **Lexer implementation** - Phase 1 🟡 PARTIALLY COMPLETE
+   - ✅ New tokens implemented (then, unless, //, !, element-wise operators)
+   - ✅ Comment syntax changed to #
+   - 🔲 Complete test coverage (need 20+ tests)
+4. **Complete Phase 1** - Finish lexer tests ← START HERE NEXT
+5. **Begin Phase 2** - Parser & AST with new syntax nodes
+6. **Follow TDD religiously** - Tests before implementation, always
+7. **Regular check-ins** - Weekly progress reviews
+8. **Adjust as needed** - Roadmap is flexible but comprehensive
 
 ---
 
 **Related Documents**:
-- [Language Specification](LANGUAGE_SPECIFICATION.md) - Canonical reference
+- [Language Specification](LANGUAGE_SPECIFICATION.md) - Canonical reference for all language features
+- [Roadmap Updates](archive/sessions/2025-01-roadmap-updates/ROADMAP_UPDATES_FOR_NEW_FEATURES.md) - **CRITICAL**: Detailed phase-by-phase implementation guidance for new features
 - [Production Tooling Specification](PRODUCTION_TOOLING_SPECIFICATION.md) - Testing, debugging, packages
 - [Architecture Design](ARCHITECTURE_DESIGN.md) - Internal architecture decisions
-- [Philosophy](PHILOSOPHY.md) - Core design principles (if exists)
-- [Edge Governance Design](EDGE_GOVERNANCE_DESIGN.md) - Edge system details (if exists)
+- [Design Decisions](archive/sessions/2025-01-design-decisions/DESIGN_DECISIONS_SESSION_1.md) - Approved design decisions for inline conditionals, mutation operators, graph querying, etc.
+
+**For Implementation**: When working on each phase, consult both this roadmap AND the archived updates document for complete implementation details, especially for:
+- Mutation operator metadata system (Rust `sort()` / `sort_mut()` → Graphoid `sort()` / `sort!()`)
+- 5-level graph querying system specification
+- Error handling configuration stack
+- Freeze model semantics
+- TDD requirements and test count minimums per phase
