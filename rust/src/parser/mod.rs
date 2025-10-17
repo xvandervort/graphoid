@@ -1,5 +1,1048 @@
-//! Parser module for building AST
+//! Parser module for building AST from tokens
 //!
-//! This module converts tokens into an Abstract Syntax Tree.
+//! This module implements a recursive descent parser with precedence climbing
+//! for expression parsing.
 
-// TODO: Implement parser
+use crate::ast::{
+    AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Program, Stmt, TypeAnnotation,
+    UnaryOp,
+};
+use crate::error::{GraphoidError, Result, SourcePosition};
+use crate::lexer::token::{Token, TokenType};
+
+pub struct Parser {
+    tokens: Vec<Token>,
+    current: usize,
+}
+
+impl Parser {
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens, current: 0 }
+    }
+
+    pub fn parse(&mut self) -> Result<Program> {
+        let mut statements = Vec::new();
+
+        while !self.is_at_end() {
+            // Skip newlines at the top level
+            if self.match_token(&TokenType::Newline) {
+                continue;
+            }
+
+            if self.is_at_end() {
+                break;
+            }
+
+            statements.push(self.statement()?);
+        }
+
+        Ok(Program { statements })
+    }
+
+    // Statement parsing
+    fn statement(&mut self) -> Result<Stmt> {
+        // Skip leading newlines
+        while self.match_token(&TokenType::Newline) {}
+
+        if self.is_at_end() {
+            return Err(GraphoidError::SyntaxError {
+                message: "Unexpected end of input".to_string(),
+                position: self.previous_position(),
+            });
+        }
+
+        // Check for type annotations or keywords
+        let result = if self.check(&TokenType::NumType)
+            || self.check(&TokenType::StringType)
+            || self.check(&TokenType::BoolType)
+            || self.check(&TokenType::ListType)
+            || self.check(&TokenType::MapType)
+            || self.check(&TokenType::TreeType)
+            || self.check(&TokenType::GraphType)
+            || self.check(&TokenType::DataType)
+            || self.check(&TokenType::TimeType)
+        {
+            self.variable_declaration()
+        } else if self.match_token(&TokenType::Func) {
+            self.function_declaration()
+        } else if self.match_token(&TokenType::If) {
+            self.if_statement()
+        } else if self.match_token(&TokenType::While) {
+            self.while_statement()
+        } else if self.match_token(&TokenType::For) {
+            self.for_statement()
+        } else if self.match_token(&TokenType::Return) {
+            self.return_statement()
+        } else if self.match_token(&TokenType::Break) {
+            let position = self.previous_position();
+            Ok(Stmt::Break { position })
+        } else if self.match_token(&TokenType::Continue) {
+            let position = self.previous_position();
+            Ok(Stmt::Continue { position })
+        } else if self.match_token(&TokenType::Import) {
+            self.import_statement()
+        } else if self.match_token(&TokenType::Module) {
+            self.module_declaration()
+        } else {
+            // Try to parse as assignment or expression
+            self.assignment_or_expression()
+        };
+
+        // Consume optional trailing newline
+        self.match_token(&TokenType::Newline);
+
+        result
+    }
+
+    fn variable_declaration(&mut self) -> Result<Stmt> {
+        let position = self.peek().position();
+
+        // Parse type annotation
+        let type_annotation = self.type_annotation()?;
+
+        // Expect identifier
+        let name = if let TokenType::Identifier(id) = &self.peek().token_type {
+            let n = id.clone();
+            self.advance();
+            n
+        } else {
+            return Err(GraphoidError::SyntaxError {
+                message: format!("Expected identifier, got {:?}", self.peek().token_type),
+                position: self.peek().position(),
+            });
+        };
+
+        // Expect '='
+        if !self.match_token(&TokenType::Equal) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '=' after variable name".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse value expression
+        let value = self.expression()?;
+
+        Ok(Stmt::VariableDecl {
+            name,
+            type_annotation: Some(type_annotation),
+            value,
+            position,
+        })
+    }
+
+    fn type_annotation(&mut self) -> Result<TypeAnnotation> {
+        let base_type = match &self.peek().token_type {
+            TokenType::NumType => "num",
+            TokenType::StringType => "string",
+            TokenType::BoolType => "bool",
+            TokenType::ListType => "list",
+            TokenType::MapType => "map",
+            TokenType::TreeType => "tree",
+            TokenType::GraphType => "graph",
+            TokenType::DataType => "data",
+            TokenType::TimeType => "time",
+            _ => {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected type annotation".to_string(),
+                    position: self.peek().position(),
+                })
+            }
+        }
+        .to_string();
+
+        self.advance();
+
+        // TODO: Parse type constraints like list<num>
+        Ok(TypeAnnotation {
+            base_type,
+            constraint: None,
+        })
+    }
+
+    fn function_declaration(&mut self) -> Result<Stmt> {
+        let position = self.previous_position();
+
+        // Expect identifier
+        let name = if let TokenType::Identifier(id) = &self.peek().token_type {
+            let n = id.clone();
+            self.advance();
+            n
+        } else {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected function name".to_string(),
+                position: self.peek().position(),
+            });
+        };
+
+        // Expect '('
+        if !self.match_token(&TokenType::LeftParen) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '(' after function name".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse parameters
+        let mut params = Vec::new();
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                let param_name = if let TokenType::Identifier(id) = &self.peek().token_type {
+                    let n = id.clone();
+                    self.advance();
+                    n
+                } else {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected parameter name".to_string(),
+                        position: self.peek().position(),
+                    });
+                };
+
+                // TODO: Parse default values
+                params.push(Parameter {
+                    name: param_name,
+                    default_value: None,
+                });
+
+                if !self.match_token(&TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+
+        // Expect ')'
+        if !self.match_token(&TokenType::RightParen) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected ')' after parameters".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Expect '{'
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' before function body".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse body
+        let body = self.block()?;
+
+        // Expect '}'
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' after function body".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        Ok(Stmt::FunctionDecl {
+            name,
+            params,
+            body,
+            position,
+        })
+    }
+
+    fn if_statement(&mut self) -> Result<Stmt> {
+        let position = self.previous_position();
+
+        // Parse condition
+        let condition = self.expression()?;
+
+        // Expect 'then' or '{'
+        let has_then = self.match_token(&TokenType::Then);
+        let has_brace = self.match_token(&TokenType::LeftBrace);
+
+        if !has_then && !has_brace {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected 'then' or '{' after if condition".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse then branch
+        let then_branch = if has_brace {
+            let stmts = self.block()?;
+            if !self.match_token(&TokenType::RightBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '}' after if body".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+            stmts
+        } else {
+            vec![self.statement()?]
+        };
+
+        // Parse optional else branch
+        let else_branch = if self.match_token(&TokenType::Else) {
+            if self.match_token(&TokenType::LeftBrace) {
+                let stmts = self.block()?;
+                if !self.match_token(&TokenType::RightBrace) {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected '}' after else body".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
+                Some(stmts)
+            } else {
+                Some(vec![self.statement()?])
+            }
+        } else {
+            None
+        };
+
+        Ok(Stmt::If {
+            condition,
+            then_branch,
+            else_branch,
+            position,
+        })
+    }
+
+    fn while_statement(&mut self) -> Result<Stmt> {
+        let position = self.previous_position();
+
+        // Parse condition
+        let condition = self.expression()?;
+
+        // Expect '{'
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' after while condition".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse body
+        let body = self.block()?;
+
+        // Expect '}'
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' after while body".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        Ok(Stmt::While {
+            condition,
+            body,
+            position,
+        })
+    }
+
+    fn for_statement(&mut self) -> Result<Stmt> {
+        let position = self.previous_position();
+
+        // Expect identifier
+        let variable = if let TokenType::Identifier(id) = &self.peek().token_type {
+            let v = id.clone();
+            self.advance();
+            v
+        } else {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected variable name in for loop".to_string(),
+                position: self.peek().position(),
+            });
+        };
+
+        // Expect 'in'
+        if !self.match_token(&TokenType::In) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected 'in' after for variable".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse iterable
+        let iterable = self.expression()?;
+
+        // Expect '{'
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' after for clause".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse body
+        let body = self.block()?;
+
+        // Expect '}'
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' after for body".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        Ok(Stmt::For {
+            variable,
+            iterable,
+            body,
+            position,
+        })
+    }
+
+    fn return_statement(&mut self) -> Result<Stmt> {
+        let position = self.previous_position();
+
+        // Check if there's a value to return
+        let value = if self.check(&TokenType::Newline) || self.is_at_end() {
+            None
+        } else {
+            Some(self.expression()?)
+        };
+
+        Ok(Stmt::Return { value, position })
+    }
+
+    fn import_statement(&mut self) -> Result<Stmt> {
+        let position = self.previous_position();
+
+        // Expect string literal
+        let module = if let TokenType::String(s) = &self.peek().token_type {
+            let m = s.clone();
+            self.advance();
+            m
+        } else {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected string literal after 'import'".to_string(),
+                position: self.peek().position(),
+            });
+        };
+
+        // Check for 'as' alias
+        let alias = if self.match_token(&TokenType::Alias) {
+            if let TokenType::Identifier(id) = &self.peek().token_type {
+                let a = id.clone();
+                self.advance();
+                Some(a)
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected identifier after 'as'".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+        } else {
+            None
+        };
+
+        Ok(Stmt::Import {
+            module,
+            alias,
+            position,
+        })
+    }
+
+    fn module_declaration(&mut self) -> Result<Stmt> {
+        let position = self.previous_position();
+
+        // Expect identifier
+        let name = if let TokenType::Identifier(id) = &self.peek().token_type {
+            let n = id.clone();
+            self.advance();
+            n
+        } else {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected module name".to_string(),
+                position: self.peek().position(),
+            });
+        };
+
+        // Check for 'alias' keyword (optional)
+        let alias = if self.match_token(&TokenType::Alias) {
+            if let TokenType::Identifier(id) = &self.peek().token_type {
+                let a = id.clone();
+                self.advance();
+                Some(a)
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected identifier after 'alias'".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+        } else {
+            None
+        };
+
+        Ok(Stmt::ModuleDecl {
+            name,
+            alias,
+            position,
+        })
+    }
+
+    fn assignment_or_expression(&mut self) -> Result<Stmt> {
+        let position = self.peek().position();
+
+        // Try to parse as assignment
+        // Look ahead to see if there's an '=' after an identifier or index expression
+        if let TokenType::Identifier(_) = &self.peek().token_type {
+            let checkpoint = self.current;
+
+            // Try to parse the left side
+            let expr = self.expression()?;
+
+            // Check if followed by '='
+            if self.match_token(&TokenType::Equal) {
+                // This is an assignment
+                let target = match expr {
+                    Expr::Variable { name, .. } => AssignmentTarget::Variable(name),
+                    Expr::Index { object, index, .. } => {
+                        AssignmentTarget::Index { object, index }
+                    }
+                    _ => {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Invalid assignment target".to_string(),
+                            position,
+                        })
+                    }
+                };
+
+                let value = self.expression()?;
+
+                return Ok(Stmt::Assignment {
+                    target,
+                    value,
+                    position,
+                });
+            } else {
+                // Not an assignment, rewind and parse as expression statement
+                self.current = checkpoint;
+            }
+        }
+
+        // Parse as expression statement
+        let expr = self.expression()?;
+        Ok(Stmt::Expression { expr, position })
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>> {
+        let mut statements = Vec::new();
+
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            // Skip newlines
+            if self.match_token(&TokenType::Newline) {
+                continue;
+            }
+
+            if self.check(&TokenType::RightBrace) {
+                break;
+            }
+
+            statements.push(self.statement()?);
+        }
+
+        Ok(statements)
+    }
+
+    // Expression parsing with precedence climbing
+    fn expression(&mut self) -> Result<Expr> {
+        self.or_expression()
+    }
+
+    fn or_expression(&mut self) -> Result<Expr> {
+        let mut expr = self.and_expression()?;
+
+        while self.match_token(&TokenType::Or) || self.match_token(&TokenType::PipePipe) {
+            let position = self.previous_position();
+            let right = self.and_expression()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op: BinaryOp::Or,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    fn and_expression(&mut self) -> Result<Expr> {
+        let mut expr = self.equality()?;
+
+        while self.match_token(&TokenType::And) || self.match_token(&TokenType::AmpersandAmpersand)
+        {
+            let position = self.previous_position();
+            let right = self.equality()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op: BinaryOp::And,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    fn equality(&mut self) -> Result<Expr> {
+        let mut expr = self.comparison()?;
+
+        while self.match_token(&TokenType::EqualEqual)
+            || self.match_token(&TokenType::BangEqual)
+            || self.match_token(&TokenType::RegexMatch)
+            || self.match_token(&TokenType::RegexNoMatch)
+            || self.match_token(&TokenType::DotEqualEqual)
+            || self.match_token(&TokenType::DotBangEqual)
+        {
+            let op = match &self.previous().token_type {
+                TokenType::EqualEqual => BinaryOp::Equal,
+                TokenType::BangEqual => BinaryOp::NotEqual,
+                TokenType::RegexMatch => BinaryOp::RegexMatch,
+                TokenType::RegexNoMatch => BinaryOp::RegexNoMatch,
+                TokenType::DotEqualEqual => BinaryOp::DotEqual,
+                TokenType::DotBangEqual => BinaryOp::DotNotEqual,
+                _ => unreachable!(),
+            };
+            let position = self.previous_position();
+            let right = self.comparison()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    fn comparison(&mut self) -> Result<Expr> {
+        let mut expr = self.term()?;
+
+        while self.match_token(&TokenType::Less)
+            || self.match_token(&TokenType::LessEqual)
+            || self.match_token(&TokenType::Greater)
+            || self.match_token(&TokenType::GreaterEqual)
+            || self.match_token(&TokenType::DotLess)
+            || self.match_token(&TokenType::DotLessEqual)
+            || self.match_token(&TokenType::DotGreater)
+            || self.match_token(&TokenType::DotGreaterEqual)
+        {
+            let op = match &self.previous().token_type {
+                TokenType::Less => BinaryOp::Less,
+                TokenType::LessEqual => BinaryOp::LessEqual,
+                TokenType::Greater => BinaryOp::Greater,
+                TokenType::GreaterEqual => BinaryOp::GreaterEqual,
+                TokenType::DotLess => BinaryOp::DotLess,
+                TokenType::DotLessEqual => BinaryOp::DotLessEqual,
+                TokenType::DotGreater => BinaryOp::DotGreater,
+                TokenType::DotGreaterEqual => BinaryOp::DotGreaterEqual,
+                _ => unreachable!(),
+            };
+            let position = self.previous_position();
+            let right = self.term()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    fn term(&mut self) -> Result<Expr> {
+        let mut expr = self.factor()?;
+
+        while self.match_token(&TokenType::Plus)
+            || self.match_token(&TokenType::Minus)
+            || self.match_token(&TokenType::DotPlus)
+            || self.match_token(&TokenType::DotMinus)
+        {
+            let op = match &self.previous().token_type {
+                TokenType::Plus => BinaryOp::Add,
+                TokenType::Minus => BinaryOp::Subtract,
+                TokenType::DotPlus => BinaryOp::DotAdd,
+                TokenType::DotMinus => BinaryOp::DotSubtract,
+                _ => unreachable!(),
+            };
+            let position = self.previous_position();
+            let right = self.factor()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    fn factor(&mut self) -> Result<Expr> {
+        let mut expr = self.power()?;
+
+        while self.match_token(&TokenType::Star)
+            || self.match_token(&TokenType::Slash)
+            || self.match_token(&TokenType::SlashSlash)
+            || self.match_token(&TokenType::Percent)
+            || self.match_token(&TokenType::DotStar)
+            || self.match_token(&TokenType::DotSlash)
+            || self.match_token(&TokenType::DotSlashSlash)
+            || self.match_token(&TokenType::DotPercent)
+        {
+            let op = match &self.previous().token_type {
+                TokenType::Star => BinaryOp::Multiply,
+                TokenType::Slash => BinaryOp::Divide,
+                TokenType::SlashSlash => BinaryOp::IntDiv,
+                TokenType::Percent => BinaryOp::Modulo,
+                TokenType::DotStar => BinaryOp::DotMultiply,
+                TokenType::DotSlash => BinaryOp::DotDivide,
+                TokenType::DotSlashSlash => BinaryOp::DotIntDiv,
+                TokenType::DotPercent => BinaryOp::DotModulo,
+                _ => unreachable!(),
+            };
+            let position = self.previous_position();
+            let right = self.power()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    fn power(&mut self) -> Result<Expr> {
+        let mut expr = self.unary()?;
+
+        while self.match_token(&TokenType::Caret) || self.match_token(&TokenType::DotCaret) {
+            let op = match &self.previous().token_type {
+                TokenType::Caret => BinaryOp::Power,
+                TokenType::DotCaret => BinaryOp::DotPower,
+                _ => unreachable!(),
+            };
+            let position = self.previous_position();
+            let right = self.unary()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    fn unary(&mut self) -> Result<Expr> {
+        if self.match_token(&TokenType::Minus) {
+            let position = self.previous_position();
+            let operand = self.unary()?;
+            return Ok(Expr::Unary {
+                op: UnaryOp::Negate,
+                operand: Box::new(operand),
+                position,
+            });
+        }
+
+        if self.match_token(&TokenType::Not) {
+            let position = self.previous_position();
+            let operand = self.unary()?;
+            return Ok(Expr::Unary {
+                op: UnaryOp::Not,
+                operand: Box::new(operand),
+                position,
+            });
+        }
+
+        self.postfix()
+    }
+
+    fn postfix(&mut self) -> Result<Expr> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.match_token(&TokenType::LeftParen) {
+                // Function call
+                let position = expr.position().clone();
+                let args = self.arguments()?;
+                if !self.match_token(&TokenType::RightParen) {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected ')' after arguments".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
+                expr = Expr::Call {
+                    callee: Box::new(expr),
+                    args,
+                    position,
+                };
+            } else if self.match_token(&TokenType::LeftBracket) {
+                // Index access
+                let position = expr.position().clone();
+                let index = self.expression()?;
+                if !self.match_token(&TokenType::RightBracket) {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected ']' after index".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
+                expr = Expr::Index {
+                    object: Box::new(expr),
+                    index: Box::new(index),
+                    position,
+                };
+            } else if self.match_token(&TokenType::Dot) {
+                // Method call or property access
+                let position = expr.position().clone();
+                let method = if let TokenType::Identifier(id) = &self.peek().token_type {
+                    let m = id.clone();
+                    self.advance();
+                    m
+                } else {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected method name after '.'".to_string(),
+                        position: self.peek().position(),
+                    });
+                };
+
+                // Check if it's a method call (with parentheses)
+                if self.match_token(&TokenType::LeftParen) {
+                    let args = self.arguments()?;
+                    if !self.match_token(&TokenType::RightParen) {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected ')' after method arguments".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+                    expr = Expr::MethodCall {
+                        object: Box::new(expr),
+                        method,
+                        args,
+                        position,
+                    };
+                } else {
+                    // Property access - treat as method call with no args for now
+                    expr = Expr::MethodCall {
+                        object: Box::new(expr),
+                        method,
+                        args: vec![],
+                        position,
+                    };
+                }
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn arguments(&mut self) -> Result<Vec<Expr>> {
+        let mut args = Vec::new();
+
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                args.push(self.expression()?);
+                if !self.match_token(&TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+
+        Ok(args)
+    }
+
+    fn primary(&mut self) -> Result<Expr> {
+        let position = self.peek().position();
+
+        // Numbers
+        if let TokenType::Number(n) = self.peek().token_type {
+            self.advance();
+            return Ok(Expr::Literal {
+                value: LiteralValue::Number(n),
+                position,
+            });
+        }
+
+        // Strings
+        if let TokenType::String(s) = &self.peek().token_type {
+            let str_val = s.clone();
+            self.advance();
+            return Ok(Expr::Literal {
+                value: LiteralValue::String(str_val),
+                position,
+            });
+        }
+
+        // Symbols
+        if let TokenType::Symbol(s) = &self.peek().token_type {
+            let sym_val = s.clone();
+            self.advance();
+            return Ok(Expr::Literal {
+                value: LiteralValue::Symbol(sym_val),
+                position,
+            });
+        }
+
+        // Booleans
+        if self.match_token(&TokenType::True) {
+            return Ok(Expr::Literal {
+                value: LiteralValue::Boolean(true),
+                position,
+            });
+        }
+
+        if self.match_token(&TokenType::False) {
+            return Ok(Expr::Literal {
+                value: LiteralValue::Boolean(false),
+                position,
+            });
+        }
+
+        // None
+        if self.match_token(&TokenType::None) {
+            return Ok(Expr::Literal {
+                value: LiteralValue::None,
+                position,
+            });
+        }
+
+        // Identifiers (variables)
+        if let TokenType::Identifier(id) = &self.peek().token_type {
+            let name = id.clone();
+            self.advance();
+            return Ok(Expr::Variable { name, position });
+        }
+
+        // Lists
+        if self.match_token(&TokenType::LeftBracket) {
+            let mut elements = Vec::new();
+
+            if !self.check(&TokenType::RightBracket) {
+                loop {
+                    elements.push(self.expression()?);
+                    if !self.match_token(&TokenType::Comma) {
+                        break;
+                    }
+                }
+            }
+
+            if !self.match_token(&TokenType::RightBracket) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected ']' after list elements".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            return Ok(Expr::List { elements, position });
+        }
+
+        // Maps
+        if self.match_token(&TokenType::LeftBrace) {
+            let mut entries = Vec::new();
+
+            if !self.check(&TokenType::RightBrace) {
+                loop {
+                    // Parse key (must be string or identifier)
+                    let key = if let TokenType::String(s) = &self.peek().token_type {
+                        let k = s.clone();
+                        self.advance();
+                        k
+                    } else if let TokenType::Identifier(id) = &self.peek().token_type {
+                        let k = id.clone();
+                        self.advance();
+                        k
+                    } else {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected string or identifier as map key".to_string(),
+                            position: self.peek().position(),
+                        });
+                    };
+
+                    // Expect ':'
+                    if !self.match_token(&TokenType::Colon) {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected ':' after map key".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+
+                    // Parse value
+                    let value = self.expression()?;
+                    entries.push((key, value));
+
+                    if !self.match_token(&TokenType::Comma) {
+                        break;
+                    }
+                }
+            }
+
+            if !self.match_token(&TokenType::RightBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '}' after map entries".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            return Ok(Expr::Map { entries, position });
+        }
+
+        // Parenthesized expressions
+        if self.match_token(&TokenType::LeftParen) {
+            let expr = self.expression()?;
+            if !self.match_token(&TokenType::RightParen) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected ')' after expression".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+            return Ok(expr);
+        }
+
+        Err(GraphoidError::SyntaxError {
+            message: format!("Unexpected token: {:?}", self.peek().token_type),
+            position: self.peek().position(),
+        })
+    }
+
+    // Helper methods
+    fn is_at_end(&self) -> bool {
+        matches!(self.peek().token_type, TokenType::Eof)
+    }
+
+    fn peek(&self) -> &Token {
+        &self.tokens[self.current]
+    }
+
+    fn previous(&self) -> &Token {
+        &self.tokens[self.current - 1]
+    }
+
+    fn previous_position(&self) -> SourcePosition {
+        self.previous().position()
+    }
+
+    fn advance(&mut self) -> &Token {
+        if !self.is_at_end() {
+            self.current += 1;
+        }
+        self.previous()
+    }
+
+    fn check(&self, token_type: &TokenType) -> bool {
+        if self.is_at_end() {
+            return false;
+        }
+        std::mem::discriminant(&self.peek().token_type) == std::mem::discriminant(token_type)
+    }
+
+    fn match_token(&mut self, token_type: &TokenType) -> bool {
+        if self.check(token_type) {
+            self.advance();
+            true
+        } else {
+            false
+        }
+    }
+}

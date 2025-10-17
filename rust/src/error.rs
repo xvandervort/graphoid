@@ -4,7 +4,7 @@ use std::fmt;
 
 pub type Result<T> = std::result::Result<T, GraphoidError>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SourcePosition {
     pub line: usize,
     pub column: usize,

@@ -1,5 +1,7 @@
 //! Token types for the Graphoid lexer
 
+use crate::error::SourcePosition;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     // Literals
@@ -124,6 +126,14 @@ impl Token {
             lexeme,
             line,
             column,
+        }
+    }
+
+    pub fn position(&self) -> SourcePosition {
+        SourcePosition {
+            line: self.line,
+            column: self.column,
+            file: None,
         }
     }
 }
