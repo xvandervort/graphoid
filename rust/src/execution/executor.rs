@@ -8,6 +8,7 @@ use std::rc::Rc;
 /// The executor evaluates AST nodes and produces values.
 pub struct Executor {
     env: Environment,
+    call_stack: Vec<String>,
 }
 
 impl Executor {
@@ -15,12 +16,16 @@ impl Executor {
     pub fn new() -> Self {
         Executor {
             env: Environment::new(),
+            call_stack: Vec::new(),
         }
     }
 
     /// Creates a new executor with a given environment.
     pub fn with_env(env: Environment) -> Self {
-        Executor { env }
+        Executor {
+            env,
+            call_stack: Vec::new(),
+        }
     }
 
     /// Evaluates an expression and returns its value.
@@ -36,6 +41,7 @@ impl Executor {
             } => self.eval_binary(left, op, right),
             Expr::Unary { op, operand, .. } => self.eval_unary(op, operand),
             Expr::Call { callee, args, .. } => self.eval_call(callee, args),
+            Expr::Lambda { params, body, .. } => self.eval_lambda(params, body),
             Expr::List { elements, .. } => self.eval_list(elements),
             Expr::Map { entries, .. } => self.eval_map(entries),
             _ => Err(GraphoidError::runtime(format!(
@@ -195,6 +201,26 @@ impl Executor {
         Ok(Value::Map(map))
     }
 
+    /// Evaluates a lambda expression.
+    /// Creates an anonymous function that captures the current environment.
+    fn eval_lambda(&self, params: &[String], body: &Expr) -> Result<Value> {
+        // Convert expression body to a return statement
+        let return_stmt = Stmt::Return {
+            value: Some((*body).clone()),
+            position: body.position().clone(),
+        };
+
+        // Create anonymous function with captured environment
+        let func = Function {
+            name: None, // Anonymous
+            params: params.to_vec(),
+            body: vec![return_stmt],
+            env: Rc::new(self.env.clone()),
+        };
+
+        Ok(Value::Function(func))
+    }
+
     /// Evaluates a function call expression.
     fn eval_call(&mut self, callee: &Expr, args: &[Expr]) -> Result<Value> {
         // Evaluate the callee to get the function
@@ -227,6 +253,10 @@ impl Executor {
             )));
         }
 
+        // Push function name onto call stack
+        let func_name = func.name.as_ref().unwrap_or(&"<anonymous>".to_string()).clone();
+        self.call_stack.push(func_name.clone());
+
         // Create new environment as child of function's closure environment
         let mut call_env = Environment::with_parent((*func.env).clone());
 
@@ -240,21 +270,30 @@ impl Executor {
 
         // Execute function body
         let mut return_value = Value::None;
-        for stmt in &func.body {
-            match self.eval_stmt(stmt)? {
-                Some(val) => {
-                    // Return statement executed
-                    return_value = val;
-                    break;
-                }
-                None => {
-                    // Normal statement, continue
+        let execution_result: Result<()> = (|| {
+            for stmt in &func.body {
+                match self.eval_stmt(stmt)? {
+                    Some(val) => {
+                        // Return statement executed
+                        return_value = val;
+                        break;
+                    }
+                    None => {
+                        // Normal statement, continue
+                    }
                 }
             }
-        }
+            Ok(())
+        })();
 
         // Restore original environment
         self.env = saved_env;
+
+        // Pop function from call stack
+        self.call_stack.pop();
+
+        // Propagate errors
+        execution_result?;
 
         Ok(return_value)
     }
@@ -400,6 +439,11 @@ impl Executor {
     /// Gets a mutable reference to the environment (for testing).
     pub fn env_mut(&mut self) -> &mut Environment {
         &mut self.env
+    }
+
+    /// Gets the current call stack (for debugging and error reporting).
+    pub fn call_stack(&self) -> &[String] {
+        &self.call_stack
     }
 }
 

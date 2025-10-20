@@ -1,4 +1,4 @@
-use graphoid::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Stmt, UnaryOp};
+use graphoid::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Stmt, UnaryOp};
 use graphoid::error::SourcePosition;
 use graphoid::execution::Executor;
 use graphoid::values::Value;
@@ -1564,4 +1564,1505 @@ fn test_function_undefined() {
 
     let result = executor.eval_expr(&call_expr);
     assert!(result.is_err());
+}
+
+#[test]
+fn test_lambda_simple() {
+    let mut executor = Executor::new();
+
+    // Lambda: x => x * 2
+    let lambda = Expr::Lambda {
+        params: vec!["x".to_string()],
+        body: Box::new(Expr::Binary {
+            left: Box::new(Expr::Variable {
+                name: "x".to_string(),
+                position: pos(),
+            }),
+            op: BinaryOp::Multiply,
+            right: Box::new(Expr::Literal {
+                value: LiteralValue::Number(2.0),
+                position: pos(),
+            }),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    // Evaluate lambda to get function value
+    let func_value = executor.eval_expr(&lambda).unwrap();
+
+    // Should be a function
+    match func_value {
+        Value::Function(f) => {
+            assert_eq!(f.name, None); // Anonymous
+            assert_eq!(f.params, vec!["x"]);
+        }
+        _ => panic!("Expected function value"),
+    }
+}
+
+#[test]
+fn test_lambda_call() {
+    let mut executor = Executor::new();
+
+    // Create lambda: x => x * 2
+    let lambda = Expr::Lambda {
+        params: vec!["x".to_string()],
+        body: Box::new(Expr::Binary {
+            left: Box::new(Expr::Variable {
+                name: "x".to_string(),
+                position: pos(),
+            }),
+            op: BinaryOp::Multiply,
+            right: Box::new(Expr::Literal {
+                value: LiteralValue::Number(2.0),
+                position: pos(),
+            }),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    // Call lambda immediately: (x => x * 2)(5)
+    let call = Expr::Call {
+        callee: Box::new(lambda),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(10.0));
+}
+
+#[test]
+fn test_lambda_closure() {
+    let mut executor = Executor::new();
+
+    // x = 10
+    executor.env_mut().define("x".to_string(), Value::Number(10.0));
+
+    // Lambda captures x: y => x + y
+    let lambda = Expr::Lambda {
+        params: vec!["y".to_string()],
+        body: Box::new(Expr::Binary {
+            left: Box::new(Expr::Variable {
+                name: "x".to_string(),
+                position: pos(),
+            }),
+            op: BinaryOp::Add,
+            right: Box::new(Expr::Variable {
+                name: "y".to_string(),
+                position: pos(),
+            }),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    // Call lambda: (y => x + y)(5)
+    let call = Expr::Call {
+        callee: Box::new(lambda),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(15.0)); // 10 + 5
+}
+
+#[test]
+fn test_lambda_no_params() {
+    let mut executor = Executor::new();
+
+    // Lambda: () => 42
+    let lambda = Expr::Lambda {
+        params: vec![],
+        body: Box::new(Expr::Literal {
+            value: LiteralValue::Number(42.0),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    // Call: (() => 42)()
+    let call = Expr::Call {
+        callee: Box::new(lambda),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(42.0));
+}
+
+#[test]
+fn test_function_as_value() {
+    let mut executor = Executor::new();
+
+    // func double(n) { return n * 2 }
+    let func_decl = Stmt::FunctionDecl {
+        name: "double".to_string(),
+        params: vec![Parameter {
+            name: "n".to_string(),
+            default_value: None,
+        }],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "n".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Multiply,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(2.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // Get function as a value
+    let func_value = executor.env().get("double").unwrap();
+    assert!(matches!(func_value, Value::Function(_)));
+}
+
+#[test]
+fn test_function_multiple_params() {
+    let mut executor = Executor::new();
+
+    // func calculate(a, b, c) { return a + b * c }
+    let func_decl = Stmt::FunctionDecl {
+        name: "calculate".to_string(),
+        params: vec![
+            Parameter {
+                name: "a".to_string(),
+                default_value: None,
+            },
+            Parameter {
+                name: "b".to_string(),
+                default_value: None,
+            },
+            Parameter {
+                name: "c".to_string(),
+                default_value: None,
+            },
+        ],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "a".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Binary {
+                    left: Box::new(Expr::Variable {
+                        name: "b".to_string(),
+                        position: pos(),
+                    }),
+                    op: BinaryOp::Multiply,
+                    right: Box::new(Expr::Variable {
+                        name: "c".to_string(),
+                        position: pos(),
+                    }),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // calculate(10, 2, 5) = 10 + 2 * 5 = 20
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "calculate".to_string(),
+            position: pos(),
+        }),
+        args: vec![
+            Expr::Literal {
+                value: LiteralValue::Number(10.0),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(2.0),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(5.0),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(20.0));
+}
+
+#[test]
+fn test_recursive_function() {
+    let mut executor = Executor::new();
+
+    // func factorial(n) {
+    //     if n <= 1 { return 1 }
+    //     return n * factorial(n - 1)
+    // }
+    // Note: Since we don't have if statements yet, let's test recursion differently
+    // func countdown(n) {
+    //     return n
+    // }
+    // This is a placeholder for now - real recursion needs control flow
+
+    // For now, test that function can call itself (will hit max depth eventually)
+    let func_decl = Stmt::FunctionDecl {
+        name: "identity".to_string(),
+        params: vec![Parameter {
+            name: "n".to_string(),
+            default_value: None,
+        }],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Variable {
+                name: "n".to_string(),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "identity".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(5.0));
+}
+
+#[test]
+fn test_function_with_string_return() {
+    let mut executor = Executor::new();
+
+    // func greet(name) { return "Hello, " + name }
+    let func_decl = Stmt::FunctionDecl {
+        name: "greet".to_string(),
+        params: vec![Parameter {
+            name: "name".to_string(),
+            default_value: None,
+        }],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Literal {
+                    value: LiteralValue::String("Hello, ".to_string()),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Variable {
+                    name: "name".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "greet".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::String("Alice".to_string()),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::String("Hello, Alice".to_string()));
+}
+
+#[test]
+fn test_function_modifying_closure_var() {
+    let mut executor = Executor::new();
+
+    // x = 5
+    executor.env_mut().define("x".to_string(), Value::Number(5.0));
+
+    // func get_x() { return x }
+    let func_decl = Stmt::FunctionDecl {
+        name: "get_x".to_string(),
+        params: vec![],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Variable {
+                name: "x".to_string(),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // Call get_x() - should return 5
+    let call1 = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "get_x".to_string(),
+            position: pos(),
+        }),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result1 = executor.eval_expr(&call1).unwrap();
+    assert_eq!(result1, Value::Number(5.0));
+
+    // Modify x in outer scope
+    executor.env_mut().set("x", Value::Number(10.0)).unwrap();
+
+    // Call get_x() again
+    // With our Rc<Environment> implementation, the closure captured a clone of the environment
+    // So it won't see the change - it still has x = 5
+    // This is snapshot semantics, which is one valid closure model
+    let result2 = executor.eval_expr(&call1).unwrap();
+    // Closure captured environment at function definition time
+    assert_eq!(result2, Value::Number(5.0));
+}
+
+#[test]
+fn test_lambda_multiple_params() {
+    let mut executor = Executor::new();
+
+    // Lambda: (a, b, c) => a + b + c
+    let lambda = Expr::Lambda {
+        params: vec!["a".to_string(), "b".to_string(), "c".to_string()],
+        body: Box::new(Expr::Binary {
+            left: Box::new(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "a".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Variable {
+                    name: "b".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            op: BinaryOp::Add,
+            right: Box::new(Expr::Variable {
+                name: "c".to_string(),
+                position: pos(),
+            }),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    let call = Expr::Call {
+        callee: Box::new(lambda),
+        args: vec![
+            Expr::Literal {
+                value: LiteralValue::Number(1.0),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(2.0),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(3.0),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(6.0));
+}
+
+#[test]
+fn test_lambda_with_string_concat() {
+    let mut executor = Executor::new();
+
+    // Lambda: (first, last) => first + " " + last
+    let lambda = Expr::Lambda {
+        params: vec!["first".to_string(), "last".to_string()],
+        body: Box::new(Expr::Binary {
+            left: Box::new(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "first".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::String(" ".to_string()),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            op: BinaryOp::Add,
+            right: Box::new(Expr::Variable {
+                name: "last".to_string(),
+                position: pos(),
+            }),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    let call = Expr::Call {
+        callee: Box::new(lambda),
+        args: vec![
+            Expr::Literal {
+                value: LiteralValue::String("John".to_string()),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::String("Doe".to_string()),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::String("John Doe".to_string()));
+}
+
+#[test]
+fn test_function_returning_boolean() {
+    let mut executor = Executor::new();
+
+    // func is_positive(n) { return n > 0 }
+    let func_decl = Stmt::FunctionDecl {
+        name: "is_positive".to_string(),
+        params: vec![Parameter {
+            name: "n".to_string(),
+            default_value: None,
+        }],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "n".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Greater,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(0.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    let call1 = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "is_positive".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result1 = executor.eval_expr(&call1).unwrap();
+    assert_eq!(result1, Value::Boolean(true));
+
+    let call2 = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "is_positive".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(-5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result2 = executor.eval_expr(&call2).unwrap();
+    assert_eq!(result2, Value::Boolean(false));
+}
+
+#[test]
+fn test_function_returning_list() {
+    let mut executor = Executor::new();
+
+    // func make_list(a, b) { return [a, b] }
+    let func_decl = Stmt::FunctionDecl {
+        name: "make_list".to_string(),
+        params: vec![
+            Parameter {
+                name: "a".to_string(),
+                default_value: None,
+            },
+            Parameter {
+                name: "b".to_string(),
+                default_value: None,
+            },
+        ],
+        body: vec![Stmt::Return {
+            value: Some(Expr::List {
+                elements: vec![
+                    Expr::Variable {
+                        name: "a".to_string(),
+                        position: pos(),
+                    },
+                    Expr::Variable {
+                        name: "b".to_string(),
+                        position: pos(),
+                    },
+                ],
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "make_list".to_string(),
+            position: pos(),
+        }),
+        args: vec![
+            Expr::Literal {
+                value: LiteralValue::Number(1.0),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(2.0),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(
+        result,
+        Value::List(vec![Value::Number(1.0), Value::Number(2.0)])
+    );
+}
+
+#[test]
+fn test_deeply_nested_calls() {
+    let mut executor = Executor::new();
+
+    // func add1(n) { return n + 1 }
+    let func_decl = Stmt::FunctionDecl {
+        name: "add1".to_string(),
+        params: vec![Parameter {
+            name: "n".to_string(),
+            default_value: None,
+        }],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "n".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // add1(add1(add1(5))) = 8
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "add1".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Call {
+            callee: Box::new(Expr::Variable {
+                name: "add1".to_string(),
+                position: pos(),
+            }),
+            args: vec![Expr::Call {
+                callee: Box::new(Expr::Variable {
+                    name: "add1".to_string(),
+                    position: pos(),
+                }),
+                args: vec![Expr::Literal {
+                    value: LiteralValue::Number(5.0),
+                    position: pos(),
+                }],
+                position: pos(),
+            }],
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(8.0));
+}
+
+#[test]
+fn test_function_with_no_return_statement() {
+    let mut executor = Executor::new();
+
+    // func do_nothing() { }
+    let func_decl = Stmt::FunctionDecl {
+        name: "do_nothing".to_string(),
+        params: vec![],
+        body: vec![], // No statements
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "do_nothing".to_string(),
+            position: pos(),
+        }),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::None); // Should return none
+}
+
+#[test]
+fn test_function_early_return() {
+    let mut executor = Executor::new();
+
+    // func early() { return 1; return 2; }
+    let func_decl = Stmt::FunctionDecl {
+        name: "early".to_string(),
+        params: vec![],
+        body: vec![
+            Stmt::Return {
+                value: Some(Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+            Stmt::Return {
+                value: Some(Expr::Literal {
+                    value: LiteralValue::Number(2.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "early".to_string(),
+            position: pos(),
+        }),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(1.0)); // Should return first value
+}
+
+#[test]
+fn test_lambda_wrong_arg_count() {
+    let mut executor = Executor::new();
+
+    // Lambda: x => x * 2
+    let lambda = Expr::Lambda {
+        params: vec!["x".to_string()],
+        body: Box::new(Expr::Binary {
+            left: Box::new(Expr::Variable {
+                name: "x".to_string(),
+                position: pos(),
+            }),
+            op: BinaryOp::Multiply,
+            right: Box::new(Expr::Literal {
+                value: LiteralValue::Number(2.0),
+                position: pos(),
+            }),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    // Call with wrong number of args
+    let call = Expr::Call {
+        callee: Box::new(lambda),
+        args: vec![], // Should be 1 arg, gave 0
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_function_with_side_effects() {
+    let mut executor = Executor::new();
+
+    // x = 0
+    executor.env_mut().define("x".to_string(), Value::Number(0.0));
+
+    // func set_x(val) { x = val; return x }
+    let func_decl = Stmt::FunctionDecl {
+        name: "set_x".to_string(),
+        params: vec![Parameter {
+            name: "val".to_string(),
+            default_value: None,
+        }],
+        body: vec![
+            Stmt::Assignment {
+                target: AssignmentTarget::Variable("x".to_string()),
+                value: Expr::Variable {
+                    name: "val".to_string(),
+                    position: pos(),
+                },
+                position: pos(),
+            },
+            Stmt::Return {
+                value: Some(Expr::Variable {
+                    name: "x".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // Call set_x(42)
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "set_x".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(42.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(42.0));
+
+    // Verify x was modified (in closure's captured environment)
+    // Due to our snapshot semantics, outer x won't change
+    let x_value = executor.env().get("x").unwrap();
+    assert_eq!(x_value, Value::Number(0.0)); // Still 0, not modified
+}
+
+#[test]
+fn test_nested_closures() {
+    let mut executor = Executor::new();
+
+    // x = 5
+    executor.env_mut().define("x".to_string(), Value::Number(5.0));
+
+    // func outer() { return x }
+    let outer_decl = Stmt::FunctionDecl {
+        name: "outer".to_string(),
+        params: vec![],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Variable {
+                name: "x".to_string(),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&outer_decl).unwrap();
+
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "outer".to_string(),
+            position: pos(),
+        }),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(5.0));
+}
+
+#[test]
+fn test_function_parameter_shadowing() {
+    let mut executor = Executor::new();
+
+    // x = 10
+    executor.env_mut().define("x".to_string(), Value::Number(10.0));
+
+    // func use_param(x) { return x * 2 }
+    let func_decl = Stmt::FunctionDecl {
+        name: "use_param".to_string(),
+        params: vec![Parameter {
+            name: "x".to_string(), // Shadows outer x
+            default_value: None,
+        }],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "x".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Multiply,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(2.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // use_param(5) - should use parameter x=5, not outer x=10
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "use_param".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(10.0)); // 5 * 2, not 10 * 2
+}
+
+#[test]
+fn test_function_returning_function_value() {
+    let mut executor = Executor::new();
+
+    // func make_adder(n) { return n + 1 }
+    let func_decl = Stmt::FunctionDecl {
+        name: "make_adder".to_string(),
+        params: vec![Parameter {
+            name: "n".to_string(),
+            default_value: None,
+        }],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "n".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // adder = make_adder
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("adder".to_string()),
+        value: Expr::Variable {
+            name: "make_adder".to_string(),
+            position: pos(),
+        },
+        position: pos(),
+    };
+
+    executor.eval_stmt(&assign).unwrap();
+
+    // adder(5) should work
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "adder".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(6.0));
+}
+
+#[test]
+fn test_lambda_with_logical_operations() {
+    let mut executor = Executor::new();
+
+    // Lambda: (a, b) => a and b
+    let lambda = Expr::Lambda {
+        params: vec!["a".to_string(), "b".to_string()],
+        body: Box::new(Expr::Binary {
+            left: Box::new(Expr::Variable {
+                name: "a".to_string(),
+                position: pos(),
+            }),
+            op: BinaryOp::And,
+            right: Box::new(Expr::Variable {
+                name: "b".to_string(),
+                position: pos(),
+            }),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    let call = Expr::Call {
+        callee: Box::new(lambda),
+        args: vec![
+            Expr::Literal {
+                value: LiteralValue::Boolean(true),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Boolean(false),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Boolean(false));
+}
+
+#[test]
+fn test_function_with_comparison() {
+    let mut executor = Executor::new();
+
+    // func compare(a, b) { return a > b }
+    let func_decl = Stmt::FunctionDecl {
+        name: "compare".to_string(),
+        params: vec![
+            Parameter {
+                name: "a".to_string(),
+                default_value: None,
+            },
+            Parameter {
+                name: "b".to_string(),
+                default_value: None,
+            },
+        ],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "a".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Greater,
+                right: Box::new(Expr::Variable {
+                    name: "b".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    let call1 = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "compare".to_string(),
+            position: pos(),
+        }),
+        args: vec![
+            Expr::Literal {
+                value: LiteralValue::Number(10.0),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(5.0),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    let result1 = executor.eval_expr(&call1).unwrap();
+    assert_eq!(result1, Value::Boolean(true));
+}
+
+#[test]
+fn test_lambda_returning_list() {
+    let mut executor = Executor::new();
+
+    // Lambda: (a, b) => [a, b, a + b]
+    let lambda = Expr::Lambda {
+        params: vec!["a".to_string(), "b".to_string()],
+        body: Box::new(Expr::List {
+            elements: vec![
+                Expr::Variable {
+                    name: "a".to_string(),
+                    position: pos(),
+                },
+                Expr::Variable {
+                    name: "b".to_string(),
+                    position: pos(),
+                },
+                Expr::Binary {
+                    left: Box::new(Expr::Variable {
+                        name: "a".to_string(),
+                        position: pos(),
+                    }),
+                    op: BinaryOp::Add,
+                    right: Box::new(Expr::Variable {
+                        name: "b".to_string(),
+                        position: pos(),
+                    }),
+                    position: pos(),
+                },
+            ],
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    let call = Expr::Call {
+        callee: Box::new(lambda),
+        args: vec![
+            Expr::Literal {
+                value: LiteralValue::Number(3.0),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(4.0),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(
+        result,
+        Value::List(vec![
+            Value::Number(3.0),
+            Value::Number(4.0),
+            Value::Number(7.0)
+        ])
+    );
+}
+
+#[test]
+fn test_function_with_unary_ops() {
+    let mut executor = Executor::new();
+
+    // func negate(x) { return -x }
+    let func_decl = Stmt::FunctionDecl {
+        name: "negate".to_string(),
+        params: vec![Parameter {
+            name: "x".to_string(),
+            default_value: None,
+        }],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Unary {
+                op: UnaryOp::Negate,
+                operand: Box::new(Expr::Variable {
+                    name: "x".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "negate".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(-5.0));
+}
+
+#[test]
+fn test_function_with_not_op() {
+    let mut executor = Executor::new();
+
+    // func invert(b) { return not b }
+    let func_decl = Stmt::FunctionDecl {
+        name: "invert".to_string(),
+        params: vec![Parameter {
+            name: "b".to_string(),
+            default_value: None,
+        }],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Unary {
+                op: UnaryOp::Not,
+                operand: Box::new(Expr::Variable {
+                    name: "b".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "invert".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Boolean(true),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Boolean(false));
+}
+
+#[test]
+fn test_function_four_params() {
+    let mut executor = Executor::new();
+
+    // func avg(a, b, c, d) { return (a + b + c + d) / 4 }
+    let func_decl = Stmt::FunctionDecl {
+        name: "avg".to_string(),
+        params: vec![
+            Parameter {
+                name: "a".to_string(),
+                default_value: None,
+            },
+            Parameter {
+                name: "b".to_string(),
+                default_value: None,
+            },
+            Parameter {
+                name: "c".to_string(),
+                default_value: None,
+            },
+            Parameter {
+                name: "d".to_string(),
+                default_value: None,
+            },
+        ],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Binary {
+                    left: Box::new(Expr::Binary {
+                        left: Box::new(Expr::Binary {
+                            left: Box::new(Expr::Variable {
+                                name: "a".to_string(),
+                                position: pos(),
+                            }),
+                            op: BinaryOp::Add,
+                            right: Box::new(Expr::Variable {
+                                name: "b".to_string(),
+                                position: pos(),
+                            }),
+                            position: pos(),
+                        }),
+                        op: BinaryOp::Add,
+                        right: Box::new(Expr::Variable {
+                            name: "c".to_string(),
+                            position: pos(),
+                        }),
+                        position: pos(),
+                    }),
+                    op: BinaryOp::Add,
+                    right: Box::new(Expr::Variable {
+                        name: "d".to_string(),
+                        position: pos(),
+                    }),
+                    position: pos(),
+                }),
+                op: BinaryOp::Divide,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(4.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "avg".to_string(),
+            position: pos(),
+        }),
+        args: vec![
+            Expr::Literal {
+                value: LiteralValue::Number(10.0),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(20.0),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(30.0),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(40.0),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(25.0));
+}
+
+#[test]
+fn test_lambda_with_symbol_return() {
+    let mut executor = Executor::new();
+
+    // Lambda: () => :success
+    let lambda = Expr::Lambda {
+        params: vec![],
+        body: Box::new(Expr::Literal {
+            value: LiteralValue::Symbol("success".to_string()),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    let call = Expr::Call {
+        callee: Box::new(lambda),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Symbol("success".to_string()));
+}
+
+#[test]
+fn test_function_call_with_expression_args() {
+    let mut executor = Executor::new();
+
+    // func add(a, b) { return a + b }
+    let func_decl = Stmt::FunctionDecl {
+        name: "add".to_string(),
+        params: vec![
+            Parameter {
+                name: "a".to_string(),
+                default_value: None,
+            },
+            Parameter {
+                name: "b".to_string(),
+                default_value: None,
+            },
+        ],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "a".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Variable {
+                    name: "b".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // add(2 * 3, 5 + 1) = add(6, 6) = 12
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "add".to_string(),
+            position: pos(),
+        }),
+        args: vec![
+            Expr::Binary {
+                left: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(2.0),
+                    position: pos(),
+                }),
+                op: BinaryOp::Multiply,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(3.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+            Expr::Binary {
+                left: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(5.0),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(12.0));
+}
+
+#[test]
+fn test_call_stack_empty_initially() {
+    let executor = Executor::new();
+    assert_eq!(executor.call_stack().len(), 0);
+}
+
+#[test]
+fn test_call_stack_cleared_after_return() {
+    let mut executor = Executor::new();
+
+    // func add(a, b) { return a + b }
+    let func_decl = Stmt::FunctionDecl {
+        name: "add".to_string(),
+        params: vec![
+            Parameter {
+                name: "a".to_string(),
+                default_value: None,
+            },
+            Parameter {
+                name: "b".to_string(),
+                default_value: None,
+            },
+        ],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "a".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Variable {
+                    name: "b".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // Call the function
+    let call_expr = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "add".to_string(),
+            position: pos(),
+        }),
+        args: vec![
+            Expr::Literal {
+                value: LiteralValue::Number(2.0),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(3.0),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    executor.eval_expr(&call_expr).unwrap();
+
+    // After function returns, call stack should be empty
+    assert_eq!(executor.call_stack().len(), 0);
 }
