@@ -37,6 +37,42 @@ Graphoid is built on the radical principle that **every aspect of computation ca
 
 ## Type System
 
+### 🚫 The "No Generics" Policy
+
+**IMPORTANT**: Graphoid has a strict "No Generics" policy. This is a fundamental, non-negotiable design decision.
+
+**See**: `dev_docs/NO_GENERICS_POLICY.md` for complete details.
+
+#### What This Means
+
+✅ **Allowed** (simple, runtime type assertions):
+- `list<num>` - Single type parameter, runtime-checked, built-in collections only
+- `hash<string>` - Single type parameter for value constraints
+- `tree<num>`, `graph<num>` - Single parameter on built-in types
+
+❌ **NEVER Allowed**:
+- Multiple type parameters: `HashMap<K, V>` - **FORBIDDEN**
+- User-defined generics: `class Container<T>` - **FORBIDDEN**
+- Generic functions: `fn process<T>(x: T)` - **FORBIDDEN**
+- Nested constraints: `list<list<num>>` - **FORBIDDEN**
+- Type bounds: `<T: Trait>` - **FORBIDDEN**
+
+#### Why No Generics?
+
+Generics add unnecessary complexity. Instead, Graphoid provides:
+1. **Duck typing** - Works on any compatible value
+2. **Graph rules** - Structural constraints at runtime
+3. **Runtime type checks** - Explicit validation when needed
+4. **Optional type hints** - Documentation without enforcement
+
+#### The One Rule
+
+**"One type parameter, runtime-checked, built-in collections only"**
+
+This is as far as type constraints go. No exceptions.
+
+---
+
 ### Primitive Types
 
 #### Numbers (`num`)
@@ -251,6 +287,32 @@ process = x => {
     return temp + 1
 }
 ```
+
+> Proposed (Phase 11): Trailing-block sugar for lambdas
+>
+> - Rationale: Provide Ruby/Smalltalk-like trailing block syntax as pure sugar for a function's last `lambda` parameter to improve ergonomics for iteration, transactions, and DSL-style APIs. This is syntactic sugar only; blocks are ordinary lambdas.
+> - Syntax (desugaring):
+>   ```Graphoid
+>   list.each { |x, i| print(i.to_string() + ": " + x) }
+>   # == list.each((x, i) => { print(i.to_string() + ": " + x) })
+>
+>   numbers.map { |x| x * 2 }.filter { |x| x > 10 }
+>   # == numbers.map((x) => x * 2).filter((x) => x > 10)
+>   ```
+> - Function opt-in and `yield()` sugar:
+>   ```Graphoid
+>   fn times(n, block: lambda = () => {}) { i = 0; while i < n { block(i); i = i + 1 } }
+>   5.times { |i| print(i) }
+>
+>   fn with_transaction(graph, block: lambda) {
+>     begin_tx(graph)
+>     try { yield(); commit_tx(graph) } catch Error { rollback_tx(graph); raise }
+>   }
+>   # yield() == block()
+>   ```
+> - Semantics: no nonlocal returns; `return` inside the block returns from the block. Arity follows error modes (`:strict` errors on mismatch; `:lenient` ignores extras, fills missing with `none`).
+> - Parser note: trailing `{ ... }` after a call is parsed as a lambda argument; a leading `|params|` declares block parameters. Disambiguated from pattern matching (`|pattern| =>`) since that form does not appear as a call argument.
+> - Status: Deferred to Phase 11 (low priority) in the roadmap.
 
 #### Regex (`regex`)
 - Literals: `/pattern/flags`
@@ -562,13 +624,94 @@ age = person.get_attribute("age")           # Access nested attribute
 
 This enables **composition of graph structures** where nodes can be complex objects with their own behavior and structure.
 
-### Query Performance
+### Graph Performance & Auto-Optimization
 
-- **Indexing**: Graphs automatically index nodes by ID (O(1) lookup)
-- **Edge Indexing**: Outgoing/incoming edges indexed per node
-- **Pattern Optimization**: Pattern matcher uses heuristics to optimize query order
-- **Lazy Evaluation**: Queries return iterators when possible
-- **Caching**: Frequently accessed paths can be cached
+**Philosophy**: Graphs optimize themselves transparently. Users don't need to think about performance tuning.
+
+#### Automatic Optimization (v1.0)
+
+Graphoid graphs learn from usage patterns and automatically create optimizations:
+
+**Auto-Indexing**:
+```graphoid
+social = graph { type: :directed }
+
+# First few property lookups are slower (no index yet)
+social.find_node(email: "alice@example.com")  # ~100μs
+social.find_node(email: "bob@example.com")    # ~100μs
+
+# After pattern detected (10+ lookups), index auto-created
+social.find_node(email: "charlie@example.com")  # ~1μs (100x faster!)
+
+# Check what happened
+social.stats()
+# => {
+#   auto_indices: ["email"],
+#   rationale: "Frequent property lookups (10+ times)"
+# }
+```
+
+**Rule-Aware Optimization**:
+```graphoid
+# Declaring rules enables automatic algorithm selection
+dag = graph { rules: ["no_cycles"] }
+
+# Shortest path automatically uses topological algorithm instead of general BFS
+# No manual hints needed!
+path = dag.shortest_path("A", "B")
+```
+
+**Built-in Performance Features**:
+- **Index-free adjacency**: O(1) neighbor lookups (nodes directly point to neighbors)
+- **Auto-indexing**: Property indices created after repeated lookups (default: 10x threshold)
+- **Edge type indices**: Fast traversal by edge type
+- **Rule-aware algorithms**: Smarter algorithms based on declared constraints
+- **Lazy evaluation**: Queries return iterators when possible
+
+#### Explain & Statistics
+
+**Transparency via Explain**:
+```graphoid
+plan = dag.explain { dag.shortest_path("A", "B") }
+plan.show()
+
+# Output:
+# Execution Plan:
+#   1. Topological sort (uses rule: no_cycles)
+#   2. BFS from A
+#   3. Path reconstruction
+# Estimated cost: 50 operations
+# Rules applied: ["no_cycles" → "enabled topological algorithms"]
+```
+
+**Statistics Tracking**:
+```graphoid
+stats = graph.stats()
+# => {
+#   nodes: 10000,
+#   edges: 45000,
+#   avg_degree: 4.5,
+#   max_degree: 127,
+#   auto_indices: ["user_id", "email"],
+#   auto_optimizations: [
+#     "user_id indexed after 15 lookups",
+#     "email indexed after 12 lookups"
+#   ]
+# }
+```
+
+#### Manual Performance Tuning (v2.0+ Only)
+
+**NOT IN v1.0**: Advanced manual controls deferred to future versions:
+- Manual index management (create/drop indices)
+- Query hints (prefer_bfs, parallelize)
+- Optimization strategies (optimize_for reads vs writes)
+- Query plan manipulation
+- Advanced explain with suggestions
+
+See `dev_docs/FUTURE_FEATURES.md` for v2.0+ roadmap.
+
+**v1.0 Design**: Automatic optimization handles 90% of use cases. Manual tuning only needed for expert-level edge cases.
 
 ---
 
@@ -2129,9 +2272,14 @@ config = {"host": "localhost"}  # hash
 string username = "Bob"
 num max_age = 100
 bool is_valid = false
-list<num> scores = [95, 87, 92]
-hash<string> settings = {"theme": "dark"}
-tree<num> numbers = tree{}
+list<num> scores = [95, 87, 92]           # Runtime type assertion (optional)
+hash<string> settings = {"theme": "dark"}  # Runtime type assertion (optional)
+tree<num> numbers = tree{}                 # Runtime type assertion (optional)
+
+# ❌ FORBIDDEN - See NO_GENERICS_POLICY.md
+# hash<string, num> data = {}              # Multiple params - NEVER ALLOWED
+# fn process<T>(x: T) { ... }              # Generic functions - NEVER ALLOWED
+# class Container<T> { ... }               # Generic classes - NEVER ALLOWED
 ```
 
 ### Multi-line Literals

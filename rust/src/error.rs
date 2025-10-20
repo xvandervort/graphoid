@@ -44,3 +44,31 @@ pub enum GraphoidError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
+
+impl GraphoidError {
+    /// Creates a runtime error for undefined variables.
+    pub fn undefined_variable(name: &str) -> Self {
+        GraphoidError::RuntimeError {
+            message: format!("Undefined variable: {}", name),
+        }
+    }
+
+    /// Creates a runtime error for type mismatches.
+    pub fn type_error(expected: &str, actual: &str) -> Self {
+        GraphoidError::RuntimeError {
+            message: format!("Type error: expected {}, got {}", expected, actual),
+        }
+    }
+
+    /// Creates a runtime error for division by zero.
+    pub fn division_by_zero() -> Self {
+        GraphoidError::RuntimeError {
+            message: "Division by zero".to_string(),
+        }
+    }
+
+    /// Creates a runtime error with a custom message.
+    pub fn runtime(message: String) -> Self {
+        GraphoidError::RuntimeError { message }
+    }
+}

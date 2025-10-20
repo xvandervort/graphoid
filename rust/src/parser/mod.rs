@@ -154,6 +154,43 @@ impl Parser {
         self.advance();
 
         // TODO: Parse type constraints like list<num>
+        //
+        // ⚠️  IMPORTANT: NO GENERICS POLICY ENFORCEMENT
+        // See: dev_docs/NO_GENERICS_POLICY.md
+        //
+        // When implementing type constraints, MUST enforce:
+        //
+        // 1. ✅ ALLOWED: Single type parameter on built-in collections
+        //    - list<num>, hash<string>, tree<num>, graph<num>
+        //    - Constraint must be a PRIMITIVE type only
+        //    - Runtime-checked, not compile-time
+        //
+        // 2. ❌ FORBIDDEN: Multiple type parameters
+        //    - hash<K, V> → SYNTAX ERROR
+        //    - Result<T, E> → SYNTAX ERROR
+        //    - Reject with: "Multiple type parameters not supported"
+        //
+        // 3. ❌ FORBIDDEN: Nested constraints
+        //    - list<list<num>> → SYNTAX ERROR
+        //    - Reject with: "Nested type constraints not supported"
+        //
+        // 4. ❌ FORBIDDEN: Type constraints on user-defined types
+        //    - Only allow on: list, hash, tree, graph
+        //    - Reject with: "Type parameters only allowed on built-in collections"
+        //
+        // 5. ❌ FORBIDDEN: Generic type variables
+        //    - <T> where T is not num/string/bool/etc → SYNTAX ERROR
+        //    - Reject with: "Generic type variables not supported"
+        //
+        // Implementation strategy:
+        // - if peek() == TokenType::Less:
+        //     - Ensure base_type is one of: list, hash, tree, graph
+        //     - Parse exactly ONE constraint type
+        //     - Ensure constraint is primitive (num, string, bool, symbol, time, none)
+        //     - Check for comma → reject (multiple params)
+        //     - Check for another '<' → reject (nesting)
+        //     - Expect TokenType::Greater
+        //
         Ok(TypeAnnotation {
             base_type,
             constraint: None,
@@ -174,6 +211,17 @@ impl Parser {
                 position: self.peek().position(),
             });
         };
+
+        // ⚠️  NO GENERICS POLICY ENFORCEMENT
+        // See: dev_docs/NO_GENERICS_POLICY.md
+        //
+        // If next token is '<', this is an attempt at generic function syntax
+        // fn foo<T>(...) → FORBIDDEN
+        //
+        // TODO: When we see '<' after function name, reject with:
+        // "Generic functions are not supported in Graphoid.
+        //  Use duck typing instead - functions work on values, not types.
+        //  See: dev_docs/NO_GENERICS_POLICY.md"
 
         // Expect '('
         if !self.match_token(&TokenType::LeftParen) {

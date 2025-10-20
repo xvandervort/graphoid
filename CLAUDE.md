@@ -15,7 +15,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 The project is undergoing a **clean-slate Rust implementation** to build a production-ready, high-performance language from the ground up.
 
 - ✅ **Phase 0 Complete** - Project structure, dependencies, error types, CLI/REPL skeleton
-- 🔜 **Phase 1 Starting** - Lexer (tokenization) implementation
+- ✅ **Phase 1 Complete** - Lexer (tokenization) - 54 tests passing
+- ✅ **Phase 2 Complete** - Parser & AST - 31 tests passing
+- 🔜 **Phase 3 Next** - Value System & Basic Execution
 - 📋 **14-Phase Roadmap** - Complete path to production-ready language with professional tooling
 - 📚 **Comprehensive Specifications** - Language spec, architecture design, production tooling all documented
 
@@ -56,6 +58,7 @@ Graphoid is built on three levels of graph abstraction:
 - **No Semantic Markers** - All code fully implemented with real enforcement
 - **No Method Proliferation** - One method with parameters beats many similar methods
 - **Dogfooding** - Use Graphoid extensively to validate its expressiveness
+- **🚫 NO GENERICS - EVER** - See `dev_docs/NO_GENERICS_POLICY.md` - Non-negotiable!
 
 ---
 
@@ -106,6 +109,54 @@ Graphoid is built on three levels of graph abstraction:
 - **User documentation**: Always goes in `docs/` (user-facing guides, tutorials, API references)
 - **Development docs**: Always goes in `dev_docs/` (architecture, design decisions, roadmaps)
 
+### Understanding the dev_docs/ Structure
+
+The `dev_docs/` directory contains **comprehensive development documentation** in the **project root** (`/home/irv/work/grang/dev_docs/`), NOT in the rust directory. These documents guide the entire project implementation:
+
+**Core Specifications:**
+1. **`LANGUAGE_SPECIFICATION.md`** - The canonical reference
+   - Complete syntax and semantics
+   - All language features documented
+   - RSpec-style testing framework specification
+   - Standard library API
+   - **Use this** to understand what Graphoid should do
+
+2. **`NO_GENERICS_POLICY.md`** - 🚫 Non-negotiable design principle
+   - Why Graphoid NEVER has user-space generics
+   - What's allowed: `list<num>` (single param, runtime-checked, built-in only)
+   - What's forbidden: Multiple params, user-defined generics, nested constraints
+   - Parser and semantic analyzer enforcement rules
+   - Alternative patterns (duck typing, graph rules)
+   - **Read this FIRST** before implementing any type-related features
+
+3. **`RUST_IMPLEMENTATION_ROADMAP.md`** - The implementation plan
+   - 14 phases from setup to production tooling
+   - Copy-paste-ready code for each phase
+   - Success criteria and timelines
+   - **Use this** to know what to implement next
+
+4. **`ARCHITECTURE_DESIGN.md`** - Design decisions
+   - Two-tier value system
+   - Five-layer graph architecture
+   - Critical implementation choices
+   - **Use this** to understand WHY things are designed this way
+
+**Production Tooling:**
+5. **`PRODUCTION_TOOLING_SPECIFICATION.md`** - Full tooling specs
+   - Testing framework (RSpec-style)
+   - Debugger specification
+   - Package manager design
+   - **Use this** for Phases 12-14
+
+6. **`PRODUCTION_TOOLING_SUMMARY.md`** - Executive summary
+7. **`TESTING_FRAMEWORK_COMPARISON.md`** - Why RSpec-style testing
+
+**Session Documentation (in rust/ directory):**
+- `rust/SESSION_SUMMARY.md` - What was accomplished this session
+- `rust/START_HERE_NEXT_SESSION.md` - Quick start guide for next session
+
+**DO NOT create new documentation files** in `dev_docs/` without explicit user request. The existing documents are comprehensive and authoritative.
+
 ---
 
 ## Current Development: Rust Implementation
@@ -117,13 +168,27 @@ Graphoid is built on three levels of graph abstraction:
 - All dependencies configured (thiserror, regex, chrono, serde, crypto, etc.)
 - Error types with source position tracking
 - CLI and REPL skeleton functional
-- `cargo build` and `cargo test` working
 
-**Phase 1: 🔜 STARTING NEXT** - Lexer (Tokenization)
-- Define all token types
-- Implement tokenizer with position tracking
-- Handle comments, strings, numbers, symbols, regex literals
-- Write 20+ tests
+**Phase 1: ✅ COMPLETE** - Lexer (54 tests passing)
+- Complete tokenization engine
+- All operators including integer division (`//`) and element-wise (`.+`, `.*`, etc.)
+- Position tracking, comments, strings, numbers, symbols
+- Zero compiler warnings
+
+**Phase 2: ✅ COMPLETE** - Parser & AST (31 tests passing)
+- Full AST node definitions with source positions
+- Recursive descent parser with precedence climbing
+- All statements and expressions
+- Correct operator precedence
+- Zero compiler warnings
+
+**Phase 3: 🔜 STARTING NEXT** - Value System & Basic Execution
+- Runtime value types
+- Environment for variable storage
+- Basic expression evaluation
+- Write 30+ executor tests following TDD
+
+**Current Test Status**: ✅ 85/85 tests passing (54 lexer + 31 parser)
 
 ### Development Commands
 
@@ -280,6 +345,8 @@ numbers.filter(x => x > 10)
 
 ### Optional Type System
 
+**IMPORTANT**: Graphoid does NOT have generics. See `dev_docs/NO_GENERICS_POLICY.md`
+
 ```graphoid
 # Type inference (recommended)
 name = "Alice"              # Infers string
@@ -289,8 +356,17 @@ items = [1, 2, 3]           # Infers list
 # Explicit types when needed
 string username = "Bob"
 num max_age = 100
-list<num> scores = [95, 87, 92]
-tree<string> words = tree{}
+
+# ✅ ALLOWED: Single-parameter runtime type constraints on built-in collections
+list<num> scores = [95, 87, 92]       # Runtime-checked, single param
+tree<string> words = tree{}           # Built-in collection only
+hash<num> config = {}                 # Values only (keys always string)
+
+# ❌ FORBIDDEN: See NO_GENERICS_POLICY.md
+# hash<string, num> data = {}         # Multiple params - NEVER
+# fn process<T>(x: T) { ... }         # Generic functions - NEVER
+# class Container<T> { ... }          # Generic classes - NEVER
+# list<list<num>> matrix = []         # Nested constraints - NEVER
 ```
 
 ### Graph Rules
@@ -354,9 +430,9 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 14-phase plan:
 | Phase | Focus | Duration | Status |
 |-------|-------|----------|--------|
 | 0 | Project Setup | 1-2 days | ✅ COMPLETE |
-| 1 | Lexer | 3-5 days | 🔜 NEXT |
-| 2 | Parser & AST | 5-7 days | 🔲 Pending |
-| 3 | Value System & Basic Execution | 5-7 days | 🔲 Pending |
+| 1 | Lexer | 3-5 days | ✅ COMPLETE (54 tests) |
+| 2 | Parser & AST | 5-7 days | ✅ COMPLETE (31 tests) |
+| 3 | Value System & Basic Execution | 5-7 days | 🔜 NEXT |
 | 4 | Functions & Lambdas | 4-6 days | 🔲 Pending |
 | 5 | Collections & Methods | 7-10 days | 🔲 Pending |
 | 6 | Graph Types & Rules | 10-14 days | 🔲 Pending |
@@ -388,42 +464,52 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 14-phase plan:
    - Built-in testing framework (RSpec-style)
    - Standard library reference
 
-2. **`dev_docs/RUST_IMPLEMENTATION_ROADMAP.md`** (1840 lines)
+2. **`dev_docs/NO_GENERICS_POLICY.md`** 🚫 (CRITICAL - Non-negotiable)
+   - Why Graphoid NEVER has user-space generics
+   - Allowed: Single-parameter runtime type constraints on built-in collections
+   - Forbidden: Multiple params, user-defined generics, generic functions, nested constraints
+   - Parser/analyzer enforcement rules with error message templates
+   - Alternative patterns: duck typing, graph rules, runtime checks
+   - **READ THIS BEFORE implementing type-related features**
+
+3. **`dev_docs/RUST_IMPLEMENTATION_ROADMAP.md`** (1840 lines)
    - 14-phase implementation plan
    - Copy-paste-ready code for each phase
    - Success criteria and timelines
    - Testing strategy
 
-3. **`dev_docs/ARCHITECTURE_DESIGN.md`** (detailed architecture)
+4. **`dev_docs/ARCHITECTURE_DESIGN.md`** (detailed architecture)
    - Two-tier value system (Simple vs Graph-backed)
    - Five-layer graph architecture
    - Rule validation context
    - Node identity strategy
    - Critical implementation decisions
 
-4. **`dev_docs/PRODUCTION_TOOLING_SPECIFICATION.md`** (60+ pages)
+5. **`dev_docs/PRODUCTION_TOOLING_SPECIFICATION.md`** (60+ pages)
    - RSpec-style testing framework
    - Interactive debugger
    - Package manager (Cargo-inspired)
    - Complete API references
 
-5. **`dev_docs/PRODUCTION_TOOLING_SUMMARY.md`**
+6. **`dev_docs/PRODUCTION_TOOLING_SUMMARY.md`**
    - Executive summary of tooling
    - Comparison with other languages
    - FAQ and migration path
 
-6. **`dev_docs/TESTING_FRAMEWORK_COMPARISON.md`**
+7. **`dev_docs/TESTING_FRAMEWORK_COMPARISON.md`**
    - Before/after comparison of testing styles
    - Why RSpec-style wins
    - Migration examples
 
 ### Quick Reference
 
-- Phase 0 complete: ✅ Project setup done
-- Phase 1 next: 🔜 Implement lexer/tokenizer
-- Command: `cd rust && cargo build`
-- Tests: `cargo test --lib`
-- REPL: `cargo run`
+- Phase 0: ✅ Project setup
+- Phase 1: ✅ Lexer (54 tests)
+- Phase 2: ✅ Parser & AST (31 tests)
+- Phase 3: 🔜 Value System & Execution (next)
+- Total tests: **85/85 passing**
+- Command: `cd rust && cargo test`
+- Build: `cargo build` (zero warnings)
 
 ---
 
@@ -548,15 +634,20 @@ The Python prototype works for experimentation. The Rust implementation will be 
 4. Write tests first (TDD)
 5. Keep `cargo build` warning-free
 
-### For This Session
+### For Next Session
 
-**START HERE**: Begin Phase 1 - Lexer implementation
+**START HERE**: Read `rust/START_HERE_NEXT_SESSION.md` for detailed guide
 
-1. Read Phase 1 section in roadmap
-2. Define token types in `rust/src/lexer/token.rs`
-3. Implement lexer in `rust/src/lexer/mod.rs`
-4. Write 20+ tests in `rust/tests/unit/lexer_tests.rs`
-5. Ensure all tests pass and build is clean
+**Quick Start** - Phase 3: Value System & Basic Execution
+
+1. Read `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` Phase 3 section
+2. Create `src/values/mod.rs` - Runtime value types
+3. Create `src/execution/environment.rs` - Variable storage
+4. Write 30+ executor tests in `tests/unit/executor_tests.rs` (TDD - tests first!)
+5. Implement `src/execution/executor.rs` to make tests pass
+6. Verify: 115+ total tests passing (85 current + 30 new)
+
+**Or simply ask Claude**: "Continue with Phase 3. Follow TDD and write tests first."
 
 ---
 
