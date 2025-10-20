@@ -106,6 +106,7 @@ fn execute_source(source: &str, executor: &mut Executor) -> Result<(), String> {
 
     // Execute each statement
     for stmt in &program.statements {
+        // Ignore return value (top-level returns shouldn't happen in file execution)
         executor
             .eval_stmt(stmt)
             .map_err(|e| format!("Runtime error: {}", e))?;
@@ -144,6 +145,7 @@ fn execute_repl_line(
 
     // Otherwise, execute all statements
     for stmt in &program.statements {
+        // Ignore return value (top-level returns in REPL are rare but allowed)
         executor
             .eval_stmt(stmt)
             .map_err(|e| format!("Runtime error: {}", e))?;

@@ -1,9 +1,32 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
+
+use crate::ast::Stmt;
+use crate::execution::Environment;
+
+/// A function value with its captured environment (closure).
+#[derive(Debug, Clone)]
+pub struct Function {
+    /// Function name (None for anonymous lambdas)
+    pub name: Option<String>,
+    /// Parameter names
+    pub params: Vec<String>,
+    /// Function body statements
+    pub body: Vec<Stmt>,
+    /// Captured environment (for closures)
+    pub env: Rc<Environment>,
+}
+
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        // Functions are equal if they have the same name and parameters
+        // (We don't compare body or environment for equality)
+        self.name == other.name && self.params == other.params
+    }
+}
 
 /// Runtime value types in Graphoid.
-/// Phase 3 includes basic scalar and collection types.
-/// Functions will be added in Phase 4.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     /// Numeric value (64-bit floating point)
@@ -20,7 +43,8 @@ pub enum Value {
     List(Vec<Value>),
     /// Map/dictionary with string keys
     Map(HashMap<String, Value>),
-    // Function variants will be added in Phase 4
+    /// Function value (Phase 4)
+    Function(Function),
 }
 
 impl Value {
@@ -35,6 +59,7 @@ impl Value {
             Value::List(l) => !l.is_empty(),
             Value::Map(m) => !m.is_empty(),
             Value::Symbol(_) => true,
+            Value::Function(_) => true, // Functions are always truthy
         }
     }
 
@@ -76,6 +101,13 @@ impl Value {
                     .collect();
                 format!("{{{}}}", pairs.join(", "))
             }
+            Value::Function(func) => {
+                if let Some(name) = &func.name {
+                    format!("<function {}>", name)
+                } else {
+                    format!("<lambda({})>", func.params.join(", "))
+                }
+            }
         }
     }
 
@@ -89,6 +121,7 @@ impl Value {
             Value::Symbol(_) => "symbol",
             Value::List(_) => "list",
             Value::Map(_) => "map",
+            Value::Function(_) => "function",
         }
     }
 }

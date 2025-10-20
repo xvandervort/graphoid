@@ -1097,3 +1097,471 @@ fn test_eval_expression_statement() {
     let result = executor.eval_stmt(&stmt);
     assert!(result.is_ok());
 }
+
+// ============================================================================
+// FUNCTION TESTS (Phase 4)
+// ============================================================================
+
+#[test]
+fn test_function_declaration() {
+    let mut executor = Executor::new();
+
+    // Define function: func add(a, b) { return a + b }
+    let func_decl = Stmt::FunctionDecl {
+        name: "add".to_string(),
+        params: vec![
+            graphoid::ast::Parameter {
+                name: "a".to_string(),
+                default_value: None,
+            },
+            graphoid::ast::Parameter {
+                name: "b".to_string(),
+                default_value: None,
+            },
+        ],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "a".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Variable {
+                    name: "b".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // Verify function is stored in environment
+    let func_value = executor.env().get("add").unwrap();
+    assert_eq!(func_value.type_name(), "function");
+}
+
+#[test]
+fn test_function_call_simple() {
+    let mut executor = Executor::new();
+
+    // Define function: func add(a, b) { return a + b }
+    let func_decl = Stmt::FunctionDecl {
+        name: "add".to_string(),
+        params: vec![
+            graphoid::ast::Parameter {
+                name: "a".to_string(),
+                default_value: None,
+            },
+            graphoid::ast::Parameter {
+                name: "b".to_string(),
+                default_value: None,
+            },
+        ],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "a".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Variable {
+                    name: "b".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // Call function: add(2, 3)
+    let call_expr = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "add".to_string(),
+            position: pos(),
+        }),
+        args: vec![
+            Expr::Literal {
+                value: LiteralValue::Number(2.0),
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(3.0),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call_expr).unwrap();
+    assert_eq!(result, Value::Number(5.0));
+}
+
+#[test]
+fn test_function_no_params() {
+    let mut executor = Executor::new();
+
+    // Define function: func greet() { return "Hello" }
+    let func_decl = Stmt::FunctionDecl {
+        name: "greet".to_string(),
+        params: vec![],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Literal {
+                value: LiteralValue::String("Hello".to_string()),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // Call function: greet()
+    let call_expr = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "greet".to_string(),
+            position: pos(),
+        }),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call_expr).unwrap();
+    assert_eq!(result, Value::String("Hello".to_string()));
+}
+
+#[test]
+fn test_function_with_expression_body() {
+    let mut executor = Executor::new();
+
+    // Define function: func double(x) { return x * 2 }
+    let func_decl = Stmt::FunctionDecl {
+        name: "double".to_string(),
+        params: vec![graphoid::ast::Parameter {
+            name: "x".to_string(),
+            default_value: None,
+        }],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "x".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Multiply,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(2.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // Call: double(5)
+    let call_expr = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "double".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call_expr).unwrap();
+    assert_eq!(result, Value::Number(10.0));
+}
+
+#[test]
+fn test_function_nested_calls() {
+    let mut executor = Executor::new();
+
+    // Define: func add(a, b) { return a + b }
+    let add_decl = Stmt::FunctionDecl {
+        name: "add".to_string(),
+        params: vec![
+            graphoid::ast::Parameter {
+                name: "a".to_string(),
+                default_value: None,
+            },
+            graphoid::ast::Parameter {
+                name: "b".to_string(),
+                default_value: None,
+            },
+        ],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "a".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Variable {
+                    name: "b".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    // Define: func mul(a, b) { return a * b }
+    let mul_decl = Stmt::FunctionDecl {
+        name: "mul".to_string(),
+        params: vec![
+            graphoid::ast::Parameter {
+                name: "a".to_string(),
+                default_value: None,
+            },
+            graphoid::ast::Parameter {
+                name: "b".to_string(),
+                default_value: None,
+            },
+        ],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "a".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Multiply,
+                right: Box::new(Expr::Variable {
+                    name: "b".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&add_decl).unwrap();
+    executor.eval_stmt(&mul_decl).unwrap();
+
+    // Call: add(mul(2, 3), 4) => add(6, 4) => 10
+    let call_expr = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "add".to_string(),
+            position: pos(),
+        }),
+        args: vec![
+            Expr::Call {
+                callee: Box::new(Expr::Variable {
+                    name: "mul".to_string(),
+                    position: pos(),
+                }),
+                args: vec![
+                    Expr::Literal {
+                        value: LiteralValue::Number(2.0),
+                        position: pos(),
+                    },
+                    Expr::Literal {
+                        value: LiteralValue::Number(3.0),
+                        position: pos(),
+                    },
+                ],
+                position: pos(),
+            },
+            Expr::Literal {
+                value: LiteralValue::Number(4.0),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call_expr).unwrap();
+    assert_eq!(result, Value::Number(10.0));
+}
+
+#[test]
+fn test_function_closure() {
+    let mut executor = Executor::new();
+
+    // Set up: x = 10
+    executor.env_mut().define("x".to_string(), Value::Number(10.0));
+
+    // Define: func add_x(y) { return x + y }  (captures x)
+    let func_decl = Stmt::FunctionDecl {
+        name: "add_x".to_string(),
+        params: vec![graphoid::ast::Parameter {
+            name: "y".to_string(),
+            default_value: None,
+        }],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "x".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Variable {
+                    name: "y".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // Call: add_x(5) should return 15 (captures x=10)
+    let call_expr = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "add_x".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call_expr).unwrap();
+    assert_eq!(result, Value::Number(15.0));
+}
+
+#[test]
+fn test_function_return_none() {
+    let mut executor = Executor::new();
+
+    // Define: func do_nothing() { return }
+    let func_decl = Stmt::FunctionDecl {
+        name: "do_nothing".to_string(),
+        params: vec![],
+        body: vec![Stmt::Return {
+            value: None,
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // Call: do_nothing()
+    let call_expr = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "do_nothing".to_string(),
+            position: pos(),
+        }),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call_expr).unwrap();
+    assert_eq!(result, Value::None);
+}
+
+#[test]
+fn test_function_wrong_arg_count() {
+    let mut executor = Executor::new();
+
+    // Define: func add(a, b) { return a + b }
+    let func_decl = Stmt::FunctionDecl {
+        name: "add".to_string(),
+        params: vec![
+            graphoid::ast::Parameter {
+                name: "a".to_string(),
+                default_value: None,
+            },
+            graphoid::ast::Parameter {
+                name: "b".to_string(),
+                default_value: None,
+            },
+        ],
+        body: vec![Stmt::Return {
+            value: Some(Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "a".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Variable {
+                    name: "b".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            }),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // Call with wrong number of arguments: add(2)
+    let call_expr = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "add".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(2.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call_expr);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_function_call_non_function() {
+    let mut executor = Executor::new();
+
+    // Define a variable, not a function
+    executor.env_mut().define("x".to_string(), Value::Number(42.0));
+
+    // Try to call it: x()
+    let call_expr = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "x".to_string(),
+            position: pos(),
+        }),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call_expr);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_function_undefined() {
+    let mut executor = Executor::new();
+
+    // Try to call undefined function: foo()
+    let call_expr = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "foo".to_string(),
+            position: pos(),
+        }),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call_expr);
+    assert!(result.is_err());
+}
