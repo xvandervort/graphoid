@@ -405,7 +405,7 @@ impl Executor {
     }
 
     /// Evaluates a method call on a list.
-    fn eval_list_method(&self, elements: &[Value], method: &str, args: &[Value]) -> Result<Value> {
+    fn eval_list_method(&mut self, elements: &[Value], method: &str, args: &[Value]) -> Result<Value> {
         match method {
             "size" => {
                 if !args.is_empty() {
@@ -462,6 +462,96 @@ impl Executor {
                 }
                 Ok(Value::Boolean(elements.is_empty()))
             }
+            "map" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'map' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get the function argument
+                let func = match &args[0] {
+                    Value::Function(f) => f,
+                    other => {
+                        return Err(GraphoidError::type_error(
+                            "function",
+                            other.type_name(),
+                        ));
+                    }
+                };
+
+                // Apply the function to each element
+                let mut results = Vec::new();
+                for element in elements {
+                    // Call the function with this element
+                    let result = self.call_function(func, &[element.clone()])?;
+                    results.push(result);
+                }
+
+                Ok(Value::List(results))
+            }
+            "filter" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'filter' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get the function argument
+                let func = match &args[0] {
+                    Value::Function(f) => f,
+                    other => {
+                        return Err(GraphoidError::type_error(
+                            "function",
+                            other.type_name(),
+                        ));
+                    }
+                };
+
+                // Filter elements based on predicate
+                let mut results = Vec::new();
+                for element in elements {
+                    // Call the function with this element
+                    let result = self.call_function(func, &[element.clone()])?;
+
+                    // Check if result is truthy
+                    if result.is_truthy() {
+                        results.push(element.clone());
+                    }
+                }
+
+                Ok(Value::List(results))
+            }
+            "each" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'each' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get the function argument
+                let func = match &args[0] {
+                    Value::Function(f) => f,
+                    other => {
+                        return Err(GraphoidError::type_error(
+                            "function",
+                            other.type_name(),
+                        ));
+                    }
+                };
+
+                // Execute the function for each element (for side effects)
+                for element in elements {
+                    // Call the function with this element, ignore result
+                    let _ = self.call_function(func, &[element.clone()])?;
+                }
+
+                // Return the original list
+                Ok(Value::List(elements.to_vec()))
+            }
             _ => Err(GraphoidError::runtime(format!(
                 "List does not have method '{}'",
                 method
@@ -470,7 +560,7 @@ impl Executor {
     }
 
     /// Evaluates a method call on a map.
-    fn eval_map_method(&self, _map: &HashMap<String, Value>, method: &str, _args: &[Value]) -> Result<Value> {
+    fn eval_map_method(&mut self, _map: &HashMap<String, Value>, method: &str, _args: &[Value]) -> Result<Value> {
         // Placeholder for map methods - will implement later
         Err(GraphoidError::runtime(format!(
             "Map does not have method '{}' (not yet implemented)",
@@ -500,6 +590,64 @@ impl Executor {
             arg_values.push(self.eval_expr(arg)?);
         }
 
+        // Check argument count
+        if arg_values.len() != func.params.len() {
+            return Err(GraphoidError::runtime(format!(
+                "Function '{}' expects {} arguments, but got {}",
+                func.name.as_ref().unwrap_or(&"<anonymous>".to_string()),
+                func.params.len(),
+                arg_values.len()
+            )));
+        }
+
+        // Push function name onto call stack
+        let func_name = func.name.as_ref().unwrap_or(&"<anonymous>".to_string()).clone();
+        self.call_stack.push(func_name.clone());
+
+        // Create new environment as child of function's closure environment
+        let mut call_env = Environment::with_parent((*func.env).clone());
+
+        // Bind parameters to argument values
+        for (param_name, arg_value) in func.params.iter().zip(arg_values.iter()) {
+            call_env.define(param_name.clone(), arg_value.clone());
+        }
+
+        // Save current environment and switch to call environment
+        let saved_env = std::mem::replace(&mut self.env, call_env);
+
+        // Execute function body
+        let mut return_value = Value::None;
+        let execution_result: Result<()> = (|| {
+            for stmt in &func.body {
+                match self.eval_stmt(stmt)? {
+                    Some(val) => {
+                        // Return statement executed
+                        return_value = val;
+                        break;
+                    }
+                    None => {
+                        // Normal statement, continue
+                    }
+                }
+            }
+            Ok(())
+        })();
+
+        // Restore original environment
+        self.env = saved_env;
+
+        // Pop function from call stack
+        self.call_stack.pop();
+
+        // Propagate errors
+        execution_result?;
+
+        Ok(return_value)
+    }
+
+    /// Helper method to call a function with given argument values.
+    /// Used by map, filter, each, and other functional methods.
+    fn call_function(&mut self, func: &Function, arg_values: &[Value]) -> Result<Value> {
         // Check argument count
         if arg_values.len() != func.params.len() {
             return Err(GraphoidError::runtime(format!(

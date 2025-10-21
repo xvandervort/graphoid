@@ -4157,3 +4157,671 @@ fn test_nested_for_loops() {
     let count_value = executor.env().get("count").unwrap();
     assert_eq!(count_value, Value::Number(6.0));
 }
+
+// ============================================================================
+// LIST INDEXING TESTS
+// ============================================================================
+
+#[test]
+fn test_list_index_positive() {
+    let mut executor = Executor::new();
+
+    // items = [10, 20, 30]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("items".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // items[0] should be 10
+    let index_expr = Expr::Index {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        index: Box::new(Expr::Literal { value: LiteralValue::Number(0.0), position: pos() }),
+        position: pos(),
+    };
+    let result = executor.eval_expr(&index_expr).unwrap();
+    assert_eq!(result, Value::Number(10.0));
+
+    // items[1] should be 20
+    let index_expr = Expr::Index {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        index: Box::new(Expr::Literal { value: LiteralValue::Number(1.0), position: pos() }),
+        position: pos(),
+    };
+    let result = executor.eval_expr(&index_expr).unwrap();
+    assert_eq!(result, Value::Number(20.0));
+
+    // items[2] should be 30
+    let index_expr = Expr::Index {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        index: Box::new(Expr::Literal { value: LiteralValue::Number(2.0), position: pos() }),
+        position: pos(),
+    };
+    let result = executor.eval_expr(&index_expr).unwrap();
+    assert_eq!(result, Value::Number(30.0));
+}
+
+#[test]
+fn test_list_index_negative() {
+    let mut executor = Executor::new();
+
+    // items = [10, 20, 30]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("items".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // items[-1] should be 30 (last element)
+    let index_expr = Expr::Index {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        index: Box::new(Expr::Literal { value: LiteralValue::Number(-1.0), position: pos() }),
+        position: pos(),
+    };
+    let result = executor.eval_expr(&index_expr).unwrap();
+    assert_eq!(result, Value::Number(30.0));
+
+    // items[-2] should be 20
+    let index_expr = Expr::Index {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        index: Box::new(Expr::Literal { value: LiteralValue::Number(-2.0), position: pos() }),
+        position: pos(),
+    };
+    let result = executor.eval_expr(&index_expr).unwrap();
+    assert_eq!(result, Value::Number(20.0));
+
+    // items[-3] should be 10 (first element)
+    let index_expr = Expr::Index {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        index: Box::new(Expr::Literal { value: LiteralValue::Number(-3.0), position: pos() }),
+        position: pos(),
+    };
+    let result = executor.eval_expr(&index_expr).unwrap();
+    assert_eq!(result, Value::Number(10.0));
+}
+
+#[test]
+fn test_list_index_out_of_bounds() {
+    let mut executor = Executor::new();
+
+    // items = [10, 20]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("items".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // items[5] should error (out of bounds)
+    let index_expr = Expr::Index {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        index: Box::new(Expr::Literal { value: LiteralValue::Number(5.0), position: pos() }),
+        position: pos(),
+    };
+    let result = executor.eval_expr(&index_expr);
+    assert!(result.is_err());
+
+    // items[-5] should error (out of bounds)
+    let index_expr = Expr::Index {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        index: Box::new(Expr::Literal { value: LiteralValue::Number(-5.0), position: pos() }),
+        position: pos(),
+    };
+    let result = executor.eval_expr(&index_expr);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_list_index_with_strings() {
+    let mut executor = Executor::new();
+
+    // words = ["hello", "world"]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("words".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::String("hello".to_string()), position: pos() },
+                Expr::Literal { value: LiteralValue::String("world".to_string()), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // words[0] should be "hello"
+    let index_expr = Expr::Index {
+        object: Box::new(Expr::Variable { name: "words".to_string(), position: pos() }),
+        index: Box::new(Expr::Literal { value: LiteralValue::Number(0.0), position: pos() }),
+        position: pos(),
+    };
+    let result = executor.eval_expr(&index_expr).unwrap();
+    assert_eq!(result, Value::String("hello".to_string()));
+}
+
+#[test]
+fn test_map_index_string_key() {
+    let mut executor = Executor::new();
+
+    // config = {"name": "Alice", "age": 30}
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("config".to_string()),
+        value: Expr::Map {
+            entries: vec![
+                ("name".to_string(), Expr::Literal { value: LiteralValue::String("Alice".to_string()), position: pos() }),
+                ("age".to_string(), Expr::Literal { value: LiteralValue::Number(30.0), position: pos() }),
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // config["name"] should be "Alice"
+    let index_expr = Expr::Index {
+        object: Box::new(Expr::Variable { name: "config".to_string(), position: pos() }),
+        index: Box::new(Expr::Literal { value: LiteralValue::String("name".to_string()), position: pos() }),
+        position: pos(),
+    };
+    let result = executor.eval_expr(&index_expr).unwrap();
+    assert_eq!(result, Value::String("Alice".to_string()));
+
+    // config["age"] should be 30
+    let index_expr = Expr::Index {
+        object: Box::new(Expr::Variable { name: "config".to_string(), position: pos() }),
+        index: Box::new(Expr::Literal { value: LiteralValue::String("age".to_string()), position: pos() }),
+        position: pos(),
+    };
+    let result = executor.eval_expr(&index_expr).unwrap();
+    assert_eq!(result, Value::Number(30.0));
+}
+
+#[test]
+fn test_map_index_missing_key() {
+    let mut executor = Executor::new();
+
+    // config = {"name": "Alice"}
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("config".to_string()),
+        value: Expr::Map {
+            entries: vec![
+                ("name".to_string(), Expr::Literal { value: LiteralValue::String("Alice".to_string()), position: pos() }),
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // config["missing"] should error
+    let index_expr = Expr::Index {
+        object: Box::new(Expr::Variable { name: "config".to_string(), position: pos() }),
+        index: Box::new(Expr::Literal { value: LiteralValue::String("missing".to_string()), position: pos() }),
+        position: pos(),
+    };
+    let result = executor.eval_expr(&index_expr);
+    assert!(result.is_err());
+}
+
+// ============================================================================
+// LIST METHOD TESTS
+// ============================================================================
+
+#[test]
+fn test_list_method_size() {
+    let mut executor = Executor::new();
+
+    // items = [10, 20, 30]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("items".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // items.size() should be 3
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        method: "size".to_string(),
+        args: vec![],
+        position: pos(),
+    };
+    let result = executor.eval_expr(&method_call).unwrap();
+    assert_eq!(result, Value::Number(3.0));
+}
+
+#[test]
+fn test_list_method_first() {
+    let mut executor = Executor::new();
+
+    // items = [10, 20, 30]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("items".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // items.first() should be 10
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        method: "first".to_string(),
+        args: vec![],
+        position: pos(),
+    };
+    let result = executor.eval_expr(&method_call).unwrap();
+    assert_eq!(result, Value::Number(10.0));
+}
+
+#[test]
+fn test_list_method_last() {
+    let mut executor = Executor::new();
+
+    // items = [10, 20, 30]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("items".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // items.last() should be 30
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        method: "last".to_string(),
+        args: vec![],
+        position: pos(),
+    };
+    let result = executor.eval_expr(&method_call).unwrap();
+    assert_eq!(result, Value::Number(30.0));
+}
+
+#[test]
+fn test_list_method_contains() {
+    let mut executor = Executor::new();
+
+    // items = [10, 20, 30]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("items".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // items.contains(20) should be true
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        method: "contains".to_string(),
+        args: vec![Expr::Literal { value: LiteralValue::Number(20.0), position: pos() }],
+        position: pos(),
+    };
+    let result = executor.eval_expr(&method_call).unwrap();
+    assert_eq!(result, Value::Boolean(true));
+
+    // items.contains(99) should be false
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        method: "contains".to_string(),
+        args: vec![Expr::Literal { value: LiteralValue::Number(99.0), position: pos() }],
+        position: pos(),
+    };
+    let result = executor.eval_expr(&method_call).unwrap();
+    assert_eq!(result, Value::Boolean(false));
+}
+
+#[test]
+fn test_list_method_is_empty() {
+    let mut executor = Executor::new();
+
+    // empty = []
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("empty".to_string()),
+        value: Expr::List {
+            elements: vec![],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // empty.is_empty() should be true
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "empty".to_string(), position: pos() }),
+        method: "is_empty".to_string(),
+        args: vec![],
+        position: pos(),
+    };
+    let result = executor.eval_expr(&method_call).unwrap();
+    assert_eq!(result, Value::Boolean(true));
+
+    // items = [1]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("items".to_string()),
+        value: Expr::List {
+            elements: vec![Expr::Literal { value: LiteralValue::Number(1.0), position: pos() }],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // items.is_empty() should be false
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        method: "is_empty".to_string(),
+        args: vec![],
+        position: pos(),
+    };
+    let result = executor.eval_expr(&method_call).unwrap();
+    assert_eq!(result, Value::Boolean(false));
+}
+
+// ============================================================================
+// LIST FUNCTIONAL METHOD TESTS
+// ============================================================================
+
+#[test]
+fn test_list_method_map() {
+    let mut executor = Executor::new();
+
+    // numbers = [1, 2, 3]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("numbers".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // doubled = numbers.map(x => x * 2)
+    let lambda = Expr::Lambda {
+        params: vec!["x".to_string()],
+        body: Box::new(Expr::Binary {
+            left: Box::new(Expr::Variable { name: "x".to_string(), position: pos() }),
+            op: BinaryOp::Multiply,
+            right: Box::new(Expr::Literal { value: LiteralValue::Number(2.0), position: pos() }),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
+        method: "map".to_string(),
+        args: vec![lambda],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(2.0));
+            assert_eq!(elements[1], Value::Number(4.0));
+            assert_eq!(elements[2], Value::Number(6.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_list_method_filter() {
+    let mut executor = Executor::new();
+
+    // numbers = [1, 2, 3, 4, 5]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("numbers".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(4.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(5.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // evens = numbers.filter(x => x % 2 == 0)
+    let lambda = Expr::Lambda {
+        params: vec!["x".to_string()],
+        body: Box::new(Expr::Binary {
+            left: Box::new(Expr::Binary {
+                left: Box::new(Expr::Variable { name: "x".to_string(), position: pos() }),
+                op: BinaryOp::Modulo,
+                right: Box::new(Expr::Literal { value: LiteralValue::Number(2.0), position: pos() }),
+                position: pos(),
+            }),
+            op: BinaryOp::Equal,
+            right: Box::new(Expr::Literal { value: LiteralValue::Number(0.0), position: pos() }),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
+        method: "filter".to_string(),
+        args: vec![lambda],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 2);
+            assert_eq!(elements[0], Value::Number(2.0));
+            assert_eq!(elements[1], Value::Number(4.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_list_method_each() {
+    let mut executor = Executor::new();
+
+    // numbers = [1, 2, 3]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("numbers".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // numbers.each(x => x * 2) - just executes the lambda for each element
+    let lambda = Expr::Lambda {
+        params: vec!["x".to_string()],
+        body: Box::new(Expr::Binary {
+            left: Box::new(Expr::Variable { name: "x".to_string(), position: pos() }),
+            op: BinaryOp::Multiply,
+            right: Box::new(Expr::Literal { value: LiteralValue::Number(2.0), position: pos() }),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
+        method: "each".to_string(),
+        args: vec![lambda],
+        position: pos(),
+    };
+
+    // each() should return the original list
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(1.0));
+            assert_eq!(elements[1], Value::Number(2.0));
+            assert_eq!(elements[2], Value::Number(3.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_list_method_map_with_strings() {
+    let mut executor = Executor::new();
+
+    // words = ["hello", "world"]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("words".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::String("hello".to_string()), position: pos() },
+                Expr::Literal { value: LiteralValue::String("world".to_string()), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // exclaimed = words.map(w => w + "!")
+    let lambda = Expr::Lambda {
+        params: vec!["w".to_string()],
+        body: Box::new(Expr::Binary {
+            left: Box::new(Expr::Variable { name: "w".to_string(), position: pos() }),
+            op: BinaryOp::Add,
+            right: Box::new(Expr::Literal { value: LiteralValue::String("!".to_string()), position: pos() }),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "words".to_string(), position: pos() }),
+        method: "map".to_string(),
+        args: vec![lambda],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 2);
+            assert_eq!(elements[0], Value::String("hello!".to_string()));
+            assert_eq!(elements[1], Value::String("world!".to_string()));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_list_method_filter_greater_than() {
+    let mut executor = Executor::new();
+
+    // numbers = [1, 5, 10, 15, 20]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("numbers".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(5.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(15.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // big = numbers.filter(x => x > 10)
+    let lambda = Expr::Lambda {
+        params: vec!["x".to_string()],
+        body: Box::new(Expr::Binary {
+            left: Box::new(Expr::Variable { name: "x".to_string(), position: pos() }),
+            op: BinaryOp::Greater,
+            right: Box::new(Expr::Literal { value: LiteralValue::Number(10.0), position: pos() }),
+            position: pos(),
+        }),
+        position: pos(),
+    };
+
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
+        method: "filter".to_string(),
+        args: vec![lambda],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 2);
+            assert_eq!(elements[0], Value::Number(15.0));
+            assert_eq!(elements[1], Value::Number(20.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
