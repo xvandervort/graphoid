@@ -2999,6 +2999,270 @@ fn test_function_call_with_expression_args() {
     assert_eq!(result, Value::Number(12.0));
 }
 
+// ============================================================================
+// CONTROL FLOW TESTS
+// ============================================================================
+
+#[test]
+fn test_if_statement_true() {
+    let mut executor = Executor::new();
+
+    // x = 0
+    executor.env_mut().define("x".to_string(), Value::Number(0.0));
+
+    // if true { x = 1 }
+    let if_stmt = Stmt::If {
+        condition: Expr::Literal {
+            value: LiteralValue::Boolean(true),
+            position: pos(),
+        },
+        then_branch: vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("x".to_string()),
+            value: Expr::Literal {
+                value: LiteralValue::Number(1.0),
+                position: pos(),
+            },
+            position: pos(),
+        }],
+        else_branch: None,
+        position: pos(),
+    };
+
+    executor.eval_stmt(&if_stmt).unwrap();
+
+    let x = executor.env().get("x").unwrap();
+    assert_eq!(x, Value::Number(1.0));
+}
+
+#[test]
+fn test_if_statement_false() {
+    let mut executor = Executor::new();
+
+    // x = 0
+    executor.env_mut().define("x".to_string(), Value::Number(0.0));
+
+    // if false { x = 1 }
+    let if_stmt = Stmt::If {
+        condition: Expr::Literal {
+            value: LiteralValue::Boolean(false),
+            position: pos(),
+        },
+        then_branch: vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("x".to_string()),
+            value: Expr::Literal {
+                value: LiteralValue::Number(1.0),
+                position: pos(),
+            },
+            position: pos(),
+        }],
+        else_branch: None,
+        position: pos(),
+    };
+
+    executor.eval_stmt(&if_stmt).unwrap();
+
+    let x = executor.env().get("x").unwrap();
+    assert_eq!(x, Value::Number(0.0)); // Should still be 0
+}
+
+#[test]
+fn test_if_else_true() {
+    let mut executor = Executor::new();
+
+    // x = 0
+    executor.env_mut().define("x".to_string(), Value::Number(0.0));
+
+    // if true { x = 1 } else { x = 2 }
+    let if_stmt = Stmt::If {
+        condition: Expr::Literal {
+            value: LiteralValue::Boolean(true),
+            position: pos(),
+        },
+        then_branch: vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("x".to_string()),
+            value: Expr::Literal {
+                value: LiteralValue::Number(1.0),
+                position: pos(),
+            },
+            position: pos(),
+        }],
+        else_branch: Some(vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("x".to_string()),
+            value: Expr::Literal {
+                value: LiteralValue::Number(2.0),
+                position: pos(),
+            },
+            position: pos(),
+        }]),
+        position: pos(),
+    };
+
+    executor.eval_stmt(&if_stmt).unwrap();
+
+    let x = executor.env().get("x").unwrap();
+    assert_eq!(x, Value::Number(1.0));
+}
+
+#[test]
+fn test_if_else_false() {
+    let mut executor = Executor::new();
+
+    // x = 0
+    executor.env_mut().define("x".to_string(), Value::Number(0.0));
+
+    // if false { x = 1 } else { x = 2 }
+    let if_stmt = Stmt::If {
+        condition: Expr::Literal {
+            value: LiteralValue::Boolean(false),
+            position: pos(),
+        },
+        then_branch: vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("x".to_string()),
+            value: Expr::Literal {
+                value: LiteralValue::Number(1.0),
+                position: pos(),
+            },
+            position: pos(),
+        }],
+        else_branch: Some(vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("x".to_string()),
+            value: Expr::Literal {
+                value: LiteralValue::Number(2.0),
+                position: pos(),
+            },
+            position: pos(),
+        }]),
+        position: pos(),
+    };
+
+    executor.eval_stmt(&if_stmt).unwrap();
+
+    let x = executor.env().get("x").unwrap();
+    assert_eq!(x, Value::Number(2.0));
+}
+
+#[test]
+fn test_if_with_comparison() {
+    let mut executor = Executor::new();
+
+    // x = 10
+    executor.env_mut().define("x".to_string(), Value::Number(10.0));
+    // result = 0
+    executor.env_mut().define("result".to_string(), Value::Number(0.0));
+
+    // if x > 5 { result = 1 }
+    let if_stmt = Stmt::If {
+        condition: Expr::Binary {
+            left: Box::new(Expr::Variable {
+                name: "x".to_string(),
+                position: pos(),
+            }),
+            op: BinaryOp::Greater,
+            right: Box::new(Expr::Literal {
+                value: LiteralValue::Number(5.0),
+                position: pos(),
+            }),
+            position: pos(),
+        },
+        then_branch: vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("result".to_string()),
+            value: Expr::Literal {
+                value: LiteralValue::Number(1.0),
+                position: pos(),
+            },
+            position: pos(),
+        }],
+        else_branch: None,
+        position: pos(),
+    };
+
+    executor.eval_stmt(&if_stmt).unwrap();
+
+    let result = executor.env().get("result").unwrap();
+    assert_eq!(result, Value::Number(1.0));
+}
+
+#[test]
+fn test_if_return_in_function() {
+    let mut executor = Executor::new();
+
+    // func check(n) { if n > 0 { return 1 } return 0 }
+    let func_decl = Stmt::FunctionDecl {
+        name: "check".to_string(),
+        params: vec![Parameter {
+            name: "n".to_string(),
+            default_value: None,
+        }],
+        body: vec![
+            Stmt::If {
+                condition: Expr::Binary {
+                    left: Box::new(Expr::Variable {
+                        name: "n".to_string(),
+                        position: pos(),
+                    }),
+                    op: BinaryOp::Greater,
+                    right: Box::new(Expr::Literal {
+                        value: LiteralValue::Number(0.0),
+                        position: pos(),
+                    }),
+                    position: pos(),
+                },
+                then_branch: vec![Stmt::Return {
+                    value: Some(Expr::Literal {
+                        value: LiteralValue::Number(1.0),
+                        position: pos(),
+                    }),
+                    position: pos(),
+                }],
+                else_branch: None,
+                position: pos(),
+            },
+            Stmt::Return {
+                value: Some(Expr::Literal {
+                    value: LiteralValue::Number(0.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // check(5) should return 1
+    let call1 = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "check".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result1 = executor.eval_expr(&call1).unwrap();
+    assert_eq!(result1, Value::Number(1.0));
+
+    // check(-5) should return 0
+    let call2 = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "check".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(-5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result2 = executor.eval_expr(&call2).unwrap();
+    assert_eq!(result2, Value::Number(0.0));
+}
+
 #[test]
 fn test_call_stack_empty_initially() {
     let executor = Executor::new();
@@ -3065,4 +3329,831 @@ fn test_call_stack_cleared_after_return() {
 
     // After function returns, call stack should be empty
     assert_eq!(executor.call_stack().len(), 0);
+}
+
+// ============================================================================
+// WHILE LOOP TESTS
+// ============================================================================
+
+#[test]
+fn test_while_loop_simple_counter() {
+    let mut executor = Executor::new();
+
+    // count = 0
+    // while count < 3 { count = count + 1 }
+    executor
+        .eval_stmt(&Stmt::VariableDecl {
+            name: "count".to_string(),
+            value: Expr::Literal {
+                value: LiteralValue::Number(0.0),
+                position: pos(),
+            },
+            type_annotation: None,
+            position: pos(),
+        })
+        .unwrap();
+
+    let while_stmt = Stmt::While {
+        condition: Expr::Binary {
+            left: Box::new(Expr::Variable {
+                name: "count".to_string(),
+                position: pos(),
+            }),
+            op: BinaryOp::Less,
+            right: Box::new(Expr::Literal {
+                value: LiteralValue::Number(3.0),
+                position: pos(),
+            }),
+            position: pos(),
+        },
+        body: vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("count".to_string()),
+            value: Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "count".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&while_stmt).unwrap();
+
+    let count_value = executor.env().get("count").unwrap();
+    assert_eq!(count_value, Value::Number(3.0));
+}
+
+#[test]
+fn test_while_loop_never_executes() {
+    let mut executor = Executor::new();
+
+    // x = 10
+    // while x < 5 { x = x + 1 }
+    executor
+        .eval_stmt(&Stmt::VariableDecl {
+            name: "x".to_string(),
+            value: Expr::Literal {
+                value: LiteralValue::Number(10.0),
+                position: pos(),
+            },
+            type_annotation: None,
+            position: pos(),
+        })
+        .unwrap();
+
+    let while_stmt = Stmt::While {
+        condition: Expr::Binary {
+            left: Box::new(Expr::Variable {
+                name: "x".to_string(),
+                position: pos(),
+            }),
+            op: BinaryOp::Less,
+            right: Box::new(Expr::Literal {
+                value: LiteralValue::Number(5.0),
+                position: pos(),
+            }),
+            position: pos(),
+        },
+        body: vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("x".to_string()),
+            value: Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "x".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&while_stmt).unwrap();
+
+    // x should still be 10 since loop never executed
+    let x_value = executor.env().get("x").unwrap();
+    assert_eq!(x_value, Value::Number(10.0));
+}
+
+#[test]
+fn test_while_loop_with_multiple_statements() {
+    let mut executor = Executor::new();
+
+    // sum = 0
+    // i = 1
+    // while i <= 5 {
+    //     sum = sum + i
+    //     i = i + 1
+    // }
+    executor
+        .eval_stmt(&Stmt::VariableDecl {
+            name: "sum".to_string(),
+            value: Expr::Literal {
+                value: LiteralValue::Number(0.0),
+                position: pos(),
+            },
+            type_annotation: None,
+            position: pos(),
+        })
+        .unwrap();
+
+    executor
+        .eval_stmt(&Stmt::VariableDecl {
+            name: "i".to_string(),
+            value: Expr::Literal {
+                value: LiteralValue::Number(1.0),
+                position: pos(),
+            },
+            type_annotation: None,
+            position: pos(),
+        })
+        .unwrap();
+
+    let while_stmt = Stmt::While {
+        condition: Expr::Binary {
+            left: Box::new(Expr::Variable {
+                name: "i".to_string(),
+                position: pos(),
+            }),
+            op: BinaryOp::LessEqual,
+            right: Box::new(Expr::Literal {
+                value: LiteralValue::Number(5.0),
+                position: pos(),
+            }),
+            position: pos(),
+        },
+        body: vec![
+            Stmt::Assignment {
+                target: AssignmentTarget::Variable("sum".to_string()),
+                value: Expr::Binary {
+                    left: Box::new(Expr::Variable {
+                        name: "sum".to_string(),
+                        position: pos(),
+                    }),
+                    op: BinaryOp::Add,
+                    right: Box::new(Expr::Variable {
+                        name: "i".to_string(),
+                        position: pos(),
+                    }),
+                    position: pos(),
+                },
+                position: pos(),
+            },
+            Stmt::Assignment {
+                target: AssignmentTarget::Variable("i".to_string()),
+                value: Expr::Binary {
+                    left: Box::new(Expr::Variable {
+                        name: "i".to_string(),
+                        position: pos(),
+                    }),
+                    op: BinaryOp::Add,
+                    right: Box::new(Expr::Literal {
+                        value: LiteralValue::Number(1.0),
+                        position: pos(),
+                    }),
+                    position: pos(),
+                },
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&while_stmt).unwrap();
+
+    // sum should be 1+2+3+4+5 = 15
+    let sum_value = executor.env().get("sum").unwrap();
+    assert_eq!(sum_value, Value::Number(15.0));
+
+    // i should be 6
+    let i_value = executor.env().get("i").unwrap();
+    assert_eq!(i_value, Value::Number(6.0));
+}
+
+#[test]
+fn test_while_loop_in_function() {
+    let mut executor = Executor::new();
+
+    // func factorial(n) {
+    //     result = 1
+    //     i = 1
+    //     while i <= n {
+    //         result = result * i
+    //         i = i + 1
+    //     }
+    //     return result
+    // }
+    let func_decl = Stmt::FunctionDecl {
+        name: "factorial".to_string(),
+        params: vec![Parameter {
+            name: "n".to_string(),
+            default_value: None,
+        }],
+        body: vec![
+            Stmt::VariableDecl {
+                name: "result".to_string(),
+                value: Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                },
+                type_annotation: None,
+                position: pos(),
+            },
+            Stmt::VariableDecl {
+                name: "i".to_string(),
+                value: Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                },
+                type_annotation: None,
+                position: pos(),
+            },
+            Stmt::While {
+                condition: Expr::Binary {
+                    left: Box::new(Expr::Variable {
+                        name: "i".to_string(),
+                        position: pos(),
+                    }),
+                    op: BinaryOp::LessEqual,
+                    right: Box::new(Expr::Variable {
+                        name: "n".to_string(),
+                        position: pos(),
+                    }),
+                    position: pos(),
+                },
+                body: vec![
+                    Stmt::Assignment {
+                        target: AssignmentTarget::Variable("result".to_string()),
+                        value: Expr::Binary {
+                            left: Box::new(Expr::Variable {
+                                name: "result".to_string(),
+                                position: pos(),
+                            }),
+                            op: BinaryOp::Multiply,
+                            right: Box::new(Expr::Variable {
+                                name: "i".to_string(),
+                                position: pos(),
+                            }),
+                            position: pos(),
+                        },
+                        position: pos(),
+                    },
+                    Stmt::Assignment {
+                        target: AssignmentTarget::Variable("i".to_string()),
+                        value: Expr::Binary {
+                            left: Box::new(Expr::Variable {
+                                name: "i".to_string(),
+                                position: pos(),
+                            }),
+                            op: BinaryOp::Add,
+                            right: Box::new(Expr::Literal {
+                                value: LiteralValue::Number(1.0),
+                                position: pos(),
+                            }),
+                            position: pos(),
+                        },
+                        position: pos(),
+                    },
+                ],
+                position: pos(),
+            },
+            Stmt::Return {
+                value: Some(Expr::Variable {
+                    name: "result".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // factorial(5) should be 120
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "factorial".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::Literal {
+            value: LiteralValue::Number(5.0),
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(120.0));
+}
+
+#[test]
+fn test_nested_while_loops() {
+    let mut executor = Executor::new();
+
+    // sum = 0
+    // i = 1
+    // while i <= 3 {
+    //     j = 1
+    //     while j <= 2 {
+    //         sum = sum + 1
+    //         j = j + 1
+    //     }
+    //     i = i + 1
+    // }
+    executor
+        .eval_stmt(&Stmt::VariableDecl {
+            name: "sum".to_string(),
+            value: Expr::Literal {
+                value: LiteralValue::Number(0.0),
+                position: pos(),
+            },
+            type_annotation: None,
+            position: pos(),
+        })
+        .unwrap();
+
+    executor
+        .eval_stmt(&Stmt::VariableDecl {
+            name: "i".to_string(),
+            value: Expr::Literal {
+                value: LiteralValue::Number(1.0),
+                position: pos(),
+            },
+            type_annotation: None,
+            position: pos(),
+        })
+        .unwrap();
+
+    let inner_while = Stmt::While {
+        condition: Expr::Binary {
+            left: Box::new(Expr::Variable {
+                name: "j".to_string(),
+                position: pos(),
+            }),
+            op: BinaryOp::LessEqual,
+            right: Box::new(Expr::Literal {
+                value: LiteralValue::Number(2.0),
+                position: pos(),
+            }),
+            position: pos(),
+        },
+        body: vec![
+            Stmt::Assignment {
+                target: AssignmentTarget::Variable("sum".to_string()),
+                value: Expr::Binary {
+                    left: Box::new(Expr::Variable {
+                        name: "sum".to_string(),
+                        position: pos(),
+                    }),
+                    op: BinaryOp::Add,
+                    right: Box::new(Expr::Literal {
+                        value: LiteralValue::Number(1.0),
+                        position: pos(),
+                    }),
+                    position: pos(),
+                },
+                position: pos(),
+            },
+            Stmt::Assignment {
+                target: AssignmentTarget::Variable("j".to_string()),
+                value: Expr::Binary {
+                    left: Box::new(Expr::Variable {
+                        name: "j".to_string(),
+                        position: pos(),
+                    }),
+                    op: BinaryOp::Add,
+                    right: Box::new(Expr::Literal {
+                        value: LiteralValue::Number(1.0),
+                        position: pos(),
+                    }),
+                    position: pos(),
+                },
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    let outer_while = Stmt::While {
+        condition: Expr::Binary {
+            left: Box::new(Expr::Variable {
+                name: "i".to_string(),
+                position: pos(),
+            }),
+            op: BinaryOp::LessEqual,
+            right: Box::new(Expr::Literal {
+                value: LiteralValue::Number(3.0),
+                position: pos(),
+            }),
+            position: pos(),
+        },
+        body: vec![
+            Stmt::VariableDecl {
+                name: "j".to_string(),
+                value: Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                },
+                type_annotation: None,
+                position: pos(),
+            },
+            inner_while,
+            Stmt::Assignment {
+                target: AssignmentTarget::Variable("i".to_string()),
+                value: Expr::Binary {
+                    left: Box::new(Expr::Variable {
+                        name: "i".to_string(),
+                        position: pos(),
+                    }),
+                    op: BinaryOp::Add,
+                    right: Box::new(Expr::Literal {
+                        value: LiteralValue::Number(1.0),
+                        position: pos(),
+                    }),
+                    position: pos(),
+                },
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&outer_while).unwrap();
+
+    // sum should be 6 (3 outer iterations * 2 inner iterations)
+    let sum_value = executor.env().get("sum").unwrap();
+    assert_eq!(sum_value, Value::Number(6.0));
+}
+
+// ============================================================================
+// FOR LOOP TESTS
+// ============================================================================
+
+#[test]
+fn test_for_loop_simple() {
+    let mut executor = Executor::new();
+
+    // for i in [1, 2, 3] { sum = sum + i }
+    executor
+        .eval_stmt(&Stmt::VariableDecl {
+            name: "sum".to_string(),
+            value: Expr::Literal {
+                value: LiteralValue::Number(0.0),
+                position: pos(),
+            },
+            type_annotation: None,
+            position: pos(),
+        })
+        .unwrap();
+
+    let for_stmt = Stmt::For {
+        variable: "i".to_string(),
+        iterable: Expr::List {
+            elements: vec![
+                Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                },
+                Expr::Literal {
+                    value: LiteralValue::Number(2.0),
+                    position: pos(),
+                },
+                Expr::Literal {
+                    value: LiteralValue::Number(3.0),
+                    position: pos(),
+                },
+            ],
+            position: pos(),
+        },
+        body: vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("sum".to_string()),
+            value: Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "sum".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Variable {
+                    name: "i".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&for_stmt).unwrap();
+
+    // sum should be 1 + 2 + 3 = 6
+    let sum_value = executor.env().get("sum").unwrap();
+    assert_eq!(sum_value, Value::Number(6.0));
+}
+
+#[test]
+fn test_for_loop_empty_list() {
+    let mut executor = Executor::new();
+
+    // x = 0
+    // for i in [] { x = x + 1 }
+    executor
+        .eval_stmt(&Stmt::VariableDecl {
+            name: "x".to_string(),
+            value: Expr::Literal {
+                value: LiteralValue::Number(0.0),
+                position: pos(),
+            },
+            type_annotation: None,
+            position: pos(),
+        })
+        .unwrap();
+
+    let for_stmt = Stmt::For {
+        variable: "i".to_string(),
+        iterable: Expr::List {
+            elements: vec![],
+            position: pos(),
+        },
+        body: vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("x".to_string()),
+            value: Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "x".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&for_stmt).unwrap();
+
+    // x should still be 0 since loop never executed
+    let x_value = executor.env().get("x").unwrap();
+    assert_eq!(x_value, Value::Number(0.0));
+}
+
+#[test]
+fn test_for_loop_with_strings() {
+    let mut executor = Executor::new();
+
+    // result = ""
+    // for s in ["a", "b", "c"] { result = result + s }
+    executor
+        .eval_stmt(&Stmt::VariableDecl {
+            name: "result".to_string(),
+            value: Expr::Literal {
+                value: LiteralValue::String("".to_string()),
+                position: pos(),
+            },
+            type_annotation: None,
+            position: pos(),
+        })
+        .unwrap();
+
+    let for_stmt = Stmt::For {
+        variable: "s".to_string(),
+        iterable: Expr::List {
+            elements: vec![
+                Expr::Literal {
+                    value: LiteralValue::String("a".to_string()),
+                    position: pos(),
+                },
+                Expr::Literal {
+                    value: LiteralValue::String("b".to_string()),
+                    position: pos(),
+                },
+                Expr::Literal {
+                    value: LiteralValue::String("c".to_string()),
+                    position: pos(),
+                },
+            ],
+            position: pos(),
+        },
+        body: vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("result".to_string()),
+            value: Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "result".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Variable {
+                    name: "s".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&for_stmt).unwrap();
+
+    // result should be "abc"
+    let result_value = executor.env().get("result").unwrap();
+    assert_eq!(result_value, Value::String("abc".to_string()));
+}
+
+#[test]
+fn test_for_loop_in_function() {
+    let mut executor = Executor::new();
+
+    // func sum_list(numbers) {
+    //     total = 0
+    //     for n in numbers {
+    //         total = total + n
+    //     }
+    //     return total
+    // }
+    let func_decl = Stmt::FunctionDecl {
+        name: "sum_list".to_string(),
+        params: vec![Parameter {
+            name: "numbers".to_string(),
+            default_value: None,
+        }],
+        body: vec![
+            Stmt::VariableDecl {
+                name: "total".to_string(),
+                value: Expr::Literal {
+                    value: LiteralValue::Number(0.0),
+                    position: pos(),
+                },
+                type_annotation: None,
+                position: pos(),
+            },
+            Stmt::For {
+                variable: "n".to_string(),
+                iterable: Expr::Variable {
+                    name: "numbers".to_string(),
+                    position: pos(),
+                },
+                body: vec![Stmt::Assignment {
+                    target: AssignmentTarget::Variable("total".to_string()),
+                    value: Expr::Binary {
+                        left: Box::new(Expr::Variable {
+                            name: "total".to_string(),
+                            position: pos(),
+                        }),
+                        op: BinaryOp::Add,
+                        right: Box::new(Expr::Variable {
+                            name: "n".to_string(),
+                            position: pos(),
+                        }),
+                        position: pos(),
+                    },
+                    position: pos(),
+                }],
+                position: pos(),
+            },
+            Stmt::Return {
+                value: Some(Expr::Variable {
+                    name: "total".to_string(),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+        ],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&func_decl).unwrap();
+
+    // sum_list([10, 20, 30]) should be 60
+    let call = Expr::Call {
+        callee: Box::new(Expr::Variable {
+            name: "sum_list".to_string(),
+            position: pos(),
+        }),
+        args: vec![Expr::List {
+            elements: vec![
+                Expr::Literal {
+                    value: LiteralValue::Number(10.0),
+                    position: pos(),
+                },
+                Expr::Literal {
+                    value: LiteralValue::Number(20.0),
+                    position: pos(),
+                },
+                Expr::Literal {
+                    value: LiteralValue::Number(30.0),
+                    position: pos(),
+                },
+            ],
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&call).unwrap();
+    assert_eq!(result, Value::Number(60.0));
+}
+
+#[test]
+fn test_nested_for_loops() {
+    let mut executor = Executor::new();
+
+    // count = 0
+    // for i in [1, 2] {
+    //     for j in [10, 20, 30] {
+    //         count = count + 1
+    //     }
+    // }
+    executor
+        .eval_stmt(&Stmt::VariableDecl {
+            name: "count".to_string(),
+            value: Expr::Literal {
+                value: LiteralValue::Number(0.0),
+                position: pos(),
+            },
+            type_annotation: None,
+            position: pos(),
+        })
+        .unwrap();
+
+    let inner_for = Stmt::For {
+        variable: "j".to_string(),
+        iterable: Expr::List {
+            elements: vec![
+                Expr::Literal {
+                    value: LiteralValue::Number(10.0),
+                    position: pos(),
+                },
+                Expr::Literal {
+                    value: LiteralValue::Number(20.0),
+                    position: pos(),
+                },
+                Expr::Literal {
+                    value: LiteralValue::Number(30.0),
+                    position: pos(),
+                },
+            ],
+            position: pos(),
+        },
+        body: vec![Stmt::Assignment {
+            target: AssignmentTarget::Variable("count".to_string()),
+            value: Expr::Binary {
+                left: Box::new(Expr::Variable {
+                    name: "count".to_string(),
+                    position: pos(),
+                }),
+                op: BinaryOp::Add,
+                right: Box::new(Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                }),
+                position: pos(),
+            },
+            position: pos(),
+        }],
+        position: pos(),
+    };
+
+    let outer_for = Stmt::For {
+        variable: "i".to_string(),
+        iterable: Expr::List {
+            elements: vec![
+                Expr::Literal {
+                    value: LiteralValue::Number(1.0),
+                    position: pos(),
+                },
+                Expr::Literal {
+                    value: LiteralValue::Number(2.0),
+                    position: pos(),
+                },
+            ],
+            position: pos(),
+        },
+        body: vec![inner_for],
+        position: pos(),
+    };
+
+    executor.eval_stmt(&outer_for).unwrap();
+
+    // count should be 6 (2 outer * 3 inner)
+    let count_value = executor.env().get("count").unwrap();
+    assert_eq!(count_value, Value::Number(6.0));
 }

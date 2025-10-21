@@ -111,10 +111,98 @@ impl Executor {
                 };
                 Ok(Some(return_value))
             }
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                let cond_value = self.eval_expr(condition)?;
+                if cond_value.is_truthy() {
+                    // Execute then branch
+                    for stmt in then_branch {
+                        if let Some(val) = self.eval_stmt(stmt)? {
+                            // Return statement in then branch
+                            return Ok(Some(val));
+                        }
+                    }
+                } else if let Some(else_stmts) = else_branch {
+                    // Execute else branch
+                    for stmt in else_stmts {
+                        if let Some(val) = self.eval_stmt(stmt)? {
+                            // Return statement in else branch
+                            return Ok(Some(val));
+                        }
+                    }
+                }
+                Ok(None)
+            }
             Stmt::Expression { expr, .. } => {
                 // Evaluate expression and discard result
                 // In REPL mode, caller may want to print the result
                 self.eval_expr(expr)?;
+                Ok(None)
+            }
+            Stmt::While {
+                condition,
+                body,
+                ..
+            } => {
+                // While loop: evaluate condition, execute body, repeat
+                loop {
+                    let cond_value = self.eval_expr(condition)?;
+                    if !cond_value.is_truthy() {
+                        // Condition is false, exit loop
+                        break;
+                    }
+
+                    // Execute loop body
+                    for stmt in body {
+                        if let Some(val) = self.eval_stmt(stmt)? {
+                            // Return statement in loop body
+                            return Ok(Some(val));
+                        }
+                    }
+                }
+                Ok(None)
+            }
+            Stmt::For {
+                variable,
+                iterable,
+                body,
+                ..
+            } => {
+                // For loop: evaluate iterable, iterate over elements
+                let iterable_value = self.eval_expr(iterable)?;
+
+                // Get the list of values to iterate over
+                let values = match iterable_value {
+                    Value::List(ref items) => items.clone(),
+                    other => {
+                        return Err(GraphoidError::type_error(
+                            "list",
+                            other.type_name(),
+                        ));
+                    }
+                };
+
+                // Iterate over each value
+                for value in values {
+                    // Bind loop variable to current value
+                    if self.env.exists(variable) {
+                        self.env.set(variable, value)?;
+                    } else {
+                        self.env.define(variable.clone(), value);
+                    }
+
+                    // Execute loop body
+                    for stmt in body {
+                        if let Some(val) = self.eval_stmt(stmt)? {
+                            // Return statement in loop body
+                            return Ok(Some(val));
+                        }
+                    }
+                }
                 Ok(None)
             }
             _ => Err(GraphoidError::runtime(format!(
