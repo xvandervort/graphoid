@@ -44,10 +44,8 @@ impl Executor {
             Expr::Lambda { params, body, .. } => self.eval_lambda(params, body),
             Expr::List { elements, .. } => self.eval_list(elements),
             Expr::Map { entries, .. } => self.eval_map(entries),
-            _ => Err(GraphoidError::runtime(format!(
-                "Unsupported expression type: {:?}",
-                expr
-            ))),
+            Expr::Index { object, index, .. } => self.eval_index(object, index),
+            Expr::MethodCall { object, method, args, .. } => self.eval_method_call(object, method, args),
         }
     }
 
@@ -307,6 +305,177 @@ impl Executor {
         };
 
         Ok(Value::Function(func))
+    }
+
+    /// Evaluates an index expression (list[i] or map[key]).
+    fn eval_index(&mut self, object: &Expr, index: &Expr) -> Result<Value> {
+        // Evaluate the object being indexed
+        let object_value = self.eval_expr(object)?;
+
+        // Evaluate the index expression
+        let index_value = self.eval_expr(index)?;
+
+        match object_value {
+            Value::List(ref elements) => {
+                // Index must be a number for lists
+                let idx = match index_value {
+                    Value::Number(n) => n,
+                    other => {
+                        return Err(GraphoidError::type_error(
+                            "number",
+                            other.type_name(),
+                        ));
+                    }
+                };
+
+                // Handle fractional indices by truncating to integer
+                let idx_int = idx as i64;
+
+                // Calculate actual index (handle negative indices)
+                let actual_index = if idx_int < 0 {
+                    // Negative index: count from end
+                    let len = elements.len() as i64;
+                    len + idx_int
+                } else {
+                    idx_int
+                };
+
+                // Check bounds
+                if actual_index < 0 || actual_index >= elements.len() as i64 {
+                    return Err(GraphoidError::runtime(format!(
+                        "List index out of bounds: index {} for list of length {}",
+                        idx_int,
+                        elements.len()
+                    )));
+                }
+
+                Ok(elements[actual_index as usize].clone())
+            }
+            Value::Map(ref map) => {
+                // Index must be a string for maps
+                let key = match index_value {
+                    Value::String(s) => s,
+                    other => {
+                        return Err(GraphoidError::type_error(
+                            "string",
+                            other.type_name(),
+                        ));
+                    }
+                };
+
+                // Look up the key
+                match map.get(&key) {
+                    Some(value) => Ok(value.clone()),
+                    None => Err(GraphoidError::runtime(format!(
+                        "Map key not found: '{}'",
+                        key
+                    ))),
+                }
+            }
+            other => {
+                Err(GraphoidError::runtime(format!(
+                    "Cannot index value of type '{}'",
+                    other.type_name()
+                )))
+            }
+        }
+    }
+
+    /// Evaluates a method call expression (object.method(args)).
+    fn eval_method_call(&mut self, object: &Expr, method: &str, args: &[Expr]) -> Result<Value> {
+        // Evaluate the object
+        let object_value = self.eval_expr(object)?;
+
+        // Evaluate all argument expressions
+        let mut arg_values = Vec::new();
+        for arg in args {
+            arg_values.push(self.eval_expr(arg)?);
+        }
+
+        // Dispatch based on object type and method name
+        match &object_value {
+            Value::List(elements) => self.eval_list_method(elements, method, &arg_values),
+            Value::Map(map) => self.eval_map_method(map, method, &arg_values),
+            other => Err(GraphoidError::runtime(format!(
+                "Type '{}' does not have method '{}'",
+                other.type_name(),
+                method
+            ))),
+        }
+    }
+
+    /// Evaluates a method call on a list.
+    fn eval_list_method(&self, elements: &[Value], method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "size" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'size' expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                Ok(Value::Number(elements.len() as f64))
+            }
+            "first" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'first' expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                elements.first()
+                    .cloned()
+                    .ok_or_else(|| GraphoidError::runtime("Cannot get first element of empty list".to_string()))
+            }
+            "last" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'last' expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                elements.last()
+                    .cloned()
+                    .ok_or_else(|| GraphoidError::runtime("Cannot get last element of empty list".to_string()))
+            }
+            "contains" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'contains' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+                let search_value = &args[0];
+                for element in elements {
+                    if element == search_value {
+                        return Ok(Value::Boolean(true));
+                    }
+                }
+                Ok(Value::Boolean(false))
+            }
+            "is_empty" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'is_empty' expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                Ok(Value::Boolean(elements.is_empty()))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "List does not have method '{}'",
+                method
+            ))),
+        }
+    }
+
+    /// Evaluates a method call on a map.
+    fn eval_map_method(&self, _map: &HashMap<String, Value>, method: &str, _args: &[Value]) -> Result<Value> {
+        // Placeholder for map methods - will implement later
+        Err(GraphoidError::runtime(format!(
+            "Map does not have method '{}' (not yet implemented)",
+            method
+        )))
     }
 
     /// Evaluates a function call expression.
