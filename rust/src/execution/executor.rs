@@ -248,6 +248,15 @@ impl Executor {
             BinaryOp::And => Ok(Value::Boolean(left_val.is_truthy() && right_val.is_truthy())),
             BinaryOp::Or => Ok(Value::Boolean(left_val.is_truthy() || right_val.is_truthy())),
 
+            // Element-wise operators
+            BinaryOp::DotAdd => self.eval_element_wise(left_val, right_val, BinaryOp::Add),
+            BinaryOp::DotSubtract => self.eval_element_wise(left_val, right_val, BinaryOp::Subtract),
+            BinaryOp::DotMultiply => self.eval_element_wise(left_val, right_val, BinaryOp::Multiply),
+            BinaryOp::DotDivide => self.eval_element_wise(left_val, right_val, BinaryOp::Divide),
+            BinaryOp::DotIntDiv => self.eval_element_wise(left_val, right_val, BinaryOp::IntDiv),
+            BinaryOp::DotModulo => self.eval_element_wise(left_val, right_val, BinaryOp::Modulo),
+            BinaryOp::DotPower => self.eval_element_wise(left_val, right_val, BinaryOp::Power),
+
             _ => Err(GraphoidError::runtime(format!(
                 "Unsupported binary operator: {:?}",
                 op
@@ -828,6 +837,73 @@ impl Executor {
             _ => Err(GraphoidError::runtime(format!(
                 "Unknown named predicate: '{}'",
                 predicate_name
+            ))),
+        }
+    }
+
+    /// Applies an element-wise operation to lists or scalars.
+    /// Supports list-list and list-scalar operations (broadcasting).
+    fn eval_element_wise(&mut self, left: Value, right: Value, base_op: BinaryOp) -> Result<Value> {
+        match (left, right) {
+            // List-List element-wise operation
+            (Value::List(left_elements), Value::List(right_elements)) => {
+                // Check that lists have same length
+                if left_elements.len() != right_elements.len() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Element-wise operation requires lists of same length, got {} and {}",
+                        left_elements.len(),
+                        right_elements.len()
+                    )));
+                }
+
+                // Apply operation element by element
+                let mut results = Vec::new();
+                for (left_elem, right_elem) in left_elements.iter().zip(right_elements.iter()) {
+                    let result = self.apply_scalar_op(left_elem.clone(), right_elem.clone(), &base_op)?;
+                    results.push(result);
+                }
+                Ok(Value::List(results))
+            }
+            // List-Scalar element-wise operation (broadcast scalar)
+            (Value::List(elements), scalar) => {
+                let mut results = Vec::new();
+                for elem in elements.iter() {
+                    let result = self.apply_scalar_op(elem.clone(), scalar.clone(), &base_op)?;
+                    results.push(result);
+                }
+                Ok(Value::List(results))
+            }
+            // Scalar-List element-wise operation (broadcast scalar)
+            (scalar, Value::List(elements)) => {
+                let mut results = Vec::new();
+                for elem in elements.iter() {
+                    let result = self.apply_scalar_op(scalar.clone(), elem.clone(), &base_op)?;
+                    results.push(result);
+                }
+                Ok(Value::List(results))
+            }
+            // Scalar-Scalar: not element-wise, error
+            (left, right) => Err(GraphoidError::runtime(format!(
+                "Element-wise operations require at least one list, got {} and {}",
+                left.type_name(),
+                right.type_name()
+            ))),
+        }
+    }
+
+    /// Applies a scalar binary operation (used by element-wise operations).
+    fn apply_scalar_op(&mut self, left: Value, right: Value, op: &BinaryOp) -> Result<Value> {
+        match op {
+            BinaryOp::Add => self.eval_add(left, right),
+            BinaryOp::Subtract => self.eval_subtract(left, right),
+            BinaryOp::Multiply => self.eval_multiply(left, right),
+            BinaryOp::Divide => self.eval_divide(left, right),
+            BinaryOp::IntDiv => self.eval_int_div(left, right),
+            BinaryOp::Modulo => self.eval_modulo(left, right),
+            BinaryOp::Power => self.eval_power(left, right),
+            _ => Err(GraphoidError::runtime(format!(
+                "Unsupported scalar operation: {:?}",
+                op
             ))),
         }
     }

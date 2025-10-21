@@ -5073,3 +5073,208 @@ fn test_list_method_filter_with_named_predicate_odd() {
         _ => panic!("Expected list, got {:?}", result),
     }
 }
+
+// ============================================================================
+// ELEMENT-WISE OPERATOR TESTS
+// ============================================================================
+
+#[test]
+fn test_element_wise_add() {
+    let mut executor = Executor::new();
+
+    // a = [1, 2, 3]
+    // b = [4, 5, 6]
+    // result = a .+ b  # [5, 7, 9]
+    let a = Stmt::Assignment {
+        target: AssignmentTarget::Variable("a".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&a).unwrap();
+
+    let b = Stmt::Assignment {
+        target: AssignmentTarget::Variable("b".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(4.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(5.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(6.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&b).unwrap();
+
+    let expr = Expr::Binary {
+        left: Box::new(Expr::Variable { name: "a".to_string(), position: pos() }),
+        op: BinaryOp::DotAdd,
+        right: Box::new(Expr::Variable { name: "b".to_string(), position: pos() }),
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&expr).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(5.0));
+            assert_eq!(elements[1], Value::Number(7.0));
+            assert_eq!(elements[2], Value::Number(9.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_element_wise_multiply() {
+    let mut executor = Executor::new();
+
+    // a = [2, 3, 4]
+    // b = [10, 20, 30]
+    // result = a .* b  # [20, 60, 120]
+    let a = Stmt::Assignment {
+        target: AssignmentTarget::Variable("a".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(4.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&a).unwrap();
+
+    let b = Stmt::Assignment {
+        target: AssignmentTarget::Variable("b".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&b).unwrap();
+
+    let expr = Expr::Binary {
+        left: Box::new(Expr::Variable { name: "a".to_string(), position: pos() }),
+        op: BinaryOp::DotMultiply,
+        right: Box::new(Expr::Variable { name: "b".to_string(), position: pos() }),
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&expr).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(20.0));
+            assert_eq!(elements[1], Value::Number(60.0));
+            assert_eq!(elements[2], Value::Number(120.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_element_wise_scalar_broadcast() {
+    let mut executor = Executor::new();
+
+    // nums = [1, 2, 3]
+    // result = nums .* 10  # [10, 20, 30] (broadcast scalar)
+    let nums = Stmt::Assignment {
+        target: AssignmentTarget::Variable("nums".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&nums).unwrap();
+
+    let expr = Expr::Binary {
+        left: Box::new(Expr::Variable { name: "nums".to_string(), position: pos() }),
+        op: BinaryOp::DotMultiply,
+        right: Box::new(Expr::Literal { value: LiteralValue::Number(10.0), position: pos() }),
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&expr).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(10.0));
+            assert_eq!(elements[1], Value::Number(20.0));
+            assert_eq!(elements[2], Value::Number(30.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_element_wise_subtract() {
+    let mut executor = Executor::new();
+
+    // a = [10, 20, 30]
+    // b = [1, 2, 3]
+    // result = a .- b  # [9, 18, 27]
+    let a = Stmt::Assignment {
+        target: AssignmentTarget::Variable("a".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&a).unwrap();
+
+    let b = Stmt::Assignment {
+        target: AssignmentTarget::Variable("b".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&b).unwrap();
+
+    let expr = Expr::Binary {
+        left: Box::new(Expr::Variable { name: "a".to_string(), position: pos() }),
+        op: BinaryOp::DotSubtract,
+        right: Box::new(Expr::Variable { name: "b".to_string(), position: pos() }),
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&expr).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(9.0));
+            assert_eq!(elements[1], Value::Number(18.0));
+            assert_eq!(elements[2], Value::Number(27.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
