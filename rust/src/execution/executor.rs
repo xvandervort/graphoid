@@ -470,26 +470,34 @@ impl Executor {
                     )));
                 }
 
-                // Get the function argument
-                let func = match &args[0] {
-                    Value::Function(f) => f,
-                    other => {
-                        return Err(GraphoidError::type_error(
-                            "function",
-                            other.type_name(),
-                        ));
+                // Check if argument is a symbol (named transformation) or function
+                match &args[0] {
+                    Value::Symbol(transform_name) => {
+                        // Apply named transformation
+                        let mut results = Vec::new();
+                        for element in elements {
+                            let result = self.apply_named_transformation(element, transform_name)?;
+                            results.push(result);
+                        }
+                        Ok(Value::List(results))
                     }
-                };
-
-                // Apply the function to each element
-                let mut results = Vec::new();
-                for element in elements {
-                    // Call the function with this element
-                    let result = self.call_function(func, &[element.clone()])?;
-                    results.push(result);
+                    Value::Function(func) => {
+                        // Apply the function to each element
+                        let mut results = Vec::new();
+                        for element in elements {
+                            // Call the function with this element
+                            let result = self.call_function(func, &[element.clone()])?;
+                            results.push(result);
+                        }
+                        Ok(Value::List(results))
+                    }
+                    other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "Method 'map' expects function or symbol, got {}",
+                            other.type_name()
+                        )));
+                    }
                 }
-
-                Ok(Value::List(results))
             }
             "filter" => {
                 if args.len() != 1 {
@@ -499,30 +507,39 @@ impl Executor {
                     )));
                 }
 
-                // Get the function argument
-                let func = match &args[0] {
-                    Value::Function(f) => f,
-                    other => {
-                        return Err(GraphoidError::type_error(
-                            "function",
-                            other.type_name(),
-                        ));
+                // Check if argument is a symbol (named predicate) or function
+                match &args[0] {
+                    Value::Symbol(predicate_name) => {
+                        // Apply named predicate
+                        let mut results = Vec::new();
+                        for element in elements {
+                            if self.apply_named_predicate(element, predicate_name)? {
+                                results.push(element.clone());
+                            }
+                        }
+                        Ok(Value::List(results))
                     }
-                };
+                    Value::Function(func) => {
+                        // Filter elements based on predicate function
+                        let mut results = Vec::new();
+                        for element in elements {
+                            // Call the function with this element
+                            let result = self.call_function(func, &[element.clone()])?;
 
-                // Filter elements based on predicate
-                let mut results = Vec::new();
-                for element in elements {
-                    // Call the function with this element
-                    let result = self.call_function(func, &[element.clone()])?;
-
-                    // Check if result is truthy
-                    if result.is_truthy() {
-                        results.push(element.clone());
+                            // Check if result is truthy
+                            if result.is_truthy() {
+                                results.push(element.clone());
+                            }
+                        }
+                        Ok(Value::List(results))
+                    }
+                    other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "Method 'filter' expects function or symbol, got {}",
+                            other.type_name()
+                        )));
                     }
                 }
-
-                Ok(Value::List(results))
             }
             "each" => {
                 if args.len() != 1 {
@@ -701,6 +718,118 @@ impl Executor {
         execution_result?;
 
         Ok(return_value)
+    }
+
+    /// Applies a named transformation to a value.
+    /// Named transformations: double, square, negate, increment, decrement, etc.
+    fn apply_named_transformation(&self, value: &Value, transform_name: &str) -> Result<Value> {
+        match transform_name {
+            "double" => {
+                match value {
+                    Value::Number(n) => Ok(Value::Number(n * 2.0)),
+                    _ => Err(GraphoidError::runtime(format!(
+                        "Transformation 'double' requires a number, got {}",
+                        value.type_name()
+                    ))),
+                }
+            }
+            "square" => {
+                match value {
+                    Value::Number(n) => Ok(Value::Number(n * n)),
+                    _ => Err(GraphoidError::runtime(format!(
+                        "Transformation 'square' requires a number, got {}",
+                        value.type_name()
+                    ))),
+                }
+            }
+            "negate" => {
+                match value {
+                    Value::Number(n) => Ok(Value::Number(-n)),
+                    _ => Err(GraphoidError::runtime(format!(
+                        "Transformation 'negate' requires a number, got {}",
+                        value.type_name()
+                    ))),
+                }
+            }
+            "increment" | "inc" => {
+                match value {
+                    Value::Number(n) => Ok(Value::Number(n + 1.0)),
+                    _ => Err(GraphoidError::runtime(format!(
+                        "Transformation 'increment' requires a number, got {}",
+                        value.type_name()
+                    ))),
+                }
+            }
+            "decrement" | "dec" => {
+                match value {
+                    Value::Number(n) => Ok(Value::Number(n - 1.0)),
+                    _ => Err(GraphoidError::runtime(format!(
+                        "Transformation 'decrement' requires a number, got {}",
+                        value.type_name()
+                    ))),
+                }
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "Unknown named transformation: '{}'",
+                transform_name
+            ))),
+        }
+    }
+
+    /// Applies a named predicate to a value.
+    /// Named predicates: even, odd, positive, negative, zero, etc.
+    fn apply_named_predicate(&self, value: &Value, predicate_name: &str) -> Result<bool> {
+        match predicate_name {
+            "even" => {
+                match value {
+                    Value::Number(n) => Ok((n % 2.0).abs() < 0.0001), // Handle floating point comparison
+                    _ => Err(GraphoidError::runtime(format!(
+                        "Predicate 'even' requires a number, got {}",
+                        value.type_name()
+                    ))),
+                }
+            }
+            "odd" => {
+                match value {
+                    Value::Number(n) => Ok((n % 2.0).abs() > 0.0001), // Handle floating point comparison
+                    _ => Err(GraphoidError::runtime(format!(
+                        "Predicate 'odd' requires a number, got {}",
+                        value.type_name()
+                    ))),
+                }
+            }
+            "positive" | "pos" => {
+                match value {
+                    Value::Number(n) => Ok(*n > 0.0),
+                    _ => Err(GraphoidError::runtime(format!(
+                        "Predicate 'positive' requires a number, got {}",
+                        value.type_name()
+                    ))),
+                }
+            }
+            "negative" | "neg" => {
+                match value {
+                    Value::Number(n) => Ok(*n < 0.0),
+                    _ => Err(GraphoidError::runtime(format!(
+                        "Predicate 'negative' requires a number, got {}",
+                        value.type_name()
+                    ))),
+                }
+            }
+            "zero" => {
+                match value {
+                    Value::Number(n) => Ok(n.abs() < 0.0001), // Handle floating point comparison
+                    _ => Err(GraphoidError::runtime(format!(
+                        "Predicate 'zero' requires a number, got {}",
+                        value.type_name()
+                    ))),
+                }
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "Unknown named predicate: '{}'",
+                predicate_name
+            ))),
+        }
     }
 
     // Arithmetic helpers

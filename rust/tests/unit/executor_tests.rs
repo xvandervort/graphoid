@@ -4825,3 +4825,251 @@ fn test_list_method_filter_greater_than() {
         _ => panic!("Expected list, got {:?}", result),
     }
 }
+
+// ============================================================================
+// NAMED TRANSFORMATION TESTS
+// ============================================================================
+
+#[test]
+fn test_list_method_map_with_named_transform_double() {
+    let mut executor = Executor::new();
+
+    // numbers = [1, 2, 3]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("numbers".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // doubled = numbers.map(:double)
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
+        method: "map".to_string(),
+        args: vec![Expr::Literal { value: LiteralValue::Symbol("double".to_string()), position: pos() }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(2.0));
+            assert_eq!(elements[1], Value::Number(4.0));
+            assert_eq!(elements[2], Value::Number(6.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_list_method_map_with_named_transform_square() {
+    let mut executor = Executor::new();
+
+    // numbers = [2, 3, 4]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("numbers".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(4.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // squared = numbers.map(:square)
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
+        method: "map".to_string(),
+        args: vec![Expr::Literal { value: LiteralValue::Symbol("square".to_string()), position: pos() }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(4.0));
+            assert_eq!(elements[1], Value::Number(9.0));
+            assert_eq!(elements[2], Value::Number(16.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_list_method_map_with_named_transform_negate() {
+    let mut executor = Executor::new();
+
+    // numbers = [1, -2, 3]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("numbers".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(-2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // negated = numbers.map(:negate)
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
+        method: "map".to_string(),
+        args: vec![Expr::Literal { value: LiteralValue::Symbol("negate".to_string()), position: pos() }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(-1.0));
+            assert_eq!(elements[1], Value::Number(2.0));
+            assert_eq!(elements[2], Value::Number(-3.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+// ============================================================================
+// NAMED PREDICATE TESTS
+// ============================================================================
+
+#[test]
+fn test_list_method_filter_with_named_predicate_even() {
+    let mut executor = Executor::new();
+
+    // numbers = [1, 2, 3, 4, 5, 6]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("numbers".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(4.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(5.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(6.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // evens = numbers.filter(:even)
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
+        method: "filter".to_string(),
+        args: vec![Expr::Literal { value: LiteralValue::Symbol("even".to_string()), position: pos() }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(2.0));
+            assert_eq!(elements[1], Value::Number(4.0));
+            assert_eq!(elements[2], Value::Number(6.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_list_method_filter_with_named_predicate_positive() {
+    let mut executor = Executor::new();
+
+    // numbers = [-2, -1, 0, 1, 2]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("numbers".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(-2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(-1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(0.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // positives = numbers.filter(:positive)
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
+        method: "filter".to_string(),
+        args: vec![Expr::Literal { value: LiteralValue::Symbol("positive".to_string()), position: pos() }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 2);
+            assert_eq!(elements[0], Value::Number(1.0));
+            assert_eq!(elements[1], Value::Number(2.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_list_method_filter_with_named_predicate_odd() {
+    let mut executor = Executor::new();
+
+    // numbers = [1, 2, 3, 4, 5]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("numbers".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(4.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(5.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // odds = numbers.filter(:odd)
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
+        method: "filter".to_string(),
+        args: vec![Expr::Literal { value: LiteralValue::Symbol("odd".to_string()), position: pos() }],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(1.0));
+            assert_eq!(elements[1], Value::Number(3.0));
+            assert_eq!(elements[2], Value::Number(5.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
