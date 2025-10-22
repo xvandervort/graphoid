@@ -551,7 +551,8 @@ impl Parser {
                     }
                 };
 
-                let value = self.expression()?;
+                // Parse value - could be a lambda
+                let value = self.lambda_or_expression()?;
 
                 return Ok(Stmt::Assignment {
                     target,
@@ -844,15 +845,28 @@ impl Parser {
             } else if self.match_token(&TokenType::Dot) {
                 // Method call or property access
                 let position = expr.position().clone();
-                let method = if let TokenType::Identifier(id) = &self.peek().token_type {
-                    let m = id.clone();
-                    self.advance();
-                    m
-                } else {
-                    return Err(GraphoidError::SyntaxError {
-                        message: "Expected method name after '.'".to_string(),
-                        position: self.peek().position(),
-                    });
+
+                // Method name can be an identifier OR a keyword (like "map", "filter", etc.)
+                // We use the lexeme directly to allow keywords as method names
+                let method = match &self.peek().token_type {
+                    TokenType::Identifier(id) => {
+                        let m = id.clone();
+                        self.advance();
+                        m
+                    }
+                    // Allow keywords as method names by using their lexeme
+                    _ => {
+                        let lexeme = self.peek().lexeme.clone();
+                        if lexeme.chars().all(|c| c.is_alphabetic() || c == '_') && !lexeme.is_empty() {
+                            self.advance();
+                            lexeme
+                        } else {
+                            return Err(GraphoidError::SyntaxError {
+                                message: "Expected method name after '.'".to_string(),
+                                position: self.peek().position(),
+                            });
+                        }
+                    }
                 };
 
                 // Check if it's a method call (with parentheses)
@@ -892,7 +906,8 @@ impl Parser {
 
         if !self.check(&TokenType::RightParen) {
             loop {
-                args.push(self.expression()?);
+                // Try to parse lambda or regular expression
+                args.push(self.lambda_or_expression()?);
                 if !self.match_token(&TokenType::Comma) {
                     break;
                 }
@@ -900,6 +915,75 @@ impl Parser {
         }
 
         Ok(args)
+    }
+
+    /// Try to parse a lambda, otherwise parse a regular expression
+    fn lambda_or_expression(&mut self) -> Result<Expr> {
+        let position = self.peek().position();
+
+        // Case 1: Single parameter lambda: x => expr
+        if let TokenType::Identifier(param_name) = &self.peek().token_type {
+            // Look ahead to see if this is a lambda
+            if self.current + 1 < self.tokens.len() {
+                if let TokenType::Arrow = self.tokens[self.current + 1].token_type {
+                    // This is a single-param lambda!
+                    let param = param_name.clone();
+                    self.advance(); // consume param
+                    self.advance(); // consume =>
+
+                    let body = Box::new(self.or_expression()?);
+                    return Ok(Expr::Lambda {
+                        params: vec![param],
+                        body,
+                        position,
+                    });
+                }
+            }
+        }
+
+        // Case 2: Multi-param or zero-param lambda: (a, b) => expr  OR  () => expr
+        if self.check(&TokenType::LeftParen) {
+            let paren_checkpoint = self.current;
+            self.advance(); // consume '('
+
+            let mut params = Vec::new();
+            let mut could_be_lambda = true;
+
+            // Parse parameter list
+            if !self.check(&TokenType::RightParen) {
+                loop {
+                    if let TokenType::Identifier(param_name) = &self.peek().token_type {
+                        params.push(param_name.clone());
+                        self.advance();
+
+                        if !self.match_token(&TokenType::Comma) {
+                            break;
+                        }
+                    } else {
+                        // Not a valid param, not a lambda
+                        could_be_lambda = false;
+                        break;
+                    }
+                }
+            }
+
+            if could_be_lambda && self.match_token(&TokenType::RightParen) && self.check(&TokenType::Arrow) {
+                // This is a lambda!
+                self.advance(); // consume =>
+                let body = Box::new(self.or_expression()?);
+                return Ok(Expr::Lambda {
+                    params,
+                    body,
+                    position,
+                });
+            }
+
+            // Not a lambda, rewind and parse as expression
+            self.current = paren_checkpoint;
+        }
+
+        // Not a lambda, parse as regular expression
+        self.expression()
     }
 
     fn primary(&mut self) -> Result<Expr> {
