@@ -495,3 +495,104 @@ fn test_map_methods() {
     assert_eq!(has_missing, graphoid::values::Value::Boolean(false));
     assert_eq!(map_size, graphoid::values::Value::Number(3.0));
 }
+
+// ============================================================================
+// PHASE 6: GRAPH AND TREE TESTS
+// ============================================================================
+
+#[test]
+fn test_graph_creation_directed() {
+    let source = r#"
+        g = graph { type: :directed }
+    "#;
+    execute(source).unwrap();
+}
+
+#[test]
+fn test_graph_creation_undirected() {
+    let source = r#"
+        g = graph { type: :undirected }
+    "#;
+    execute(source).unwrap();
+}
+
+#[test]
+fn test_graph_creation_empty() {
+    let source = r#"
+        g = graph {}
+    "#;
+    execute(source).unwrap();
+}
+
+#[test]
+fn test_tree_creation() {
+    let source = r#"
+        t = tree {}
+    "#;
+    execute(source).unwrap();
+}
+
+#[test]
+fn test_graph_type_name() {
+    let source = r#"
+        g = graph { type: :directed }
+    "#;
+
+    let g = execute_and_get(source, "g").unwrap();
+    assert_eq!(g.type_name(), "graph");
+}
+
+#[test]
+fn test_tree_type_name() {
+    let source = r#"
+        t = tree {}
+    "#;
+
+    let t = execute_and_get(source, "t").unwrap();
+    assert_eq!(t.type_name(), "tree");
+}
+
+#[test]
+fn test_empty_graph_is_falsy() {
+    let source = r#"
+        g = graph {}
+    "#;
+
+    let g = execute_and_get(source, "g").unwrap();
+    assert!(!g.is_truthy());
+}
+
+#[test]
+fn test_empty_tree_is_falsy() {
+    let source = r#"
+        t = tree {}
+    "#;
+
+    let t = execute_and_get(source, "t").unwrap();
+    assert!(!t.is_truthy());
+}
+
+#[test]
+fn test_graph_to_string() {
+    let source = r#"
+        g = graph { type: :directed }
+    "#;
+
+    let g = execute_and_get(source, "g").unwrap();
+    let s = g.to_string_value();
+    assert!(s.contains("graph"));
+    assert!(s.contains("0 nodes"));
+    assert!(s.contains("0 edges"));
+}
+
+#[test]
+fn test_tree_to_string() {
+    let source = r#"
+        t = tree {}
+    "#;
+
+    let t = execute_and_get(source, "t").unwrap();
+    let s = t.to_string_value();
+    assert!(s.contains("tree"));
+    assert!(s.contains("0 nodes"));
+}

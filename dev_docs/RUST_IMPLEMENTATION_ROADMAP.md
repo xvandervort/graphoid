@@ -1720,6 +1720,7 @@ See detailed implementation in next section...
 - Map operations
 - String methods
 - Method dispatch system
+- **Note**: Graphs are NOT implemented in Phase 5. Phase 6 implements graphs with tree{} as syntactic sugar for graph{}.with_ruleset(:tree)
 
 ### Phase 6: Graph Types, Rules & Auto-Performance (14-18 days)
 
@@ -1737,26 +1738,34 @@ Phase 6 delivers a complete, performant graph system that automatically optimize
 
 **Goal**: Basic graph operations with index-free adjacency
 
+**IMPORTANT PHILOSOPHY**: Trees are NOT a separate type. Trees are graphs with rules applied. The `tree{}` syntax is syntactic sugar for `graph{}.with_ruleset(:tree)`, implemented in Week 2 when the rule system is added.
+
 #### Tasks
 
 1. **Graph Value Representation** (`src/values/graph.rs`)
    - Node storage with direct neighbor pointers (index-free adjacency)
    - Edge storage with properties
    - Directed vs undirected graph support
-   - Basic traversal (BFS, DFS)
+   - Traversal methods (BFS, DFS, in-order, pre-order, post-order)
+   - Note: Traversal methods work on ALL graphs, not just trees
 
-2. **Tree Implementation** (`src/values/tree.rs`)
-   - Binary search tree
-   - Tree as constrained graph
-   - Tree-specific traversals (in-order, pre-order, post-order)
-
-3. **Basic Graph Operations**
+2. **Basic Graph Operations**
    - `add_node(id, value)` - O(1)
    - `add_edge(from, to, type, properties)` - O(1)
+   - `insert(value, parent?)` - Convenience method for tree-like insertion
    - `remove_node(id)` - O(degree)
    - `remove_edge(from, to)` - O(1)
    - `neighbors(id)` - O(1) lookup, O(degree) iteration
    - `has_node(id)`, `has_edge(from, to)` - O(1)
+   - `contains(value)` - Search for node with value
+
+3. **Traversal Methods** (work on all graphs)
+   - `bfs(start_node)` - Breadth-first traversal
+   - `dfs(start_node)` - Depth-first traversal
+   - `in_order()` - In-order traversal (assumes binary tree structure)
+   - `pre_order()` - Pre-order traversal
+   - `post_order()` - Post-order traversal
+   - Note: Tree traversals don't enforce constraints yet (rules added in Week 2)
 
 #### Tests (Week 1)
 
@@ -1767,7 +1776,7 @@ fn test_graph_creation() {
     g.add_node("alice", Value::Number(1.0));
     g.add_node("bob", Value::Number(2.0));
     g.add_edge("alice", "bob", "follows", HashMap::new());
-    
+
     assert_eq!(g.node_count(), 2);
     assert_eq!(g.edge_count(), 1);
     assert!(g.has_edge("alice", "bob"));
@@ -1776,60 +1785,111 @@ fn test_graph_creation() {
 #[test]
 fn test_index_free_adjacency() {
     let mut g = create_large_graph(10000);
-    
+
     // Neighbor lookup should be O(1), not require index scan
     let start = Instant::now();
     let neighbors = g.neighbors("node_5000");
     let elapsed = start.elapsed();
-    
+
     assert!(elapsed < Duration::from_micros(10)); // Very fast
 }
 
 #[test]
-fn test_tree_operations() {
-    let mut tree = Tree::new();
-    tree.insert(5);
-    tree.insert(3);
-    tree.insert(7);
-    
-    assert!(tree.contains(5));
-    assert_eq!(tree.in_order(), vec![3, 5, 7]);
+fn test_graph_insert_and_traversal() {
+    // Create a graph and use it like a binary search tree
+    // (constraints will be enforced via rules in Week 2)
+    let mut g = Graph::new(GraphType::Directed);
+
+    // Manually build BST structure
+    g.add_node("5", Value::Number(5.0));
+    g.add_node("3", Value::Number(3.0));
+    g.add_node("7", Value::Number(7.0));
+    g.add_edge("5", "3", "left", HashMap::new());
+    g.add_edge("5", "7", "right", HashMap::new());
+
+    // Test traversal methods work on any graph
+    assert!(g.contains(&Value::Number(5.0)));
+    let values = g.in_order("5");  // Start from root
+    assert_eq!(values, vec![Value::Number(3.0), Value::Number(5.0), Value::Number(7.0)]);
+}
+
+#[test]
+fn test_insert_convenience_method() {
+    let mut g = Graph::new(GraphType::Directed);
+
+    // insert() is a convenience method for tree-like insertion
+    // It doesn't enforce BST ordering yet (rules do that in Week 2)
+    g.insert(Value::Number(5.0), None);  // Root
+    g.insert(Value::Number(3.0), Some("5"));  // Parent: 5
+    g.insert(Value::Number(7.0), Some("5"));  // Parent: 5
+
+    assert_eq!(g.node_count(), 3);
+    assert!(g.has_edge("5", "3"));
+    assert!(g.has_edge("5", "7"));
+}
+
+#[test]
+fn test_bfs_dfs_traversal() {
+    let mut g = Graph::new(GraphType::Directed);
+    g.add_node("A", Value::String("A".to_string()));
+    g.add_node("B", Value::String("B".to_string()));
+    g.add_node("C", Value::String("C".to_string()));
+    g.add_edge("A", "B", "edge", HashMap::new());
+    g.add_edge("A", "C", "edge", HashMap::new());
+
+    let bfs = g.bfs("A");
+    assert_eq!(bfs, vec!["A", "B", "C"]); // BFS order
+
+    let dfs = g.dfs("A");
+    // DFS order depends on edge order, just verify all nodes visited
+    assert_eq!(dfs.len(), 3);
 }
 ```
 
 **Acceptance Criteria (Week 1)**:
 - ✅ Basic graph operations work correctly
 - ✅ Index-free adjacency provides O(1) neighbor lookups
-- ✅ Trees function as constrained graphs
-- ✅ 15+ tests passing
+- ✅ Traversal methods (BFS, DFS, in-order, etc.) work on graphs
+- ✅ insert() convenience method works for tree-like structures
+- ✅ No separate Tree type exists - only Graph
+- ✅ 20+ tests passing
 - ✅ Zero compiler warnings
 
 ---
 
 ### Week 2 (Days 7-12): Rules & Automatic Optimization
 
-**Goal**: Rule validation + query pattern detection + auto-indexing
+**Goal**: Rule validation + query pattern detection + auto-indexing + tree{} syntax
+
+**PHILOSOPHY IMPLEMENTATION**: This week implements the core philosophy that **trees are graphs with rules**. The `tree{}` syntax is syntactic sugar for `graph{}.with_ruleset(:tree)`.
 
 #### Tasks
 
 1. **Rule System** (`src/graph/rules.rs`)
    - Rule declaration: `graph.add_rule("no_cycles")`
-   - Built-in rules: `no_cycles`, `connected`, `max_degree`, `single_root`
+   - Built-in rules: `no_cycles`, `connected`, `max_degree`, `single_root`, `binary_tree`
+   - Ruleset support: `graph.with_ruleset(:tree)` applies multiple rules
+   - Built-in rulesets: `:tree` (no_cycles, single_root, connected)
    - Rule validation on mutations
    - Rule metadata for optimizer
 
-2. **Query Pattern Detection** (`src/graph/optimizer.rs`)
+2. **Tree Syntax Sugar** (parser/AST)
+   - Parse `tree{}` as syntactic sugar for `graph{}.with_ruleset(:tree)`
+   - Parse `tree<num>{}` as `graph<num>{}.with_ruleset(:tree)`
+   - Desugar during parsing - no separate Tree type in runtime
+
+3. **Query Pattern Detection** (`src/graph/optimizer.rs`)
    - Track access patterns (property lookups, traversals)
    - Frequency counters for operations
    - Automatic index creation threshold (e.g., after 10 lookups on same property)
 
-3. **Automatic Index Creation**
+4. **Automatic Index Creation**
    - Property indices (hash-based): Fast `find_node(property: value)` lookups
    - Edge type indices: Fast traversal by edge type
    - Degree indices: Quick degree lookups for hub detection
    - Transparent to user - indices created/destroyed automatically
 
-4. **Rule-Aware Algorithm Selection**
+5. **Rule-Aware Algorithm Selection**
    - `no_cycles` → Use topological algorithms, skip cycle detection
    - `max_degree` → Choose algorithms with better complexity bounds
    - `connected` → Skip component detection
@@ -1898,25 +1958,77 @@ fn test_auto_index_creation() {
 fn test_rule_aware_shortest_path() {
     let mut dag = Graph::new(GraphType::Directed);
     dag.add_rule("no_cycles").unwrap();
-    
+
     // Add nodes forming a DAG
     dag.add_edge("A", "B", "edge");
     dag.add_edge("A", "C", "edge");
     dag.add_edge("B", "D", "edge");
     dag.add_edge("C", "D", "edge");
-    
+
     // Shortest path should use topological ordering, not general BFS
     let path = dag.shortest_path("A", "D");
     assert_eq!(path.algorithm_used(), "topological_shortest_path");
+}
+
+#[test]
+fn test_tree_syntax_is_graph_with_rules() {
+    // This test shows that tree{} creates a graph with the :tree ruleset
+    // In actual Graphoid code: my_tree = tree{}
+    // Parser desugars to: my_tree = graph{}.with_ruleset(:tree)
+
+    let mut tree = Graph::new(GraphType::Directed);
+    tree.with_ruleset(Ruleset::Tree).unwrap();  // Applies no_cycles, single_root, connected
+
+    // Build a valid tree structure
+    tree.insert(Value::Number(5.0), None);  // Root
+    tree.insert(Value::Number(3.0), Some("5"));
+    tree.insert(Value::Number(7.0), Some("5"));
+
+    // Verify tree rules are enforced
+    assert!(tree.has_ruleset(Ruleset::Tree));
+    assert_eq!(tree.count_roots(), 1);  // single_root enforced
+
+    // Try to violate tree structure - should fail
+    tree.add_node("orphan", Value::Number(10.0));
+    let result = tree.add_edge("7", "3", "edge", HashMap::new());  // Would create cycle
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("no_cycles"));
+}
+
+#[test]
+fn test_bst_insertion_with_rules() {
+    // Demonstrate that BST behavior comes from rules/behaviors
+    // (This might be implemented via behaviors in Phase 7, but we show the structure)
+    let mut tree = Graph::new(GraphType::Directed);
+    tree.with_ruleset(Ruleset::Tree).unwrap();
+
+    // For now, manual BST insertion (automatic BST ordering via behaviors in Phase 7)
+    tree.insert(Value::Number(5.0), None);
+    tree.insert(Value::Number(3.0), Some("5"));
+    tree.insert(Value::Number(7.0), Some("5"));
+    tree.insert(Value::Number(1.0), Some("3"));
+    tree.insert(Value::Number(9.0), Some("7"));
+
+    // Tree rules ensure no cycles, single root
+    assert_eq!(tree.count_roots(), 1);
+
+    // Traversal methods work on this tree-structured graph
+    let in_order = tree.in_order("5");
+    assert_eq!(in_order, vec![
+        Value::Number(1.0), Value::Number(3.0), Value::Number(5.0),
+        Value::Number(7.0), Value::Number(9.0)
+    ]);
 }
 ```
 
 **Acceptance Criteria (Week 2)**:
 - ✅ Rules validate on every mutation
+- ✅ Ruleset support works (`:tree`, `:dag`, etc.)
+- ✅ tree{} syntax desugars to graph{}.with_ruleset(:tree) in parser
 - ✅ Auto-indexing triggers after threshold (default: 10 lookups)
 - ✅ Rule-aware algorithms automatically selected
 - ✅ Performance measurably improves with auto-indices
-- ✅ 20+ tests passing
+- ✅ 25+ tests passing (including tree syntax tests)
 - ✅ Zero compiler warnings
 
 ---
@@ -2129,10 +2241,9 @@ See `dev_docs/FUTURE_FEATURES.md` for complete v2.0+ roadmap.
 ### Files to Create/Modify
 
 **New files**:
-- `src/values/graph.rs` - Graph value type
-- `src/values/tree.rs` - Tree value type
+- `src/values/graph.rs` - Graph value type (includes all graph/tree functionality)
 - `src/graph/mod.rs` - Graph module root
-- `src/graph/rules.rs` - Rule system
+- `src/graph/rules.rs` - Rule system (includes ruleset support)
 - `src/graph/optimizer.rs` - Auto-optimization
 - `src/graph/explain.rs` - Query explanation
 - `src/graph/stats.rs` - Statistics tracking
@@ -2140,8 +2251,11 @@ See `dev_docs/FUTURE_FEATURES.md` for complete v2.0+ roadmap.
 - `tests/integration/graph_performance_tests.rs` - Performance tests
 
 **Modified files**:
-- `src/values/mod.rs` - Add Graph and Tree variants to Value enum
+- `src/values/mod.rs` - Add Graph variant to Value enum (NO separate Tree variant!)
+- `src/parser/mod.rs` - Add tree{} syntax desugaring to graph{}.with_ruleset(:tree)
 - `src/lib.rs` - Add graph module
+
+**IMPORTANT**: No `src/values/tree.rs` file! Trees are graphs with rules, not a separate type.
 
 ---
 

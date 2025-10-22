@@ -119,6 +119,14 @@ pub enum Expr {
         entries: Vec<(String, Expr)>,
         position: SourcePosition,
     },
+    Graph {
+        config: Vec<(String, Expr)>,
+        position: SourcePosition,
+    },
+    Tree {
+        config: Vec<(String, Expr)>,
+        position: SourcePosition,
+    },
 }
 
 impl Expr {
@@ -134,6 +142,8 @@ impl Expr {
             Expr::Lambda { position, .. } => position,
             Expr::List { position, .. } => position,
             Expr::Map { position, .. } => position,
+            Expr::Graph { position, .. } => position,
+            Expr::Tree { position, .. } => position,
         }
     }
 }

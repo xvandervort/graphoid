@@ -1,431 +1,517 @@
-# START HERE - Next Session Guide
+# START HERE - Next Session Quick Start
 
-**Last Updated**: October 20, 2025
-**Current Status**: ✅ Phase 4 Complete + Control Flow Complete → Start Phase 5
-
----
-
-## Quick Status Check
-
-Run these commands to verify everything is ready:
-
-```bash
-cd /home/irv/work/grang/rust
-
-# Should show 195 tests passing
-~/.cargo/bin/cargo test --test unit_tests
-
-# Should build with zero warnings
-~/.cargo/bin/cargo build
-
-# Test the REPL with control flow
-~/.cargo/bin/cargo run
-> func max(a, b) { if a > b { return a } else { return b } }
-> max(10, 20)
-> for i in [1, 2, 3] { x = x + i }
-> /exit
-```
-
-**Expected Results:**
-- ✅ 195 tests passing (54 lexer + 31 parser + 110 executor)
-- ✅ Zero compiler warnings
-- ✅ REPL working perfectly with functions and control flow
-- ✅ File execution mode working
+**Last Updated**: October 22, 2025
+**Current Status**: 🔧 REFACTOR REQUIRED - Option A Implementation
+**Tests Passing**: 388/388 (100%)
+**What's Next**: Execute refactor plan to align with philosophy
 
 ---
 
-## What's Complete
+## 📖 What Happened Last Session
 
-### ✅ Phase 0: Project Setup
-- Rust project structure
-- Dependencies configured (thiserror, regex, chrono, serde, crypto, etc.)
-- Error types with source positions
-- CLI/REPL skeleton
+**Last session was a DESIGN REVIEW session**, not a coding session.
 
-### ✅ Phase 1: Lexer (54 tests)
-- Complete tokenization engine
-- All operators including `//`, `.+`, `.*`, etc.
-- Comments (hash and block), strings, numbers, symbols
-- Position tracking
+### What Was Discovered
+The previous implementation (Phase 6 Week 1) created separate `Tree` and `Graph` types, which **violates the core Graphoid philosophy** that "trees are graphs with rules."
 
-### ✅ Phase 2: Parser & AST (31 tests)
-- Full AST node definitions with source positions
-- Recursive descent parser with precedence climbing
-- All statements: variables, functions, if/while/for, return, break, continue
-- All expressions: literals, binary/unary ops, calls, lambdas, collections
-- Correct operator precedence
-- Zero compiler warnings
+### What Was Done
+- ✅ Identified the design inconsistency
+- ✅ Chose Option A: Pure Philosophy approach
+- ✅ Updated ALL documentation to reflect Option A
+- ✅ Created detailed refactor plan (REFACTOR_PLAN_OPTION_A.md)
 
-### ✅ Phase 3: Value System & Basic Execution (59 tests)
-- **Value System** - All 7 value types (Number, String, Boolean, None, Symbol, List, Map)
-- **Function Values** - Functions are first-class values with closures
-- **Environment** - Variable storage with nested scopes and parent links
-- **Executor** - Full expression evaluation and statement execution
-- **All Arithmetic** - +, -, *, /, //, %, ^
-- **All Comparisons** - ==, !=, <, <=, >, >= (numbers AND strings)
-- **All Logical** - and, or, not
-- **String Concatenation** - `"hello" + " world"`
-- **Collections** - Lists `[1, 2, 3]` and maps `{"key": value}`
-- **Implicit Variable Declaration** - `x = 10` creates variable
+### What Was NOT Done
+- ❌ No code changes made
+- ❌ Implementation still has separate Tree/Graph types
+- ❌ Refactor not yet executed
 
-### ✅ Phase 4: Functions & Lambdas (51 tests total)
-- **Function Declarations** - `func add(a, b) { return a + b }`
-- **Function Calls** - `add(2, 3)` → `5`
-- **Return Statements** - Early exit from functions
-- **Closures** - Functions capture environment at definition time (snapshot semantics)
-- **Nested Calls** - `add(double(5), 3)` → `13`
-- **Anonymous Lambdas** - `x => x * 2`
-- **Call Stack** - Track function call chain for debugging
-- **Error Handling** - Wrong argument count, undefined functions, type errors
-- **Multiple Parameters** - Up to 4+ parameters tested
-- **Various Return Types** - Numbers, strings, booleans, lists, symbols
-- **First-Class Functions** - Store, pass, and return functions as values
-
-### ✅ Control Flow (16 tests)
-- **If/Else Statements** (6 tests)
-  - Truthiness evaluation
-  - Then/else branch execution
-  - Early returns from branches
-  - Comparisons in conditions
-  - Nested in functions
-
-- **While Loops** (5 tests)
-  - Condition re-evaluation each iteration
-  - Break when false
-  - Never executes if initially false
-  - Multiple statements in body
-  - Nested while loops
-  - Early returns from loops
-  - While in functions (factorial example)
-
-- **For Loops** (5 tests)
-  - Iterate over list elements
-  - Empty list (zero iterations)
-  - String concatenation
-  - For in functions (sum_list example)
-  - Nested for loops
-  - Loop variable binding
-
-### ✅ REPL & File Execution
-- Fully functional REPL with help, expression printing, error handling
-- File execution mode: `cargo run file.gr`
-- Zero warnings compilation
+**Result**: Documentation is ready, code needs to be updated to match.
 
 ---
 
-## What's Next: Phase 5
+## ⚠️ CRITICAL: Why This Refactor Matters
 
-### 🎯 Phase 5: Collections & Methods (7-10 days)
+### Current State (WRONG)
+```rust
+// src/values/tree.rs exists (separate file)
+pub struct Tree { ... }
 
-**Goal**: Implement collection methods (`map`, `filter`, etc.) and element-wise operations
-
-**Prerequisites**: ✅ Control flow (if/while/for) - COMPLETE!
-
-#### What Phase 5 Includes:
-
-1. **Collection Methods** - Core functional programming operations
-   - `list.map(func)` - Transform each element
-   - `list.filter(func)` - Keep matching elements
-   - `list.reduce(func, init)` - Aggregate values
-   - `list.each(func)` - Side effects
-   - `list.length()`, `list.append()`, `list.contains()`
-   - Named transformations: `map("double")`, `filter("even")`
-
-2. **Element-wise Operators**
-   - `.+`, `.-`, `.*`, `./` - Element-wise arithmetic
-   - `[1, 2, 3] .+ [4, 5, 6]` → `[5, 7, 9]`
-   - Broadcasting: `[1, 2, 3] .* 2` → `[2, 4, 6]`
-
-3. **List Operations**
-   - Concatenation: `[1, 2] + [3, 4]` → `[1, 2, 3, 4]`
-   - Slicing: `list[1:3]`, `list[:2]`, `list[2:]`
-   - Indexing: `list[0]`, `list[-1]`
-
-4. **Map Operations**
-   - Key access: `map["key"]`
-   - Methods: `keys()`, `values()`, `has_key()`
-
-#### Step 1: Read the Roadmap (15 minutes)
-
-```bash
-less /home/irv/work/grang/dev_docs/RUST_IMPLEMENTATION_ROADMAP.md
-# Search for "Phase 5:" and read through
-```
-
-#### Step 2: Plan Implementation Order
-
-**Suggested order** (following TDD for each):
-1. List indexing (`list[0]`)
-2. Map key access (`map["key"]`)
-3. Basic list methods (`length()`, `append()`, `contains()`)
-4. Functional methods (`map()`, `filter()`, `each()`)
-5. Named transformations (`map("double")`)
-6. Element-wise operators (`.+`, `.*`, etc.)
-7. List slicing (`list[1:3]`)
-8. Advanced methods (`reduce()`, `sort()`, etc.)
-
-#### Step 3: Follow TDD for Each Feature
-
-**Example: Implementing `list.length()`**
-
-```bash
-# RED: Write test first
-# In tests/unit/executor_tests.rs:
-#[test]
-fn test_list_length() {
-    // items = [1, 2, 3]
-    // result = items.length()
-    // assert result == 3
+// src/values/mod.rs
+pub enum Value {
+    Graph(Graph),
+    Tree(Tree),  // ❌ Separate variant
 }
 
-# Run test - should FAIL
-cargo test test_list_length
-
-# GREEN: Implement method call
-# In src/execution/executor.rs - handle Expr::MethodCall
-# In src/values/mod.rs - implement list methods
-
-# Run test - should PASS
-cargo test test_list_length
-
-# Build - should have ZERO warnings
-cargo build
+// Graphoid code
+t = tree {}      // Creates Value::Tree
+g = graph {}     // Creates Value::Graph
+// These are DIFFERENT types!
 ```
 
----
+### Required State (CORRECT - Option A)
+```rust
+// NO src/values/tree.rs file!
 
-## Phase 5 Success Criteria
+// src/values/mod.rs
+pub enum Value {
+    Graph(Graph),  // ✅ Only Graph variant
+}
 
-When Phase 5 is complete, you should be able to:
-
-✅ **Access list elements**: `list[0]`, `list[-1]`
-✅ **Access map values**: `map["key"]`
-✅ **Call list methods**: `list.length()`, `list.append(4)`
-✅ **Map over lists**: `[1, 2, 3].map(x => x * 2)` → `[2, 4, 6]`
-✅ **Filter lists**: `[1, 2, 3, 4].filter(x => x > 2)` → `[3, 4]`
-✅ **Use named transforms**: `numbers.map("double").filter("positive")`
-✅ **Element-wise ops**: `[1, 2] .+ [3, 4]` → `[4, 6]`
-✅ **Slice lists**: `list[1:3]`
-✅ **Pass 50+ collection tests**
-✅ **Total tests: 245+ (195 existing + 50 new)**
-
----
-
-## NOT in Phase 5
-
-These come later, don't implement yet:
-
-❌ Graph types (Phase 6)
-❌ Tree types (Phase 6)
-❌ Graph rules and validation (Phase 7)
-❌ Intrinsic behaviors (Phase 7)
-❌ Module system (Phase 8)
-❌ Standard library modules (Phase 9-10)
-
----
-
-## Key Files Reference
-
-### Implementation Files (Will Modify)
-- `src/values/mod.rs` - Add method implementations for List/Map
-- `src/execution/executor.rs` - Handle method calls, indexing, slicing
-- `src/ast/mod.rs` - May need Index/Slice expression variants (check if exists)
-
-### Test Files (Will Modify)
-- `tests/unit/executor_tests.rs` - Add collection method tests
-- `tests/integration_tests.rs` - Add end-to-end collection tests
-
-### Documentation Files (Reference)
-- `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` - Phase 5 specification
-- `dev_docs/LANGUAGE_SPECIFICATION.md` - Collection method syntax
-- `dev_docs/ARCHITECTURE_DESIGN.md` - Design decisions
-
-### Session Tracking
-- `SESSION_SUMMARY.md` - What was accomplished this session
-- `START_HERE_NEXT_SESSION.md` - This file
-
----
-
-## Current Project Structure
-
-```
-/home/irv/work/grang/rust/
-├── src/
-│   ├── lib.rs              # Library root
-│   ├── main.rs             # ✅ CLI & REPL
-│   ├── error.rs            # ✅ Error types
-│   ├── lexer/              # ✅ Complete (Phase 1)
-│   │   ├── mod.rs
-│   │   └── token.rs
-│   ├── parser/             # ✅ Complete (Phase 2)
-│   │   └── mod.rs
-│   ├── ast/                # ✅ Complete (Phase 2)
-│   │   └── mod.rs
-│   ├── values/             # ✅ Complete (Phases 3-4)
-│   │   └── mod.rs          # 🔜 ADD collection methods (Phase 5)
-│   ├── execution/          # ✅ Complete (Phases 3-4)
-│   │   ├── mod.rs
-│   │   ├── environment.rs  # ✅ Nested scopes with parent links
-│   │   └── executor.rs     # 🔜 ADD method calls, indexing (Phase 5)
-│   └── graph/              # Phase 6 (future)
-├── tests/
-│   ├── unit_tests.rs       # Test registration
-│   ├── integration_tests.rs # Integration tests
-│   └── unit/
-│       ├── lexer_tests.rs  # ✅ 54 tests
-│       ├── parser_tests.rs # ✅ 31 tests
-│       └── executor_tests.rs # ✅ 110 tests, 🔜 ADD collection tests
-├── tmp/                    # Test files
-│   └── test_control_flow.gr # Control flow integration test
-└── dev_docs/               # 📚 In project root!
-    ├── RUST_IMPLEMENTATION_ROADMAP.md  # READ Phase 5!
-    ├── LANGUAGE_SPECIFICATION.md       # Collection syntax
-    └── ARCHITECTURE_DESIGN.md          # Design decisions
+// Graphoid code
+t = tree {}      // Desugars to: graph{}.with_ruleset(:tree)
+g = graph {}     // Creates Value::Graph
+// Both create the SAME type!
 ```
 
+### Core Philosophy
+1. **Trees are NOT a separate type** - Only `Value::Graph` exists
+2. **tree{} is syntactic sugar** - Parser transforms to `graph{}.with_ruleset(:tree)`
+3. **All methods on Graph** - Traversals, insert, etc. work on any graph
+4. **Rules enforce constraints** - `:tree` ruleset provides tree behavior
+
 ---
 
-## Common Commands
+## 🎯 This Session's Goal
+
+**Execute REFACTOR_PLAN_OPTION_A.md to align implementation with philosophy**
+
+### Timeline
+- **2-3 days** total
+- **Day 1**: Extend Graph with tree functionality
+- **Day 2**: Remove Tree type, update tests
+- **Day 3**: Polish and verify
+
+### Success Criteria
+- ✅ No `src/values/tree.rs` file exists
+- ✅ No `Value::Tree` variant exists
+- ✅ tree{} desugars to graph{}.with_ruleset(:tree)
+- ✅ All tests pass (with updates)
+- ✅ Zero compiler warnings
+
+---
+
+## 📚 MUST READ Before Starting (15 minutes)
+
+### 1. The Refactor Plan (10 min) - PRIMARY GUIDE
+```bash
+less /home/irv/work/grang/rust/REFACTOR_PLAN_OPTION_A.md
+```
+
+This is your **step-by-step implementation guide**:
+- Problem explanation
+- Solution approach (Option A)
+- **7 detailed steps** with code examples
+- Testing strategy
+- Timeline and success criteria
+
+**Read this first!**
+
+### 2. Updated Roadmap (3 min)
+```bash
+less /home/irv/work/grang/dev_docs/RUST_IMPLEMENTATION_ROADMAP.md
+# Search for "Phase 6" (press / then type "Phase 6")
+```
+
+Shows the correct Phase 6 approach:
+- Week 1: Graph only (no separate Tree)
+- Week 2: Rules and tree{} syntax sugar
+
+### 3. Last Session Summary (2 min)
+```bash
+less /home/irv/work/grang/rust/SESSION_SUMMARY.md
+```
+
+Explains what was done last session (doc updates, not code).
+
+---
+
+## 🗺️ The Refactor Plan (Overview)
+
+Here are the 7 steps from REFACTOR_PLAN_OPTION_A.md:
+
+### Step 1: Extend Graph with Tree Functionality (1 day)
+**File**: `src/values/graph.rs`
+
+Add these methods to Graph:
+- `insert(value, parent?)` - Tree-like insertion
+- `contains(value)` - Search for value
+- `bfs(start)` - Breadth-first traversal
+- `dfs(start)` - Depth-first traversal
+- `in_order(start)` - In-order traversal
+- `pre_order(start)` - Pre-order traversal
+- `post_order(start)` - Post-order traversal
+
+**Use TDD**: Write test → Implement → Verify
+
+### Step 2: Remove Tree from Value Enum (30 min)
+**File**: `src/values/mod.rs`
+
+Remove `Tree(Tree)` variant from Value enum.
+Update all Value methods (type_name, to_string_value, etc.).
+
+### Step 3: Update Parser (1 hour)
+**File**: `src/parser/mod.rs`
+
+Change tree{} parsing to desugar into:
+```rust
+tree{} → graph{}.with_ruleset(:tree)
+```
+
+### Step 4: Update Executor (30 min)
+**File**: `src/execution/executor.rs`
+
+Remove `eval_tree()` function.
+Remove Expr::Tree match arm from eval_expr().
+
+### Step 5: Delete tree.rs (5 min)
+```bash
+rm src/values/tree.rs
+```
+Remove imports from mod.rs.
+
+### Step 6: Update Tests (1 day)
+**File**: `tests/integration_tests.rs`
+
+Update all tree tests to expect Graph instead of Tree.
+Add new tests for tree-as-graph functionality.
+
+### Step 7: Update AST (30 min)
+**File**: `src/ast/mod.rs`
+
+Remove `Expr::Tree` variant (if present).
+
+---
+
+## 🚀 Quick Start Commands
+
+### Verify Current State
+```bash
+cd /home/irv/work/grang/rust
+
+# Should show 388 tests passing
+~/.cargo/bin/cargo test 2>&1 | grep "test result:"
+
+# Should build with zero warnings
+~/.cargo/bin/cargo build 2>&1 | grep -i warning
+```
+
+**Expected**: 388/388 tests, zero warnings
+
+### Start Refactor - Step 1
+```bash
+# Read the refactor plan
+less REFACTOR_PLAN_OPTION_A.md
+
+# Open graph.rs to add tree methods
+# Start with insert() method
+
+# TDD approach for each method:
+# 1. Write test in tests/unit/graph_tests.rs
+# 2. Run: ~/.cargo/bin/cargo test test_graph_insert
+# 3. Implement method in src/values/graph.rs
+# 4. Run: ~/.cargo/bin/cargo test test_graph_insert (should pass)
+# 5. Run: ~/.cargo/bin/cargo test (all should pass)
+# 6. Commit
+```
+
+### Ask Claude Code
+
+**If using Claude Code, say:**
+
+> "Execute Step 1 of REFACTOR_PLAN_OPTION_A.md: Extend Graph with tree functionality (insert, contains, traversals). Follow TDD. Keep all tests passing."
+
+Claude will:
+1. Read REFACTOR_PLAN_OPTION_A.md
+2. Add tree methods to Graph (insert, contains, traversals)
+3. Write tests for each method (TDD)
+4. Keep all 388 tests passing throughout
+5. Maintain zero warnings
+
+After Step 1 is complete, continue with:
+
+> "Execute Step 2 of REFACTOR_PLAN_OPTION_A.md: Remove Tree from Value enum."
+
+And so on through all 7 steps.
+
+---
+
+## 🎯 Step 1 Details (Start Here)
+
+### Goal
+Add tree functionality to Graph struct so it can handle both graphs and trees.
+
+### Methods to Add
+
+1. **insert(value, parent?) → String**
+   ```rust
+   pub fn insert(&mut self, value: Value, parent: Option<&str>) -> String {
+       // Generate node ID
+       // Add node
+       // If parent specified, add edge
+       // Return node ID
+   }
+   ```
+
+2. **contains(value) → bool**
+   ```rust
+   pub fn contains(&self, value: &Value) -> bool {
+       // Search all nodes for matching value
+   }
+   ```
+
+3. **bfs(start) → Vec<String>**
+   ```rust
+   pub fn bfs(&self, start: &str) -> Vec<String> {
+       // Standard BFS - return node IDs in order
+   }
+   ```
+
+4. **dfs(start) → Vec<String>**
+   ```rust
+   pub fn dfs(&self, start: &str) -> Vec<String> {
+       // Standard DFS - return node IDs in order
+   }
+   ```
+
+5. **in_order(start) → Vec<Value>**
+   ```rust
+   pub fn in_order(&self, start: &str) -> Vec<Value> {
+       // Assumes binary tree (left/right edges)
+       // Return values in in-order: left, root, right
+   }
+   ```
+
+6. **pre_order(start) → Vec<Value>**
+   ```rust
+   pub fn pre_order(&self, start: &str) -> Vec<Value> {
+       // Return values in pre-order: root, left, right
+   }
+   ```
+
+7. **post_order(start) → Vec<Value>**
+   ```rust
+   pub fn post_order(&self, start: &str) -> Vec<Value> {
+       // Return values in post-order: left, right, root
+   }
+   ```
+
+### TDD Workflow
+
+For **each method** above:
+
+1. **RED**: Write failing test
+   ```rust
+   // tests/unit/graph_tests.rs
+   #[test]
+   fn test_graph_insert() {
+       let mut g = Graph::new(GraphType::Directed);
+       let node_id = g.insert(Value::Number(5.0), None);
+       assert_eq!(g.node_count(), 1);
+       assert!(g.has_node(&node_id));
+   }
+   ```
+
+2. **RUN**: `~/.cargo/bin/cargo test test_graph_insert` (should FAIL)
+
+3. **GREEN**: Implement method in src/values/graph.rs
+
+4. **RUN**: `~/.cargo/bin/cargo test test_graph_insert` (should PASS)
+
+5. **VERIFY**: `~/.cargo/bin/cargo test` (all 388+ should PASS)
+
+6. **BUILD**: `~/.cargo/bin/cargo build` (zero warnings)
+
+7. **COMMIT**: Small commit for this one method
+
+### Tips
+
+- **Look at tree.rs** for reference implementations
+  - Contains BST insertion logic
+  - Contains traversal implementations
+  - Extract and adapt for Graph structure
+
+- **Start simple**: Begin with insert() and contains()
+
+- **Test incrementally**: Don't implement all methods before testing
+
+- **Keep tests passing**: All 388 tests should pass after each method
+
+---
+
+## 📊 Progress Tracking
+
+Use this checklist to track refactor progress:
+
+### Step 1: Extend Graph (Day 1)
+- [ ] Add insert() method + test
+- [ ] Add contains() method + test
+- [ ] Add bfs() method + test
+- [ ] Add dfs() method + test
+- [ ] Add in_order() method + test
+- [ ] Add pre_order() method + test
+- [ ] Add post_order() method + test
+- [ ] All 388+ tests passing
+- [ ] Zero warnings
+
+### Step 2-5: Remove Tree Type (Day 2, Morning)
+- [ ] Remove Tree from Value enum
+- [ ] Update Value methods
+- [ ] Update parser (desugar tree{})
+- [ ] Update executor (remove eval_tree)
+- [ ] Delete src/values/tree.rs
+- [ ] All tests passing (with updates)
+
+### Step 6: Update Tests (Day 2, Afternoon)
+- [ ] Update tree creation tests
+- [ ] Add tree-as-graph tests
+- [ ] Add traversal tests
+- [ ] All tests passing
+
+### Step 7: Polish (Day 3)
+- [ ] Update AST if needed
+- [ ] Final test verification
+- [ ] REPL testing
+- [ ] Documentation check
+
+---
+
+## 🔍 Verification Commands
+
+After each step, run these to verify correctness:
 
 ```bash
-# Run all tests
+# All tests pass
 ~/.cargo/bin/cargo test
 
-# Run specific test file
-~/.cargo/bin/cargo test --test unit_tests
+# Zero warnings
+~/.cargo/bin/cargo build 2>&1 | grep -i warning
 
-# Run specific test
-~/.cargo/bin/cargo test test_list_length
+# Count tests passing
+~/.cargo/bin/cargo test 2>&1 | grep "test result:"
 
-# Run tests with output
-~/.cargo/bin/cargo test -- --nocapture
-
-# Build without running
-~/.cargo/bin/cargo build
-
-# Check for warnings (should be ZERO)
-~/.cargo/bin/cargo build 2>&1 | grep warning
-
-# Run REPL
+# Try in REPL
 ~/.cargo/bin/cargo run
-
-# Run file
-~/.cargo/bin/cargo run /home/irv/work/grang/tmp/test_control_flow.gr
-
-# Count tests
-~/.cargo/bin/cargo test --test unit_tests 2>&1 | grep "test result"
+> g = graph {}
+> # (whatever works at this step)
 ```
 
 ---
 
-## Questions to Ask Claude
+## 🎓 Key Insights
 
-If you're continuing with Claude Code:
+### Why This Refactor Is Important
 
-1. **"Continue with Phase 5. Start with list indexing. Follow TDD."**
-   - Claude will implement `list[0]`, `list[-1]` following TDD
+1. **Philosophy First**: Graphoid's value is "everything is a graph"
+2. **Dogfooding**: Using rules to define trees proves the rule system works
+3. **Code Quality**: One implementation is simpler than two
+4. **Flexibility**: Any graph can use tree methods, not just "trees"
+5. **Teaching**: Code should exemplify the principles
 
-2. **"Show me the Phase 5 specification from the roadmap"**
-   - Claude will read and summarize Phase 5 section
+### What Makes This Safe
 
-3. **"What's the current test count?"**
-   - Claude will run tests and report (should be 195)
-
-4. **"Test list methods in the REPL"**
-   - Claude will test: `items = [1, 2, 3]` then `items.length()`
+1. **Tests**: 388 passing tests catch regressions
+2. **TDD**: Test-first approach for new functionality
+3. **Incremental**: Small steps with verification
+4. **Reversible**: Git history preserves working state
+5. **Clear Plan**: Detailed guide reduces uncertainty
 
 ---
 
-## Development Workflow
+## ⚠️ Common Pitfalls to Avoid
 
-### 1. Start Fresh
+### Don't Do This
+
+1. ❌ **Implement all methods before testing**
+   - ✅ Do: One method at a time with TDD
+
+2. ❌ **Let tests break and fix later**
+   - ✅ Do: Keep all tests passing throughout
+
+3. ❌ **Skip reading REFACTOR_PLAN_OPTION_A.md**
+   - ✅ Do: Read the plan first (has code examples!)
+
+4. ❌ **Try to keep Tree type "for now"**
+   - ✅ Do: Complete refactor to eliminate it
+
+5. ❌ **Forget to delete tree.rs**
+   - ✅ Do: Delete in Step 5 (not before!)
+
+---
+
+## 📁 Key Files Reference
+
+### Will Read
+- `rust/REFACTOR_PLAN_OPTION_A.md` - **PRIMARY GUIDE**
+- `rust/src/values/tree.rs` - Reference for BST/traversal logic
+- `rust/src/values/graph.rs` - Where tree methods will be added
+- `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` - Updated Phase 6 spec
+
+### Will Modify
+- `src/values/graph.rs` - Add tree methods (Step 1)
+- `src/values/mod.rs` - Remove Tree variant (Step 2)
+- `src/parser/mod.rs` - Desugar tree{} (Step 3)
+- `src/execution/executor.rs` - Remove eval_tree (Step 4)
+- `tests/unit/graph_tests.rs` - Add tests
+- `tests/integration_tests.rs` - Update tests
+
+### Will Delete
+- `src/values/tree.rs` - Remove in Step 5
+
+---
+
+## 💡 Success Looks Like
+
+### After Step 1 (Day 1)
+```rust
+// Graph has all tree methods
+let mut g = Graph::new(GraphType::Directed);
+let root = g.insert(Value::Number(5.0), None);
+g.insert(Value::Number(3.0), Some(&root));
+g.insert(Value::Number(7.0), Some(&root));
+
+assert!(g.contains(&Value::Number(5.0)));
+let values = g.in_order(&root);
+// [3, 5, 7]
+```
+
+### After Complete Refactor (Day 3)
+```graphoid
+# In Graphoid code:
+t = tree {}              # Creates a Graph
+g = graph {}             # Creates a Graph
+
+# Same methods work on both!
+t.insert(5, none)
+g.insert(5, none)
+
+t.in_order(start)
+g.in_order(start)
+
+# tree{} has rules enforced
+t.add_node("orphan", 10)  # May fail with rule violation
+```
+
+---
+
+## 🚦 Ready to Start?
+
+**You have everything you need:**
+- ✅ Clear problem statement
+- ✅ Detailed 7-step plan
+- ✅ Code examples for each step
+- ✅ TDD workflow defined
+- ✅ Success criteria clear
+- ✅ Timeline realistic (2-3 days)
+
+**Next command:**
 ```bash
 cd /home/irv/work/grang/rust
-~/.cargo/bin/cargo test --test unit_tests  # Verify 195 tests passing
-git status                                  # Check current state
+less REFACTOR_PLAN_OPTION_A.md
 ```
 
-### 2. Follow TDD for EACH Feature
-```bash
-# RED: Write failing test first
-# Edit: tests/unit/executor_tests.rs
-~/.cargo/bin/cargo test test_list_indexing  # Should FAIL
-
-# GREEN: Implement to make test pass
-# Edit: src/execution/executor.rs
-~/.cargo/bin/cargo test test_list_indexing  # Should PASS
-
-# Build: Check for warnings (must be ZERO)
-~/.cargo/bin/cargo build
-```
-
-### 3. Commit After Each Green Phase
-```bash
-git add .
-git commit -m "Implement list indexing"
-```
-
-### 4. Track Progress with TodoWrite
-- List indexing tests (RED)
-- Implement list indexing (GREEN)
-- Map key access tests (RED)
-- Implement map key access (GREEN)
-- List length() tests (RED)
-- Implement list length() (GREEN)
-- etc...
+**Or ask Claude Code:**
+> "Execute Step 1 of REFACTOR_PLAN_OPTION_A.md: Extend Graph with tree functionality. Follow TDD."
 
 ---
 
-## Tips for Success
-
-1. **Read Phase 5 spec first** - Don't guess, read the roadmap
-2. **TDD is mandatory** - RED-GREEN-REFACTOR for every feature
-3. **One feature at a time** - Don't implement multiple features together
-4. **Zero warnings** - Keep `cargo build` clean
-5. **Test in REPL** - Try methods interactively as you implement
-6. **Small commits** - Commit after each green phase
-
----
-
-## Phase 5 Implementation Hints
-
-### Method Calls
-- AST already has `Expr::MethodCall` variant (check parser)
-- Evaluate the object first: `list.length()` → evaluate `list`
-- Match on object type: `Value::List` → call list methods
-- Return result value
-
-### Indexing
-- AST may have `Expr::Index` variant (check parser)
-- Evaluate list and index expression
-- Handle negative indices: `-1` means last element
-- Handle out of bounds: return error or None?
-
-### Named Transformations
-- `numbers.map("double")` → lookup built-in function named "double"
-- Pre-define common functions: `double`, `square`, `even`, `odd`, `positive`, etc.
-- Store in a global registry or special environment
-
-### Element-wise Operators
-- Requires special handling in `eval_binary()`
-- Check if operator is element-wise (`.+`, `.*`, etc.)
-- Both operands must be lists OR one list + one scalar (broadcasting)
-- Apply operation element-by-element
-
----
-
-## Ready? Let's Go!
-
-**Next command to run:**
-```bash
-cd /home/irv/work/grang/rust
-less /home/irv/work/grang/dev_docs/RUST_IMPLEMENTATION_ROADMAP.md
-# Search for "Phase 5" (press / then type "Phase 5:")
-```
-
-**Or start immediately with Claude:**
-> "Continue with Phase 5: Collections & Methods. Start with list indexing. Follow TDD."
-
----
-
-**Good luck! Phase 5 will make Graphoid collections powerful! 🚀**
+**Let's align the implementation with the philosophy! 🚀**

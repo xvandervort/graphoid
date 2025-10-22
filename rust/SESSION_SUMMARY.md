@@ -1,464 +1,470 @@
-# Session Summary - Control Flow Implementation COMPLETE
+# Session Summary - Documentation Refactor for Option A Philosophy
 
-**Date**: October 20, 2025
-**Status**: ✅ Control Flow COMPLETE - Ready for Phase 5
-
----
-
-## 🎉 Major Achievement: Control Flow Fully Implemented!
-
-This session implemented complete control flow (if/else, while, for loops) using strict TDD methodology. Control flow was a prerequisite for Phase 5 (Collections & Methods).
-
-### Starting Point
-- Phase 4 complete (Functions & Lambdas)
-- 185 tests passing (54 lexer + 31 parser + 100 executor)
-- AST nodes for control flow already existed (parsed but not executed)
-- REPL and file execution working
-
-### Ending Point
-- **Control Flow 100% COMPLETE**
-- **195 tests passing** (+10 net increase, 16 new tests added)
-- **If/else, while, for loops** all working
-- **Zero compiler warnings**
-- Control flow works in REPL and file execution
+**Date**: October 22, 2025
+**Session Type**: Design Review & Documentation Update
+**Status**: ✅ COMPLETE - All docs updated, ready for refactor implementation
 
 ---
 
-## 📋 What Was Accomplished
+## 🎯 Session Goal
 
-### 1. If/Else Statement Execution (6 tests)
+**Review implementation and ensure alignment with Graphoid philosophy**
 
-**Implementation** (`src/execution/executor.rs:114-139`):
-- Evaluates condition using `is_truthy()`
-- Executes then branch if true, else branch if false
-- Handles early returns from branches
-- Optional else branch
-
-**Tests Added**:
-1. `test_if_statement_true` - Simple true condition
-2. `test_if_statement_false` - False condition, no execution
-3. `test_if_else_true` - Then branch executes
-4. `test_if_else_false` - Else branch executes
-5. `test_if_with_comparison` - Comparison in condition
-6. `test_if_return_in_function` - Early return from if in function
-
-### 2. While Loop Execution (5 tests)
-
-**Implementation** (`src/execution/executor.rs:146-168`):
-- Re-evaluates condition each iteration
-- Breaks when condition becomes false
-- Handles early returns from loop body
-- Proper scoping for loop variables
-
-**Tests Added**:
-1. `test_while_loop_simple_counter` - Basic counter increment
-2. `test_while_loop_never_executes` - Initially false condition
-3. `test_while_loop_with_multiple_statements` - Sum calculation (1+2+3+4+5=15)
-4. `test_while_loop_in_function` - Factorial implementation
-5. `test_nested_while_loops` - Nested iteration (3 outer × 2 inner = 6)
-
-### 3. For Loop Execution (5 tests)
-
-**Implementation** (`src/execution/executor.rs:169-207`):
-- Iterates over list elements
-- Binds loop variable to each element
-- Type checks iterable (must be list)
-- Handles empty lists (zero iterations)
-- Updates existing variable or creates new one
-
-**Tests Added**:
-1. `test_for_loop_simple` - Iterate and sum (1+2+3=6)
-2. `test_for_loop_empty_list` - Zero iterations with empty list
-3. `test_for_loop_with_strings` - String concatenation ("abc")
-4. `test_for_loop_in_function` - sum_list implementation
-5. `test_nested_for_loops` - Nested iteration (2 outer × 3 inner = 6)
-
-### 4. Integration Testing
-
-**Created** `/home/irv/work/grang/tmp/test_control_flow.gr`:
-- Tests if/else execution
-- Tests while loop execution
-- Tests for loop execution
-- Tests function with control flow (max function)
-
-**Result**: ✅ File executes successfully with no errors
+This session was triggered by a critical observation: the existing implementation (from previous Phase 6 Week 1 session) created separate `Tree` and `Graph` types, which **violates the core Graphoid philosophy** that "trees are graphs with rules."
 
 ---
 
-## 🔧 TDD Methodology Followed
+## 🔍 What Was Discovered
 
-We strictly followed **RED-GREEN-REFACTOR** for each feature:
+### The Problem
 
-### If/Else
-1. **RED**: Wrote 6 tests - all failed with "Unsupported statement type: If"
-2. **GREEN**: Added `Stmt::If` handler - all tests passed
-3. **REFACTOR**: Code was clean, no refactoring needed
+Previous session (Phase 6 Week 1) implemented:
+- Separate `src/values/tree.rs` with `Tree` struct
+- Separate `src/values/graph.rs` with `Graph` struct
+- `Value::Tree(Tree)` and `Value::Graph(Graph)` as distinct variants
+- Separate parsing and execution for tree{} and graph{}
 
-### While Loops
-1. **RED**: Wrote 5 tests - all failed with "Unsupported statement type: While"
-2. **GREEN**: Added `Stmt::While` handler - all tests passed
-3. **REFACTOR**: Code was clean, no refactoring needed
+**This violates the philosophy**: Trees should be graphs with rules applied, not a separate type.
 
-### For Loops
-1. **RED**: Wrote 5 tests - compilation errors (`var_type` vs `type_annotation`)
-2. **FIX**: Corrected field names using `replace_all`
-3. **RED**: Tests failed with "Unsupported statement type: For"
-4. **GREEN**: Added `Stmt::For` handler - all tests passed
-5. **REFACTOR**: Code was clean, no refactoring needed
+### The Root Cause
 
----
+The RUST_IMPLEMENTATION_ROADMAP.md originally specified creating a separate Tree type in Phase 6 Week 1, which contradicted the LANGUAGE_SPECIFICATION.md that states:
 
-## 📝 Files Modified
+> Trees are not a distinct data type—they are graphs with tree-specific rules applied. For convenience, the syntax `tree{}` creates a graph with the `:tree` ruleset.
 
-### Modified (2 files)
+### Design Options Considered
 
-**1. `src/execution/executor.rs`** (+62 lines)
-- Lines 114-139: `Stmt::If` handler
-- Lines 146-168: `Stmt::While` handler
-- Lines 169-207: `Stmt::For` handler
+Three approaches were evaluated:
 
-**2. `tests/unit/executor_tests.rs`** (+467 lines)
-- Lines 3007-3264: If/else tests (6 tests)
-- Lines 3334-3800: While loop tests (5 tests)
-- Lines 3802-4159: For loop tests (5 tests)
+**Option A: Pure Philosophy** ✅ CHOSEN
+- One Graph type with all functionality
+- tree{} is syntactic sugar for graph{}.with_ruleset(:tree)
+- Traversal methods work on any graph
+- Rules enforce tree constraints
 
-### Created (1 file)
+**Option B: Temporary Pragmatism** ❌ REJECTED
+- Keep Tree for now, refactor later
+- Creates technical debt
+- Violates philosophy temporarily
 
-**3. `/home/irv/work/grang/tmp/test_control_flow.gr`** (integration test)
-- Demonstrates all control flow features
-- Tests if/else, while, for, and function with control flow
+**Option C: Hybrid** ❌ REJECTED
+- Graph has all methods but Tree type exists
+- Still maintains unnecessary separation
+
+**Decision**: Implement Option A - stay true to philosophy from the start.
 
 ---
 
-## 📊 Test Coverage
+## 📝 What Was Accomplished
 
-### Before: 185 tests
-- 54 lexer tests
-- 31 parser tests
-- 100 executor tests
+### 1. Updated RUST_IMPLEMENTATION_ROADMAP.md
 
-### After: 195 tests (+10 net)
-- 54 lexer tests
-- 31 parser tests
-- 110 executor tests (+10)
-  - If/else: 6 tests
-  - While: 5 tests
-  - For: 5 tests
-  - Functions: 41 tests (from previous session)
-  - Basic execution: ~53 tests
+**File**: `/home/irv/work/grang/dev_docs/RUST_IMPLEMENTATION_ROADMAP.md`
 
-### Quality Metrics
-- ✅ **100% pass rate** (195/195)
-- ✅ **Zero compiler warnings**
-- ✅ **TDD methodology** followed strictly
-- ✅ **Integration testing** verified
+#### Phase 5 Summary
+- Added explicit note: Graphs NOT implemented in Phase 5
+- Clarified Phase 6 relationship between graphs and trees
 
----
+#### Phase 6 Week 1 - Complete Rewrite
+**Before**: Separate Tree and Graph implementations
+**After**: Single Graph implementation with tree functionality
 
-## 🎯 Current Capabilities
+Key changes:
+- Added philosophy statement explaining trees are graphs
+- Removed "Tree Implementation" task entirely
+- Added traversal methods to Graph (BFS, DFS, in-order, pre-order, post-order)
+- Added `insert(value, parent?)` convenience method for tree-like usage
+- Updated tests to show trees as graphs, not separate type
+- Updated acceptance criteria: "No separate Tree type exists - only Graph"
 
-The Graphoid interpreter now supports:
-
-### Data Types
-- Numbers (f64)
-- Strings
-- Booleans (true/false)
-- None
-- Symbols (:symbol)
-- Lists ([1, 2, 3])
-- Maps ({"key": value})
-- Functions (first-class values)
-
-### Operators
-- **Arithmetic**: +, -, *, /, //, %, ^
-- **Comparison**: ==, !=, <, <=, >, >= (numbers AND strings)
-- **Logical**: and, or, not
-- **Unary**: -, not
-
-### Control Flow ✨ NEW
-- **If/else statements** with truthiness evaluation
-- **While loops** with condition re-evaluation
-- **For loops** iterating over lists
-- **Early returns** from any control flow structure
-
-### Functions
-- Function declarations
-- Function calls with multiple parameters
-- Return statements (early exit)
-- Closures (snapshot semantics with `Rc<Environment>`)
-- Anonymous lambdas (x => x * 2)
-- Call stack tracking
-
-### Variables
-- Implicit declaration (x = 10)
-- Explicit declaration with types
-- Nested scopes with parent links
-- Variable shadowing
-
-### Other
-- Fully functional REPL
-- File execution mode
-- Comprehensive error messages with source positions
-- Help system
-
----
-
-## 🚫 What's NOT Yet Implemented
-
-Waiting for Phase 5:
-
-❌ Collection methods (map, filter, reduce, etc.)
-❌ Element-wise operators (.+, .*, ./, etc.)
-❌ List indexing (list[0], list[-1])
-❌ List slicing (list[1:3])
-❌ Map key access (map["key"])
-❌ Method calls (list.length(), list.append())
-❌ Break/continue statements (parsed but not executed)
-
-Waiting for Phase 6+:
-
-❌ Graph types
-❌ Tree types
-❌ Module system
-❌ Standard library
-
----
-
-## 💡 Implementation Details
-
-### If/Else Handler
-
+**New test examples**:
 ```rust
-Stmt::If { condition, then_branch, else_branch, .. } => {
-    let cond_value = self.eval_expr(condition)?;
-    if cond_value.is_truthy() {
-        for stmt in then_branch {
-            if let Some(val) = self.eval_stmt(stmt)? {
-                return Ok(Some(val));  // Early return
-            }
-        }
-    } else if let Some(else_stmts) = else_branch {
-        for stmt in else_stmts {
-            if let Some(val) = self.eval_stmt(stmt)? {
-                return Ok(Some(val));  // Early return
-            }
-        }
-    }
-    Ok(None)
+#[test]
+fn test_graph_insert_and_traversal() {
+    // Build BST structure using Graph
+    let mut g = Graph::new(GraphType::Directed);
+    g.add_node("5", Value::Number(5.0));
+    g.add_node("3", Value::Number(3.0));
+    g.add_edge("5", "3", "left", HashMap::new());
+
+    // Traversal methods work on any graph
+    let values = g.in_order("5");
+    assert_eq!(values, vec![3.0, 5.0, 7.0]);
 }
 ```
 
-**Key Features**:
-- Uses `is_truthy()` for condition evaluation
-- Properly handles early returns
-- Optional else branch
+#### Phase 6 Week 2 - Major Updates
+**Added tasks**:
+1. Rule System - with ruleset support
+2. **Tree Syntax Sugar** - Parser desugars tree{} → graph{}.with_ruleset(:tree)
+3. Query Pattern Detection
+4. Automatic Index Creation
+5. Rule-Aware Algorithm Selection
 
-### While Loop Handler
-
+**New test examples**:
 ```rust
-Stmt::While { condition, body, .. } => {
-    loop {
-        let cond_value = self.eval_expr(condition)?;
-        if !cond_value.is_truthy() {
-            break;
-        }
-        for stmt in body {
-            if let Some(val) = self.eval_stmt(stmt)? {
-                return Ok(Some(val));  // Early return
-            }
-        }
-    }
-    Ok(None)
+#[test]
+fn test_tree_syntax_is_graph_with_rules() {
+    // tree{} creates a graph with :tree ruleset
+    let mut tree = Graph::new(GraphType::Directed);
+    tree.with_ruleset(Ruleset::Tree).unwrap();
+
+    // Rules are enforced
+    assert_eq!(tree.count_roots(), 1);  // single_root
 }
 ```
 
-**Key Features**:
-- Re-evaluates condition each iteration
-- Breaks on false
-- Handles early returns from body
+#### Files to Create/Modify Section
+**Before**: Listed both tree.rs and graph.rs
+**After**:
+- Only graph.rs (no tree.rs!)
+- Added parser modification for tree{} desugaring
+- Explicit warning: "No `src/values/tree.rs` file! Trees are graphs with rules, not a separate type."
 
-### For Loop Handler
+### 2. Updated START_HERE_NEXT_SESSION.md
 
-```rust
-Stmt::For { variable, iterable, body, .. } => {
-    let iterable_value = self.eval_expr(iterable)?;
+**File**: `/home/irv/work/grang/rust/START_HERE_NEXT_SESSION.md`
 
-    let values = match iterable_value {
-        Value::List(ref items) => items.clone(),
-        other => return Err(GraphoidError::type_error("list", other.type_name())),
-    };
+#### Header Section
+**Changed status**:
+- From: "Phase 6 Week 1 Complete → Start Phase 6 Week 2"
+- To: "PHILOSOPHY VIOLATION DETECTED - Refactor Required"
 
-    for value in values {
-        if self.env.exists(variable) {
-            self.env.set(variable, value)?;
-        } else {
-            self.env.define(variable.clone(), value);
-        }
+**Added critical warning**:
+```
+## ⚠️ CRITICAL: Philosophy Violation
 
-        for stmt in body {
-            if let Some(val) = self.eval_stmt(stmt)? {
-                return Ok(Some(val));  // Early return
-            }
-        }
-    }
-    Ok(None)
-}
+PROBLEM: Separate tree.rs and graph.rs violate core philosophy
+
+CORRECT PHILOSOPHY (Option A):
+- Trees are NOT a separate type
+- tree{} is syntactic sugar for graph{}.with_ruleset(:tree)
+- All tree functionality should be graph methods
+
+REQUIRED REFACTOR:
+1. Merge tree functionality into Graph
+2. Remove src/values/tree.rs
+3. Add traversal methods to Graph
+4. Implement BST behavior via rules (Phase 6 Week 2 or Phase 7)
 ```
 
-**Key Features**:
-- Type checks iterable (must be list)
-- Binds loop variable for each element
-- Handles early returns from body
-- Updates existing variable or creates new
+#### What's Next Section
+**Changed goal**:
+- From: "Graph/Tree Method Calls (5-7 days)"
+- To: "Refactor to Pure Philosophy + Implement Methods (7-10 days)"
 
----
+**Split into two steps**:
+1. **Step 1: Refactor (2-3 days)** - Merge tree into graph, remove Tree type
+2. **Step 2: Implement Methods (5-7 days)** - Wire up through executor
 
-## 🏆 Session Metrics
+#### Method Lists
+**Before**: Separate "Graph Methods" and "Tree Methods" lists
+**After**: One unified list showing all methods work on graphs (including trees)
 
-- **Duration**: ~2 hours of focused work
-- **Lines Added**: 529 (467 tests + 62 implementation)
-- **Tests Added**: 16 control flow tests (10 net increase)
-- **Features Completed**: 3 (if/else, while, for)
-- **Bugs Found**: 1 (field name mismatch - fixed immediately)
-- **Compiler Warnings**: 0
-- **Test Failures**: 0
-- **Pass Rate**: 100% (195/195)
-
----
-
-## 🔜 Next Steps: Phase 5
-
-### Phase 5: Collections & Methods (7-10 days)
-
-**Prerequisites**: ✅ Control flow complete!
-
-**Goal**: Implement collection methods and element-wise operations
-
-**Key Tasks** (suggested order):
-1. List indexing (`list[0]`, `list[-1]`)
-2. Map key access (`map["key"]`)
-3. Basic list methods (`length()`, `append()`, `contains()`)
-4. Functional methods (`map()`, `filter()`, `each()`)
-5. Named transformations (`map("double")`, `filter("even")`)
-6. Element-wise operators (`.+`, `.*`, `./`, etc.)
-7. List slicing (`list[1:3]`, `list[:2]`, `list[2:]`)
-8. Advanced methods (`reduce()`, `sort()`, etc.)
-
-**Success Criteria**:
-- ✅ Access list elements: `list[0]`, `list[-1]`
-- ✅ Access map values: `map["key"]`
-- ✅ Call list methods: `list.length()`, `list.append(4)`
-- ✅ Map over lists: `[1, 2, 3].map(x => x * 2)` → `[2, 4, 6]`
-- ✅ Filter lists: `[1, 2, 3, 4].filter(x => x > 2)` → `[3, 4]`
-- ✅ Use named transforms: `numbers.map("double").filter("positive")`
-- ✅ Element-wise ops: `[1, 2] .+ [3, 4]` → `[4, 6]`
-- ✅ Slice lists: `list[1:3]`
-- ✅ Pass 50+ collection tests
-- ✅ Total tests: 245+ (195 existing + 50 new)
-
-**Reference**: `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` Phase 5 section
-
----
-
-## 📚 Key Documents Updated
-
-**Updated this session**:
-1. `START_HERE_NEXT_SESSION.md` - Complete rewrite for Phase 5
-2. `SESSION_SUMMARY.md` - This file
-
-**Essential for Phase 5**:
-1. `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` - Phase 5 specification
-2. `dev_docs/LANGUAGE_SPECIFICATION.md` - Collection method syntax
-3. `dev_docs/ARCHITECTURE_DESIGN.md` - Design decisions
-
----
-
-## 💭 Notes for Next Session
-
-### Phase 5 Preparation
-
-1. **Check AST**: Verify `Expr::Index` and `Expr::MethodCall` exist
-   - File: `src/ast/mod.rs`
-   - If not present, may need parser updates first
-
-2. **Named Transformations Strategy**:
-   - Option A: Global registry of built-in functions
-   - Option B: Special environment with standard functions
-   - Option C: Hardcode common names (double, square, even, odd, positive)
-
-3. **Element-wise Operators**: Already in lexer/parser
-   - Need special handling in `eval_binary()`
-   - Check for `.+`, `.*`, etc. and apply element-wise
-   - Support broadcasting: `[1, 2, 3] .* 2` → `[2, 4, 6]`
-
-4. **Error Handling Decisions**:
-   - Out of bounds access: Error or None?
-   - Missing map key: Error or None?
-   - Empty list operations: Error or return default value?
-
-5. **TDD Discipline**: Continue RED-GREEN-REFACTOR for EVERY feature
-   - Write tests FIRST
-   - Make them pass
-   - Keep warnings at ZERO
-
----
-
-## ✅ Status Summary
-
-**Completed Phases**:
-- ✅ Phase 0: Project Setup
-- ✅ Phase 1: Lexer (54 tests)
-- ✅ Phase 2: Parser & AST (31 tests)
-- ✅ Phase 3: Value System & Basic Execution (59 tests)
-- ✅ Phase 4: Functions & Lambdas (51 tests)
-- ✅ **Control Flow: If/While/For (16 tests)** ← THIS SESSION
-
-**Next Phase**:
-- 🔜 Phase 5: Collections & Methods
-
-**Total Progress**:
-- **195/195 tests passing (100%)** ✅
-- **Zero compiler warnings** ✅
-- **TDD methodology** strictly followed ✅
-- **Clean architecture** maintained ✅
-
----
-
-## 🎬 Git Status
-
-**Modified files** (ready to commit):
-- `src/execution/executor.rs` (+62 lines)
-- `tests/unit/executor_tests.rs` (+467 lines)
-- `START_HERE_NEXT_SESSION.md` (complete rewrite)
-- `SESSION_SUMMARY.md` (this file)
-
-**New files**:
-- `tmp/test_control_flow.gr` (integration test)
-
-**Suggested commit message**:
+Example:
 ```
-Implement control flow (if/else, while, for)
-
-- Add if/else statement execution with early returns
-- Add while loop execution with condition re-evaluation
-- Add for loop execution over list elements
-- Add 16 comprehensive tests following strict TDD
-- All 195 tests passing, zero warnings
-- Control flow works in REPL and file execution
-
-Control flow complete → Ready for Phase 5 (Collections & Methods)
+Graph Methods (20+ methods) - all work on graphs AND trees:
+1. g.add_node(id, value)
+...
+13. g.insert(value, parent?)  - Tree-like insertion
+14. g.in_order(start)         - Traversal
+...
 ```
 
+#### Essential Reading
+**Updated guidance**:
+- graph.rs - "needs tree methods added"
+- tree.rs - "extract logic, then DELETE"
+- roadmap - "Updated Phase 6 spec (Option A)"
+
+#### Ask Claude Code
+**Changed instruction**:
+- From: "Implement graph/tree methods"
+- To: "Refactor to Option A philosophy: merge tree.rs into graph.rs"
+
+### 3. Updated SESSION_SUMMARY.md (Previous Session)
+
+**File**: `/home/irv/work/grang/rust/SESSION_SUMMARY.md`
+
+Added warning at top of previous session's summary:
+```
+## ⚠️ IMPORTANT: Philosophy Violation Discovered
+
+AFTER this session was completed, a design review revealed
+that the implementation violates the core Graphoid philosophy.
+
+What was implemented: Separate Tree and Graph types
+Correct philosophy: Trees are graphs with rules
+
+Required refactor: Option A - Merge tree functionality into Graph
+
+Impact: Work is solid, just needs reorganization.
+```
+
+### 4. Created REFACTOR_PLAN_OPTION_A.md
+
+**File**: `/home/irv/work/grang/rust/REFACTOR_PLAN_OPTION_A.md` (NEW)
+
+Comprehensive refactor guide with:
+
+#### Problem Statement
+Clear explanation of why current approach violates philosophy
+
+#### Solution Overview
+Key principles of Option A:
+1. No separate Tree type - only Value::Graph(Graph)
+2. All methods on Graph - traversals work on any graph
+3. Rules enforce constraints - :tree ruleset for validation
+4. Syntax sugar - tree{} desugars to graph{}.with_ruleset(:tree)
+
+#### 7 Detailed Steps
+
+**Step 1: Extend Graph (1 day)**
+- Add insert(value, parent?) method
+- Add contains(value) search
+- Add traversal methods: bfs, dfs, in_order, pre_order, post_order
+- Code examples provided
+
+**Step 2: Remove Tree from Value (30 min)**
+- Remove Value::Tree variant
+- Update type_name(), to_string_value(), is_truthy()
+- Before/after code examples
+
+**Step 3: Update Parser (1 hour)**
+- Change tree{} parsing to desugar into graph{}.with_ruleset(:tree)
+- Code example of desugaring logic
+
+**Step 4: Update Executor (30 min)**
+- Remove eval_tree() function
+- Update eval_expr() match arms
+
+**Step 5: Delete tree.rs (5 min)**
+- Delete src/values/tree.rs
+- Remove imports from mod.rs
+
+**Step 6: Update Tests (1 day)**
+- Update existing tree tests to expect Graph
+- Add tests for tree-as-graph functionality
+- 20+ test examples provided
+
+**Step 7: Update AST (30 min)**
+- Consider removing Expr::Tree variant
+- Options discussed
+
+#### Testing Strategy
+- Phase 1: Unit tests (graph.rs methods)
+- Phase 2: Integration tests (all 388 pass)
+- Phase 3: REPL testing
+
+#### Timeline
+| Task | Time | Status |
+|------|------|--------|
+| Extend Graph | 1 day | ⬜ Todo |
+| Remove Tree from Value | 30 min | ⬜ Todo |
+| Update Parser | 1 hour | ⬜ Todo |
+| Update Executor | 30 min | ⬜ Todo |
+| Delete tree.rs | 5 min | ⬜ Todo |
+| Update Tests | 1 day | ⬜ Todo |
+| Update AST | 30 min | ⬜ Todo |
+| **TOTAL** | **~2-3 days** | |
+
+#### Benefits & Risks
+Benefits: True to philosophy, code reuse, flexibility, dogfooding
+Risks: Test breakage, complexity, performance (with mitigation)
+
+### 5. Created DOCUMENTATION_UPDATE_SUMMARY.md
+
+**File**: `/home/irv/work/grang/DOCUMENTATION_UPDATE_SUMMARY.md` (NEW)
+
+Executive summary of all documentation changes:
+- What was changed in each file
+- Key philosophy points emphasized
+- Current code state (what violates, what's correct)
+- Next steps for implementation
+- Why this refactor matters
+
 ---
 
-## 🎉 Session Complete!
+## 📊 Documentation Changes Summary
 
-Control flow implementation is **100% complete** with comprehensive test coverage. The Graphoid language can now execute conditional logic and loops, making it a fully functional programming language.
+### Files Modified
+1. ✅ `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md`
+   - Phase 5 summary: 1 addition
+   - Phase 6 Week 1: Complete rewrite (~120 lines changed)
+   - Phase 6 Week 2: Major updates (~50 lines changed)
+   - Files section: Updated guidance
 
-**Ready to proceed to Phase 5: Collections & Methods!** 🚀
+2. ✅ `rust/START_HERE_NEXT_SESSION.md`
+   - Header: Added philosophy violation warning
+   - What's Next: Split into refactor + implement
+   - Methods: Unified graph/tree lists
+   - Instructions: Changed to refactor-first
+
+3. ✅ `rust/SESSION_SUMMARY.md` (previous session)
+   - Added warning about philosophy violation
+   - Linked to refactor resources
+
+### Files Created
+4. ✅ `rust/REFACTOR_PLAN_OPTION_A.md` (NEW - 400+ lines)
+   - 7-step refactor guide
+   - Code examples for each step
+   - Testing strategy and timeline
+
+5. ✅ `DOCUMENTATION_UPDATE_SUMMARY.md` (NEW - 200+ lines)
+   - Complete change log
+   - Current state analysis
+   - Next steps guide
 
 ---
 
-**End of Session Summary**
+## 🎓 Key Insights Gained
 
-Phase 4 + Control Flow completed successfully. The language now has functions, lambdas, closures, and complete control flow, providing a solid foundation for implementing powerful collection operations in Phase 5.
+### 1. Early Design Reviews Are Critical
+- The separate Tree/Graph implementation worked but violated philosophy
+- Catching this after 388 passing tests is better than after full release
+- TDD alone isn't enough - must validate against core principles
+
+### 2. Documentation Drives Implementation
+- Clear specs prevent philosophical drift
+- Roadmap should explicitly state "don't do X" when X seems obvious
+- Examples in docs should exemplify philosophy
+
+### 3. Philosophy Over Pragmatism
+- Could have kept Tree type "for now" (Option B)
+- Chose to refactor early to maintain integrity
+- Short-term effort saves long-term technical debt
+
+### 4. Spec Consistency Matters
+- LANGUAGE_SPECIFICATION.md was correct (trees are graphs)
+- RUST_IMPLEMENTATION_ROADMAP.md was wrong (separate tree type)
+- Specs must be internally consistent
+
+---
+
+## 📋 Current State
+
+### What Works (Don't Need to Touch)
+- ✅ 388 tests passing
+- ✅ Zero compiler warnings
+- ✅ Lexer (Phase 1)
+- ✅ Parser (Phase 2) - except tree{} desugaring
+- ✅ Values & execution (Phase 3)
+- ✅ Functions & lambdas (Phase 4)
+- ✅ Collections & methods (Phase 5)
+- ✅ Graph/tree literal parsing (Phase 6 Week 1) - needs adaptation
+
+### What Violates Philosophy (Must Refactor)
+- ❌ `src/values/tree.rs` - Separate Tree type
+- ❌ `src/values/mod.rs` - Value::Tree variant
+- ❌ `src/parser/mod.rs` - tree{} creates Expr::Tree (should desugar)
+- ❌ `src/execution/executor.rs` - eval_tree() function
+- ❌ `src/ast/mod.rs` - Expr::Tree variant (maybe)
+
+### Tests Status
+- All 388 tests pass with current (incorrect) implementation
+- Tests will need updates during refactor
+- Goal: Keep tests passing throughout (TDD)
+- Expected: Similar test count after refactor
+
+---
+
+## 🎯 Next Session Objectives
+
+### Primary Goal
+**Execute REFACTOR_PLAN_OPTION_A.md to align implementation with philosophy**
+
+### Success Criteria
+1. ✅ No separate Tree type exists
+2. ✅ tree{} desugars to graph{}.with_ruleset(:tree)
+3. ✅ All traversal methods on Graph
+4. ✅ All tests pass (with updates)
+5. ✅ Zero compiler warnings
+6. ✅ REPL shows trees as graphs
+
+### What to Do First
+1. Read REFACTOR_PLAN_OPTION_A.md (15 min)
+2. Start Step 1: Extend Graph with tree functionality (1 day)
+3. Follow TDD: test → implement → verify
+4. Keep all tests passing throughout
+
+### Expected Timeline
+- **Step 1**: Extend Graph - 1 day
+- **Steps 2-5**: Remove Tree type - 2 hours
+- **Step 6**: Update tests - 1 day
+- **Step 7**: Update AST - 30 min
+- **TOTAL**: 2-3 days
+
+---
+
+## 💡 Lessons Learned
+
+### What Went Well
+- ✅ Caught design issue before too much code built on top
+- ✅ Thorough design review process
+- ✅ Comprehensive documentation updates
+- ✅ Clear refactor plan created
+- ✅ Philosophy articulated explicitly
+
+### What to Improve
+- ⚠️ Earlier cross-checking between specs
+- ⚠️ Philosophy checklist in roadmap phase planning
+- ⚠️ Design review step before implementation
+- ⚠️ More explicit "anti-patterns" section in specs
+
+### Process Improvements
+1. **Add Philosophy Checklist**: Before each phase, review core principles
+2. **Design Review Step**: After spec, before coding
+3. **Consistency Check**: Cross-reference all docs before implementation
+4. **Examples First**: Write example code before implementation to validate design
+
+---
+
+## 📚 Key Files for Next Session
+
+### Must Read (20 min)
+1. **REFACTOR_PLAN_OPTION_A.md** - Step-by-step guide (10 min)
+2. **RUST_IMPLEMENTATION_ROADMAP.md** - Updated Phase 6 (5 min)
+3. **START_HERE_NEXT_SESSION.md** - Quick reference (5 min)
+
+### Will Modify
+1. `src/values/graph.rs` - Add tree methods
+2. `src/values/mod.rs` - Remove Tree variant
+3. `src/parser/mod.rs` - Desugar tree{} syntax
+4. `src/execution/executor.rs` - Remove eval_tree()
+5. `tests/integration_tests.rs` - Update tests
+
+### Will Delete
+1. `src/values/tree.rs` - No longer needed
+
+---
+
+## 🚀 Ready for Next Session
+
+All documentation is now:
+- ✅ Consistent across files
+- ✅ Aligned with Option A philosophy
+- ✅ Detailed with code examples
+- ✅ Clear about next steps
+- ✅ Realistic about timeline
+
+**Next session: Execute the refactor plan and bring implementation in line with philosophy!**
+
+---
+
+## Quick Start Command for Next Session
+
+```bash
+cd /home/irv/work/grang/rust
+
+# Read the refactor plan
+less REFACTOR_PLAN_OPTION_A.md
+
+# Verify current state
+~/.cargo/bin/cargo test 2>&1 | tail -20
+
+# Start Step 1: Extend Graph
+# Open src/values/graph.rs and add tree methods
+```
+
+**Or ask Claude Code:**
+> "Execute REFACTOR_PLAN_OPTION_A.md Step 1: Extend Graph with tree functionality. Follow TDD."

@@ -46,6 +46,8 @@ impl Executor {
             Expr::Map { entries, .. } => self.eval_map(entries),
             Expr::Index { object, index, .. } => self.eval_index(object, index),
             Expr::MethodCall { object, method, args, .. } => self.eval_method_call(object, method, args),
+            Expr::Graph { config, .. } => self.eval_graph(config),
+            Expr::Tree { config, .. } => self.eval_tree(config),
         }
     }
 
@@ -294,6 +296,43 @@ impl Executor {
             map.insert(key.clone(), value);
         }
         Ok(Value::Map(map))
+    }
+
+    /// Evaluates a graph expression.
+    fn eval_graph(&mut self, config: &[(String, Expr)]) -> Result<Value> {
+        use crate::values::{Graph, GraphType};
+
+        // Parse configuration to determine graph type
+        let mut graph_type = GraphType::Directed; // Default
+
+        for (key, value_expr) in config {
+            if key == "type" {
+                let value = self.eval_expr(value_expr)?;
+                if let Value::Symbol(s) = value {
+                    match s.as_str() {
+                        "directed" => graph_type = GraphType::Directed,
+                        "undirected" => graph_type = GraphType::Undirected,
+                        _ => return Err(GraphoidError::runtime(format!(
+                            "Invalid graph type: :{}. Expected :directed or :undirected",
+                            s
+                        ))),
+                    }
+                } else {
+                    return Err(GraphoidError::type_error("symbol", value.type_name()));
+                }
+            }
+        }
+
+        Ok(Value::Graph(Graph::new(graph_type)))
+    }
+
+    /// Evaluates a tree expression.
+    fn eval_tree(&mut self, _config: &[(String, Expr)]) -> Result<Value> {
+        use crate::values::Tree;
+
+        // For now, config is ignored. Trees are just created empty.
+        // Future: Could support initial values or configuration options.
+        Ok(Value::Tree(Tree::new()))
     }
 
     /// Evaluates a lambda expression.

@@ -1071,6 +1071,48 @@ impl Parser {
             return Ok(Expr::List { elements, position });
         }
 
+        // Graphs: graph { type: :directed }
+        if self.match_token(&TokenType::GraphType) {
+            if !self.match_token(&TokenType::LeftBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '{' after 'graph'".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            let config = self.parse_config_entries()?;
+
+            if !self.match_token(&TokenType::RightBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '}' after graph config".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            return Ok(Expr::Graph { config, position });
+        }
+
+        // Trees: tree {}
+        if self.match_token(&TokenType::TreeType) {
+            if !self.match_token(&TokenType::LeftBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '{' after 'tree'".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            let config = self.parse_config_entries()?;
+
+            if !self.match_token(&TokenType::RightBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '}' after tree config".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            return Ok(Expr::Tree { config, position });
+        }
+
         // Maps
         if self.match_token(&TokenType::LeftBrace) {
             let mut entries = Vec::new();
@@ -1177,5 +1219,50 @@ impl Parser {
         } else {
             false
         }
+    }
+
+    /// Parses key-value entries for graph/tree/map config
+    fn parse_config_entries(&mut self) -> Result<Vec<(String, Expr)>> {
+        let mut entries = Vec::new();
+
+        if self.check(&TokenType::RightBrace) {
+            return Ok(entries);
+        }
+
+        loop {
+            // Parse key (must be string or identifier)
+            let key = if let TokenType::String(s) = &self.peek().token_type {
+                let k = s.clone();
+                self.advance();
+                k
+            } else if let TokenType::Identifier(id) = &self.peek().token_type {
+                let k = id.clone();
+                self.advance();
+                k
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected string or identifier as key".to_string(),
+                    position: self.peek().position(),
+                });
+            };
+
+            // Expect ':'
+            if !self.match_token(&TokenType::Colon) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected ':' after key".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            // Parse value
+            let value = self.expression()?;
+            entries.push((key, value));
+
+            if !self.match_token(&TokenType::Comma) {
+                break;
+            }
+        }
+
+        Ok(entries)
     }
 }

@@ -5,6 +5,12 @@ use std::rc::Rc;
 use crate::ast::Stmt;
 use crate::execution::Environment;
 
+pub mod graph;
+pub mod tree;
+
+pub use graph::{Graph, GraphType};
+pub use tree::Tree;
+
 /// A function value with its captured environment (closure).
 #[derive(Debug, Clone)]
 pub struct Function {
@@ -45,6 +51,10 @@ pub enum Value {
     Map(HashMap<String, Value>),
     /// Function value (Phase 4)
     Function(Function),
+    /// Graph value (Phase 6)
+    Graph(Graph),
+    /// Tree value (Phase 6)
+    Tree(Tree),
 }
 
 impl Value {
@@ -60,6 +70,8 @@ impl Value {
             Value::Map(m) => !m.is_empty(),
             Value::Symbol(_) => true,
             Value::Function(_) => true, // Functions are always truthy
+            Value::Graph(g) => g.node_count() > 0,
+            Value::Tree(t) => !t.is_empty(),
         }
     }
 
@@ -108,6 +120,12 @@ impl Value {
                     format!("<lambda({})>", func.params.join(", "))
                 }
             }
+            Value::Graph(g) => {
+                format!("<graph: {} nodes, {} edges>", g.node_count(), g.edge_count())
+            }
+            Value::Tree(t) => {
+                format!("<tree: {} nodes>", t.len())
+            }
         }
     }
 
@@ -122,6 +140,8 @@ impl Value {
             Value::List(_) => "list",
             Value::Map(_) => "map",
             Value::Function(_) => "function",
+            Value::Graph(_) => "graph",
+            Value::Tree(_) => "tree",
         }
     }
 }
