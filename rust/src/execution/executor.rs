@@ -578,6 +578,59 @@ impl Executor {
                 // Return the original list
                 Ok(Value::List(elements.to_vec()))
             }
+            "slice" => {
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'slice' expects 2 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get start and end indices
+                let start_idx = match &args[0] {
+                    Value::Number(n) => *n as i64,
+                    other => {
+                        return Err(GraphoidError::type_error(
+                            "number",
+                            other.type_name(),
+                        ));
+                    }
+                };
+
+                let end_idx = match &args[1] {
+                    Value::Number(n) => *n as i64,
+                    other => {
+                        return Err(GraphoidError::type_error(
+                            "number",
+                            other.type_name(),
+                        ));
+                    }
+                };
+
+                let len = elements.len() as i64;
+
+                // Normalize negative indices
+                let actual_start = if start_idx < 0 {
+                    (len + start_idx).max(0)
+                } else {
+                    start_idx.min(len)
+                };
+
+                let actual_end = if end_idx < 0 {
+                    (len + end_idx).max(0)
+                } else {
+                    end_idx.min(len)
+                };
+
+                // Ensure start <= end
+                if actual_start > actual_end {
+                    return Ok(Value::List(Vec::new()));
+                }
+
+                // Extract slice
+                let slice = elements[actual_start as usize..actual_end as usize].to_vec();
+                Ok(Value::List(slice))
+            }
             _ => Err(GraphoidError::runtime(format!(
                 "List does not have method '{}'",
                 method
@@ -586,12 +639,59 @@ impl Executor {
     }
 
     /// Evaluates a method call on a map.
-    fn eval_map_method(&mut self, _map: &HashMap<String, Value>, method: &str, _args: &[Value]) -> Result<Value> {
-        // Placeholder for map methods - will implement later
-        Err(GraphoidError::runtime(format!(
-            "Map does not have method '{}' (not yet implemented)",
-            method
-        )))
+    fn eval_map_method(&mut self, map: &HashMap<String, Value>, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "keys" => {
+                // Return list of all keys
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "keys() takes no arguments".to_string()
+                    ));
+                }
+                let keys: Vec<Value> = map.keys()
+                    .map(|k| Value::String(k.clone()))
+                    .collect();
+                Ok(Value::List(keys))
+            }
+            "values" => {
+                // Return list of all values
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "values() takes no arguments".to_string()
+                    ));
+                }
+                let values: Vec<Value> = map.values().cloned().collect();
+                Ok(Value::List(values))
+            }
+            "has_key" => {
+                // Check if key exists
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(
+                        "has_key() requires exactly one argument".to_string()
+                    ));
+                }
+                let key = match &args[0] {
+                    Value::String(s) => s,
+                    _ => return Err(GraphoidError::runtime(
+                        "has_key() requires a string argument".to_string()
+                    )),
+                };
+                Ok(Value::Boolean(map.contains_key(key)))
+            }
+            "size" => {
+                // Return number of entries
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "size() takes no arguments".to_string()
+                    ));
+                }
+                Ok(Value::Number(map.len() as f64))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "Map does not have method '{}'",
+                method
+            ))),
+        }
     }
 
     /// Evaluates a function call expression.

@@ -5278,3 +5278,398 @@ fn test_element_wise_subtract() {
         _ => panic!("Expected list, got {:?}", result),
     }
 }
+
+// ============================================================================
+// LIST SLICING TESTS
+// ============================================================================
+
+#[test]
+fn test_list_method_slice_basic() {
+    let mut executor = Executor::new();
+
+    // items = [10, 20, 30, 40, 50]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("items".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(40.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(50.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // items.slice(1, 3) should be [20, 30]
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        method: "slice".to_string(),
+        args: vec![
+            Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+            Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 2);
+            assert_eq!(elements[0], Value::Number(20.0));
+            assert_eq!(elements[1], Value::Number(30.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_list_method_slice_from_start() {
+    let mut executor = Executor::new();
+
+    // items = [10, 20, 30, 40, 50]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("items".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(40.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(50.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // items.slice(0, 3) should be [10, 20, 30]
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        method: "slice".to_string(),
+        args: vec![
+            Expr::Literal { value: LiteralValue::Number(0.0), position: pos() },
+            Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(10.0));
+            assert_eq!(elements[1], Value::Number(20.0));
+            assert_eq!(elements[2], Value::Number(30.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_list_method_slice_to_end() {
+    let mut executor = Executor::new();
+
+    // items = [10, 20, 30, 40, 50]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("items".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(40.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(50.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // items.slice(2, 5) should be [30, 40, 50]
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        method: "slice".to_string(),
+        args: vec![
+            Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+            Expr::Literal { value: LiteralValue::Number(5.0), position: pos() },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 3);
+            assert_eq!(elements[0], Value::Number(30.0));
+            assert_eq!(elements[1], Value::Number(40.0));
+            assert_eq!(elements[2], Value::Number(50.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_list_method_slice_negative_indices() {
+    let mut executor = Executor::new();
+
+    // items = [10, 20, 30, 40, 50]
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("items".to_string()),
+        value: Expr::List {
+            elements: vec![
+                Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(40.0), position: pos() },
+                Expr::Literal { value: LiteralValue::Number(50.0), position: pos() },
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // items.slice(-3, -1) should be [30, 40]
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
+        method: "slice".to_string(),
+        args: vec![
+            Expr::Literal { value: LiteralValue::Number(-3.0), position: pos() },
+            Expr::Literal { value: LiteralValue::Number(-1.0), position: pos() },
+        ],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 2);
+            assert_eq!(elements[0], Value::Number(30.0));
+            assert_eq!(elements[1], Value::Number(40.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+// ============================================================================
+// Map Methods Tests
+// ============================================================================
+
+#[test]
+fn test_map_method_keys() {
+    let mut executor = Executor::new();
+
+    // Create map: data = {"name": "Alice", "age": 25}
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("data".to_string()),
+        value: Expr::Map {
+            entries: vec![
+                (
+                    "name".to_string(),
+                    Expr::Literal { value: LiteralValue::String("Alice".to_string()), position: pos() },
+                ),
+                (
+                    "age".to_string(),
+                    Expr::Literal { value: LiteralValue::Number(25.0), position: pos() },
+                ),
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // data.keys() should return ["name", "age"] (order may vary)
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "data".to_string(), position: pos() }),
+        method: "keys".to_string(),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 2);
+            // Keys may be in any order, so check both are present
+            let keys: Vec<String> = elements.iter().filter_map(|v| {
+                if let Value::String(s) = v {
+                    Some(s.clone())
+                } else {
+                    None
+                }
+            }).collect();
+            assert!(keys.contains(&"name".to_string()));
+            assert!(keys.contains(&"age".to_string()));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_map_method_values() {
+    let mut executor = Executor::new();
+
+    // Create map: data = {"x": 10, "y": 20}
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("data".to_string()),
+        value: Expr::Map {
+            entries: vec![
+                (
+                    "x".to_string(),
+                    Expr::Literal { value: LiteralValue::Number(10.0), position: pos() },
+                ),
+                (
+                    "y".to_string(),
+                    Expr::Literal { value: LiteralValue::Number(20.0), position: pos() },
+                ),
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // data.values() should return [10, 20] (order may vary)
+    let method_call = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "data".to_string(), position: pos() }),
+        method: "values".to_string(),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result = executor.eval_expr(&method_call).unwrap();
+    match result {
+        Value::List(elements) => {
+            assert_eq!(elements.len(), 2);
+            // Values may be in any order, so check both are present
+            let values: Vec<f64> = elements.iter().filter_map(|v| {
+                if let Value::Number(n) = v {
+                    Some(*n)
+                } else {
+                    None
+                }
+            }).collect();
+            assert!(values.contains(&10.0));
+            assert!(values.contains(&20.0));
+        }
+        _ => panic!("Expected list, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_map_method_has_key() {
+    let mut executor = Executor::new();
+
+    // Create map: data = {"name": "Bob", "age": 30}
+    let assign = Stmt::Assignment {
+        target: AssignmentTarget::Variable("data".to_string()),
+        value: Expr::Map {
+            entries: vec![
+                (
+                    "name".to_string(),
+                    Expr::Literal { value: LiteralValue::String("Bob".to_string()), position: pos() },
+                ),
+                (
+                    "age".to_string(),
+                    Expr::Literal { value: LiteralValue::Number(30.0), position: pos() },
+                ),
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign).unwrap();
+
+    // data.has_key("name") should return true
+    let method_call1 = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "data".to_string(), position: pos() }),
+        method: "has_key".to_string(),
+        args: vec![
+            Expr::Literal { value: LiteralValue::String("name".to_string()), position: pos() },
+        ],
+        position: pos(),
+    };
+
+    let result1 = executor.eval_expr(&method_call1).unwrap();
+    assert_eq!(result1, Value::Boolean(true));
+
+    // data.has_key("missing") should return false
+    let method_call2 = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "data".to_string(), position: pos() }),
+        method: "has_key".to_string(),
+        args: vec![
+            Expr::Literal { value: LiteralValue::String("missing".to_string()), position: pos() },
+        ],
+        position: pos(),
+    };
+
+    let result2 = executor.eval_expr(&method_call2).unwrap();
+    assert_eq!(result2, Value::Boolean(false));
+}
+
+#[test]
+fn test_map_method_size() {
+    let mut executor = Executor::new();
+
+    // Empty map
+    let assign1 = Stmt::Assignment {
+        target: AssignmentTarget::Variable("empty".to_string()),
+        value: Expr::Map {
+            entries: vec![],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign1).unwrap();
+
+    let method_call1 = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "empty".to_string(), position: pos() }),
+        method: "size".to_string(),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result1 = executor.eval_expr(&method_call1).unwrap();
+    assert_eq!(result1, Value::Number(0.0));
+
+    // Map with 3 entries
+    let assign2 = Stmt::Assignment {
+        target: AssignmentTarget::Variable("data".to_string()),
+        value: Expr::Map {
+            entries: vec![
+                (
+                    "a".to_string(),
+                    Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
+                ),
+                (
+                    "b".to_string(),
+                    Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
+                ),
+                (
+                    "c".to_string(),
+                    Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+                ),
+            ],
+            position: pos(),
+        },
+        position: pos(),
+    };
+    executor.eval_stmt(&assign2).unwrap();
+
+    let method_call2 = Expr::MethodCall {
+        object: Box::new(Expr::Variable { name: "data".to_string(), position: pos() }),
+        method: "size".to_string(),
+        args: vec![],
+        position: pos(),
+    };
+
+    let result2 = executor.eval_expr(&method_call2).unwrap();
+    assert_eq!(result2, Value::Number(3.0));
+}

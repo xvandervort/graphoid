@@ -590,6 +590,7 @@ impl Parser {
 
     // Expression parsing with precedence climbing
     fn expression(&mut self) -> Result<Expr> {
+        // TODO: Add lambda parsing
         self.or_expression()
     }
 
