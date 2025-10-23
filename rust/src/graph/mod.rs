@@ -3,6 +3,8 @@
 //! This module implements graph data structures and rules.
 
 pub mod rules;
+pub mod rulesets;
 
 // Re-export commonly used types
 pub use rules::{RuleSpec, RuleInstance, RuleSeverity, RetroactivePolicy};
+pub use rulesets::{get_ruleset_rules, is_valid_ruleset, available_rulesets};

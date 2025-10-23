@@ -6,6 +6,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use super::Value;
 use crate::graph::rules::{Rule, RuleContext, GraphOperation, RuleSpec, RuleInstance, RuleSeverity};
+use crate::graph::rulesets::get_ruleset_rules;
 use crate::error::GraphoidError;
 
 /// Type of graph: directed or undirected
@@ -168,30 +169,10 @@ impl Graph {
     fn get_active_rules(&self) -> Vec<(Box<dyn Rule>, RuleSeverity)> {
         let mut rule_instances: Vec<RuleInstance> = Vec::new();
 
-        // Add rules from predefined rulesets (with default severity)
+        // Add rules from predefined rulesets using the rulesets module
         for ruleset in &self.rulesets {
-            match ruleset.as_str() {
-                "tree" => {
-                    // Tree ruleset: no cycles, single root, connected
-                    rule_instances.push(RuleInstance::new(RuleSpec::NoCycles));
-                    rule_instances.push(RuleInstance::new(RuleSpec::SingleRoot));
-                    rule_instances.push(RuleInstance::new(RuleSpec::Connected));
-                }
-                "binary_tree" => {
-                    // Binary tree: tree rules + max 2 children
-                    rule_instances.push(RuleInstance::new(RuleSpec::NoCycles));
-                    rule_instances.push(RuleInstance::new(RuleSpec::SingleRoot));
-                    rule_instances.push(RuleInstance::new(RuleSpec::Connected));
-                    rule_instances.push(RuleInstance::new(RuleSpec::MaxDegree(2)));
-                }
-                "dag" => {
-                    // DAG: just no cycles
-                    rule_instances.push(RuleInstance::new(RuleSpec::NoCycles));
-                }
-                _ => {
-                    // Unknown ruleset - ignore for now
-                }
-            }
+            let ruleset_rules = get_ruleset_rules(ruleset);
+            rule_instances.extend(ruleset_rules);
         }
 
         // Add ad hoc rules (with their configured severities)
@@ -707,7 +688,24 @@ impl Graph {
     /// - :tree → no_cycles + single_root + connected
     /// - :binary_tree → tree rules + max 2 children
     /// - :dag → no_cycles only
+    ///
+    /// When a ruleset is applied:
+    /// 1. The ruleset name is stored in self.rulesets
+    /// 2. Rules from the ruleset are automatically enforced during validation
+    /// 3. Ruleset rules are kept separate from ad hoc rules added via add_rule()
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use graphoid::values::{Graph, GraphType, Value};
+    ///
+    /// let mut g = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
+    /// g.add_node("root".to_string(), Value::Number(1.0)).unwrap();
+    /// // Tree rules are now enforced: no_cycles, single_root, connected
+    /// ```
     pub fn with_ruleset(mut self, ruleset: String) -> Self {
+        // Store the ruleset name
+        // Rules from the ruleset will be retrieved dynamically during validation
         if !self.rulesets.contains(&ruleset) {
             self.rulesets.push(ruleset);
         }
@@ -794,6 +792,42 @@ impl Graph {
     /// Get all ad hoc rules (not including ruleset rules)
     pub fn get_rules(&self) -> &[RuleInstance] {
         &self.rules
+    }
+
+    /// Get all active rule specs (including both ruleset rules and ad hoc rules)
+    ///
+    /// This returns a vector of RuleSpec objects representing all rules currently
+    /// enforced on this graph, from both applied rulesets and ad hoc rules.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use graphoid::values::{Graph, GraphType};
+    /// use graphoid::graph::RuleSpec;
+    ///
+    /// let g = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
+    /// let specs = g.get_active_rule_specs();
+    /// assert!(specs.contains(&RuleSpec::NoCycles));
+    /// assert!(specs.contains(&RuleSpec::SingleRoot));
+    /// assert!(specs.contains(&RuleSpec::Connected));
+    /// ```
+    pub fn get_active_rule_specs(&self) -> Vec<RuleSpec> {
+        let mut specs = Vec::new();
+
+        // Add rules from rulesets
+        for ruleset in &self.rulesets {
+            let ruleset_rules = get_ruleset_rules(ruleset);
+            specs.extend(ruleset_rules.iter().map(|r| r.spec.clone()));
+        }
+
+        // Add ad hoc rules
+        specs.extend(self.rules.iter().map(|r| r.spec.clone()));
+
+        // Deduplicate by spec
+        specs.sort_by(|a, b| format!("{:?}", a).cmp(&format!("{:?}", b)));
+        specs.dedup();
+
+        specs
     }
 
     /// Check if a specific rule is active (from either rulesets or ad hoc)

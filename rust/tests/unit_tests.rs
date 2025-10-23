@@ -7,4 +7,5 @@ mod unit {
     pub mod graph_tests;
     pub mod auto_index_tests;
     pub mod explain_tests;
+    pub mod ruleset_enforcement_tests;
 }
