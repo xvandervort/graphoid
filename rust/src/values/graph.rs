@@ -22,6 +22,8 @@ pub struct GraphNode {
     pub id: String,
     /// Node value
     pub value: Value,
+    /// Node properties (for property-based indexing)
+    pub properties: HashMap<String, Value>,
     /// Outgoing edges (neighbor_id -> edge_info)
     pub neighbors: HashMap<String, EdgeInfo>,
 }
@@ -45,8 +47,8 @@ enum ValidationResult {
     },
 }
 
-/// Graph data structure with index-free adjacency
-#[derive(Debug, Clone, PartialEq)]
+/// Graph data structure with index-free adjacency and auto-optimization
+#[derive(Debug, Clone)]
 pub struct Graph {
     /// Graph type (directed or undirected)
     pub graph_type: GraphType,
@@ -59,6 +61,28 @@ pub struct Graph {
     /// These are in addition to any ruleset rules
     /// Each rule includes its configured severity
     pub rules: Vec<RuleInstance>,
+
+    // Auto-optimization state (not included in PartialEq)
+    /// Track property lookup frequencies for auto-indexing
+    /// Maps property name -> access count
+    property_access_counts: HashMap<String, usize>,
+    /// Auto-created property indices
+    /// Maps property name -> (value_string -> node IDs with that property value)
+    /// We use String for the value key because Value contains f64 which doesn't impl Hash
+    property_indices: HashMap<String, HashMap<String, Vec<String>>>,
+    /// Threshold for auto-index creation (default: 10 accesses)
+    auto_index_threshold: usize,
+}
+
+// Manual PartialEq implementation that ignores optimization state
+impl PartialEq for Graph {
+    fn eq(&self, other: &Self) -> bool {
+        self.graph_type == other.graph_type
+            && self.nodes == other.nodes
+            && self.rulesets == other.rulesets
+            && self.rules == other.rules
+        // Deliberately ignore: property_access_counts, property_indices, auto_index_threshold
+    }
 }
 
 impl Graph {
@@ -69,6 +93,10 @@ impl Graph {
             nodes: HashMap::new(),
             rulesets: Vec::new(),
             rules: Vec::new(),
+            // Auto-optimization state
+            property_access_counts: HashMap::new(),
+            property_indices: HashMap::new(),
+            auto_index_threshold: 10, // Create index after 10 lookups
         }
     }
 
@@ -159,6 +187,7 @@ impl Graph {
                     GraphNode {
                         id,
                         value,
+                        properties: HashMap::new(),
                         neighbors: HashMap::new(),
                     },
                 );
@@ -733,5 +762,94 @@ impl Graph {
         }
 
         false
+    }
+
+    // ========================================================================
+    // Auto-Optimization: Property-based Indexing
+    // ========================================================================
+
+    /// Find nodes by property value with automatic indexing
+    ///
+    /// Tracks access patterns and automatically creates indices after threshold (default: 10 lookups).
+    /// First lookups are O(n) but become O(1) after index is created.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use graphoid::values::{Graph, Value};
+    /// use graphoid::values::graph::GraphType;
+    ///
+    /// let mut g = Graph::new(GraphType::Directed);
+    /// // After 10+ lookups on "user_id", an index is auto-created
+    /// let nodes = g.find_nodes_by_property("user_id", &Value::Number(42.0));
+    /// ```
+    pub fn find_nodes_by_property(&mut self, property: &str, value: &Value) -> Vec<String> {
+        // Track access pattern
+        *self.property_access_counts.entry(property.to_string()).or_insert(0) += 1;
+        let access_count = self.property_access_counts[property];
+
+        // Create index if threshold reached and index doesn't exist
+        if access_count >= self.auto_index_threshold && !self.property_indices.contains_key(property) {
+            self.create_property_index(property);
+        }
+
+        // Use index if available (O(1) lookup)
+        if let Some(index) = self.property_indices.get(property) {
+            let value_key = value.to_string();
+            if let Some(node_ids) = index.get(&value_key) {
+                return node_ids.clone();
+            } else {
+                return Vec::new();
+            }
+        }
+
+        // Otherwise, linear scan (O(n))
+        let mut result = Vec::new();
+        for (node_id, node) in &self.nodes {
+            if let Some(prop_value) = node.properties.get(property) {
+                if prop_value == value {
+                    result.push(node_id.clone());
+                }
+            }
+        }
+        result
+    }
+
+    /// Create an index for a property
+    ///
+    /// Scans all nodes and builds a HashMap: property_value_string -> Vec<node_id>
+    fn create_property_index(&mut self, property: &str) {
+        let mut index: HashMap<String, Vec<String>> = HashMap::new();
+
+        for (node_id, node) in &self.nodes {
+            if let Some(value) = node.properties.get(property) {
+                let value_key = value.to_string();
+                index
+                    .entry(value_key)
+                    .or_insert_with(Vec::new)
+                    .push(node_id.clone());
+            }
+        }
+
+        self.property_indices.insert(property.to_string(), index);
+    }
+
+    /// Get statistics about auto-created indices
+    ///
+    /// Returns information about which properties have been indexed
+    pub fn stats(&self) -> HashMap<String, serde_json::Value> {
+        let mut stats = HashMap::new();
+
+        let auto_indices: Vec<String> = self.property_indices.keys().cloned().collect();
+        stats.insert("auto_indices".to_string(), serde_json::json!(auto_indices));
+
+        stats.insert("node_count".to_string(), serde_json::json!(self.nodes.len()));
+        stats.insert("edge_count".to_string(), serde_json::json!(self.edge_count()));
+
+        stats
+    }
+
+    /// Check if a property has an auto-created index
+    pub fn has_auto_index(&self, property: &str) -> bool {
+        self.property_indices.contains_key(property)
     }
 }

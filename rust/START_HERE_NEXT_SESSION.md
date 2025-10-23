@@ -1,21 +1,76 @@
 # START HERE - Next Session Quick Start
 
 **Last Updated**: October 23, 2025
-**Current Status**: ✅ PHASE 6 WEEK 2 RULE SEVERITY & RETROACTIVE POLICIES COMPLETE
-**Tests Passing**: 636/636 (100%)
-**What's Next**: Phase 6 Week 2 Areas 2-5 - Rulesets, Optimization, Indexing
+**Current Status**: ✅ PHASE 6 WEEK 2 AUTO-OPTIMIZATION COMPLETE
+**Tests Passing**: 645/645 (100%) - Up from 636
+**What's Next**: Phase 6 Week 3 - Explain, Stats & Performance Verification
 
 **MAJOR ACCOMPLISHMENTS THIS SESSION**:
-- ✅ **Rule Severity System** - Silent/Warning/Error modes with proper rejection
-- ✅ **Retroactive Cleaning** - Rules can clean existing data when added
-- ✅ **User-Friendly Defaults** - Warning mode (reject + log) is default
-- ✅ **NoDuplicatesRule.clean()** - Automatically removes duplicate values
-- ✅ **Roadmap Updated** - Documented cleaning configuration modes (strict/any/ask)
-- ✅ **All 636 Tests Passing** - Full regression testing successful
+- ✅ **Auto-Property Indexing** - Automatic index creation after 10 lookups
+- ✅ **Query Pattern Tracking** - Tracks access patterns transparently
+- ✅ **Stats API** - `graph.stats()` shows auto-created indices
+- ✅ **Node Properties** - GraphNode now supports property-based queries
+- ✅ **Performance Optimization** - O(n) → O(1) lookups after indexing
+- ✅ **8 New Tests** - Full coverage of auto-indexing behavior
 
 ---
 
-## 📖 What Happened This Session (October 23, 2025)
+## 📖 What Happened This Session (October 23, 2025 - Continuation)
+
+**Implemented Automatic Property Indexing & Query Pattern Detection**
+
+### Key Changes
+
+#### 1. Node Properties (src/values/graph.rs)
+- ✅ **Added properties field to GraphNode** - `HashMap<String, Value>` for key-value properties
+- ✅ **Updated all GraphNode creation** - Initialize with empty properties HashMap
+- ✅ **Manual PartialEq implementation** - Graph equality ignores optimization state
+
+#### 2. Auto-Optimization Infrastructure (src/values/graph.rs)
+- ✅ **property_access_counts** - Tracks frequency of property lookups
+- ✅ **property_indices** - Stores auto-created indices (property -> value_string -> node_ids)
+- ✅ **auto_index_threshold** - Default 10 lookups before index creation
+- ✅ **Transparent indexing** - User doesn't need to know about indices
+
+#### 3. Property-Based Query API (src/values/graph.rs)
+- ✅ **find_nodes_by_property()** - Query nodes by property value
+  - First 9 lookups: O(n) linear scan
+  - After 10th lookup: Auto-creates index
+  - Subsequent lookups: O(1) using index
+- ✅ **create_property_index()** - Private method to build indices
+- ✅ **stats()** - Returns JSON with auto-indices, node_count, edge_count
+- ✅ **has_auto_index()** - Check if property has an index
+
+#### 4. String-Based Index Keys
+- ✅ **Workaround for f64 Hash issue** - Use `value.to_string()` as index key
+- ✅ **Preserves Value semantics** - Still compare Values during scan
+- ✅ **Works with all Value types** - Number, String, Bool, etc.
+
+#### 5. Comprehensive Testing (tests/unit/auto_index_tests.rs)
+- ✅ **8 new tests** - Full coverage of auto-indexing behavior
+- ✅ **Test threshold behavior** - No index before 10, index after 10
+- ✅ **Test multiple properties** - Can index many properties simultaneously
+- ✅ **Test index creation once** - Doesn't recreate after threshold
+- ✅ **Test stats API** - Verifies stats output format
+
+### Implementation Details
+
+**Key Files Modified**:
+1. `src/values/graph.rs` - Added properties, auto-optimization fields, query API
+2. `tests/unit/auto_index_tests.rs` - 8 comprehensive tests
+3. `tests/unit_tests.rs` - Registered auto_index_tests module
+
+**Technical Decisions**:
+- Use String for index keys (f64 doesn't implement Hash)
+- Separate optimization state from graph equality
+- Default threshold of 10 accesses (configurable via field)
+- Linear scan until index created (lazy optimization)
+
+**Test Status**: ✅ **645/645 tests passing** (9 new: 8 unit + 1 doctest)
+
+---
+
+## 📖 What Happened Earlier This Session (October 23, 2025)
 
 **Implemented Rule Severity System & Retroactive Cleaning Policies**
 
