@@ -47,11 +47,7 @@ impl Executor {
             Expr::Index { object, index, .. } => self.eval_index(object, index),
             Expr::MethodCall { object, method, args, .. } => self.eval_method_call(object, method, args),
             Expr::Graph { config, .. } => self.eval_graph(config),
-            Expr::Tree { .. } => {
-                // tree{} should be desugared to graph{}.with_ruleset(:tree) by the parser
-                // If we reach here, the parser didn't do its job
-                panic!("Expr::Tree should be desugared by parser to graph{{}}.with_ruleset(:tree)")
-            }
+            // Expr::Tree removed in Step 7 - tree{} now desugars to graph{}.with_ruleset(:tree) in parser
         }
     }
 
@@ -329,8 +325,6 @@ impl Executor {
 
         Ok(Value::Graph(Graph::new(graph_type)))
     }
-
-    // eval_tree() has been removed - tree{} now desugars to graph{}.with_ruleset(:tree) in parser
 
     /// Evaluates a lambda expression.
     /// Creates an anonymous function that captures the current environment.

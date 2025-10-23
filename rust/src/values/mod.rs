@@ -6,10 +6,10 @@ use crate::ast::Stmt;
 use crate::execution::Environment;
 
 pub mod graph;
-pub mod tree; // Keep for now - will be deleted in Step 5
+// pub mod tree; // DELETED in Step 5 - trees are now graphs with rules
 
 pub use graph::{Graph, GraphType};
-// pub use tree::Tree; // Removed - Tree is no longer a separate type
+// Tree type removed - use graph{}.with_ruleset(:tree) instead
 
 /// A function value with its captured environment (closure).
 #[derive(Debug, Clone)]

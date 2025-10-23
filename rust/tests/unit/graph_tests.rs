@@ -128,92 +128,69 @@ fn test_graph_keys_values() {
 }
 
 // ============================================================================
-// TREE TESTS - COMMENTED OUT FOR REFACTOR
+// BASIC TREE TESTS (using Graph with :tree ruleset)
 // ============================================================================
-// NOTE: These tests are commented out as part of Step 2 refactor
-// They will be rewritten in Step 6 to test tree{} as graph with rules
-//
-// #[test]
-// fn test_tree_creation() {
-//     let t = Tree::new();
-//     assert_eq!(t.len(), 0);
-//     assert!(t.is_empty());
-// }
-//
-// #[test]
-// fn test_tree_insert() {
-//     let mut t = Tree::new();
-//     t.insert(Value::Number(5.0));
-//     t.insert(Value::Number(3.0));
-//     t.insert(Value::Number(7.0));
-//
-//     assert_eq!(t.len(), 3);
-//     assert!(!t.is_empty());
-// }
-//
-// #[test]
-// fn test_tree_contains() {
-//     let mut t = Tree::new();
-//     t.insert(Value::Number(5.0));
-//     t.insert(Value::Number(3.0));
-//     t.insert(Value::Number(7.0));
-//
-//     assert!(t.contains(&Value::Number(5.0)));
-//     assert!(t.contains(&Value::Number(3.0)));
-//     assert!(t.contains(&Value::Number(7.0)));
-//     assert!(!t.contains(&Value::Number(10.0)));
-// }
-//
-// #[test]
-// fn test_tree_in_order_traversal() {
-//     let mut t = Tree::new();
-//     t.insert(Value::Number(5.0));
-//     t.insert(Value::Number(3.0));
-//     t.insert(Value::Number(7.0));
-//     t.insert(Value::Number(1.0));
-//     t.insert(Value::Number(9.0));
-//
-//     let traversal = t.in_order();
-//     assert_eq!(traversal, vec![
-//         Value::Number(1.0),
-//         Value::Number(3.0),
-//         Value::Number(5.0),
-//         Value::Number(7.0),
-//         Value::Number(9.0),
-//     ]);
-// }
-//
-// #[test]
-// fn test_tree_pre_order_traversal() {
-//     let mut t = Tree::new();
-//     t.insert(Value::Number(5.0));
-//     t.insert(Value::Number(3.0));
-//     t.insert(Value::Number(7.0));
-//
-//     let traversal = t.pre_order();
-//     // Root, left, right
-//     assert_eq!(traversal, vec![
-//         Value::Number(5.0),
-//         Value::Number(3.0),
-//         Value::Number(7.0),
-//     ]);
-// }
-//
-// #[test]
-// fn test_tree_post_order_traversal() {
-//     let mut t = Tree::new();
-//     t.insert(Value::Number(5.0));
-//     t.insert(Value::Number(3.0));
-//     t.insert(Value::Number(7.0));
-//
-//     let traversal = t.post_order();
-//     // Left, right, root
-//     assert_eq!(traversal, vec![
-//         Value::Number(3.0),
-//         Value::Number(7.0),
-//         Value::Number(5.0),
-//     ]);
-// }
+// NOTE: These tests were rewritten in Step 6 to test basic trees (not BST)
+// Basic trees have manual structure, not automatic BST ordering
+
+#[test]
+fn test_basic_tree_creation() {
+    // Basic tree is just a graph with :tree ruleset
+    let t = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
+    assert_eq!(t.node_count(), 0);
+    assert!(t.has_ruleset("tree"));
+}
+
+#[test]
+fn test_basic_tree_manual_structure() {
+    // Basic tree requires manual parent specification
+    let mut t = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
+    let root = t.insert(Value::Number(5.0), None);
+    let left = t.insert(Value::Number(3.0), Some(&root));
+    let right = t.insert(Value::Number(7.0), Some(&root));
+
+    assert_eq!(t.node_count(), 3);
+    assert!(t.has_node(&root));
+    assert!(t.has_node(&left));
+    assert!(t.has_node(&right));
+}
+
+#[test]
+fn test_basic_tree_contains() {
+    let mut t = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
+    t.insert(Value::Number(5.0), None);
+    t.insert(Value::Number(3.0), None);
+    t.insert(Value::Number(7.0), None);
+
+    assert!(t.contains(&Value::Number(5.0)));
+    assert!(t.contains(&Value::Number(3.0)));
+    assert!(t.contains(&Value::Number(7.0)));
+    assert!(!t.contains(&Value::Number(10.0)));
+}
+
+#[test]
+fn test_basic_tree_traversals() {
+    // Build a simple tree structure manually
+    //     5
+    //    / \
+    //   3   7
+    let mut t = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
+    let root = t.insert(Value::Number(5.0), None);
+    t.insert(Value::Number(3.0), Some(&root));
+    t.insert(Value::Number(7.0), Some(&root));
+
+    // BFS and DFS should work
+    let bfs = t.bfs(&root);
+    assert_eq!(bfs.len(), 3);
+    assert_eq!(bfs[0], root);
+
+    let dfs = t.dfs(&root);
+    assert_eq!(dfs.len(), 3);
+    assert_eq!(dfs[0], root);
+}
+
+// Note: Ordered traversals (in_order, pre_order, post_order) work on any graph
+// They just assume binary structure, no ordering requirement
 
 // ============================================================================
 // GRAPH TREE-LIKE METHODS TESTS (for Option A refactor)
@@ -497,22 +474,23 @@ fn test_empty_graph_is_falsy() {
     assert!(!val.is_truthy());
 }
 
-// NOTE: These tests are commented out as part of Step 2 refactor
-// They will be updated in Step 6 to test tree{} as graph with rules
-//
-// #[test]
-// fn test_tree_as_value() {
-//     let mut t = Tree::new();
-//     t.insert(Value::Number(5.0));
-//
-//     let val = Value::Tree(t);
-//     assert_eq!(val.type_name(), "tree");
-//     assert!(val.is_truthy());
-// }
-//
-// #[test]
-// fn test_empty_tree_is_falsy() {
-//     let t = Tree::new();
-//     let val = Value::Tree(t);
-//     assert!(!val.is_truthy());
-// }
+// NOTE: These tests rewritten in Step 6 to test tree as graph with ruleset
+
+#[test]
+fn test_tree_as_graph_value() {
+    // tree{} creates a graph with :tree ruleset
+    let t = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
+    let mut graph_with_node = t.clone();
+    graph_with_node.insert(Value::Number(5.0), None);
+
+    let val = Value::Graph(graph_with_node);
+    assert_eq!(val.type_name(), "graph");  // It's a graph, not a separate type
+    assert!(val.is_truthy());  // Non-empty graph is truthy
+}
+
+#[test]
+fn test_empty_tree_graph_is_falsy() {
+    let t = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
+    let val = Value::Graph(t);
+    assert!(!val.is_truthy());  // Empty graph is falsy
+}

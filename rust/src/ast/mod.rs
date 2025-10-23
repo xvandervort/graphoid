@@ -123,10 +123,7 @@ pub enum Expr {
         config: Vec<(String, Expr)>,
         position: SourcePosition,
     },
-    Tree {
-        config: Vec<(String, Expr)>,
-        position: SourcePosition,
-    },
+    // Tree variant removed in Step 7 - tree{} now desugars to graph{}.with_ruleset(:tree)
 }
 
 impl Expr {
@@ -143,7 +140,6 @@ impl Expr {
             Expr::List { position, .. } => position,
             Expr::Map { position, .. } => position,
             Expr::Graph { position, .. } => position,
-            Expr::Tree { position, .. } => position,
         }
     }
 }

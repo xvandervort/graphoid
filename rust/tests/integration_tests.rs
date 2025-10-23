@@ -524,15 +524,14 @@ fn test_graph_creation_empty() {
     execute(source).unwrap();
 }
 
-// NOTE: Tree tests commented out during Step 2 refactor
-// Will be rewritten in Step 6 to test tree{} as graph with rules
-// #[test]
-// fn test_tree_creation() {
-//     let source = r#"
-//         t = tree {}
-//     "#;
-//     execute(source).unwrap();
-// }
+#[test]
+fn test_tree_creation() {
+    // tree{} creates a graph with :tree ruleset
+    let source = r#"
+        t = tree {}
+    "#;
+    execute(source).unwrap();
+}
 
 #[test]
 fn test_graph_type_name() {
@@ -544,16 +543,17 @@ fn test_graph_type_name() {
     assert_eq!(g.type_name(), "graph");
 }
 
-// NOTE: Tree tests commented out during Step 2 refactor
-// #[test]
-// fn test_tree_type_name() {
-//     let source = r#"
-//         t = tree {}
-//     "#;
-//
-//     let t = execute_and_get(source, "t").unwrap();
-//     assert_eq!(t.type_name(), "tree");
-// }
+#[test]
+fn test_tree_type_name() {
+    // tree{} desugars to graph{}.with_ruleset(:tree)
+    // So type is "graph", not "tree"
+    let source = r#"
+        t = tree {}
+    "#;
+
+    let t = execute_and_get(source, "t").unwrap();
+    assert_eq!(t.type_name(), "graph");  // tree{} creates a graph
+}
 
 #[test]
 fn test_empty_graph_is_falsy() {
@@ -565,16 +565,15 @@ fn test_empty_graph_is_falsy() {
     assert!(!g.is_truthy());
 }
 
-// NOTE: Tree tests commented out during Step 2 refactor
-// #[test]
-// fn test_empty_tree_is_falsy() {
-//     let source = r#"
-//         t = tree {}
-//     "#;
-//
-//     let t = execute_and_get(source, "t").unwrap();
-//     assert!(!t.is_truthy());
-// }
+#[test]
+fn test_empty_tree_is_falsy() {
+    let source = r#"
+        t = tree {}
+    "#;
+
+    let t = execute_and_get(source, "t").unwrap();
+    assert!(!t.is_truthy());  // Empty graph (tree) is falsy
+}
 
 #[test]
 fn test_graph_to_string() {
@@ -589,15 +588,15 @@ fn test_graph_to_string() {
     assert!(s.contains("0 edges"));
 }
 
-// NOTE: Tree tests commented out during Step 2 refactor
-// #[test]
-// fn test_tree_to_string() {
-//     let source = r#"
-//         t = tree {}
-//     "#;
-//
-//     let t = execute_and_get(source, "t").unwrap();
-//     let s = t.to_string_value();
-//     assert!(s.contains("tree"));
-//     assert!(s.contains("0 nodes"));
-// }
+#[test]
+fn test_tree_to_string() {
+    // tree{} creates a graph, so string shows "graph"
+    let source = r#"
+        t = tree {}
+    "#;
+
+    let t = execute_and_get(source, "t").unwrap();
+    let s = t.to_string_value();
+    assert!(s.contains("graph"));  // tree{} creates a graph
+    assert!(s.contains("0 nodes"));
+}
