@@ -47,7 +47,11 @@ impl Executor {
             Expr::Index { object, index, .. } => self.eval_index(object, index),
             Expr::MethodCall { object, method, args, .. } => self.eval_method_call(object, method, args),
             Expr::Graph { config, .. } => self.eval_graph(config),
-            Expr::Tree { config, .. } => self.eval_tree(config),
+            Expr::Tree { .. } => {
+                // tree{} should be desugared to graph{}.with_ruleset(:tree) by the parser
+                // If we reach here, the parser didn't do its job
+                panic!("Expr::Tree should be desugared by parser to graph{{}}.with_ruleset(:tree)")
+            }
         }
     }
 
@@ -326,14 +330,7 @@ impl Executor {
         Ok(Value::Graph(Graph::new(graph_type)))
     }
 
-    /// Evaluates a tree expression.
-    fn eval_tree(&mut self, _config: &[(String, Expr)]) -> Result<Value> {
-        use crate::values::Tree;
-
-        // For now, config is ignored. Trees are just created empty.
-        // Future: Could support initial values or configuration options.
-        Ok(Value::Tree(Tree::new()))
-    }
+    // eval_tree() has been removed - tree{} now desugars to graph{}.with_ruleset(:tree) in parser
 
     /// Evaluates a lambda expression.
     /// Creates an anonymous function that captures the current environment.

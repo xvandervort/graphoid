@@ -6,10 +6,10 @@ use crate::ast::Stmt;
 use crate::execution::Environment;
 
 pub mod graph;
-pub mod tree;
+pub mod tree; // Keep for now - will be deleted in Step 5
 
 pub use graph::{Graph, GraphType};
-pub use tree::Tree;
+// pub use tree::Tree; // Removed - Tree is no longer a separate type
 
 /// A function value with its captured environment (closure).
 #[derive(Debug, Clone)]
@@ -53,8 +53,6 @@ pub enum Value {
     Function(Function),
     /// Graph value (Phase 6)
     Graph(Graph),
-    /// Tree value (Phase 6)
-    Tree(Tree),
 }
 
 impl Value {
@@ -71,7 +69,6 @@ impl Value {
             Value::Symbol(_) => true,
             Value::Function(_) => true, // Functions are always truthy
             Value::Graph(g) => g.node_count() > 0,
-            Value::Tree(t) => !t.is_empty(),
         }
     }
 
@@ -123,9 +120,6 @@ impl Value {
             Value::Graph(g) => {
                 format!("<graph: {} nodes, {} edges>", g.node_count(), g.edge_count())
             }
-            Value::Tree(t) => {
-                format!("<tree: {} nodes>", t.len())
-            }
         }
     }
 
@@ -141,7 +135,6 @@ impl Value {
             Value::Map(_) => "map",
             Value::Function(_) => "function",
             Value::Graph(_) => "graph",
-            Value::Tree(_) => "tree",
         }
     }
 }

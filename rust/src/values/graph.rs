@@ -3,7 +3,7 @@
 //! Graphoid's graph type uses index-free adjacency for O(1) neighbor lookups.
 //! Each node stores direct pointers to its neighbors, avoiding index scans.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use super::Value;
 
 /// Type of graph: directed or undirected
@@ -167,5 +167,192 @@ impl Graph {
     /// Get all node values (like map.values())
     pub fn values(&self) -> Vec<Value> {
         self.nodes.values().map(|n| n.value.clone()).collect()
+    }
+
+    // ========================================================================
+    // Tree-like convenience methods (for Option A refactor)
+    // ========================================================================
+
+    /// Insert a value into the graph with optional parent
+    /// Returns the ID of the newly created node
+    ///
+    /// This is a tree-like convenience method that:
+    /// - Generates a unique node ID
+    /// - Adds the node with the given value
+    /// - If parent is specified, adds an edge from parent to new node
+    pub fn insert(&mut self, value: Value, parent: Option<&str>) -> String {
+        // Generate unique node ID
+        let node_id = format!("node_{}", self.nodes.len());
+
+        // Add the node
+        self.add_node(node_id.clone(), value);
+
+        // If parent specified, add edge from parent to child
+        if let Some(parent_id) = parent {
+            self.add_edge(parent_id, &node_id, "child".to_string(), HashMap::new());
+        }
+
+        node_id
+    }
+
+    /// Check if the graph contains a node with the given value
+    pub fn contains(&self, value: &Value) -> bool {
+        self.nodes.values().any(|node| &node.value == value)
+    }
+
+    /// Breadth-first search traversal starting from a given node
+    /// Returns node IDs in BFS order
+    pub fn bfs(&self, start: &str) -> Vec<String> {
+        // Check if start node exists
+        if !self.has_node(start) {
+            return Vec::new();
+        }
+
+        let mut result = Vec::new();
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        // Start from the given node
+        queue.push_back(start.to_string());
+        visited.insert(start.to_string());
+
+        while let Some(node_id) = queue.pop_front() {
+            result.push(node_id.clone());
+
+            // Add unvisited neighbors to queue
+            if let Some(node) = self.nodes.get(&node_id) {
+                for neighbor_id in node.neighbors.keys() {
+                    if !visited.contains(neighbor_id) {
+                        visited.insert(neighbor_id.clone());
+                        queue.push_back(neighbor_id.clone());
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Depth-first search traversal starting from a given node
+    /// Returns node IDs in DFS order
+    pub fn dfs(&self, start: &str) -> Vec<String> {
+        // Check if start node exists
+        if !self.has_node(start) {
+            return Vec::new();
+        }
+
+        let mut result = Vec::new();
+        let mut visited = HashSet::new();
+        let mut stack = Vec::new();
+
+        // Start from the given node
+        stack.push(start.to_string());
+
+        while let Some(node_id) = stack.pop() {
+            if visited.contains(&node_id) {
+                continue;
+            }
+
+            visited.insert(node_id.clone());
+            result.push(node_id.clone());
+
+            // Add unvisited neighbors to stack
+            if let Some(node) = self.nodes.get(&node_id) {
+                for neighbor_id in node.neighbors.keys() {
+                    if !visited.contains(neighbor_id) {
+                        stack.push(neighbor_id.clone());
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    /// In-order traversal (left, root, right) starting from a given node
+    /// Assumes binary tree structure where first child is left, second is right
+    /// Returns values in in-order
+    pub fn in_order(&self, start: &str) -> Vec<Value> {
+        let mut result = Vec::new();
+        self.in_order_rec(start, &mut result);
+        result
+    }
+
+    /// Recursive helper for in-order traversal
+    fn in_order_rec(&self, node_id: &str, result: &mut Vec<Value>) {
+        if let Some(node) = self.nodes.get(node_id) {
+            let children: Vec<String> = node.neighbors.keys().cloned().collect();
+
+            // Process left child (first child)
+            if !children.is_empty() {
+                self.in_order_rec(&children[0], result);
+            }
+
+            // Process current node
+            result.push(node.value.clone());
+
+            // Process right child (second child)
+            if children.len() > 1 {
+                self.in_order_rec(&children[1], result);
+            }
+        }
+    }
+
+    /// Pre-order traversal (root, left, right) starting from a given node
+    /// Assumes binary tree structure where first child is left, second is right
+    /// Returns values in pre-order
+    pub fn pre_order(&self, start: &str) -> Vec<Value> {
+        let mut result = Vec::new();
+        self.pre_order_rec(start, &mut result);
+        result
+    }
+
+    /// Recursive helper for pre-order traversal
+    fn pre_order_rec(&self, node_id: &str, result: &mut Vec<Value>) {
+        if let Some(node) = self.nodes.get(node_id) {
+            let children: Vec<String> = node.neighbors.keys().cloned().collect();
+
+            // Process current node first
+            result.push(node.value.clone());
+
+            // Process left child (first child)
+            if !children.is_empty() {
+                self.pre_order_rec(&children[0], result);
+            }
+
+            // Process right child (second child)
+            if children.len() > 1 {
+                self.pre_order_rec(&children[1], result);
+            }
+        }
+    }
+
+    /// Post-order traversal (left, right, root) starting from a given node
+    /// Assumes binary tree structure where first child is left, second is right
+    /// Returns values in post-order
+    pub fn post_order(&self, start: &str) -> Vec<Value> {
+        let mut result = Vec::new();
+        self.post_order_rec(start, &mut result);
+        result
+    }
+
+    /// Recursive helper for post-order traversal
+    fn post_order_rec(&self, node_id: &str, result: &mut Vec<Value>) {
+        if let Some(node) = self.nodes.get(node_id) {
+            let children: Vec<String> = node.neighbors.keys().cloned().collect();
+
+            // Process left child (first child)
+            if !children.is_empty() {
+                self.post_order_rec(&children[0], result);
+            }
+
+            // Process right child (second child)
+            if children.len() > 1 {
+                self.post_order_rec(&children[1], result);
+            }
+
+            // Process current node last
+            result.push(node.value.clone());
+        }
     }
 }

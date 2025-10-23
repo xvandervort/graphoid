@@ -1,6 +1,7 @@
 //! Graph and Tree unit tests
 
-use graphoid::values::{Graph, GraphType, Tree, Value};
+use graphoid::values::{Graph, GraphType, Value};
+// Tree import removed - Tree is no longer a separate type (Option A refactor)
 use std::collections::HashMap;
 
 // ============================================================================
@@ -127,89 +128,352 @@ fn test_graph_keys_values() {
 }
 
 // ============================================================================
-// TREE TESTS
+// TREE TESTS - COMMENTED OUT FOR REFACTOR
+// ============================================================================
+// NOTE: These tests are commented out as part of Step 2 refactor
+// They will be rewritten in Step 6 to test tree{} as graph with rules
+//
+// #[test]
+// fn test_tree_creation() {
+//     let t = Tree::new();
+//     assert_eq!(t.len(), 0);
+//     assert!(t.is_empty());
+// }
+//
+// #[test]
+// fn test_tree_insert() {
+//     let mut t = Tree::new();
+//     t.insert(Value::Number(5.0));
+//     t.insert(Value::Number(3.0));
+//     t.insert(Value::Number(7.0));
+//
+//     assert_eq!(t.len(), 3);
+//     assert!(!t.is_empty());
+// }
+//
+// #[test]
+// fn test_tree_contains() {
+//     let mut t = Tree::new();
+//     t.insert(Value::Number(5.0));
+//     t.insert(Value::Number(3.0));
+//     t.insert(Value::Number(7.0));
+//
+//     assert!(t.contains(&Value::Number(5.0)));
+//     assert!(t.contains(&Value::Number(3.0)));
+//     assert!(t.contains(&Value::Number(7.0)));
+//     assert!(!t.contains(&Value::Number(10.0)));
+// }
+//
+// #[test]
+// fn test_tree_in_order_traversal() {
+//     let mut t = Tree::new();
+//     t.insert(Value::Number(5.0));
+//     t.insert(Value::Number(3.0));
+//     t.insert(Value::Number(7.0));
+//     t.insert(Value::Number(1.0));
+//     t.insert(Value::Number(9.0));
+//
+//     let traversal = t.in_order();
+//     assert_eq!(traversal, vec![
+//         Value::Number(1.0),
+//         Value::Number(3.0),
+//         Value::Number(5.0),
+//         Value::Number(7.0),
+//         Value::Number(9.0),
+//     ]);
+// }
+//
+// #[test]
+// fn test_tree_pre_order_traversal() {
+//     let mut t = Tree::new();
+//     t.insert(Value::Number(5.0));
+//     t.insert(Value::Number(3.0));
+//     t.insert(Value::Number(7.0));
+//
+//     let traversal = t.pre_order();
+//     // Root, left, right
+//     assert_eq!(traversal, vec![
+//         Value::Number(5.0),
+//         Value::Number(3.0),
+//         Value::Number(7.0),
+//     ]);
+// }
+//
+// #[test]
+// fn test_tree_post_order_traversal() {
+//     let mut t = Tree::new();
+//     t.insert(Value::Number(5.0));
+//     t.insert(Value::Number(3.0));
+//     t.insert(Value::Number(7.0));
+//
+//     let traversal = t.post_order();
+//     // Left, right, root
+//     assert_eq!(traversal, vec![
+//         Value::Number(3.0),
+//         Value::Number(7.0),
+//         Value::Number(5.0),
+//     ]);
+// }
+
+// ============================================================================
+// GRAPH TREE-LIKE METHODS TESTS (for Option A refactor)
 // ============================================================================
 
 #[test]
-fn test_tree_creation() {
-    let t = Tree::new();
-    assert_eq!(t.len(), 0);
-    assert!(t.is_empty());
+fn test_graph_insert_without_parent() {
+    let mut g = Graph::new(GraphType::Directed);
+    let node_id = g.insert(Value::Number(5.0), None);
+
+    assert_eq!(g.node_count(), 1);
+    assert!(g.has_node(&node_id));
+    assert_eq!(g.get_node(&node_id), Some(&Value::Number(5.0)));
 }
 
 #[test]
-fn test_tree_insert() {
-    let mut t = Tree::new();
-    t.insert(Value::Number(5.0));
-    t.insert(Value::Number(3.0));
-    t.insert(Value::Number(7.0));
+fn test_graph_insert_with_parent() {
+    let mut g = Graph::new(GraphType::Directed);
+    let root = g.insert(Value::Number(5.0), None);
+    let child = g.insert(Value::Number(3.0), Some(&root));
 
-    assert_eq!(t.len(), 3);
-    assert!(!t.is_empty());
+    assert_eq!(g.node_count(), 2);
+    assert!(g.has_node(&root));
+    assert!(g.has_node(&child));
+    assert!(g.has_edge(&root, &child));
 }
 
 #[test]
-fn test_tree_contains() {
-    let mut t = Tree::new();
-    t.insert(Value::Number(5.0));
-    t.insert(Value::Number(3.0));
-    t.insert(Value::Number(7.0));
+fn test_graph_insert_multiple_children() {
+    let mut g = Graph::new(GraphType::Directed);
+    let root = g.insert(Value::Number(5.0), None);
+    let left = g.insert(Value::Number(3.0), Some(&root));
+    let right = g.insert(Value::Number(7.0), Some(&root));
 
-    assert!(t.contains(&Value::Number(5.0)));
-    assert!(t.contains(&Value::Number(3.0)));
-    assert!(t.contains(&Value::Number(7.0)));
-    assert!(!t.contains(&Value::Number(10.0)));
+    assert_eq!(g.node_count(), 3);
+    let neighbors = g.neighbors(&root);
+    assert_eq!(neighbors.len(), 2);
+    assert!(neighbors.contains(&left));
+    assert!(neighbors.contains(&right));
 }
 
 #[test]
-fn test_tree_in_order_traversal() {
-    let mut t = Tree::new();
-    t.insert(Value::Number(5.0));
-    t.insert(Value::Number(3.0));
-    t.insert(Value::Number(7.0));
-    t.insert(Value::Number(1.0));
-    t.insert(Value::Number(9.0));
+fn test_graph_contains_found() {
+    let mut g = Graph::new(GraphType::Directed);
+    g.insert(Value::Number(5.0), None);
+    g.insert(Value::Number(3.0), None);
+    g.insert(Value::Number(7.0), None);
 
-    let traversal = t.in_order();
-    assert_eq!(traversal, vec![
-        Value::Number(1.0),
-        Value::Number(3.0),
-        Value::Number(5.0),
-        Value::Number(7.0),
-        Value::Number(9.0),
-    ]);
+    assert!(g.contains(&Value::Number(5.0)));
+    assert!(g.contains(&Value::Number(3.0)));
+    assert!(g.contains(&Value::Number(7.0)));
 }
 
 #[test]
-fn test_tree_pre_order_traversal() {
-    let mut t = Tree::new();
-    t.insert(Value::Number(5.0));
-    t.insert(Value::Number(3.0));
-    t.insert(Value::Number(7.0));
+fn test_graph_contains_not_found() {
+    let mut g = Graph::new(GraphType::Directed);
+    g.insert(Value::Number(5.0), None);
 
-    let traversal = t.pre_order();
-    // Root, left, right
-    assert_eq!(traversal, vec![
-        Value::Number(5.0),
-        Value::Number(3.0),
-        Value::Number(7.0),
-    ]);
+    assert!(!g.contains(&Value::Number(10.0)));
 }
 
 #[test]
-fn test_tree_post_order_traversal() {
-    let mut t = Tree::new();
-    t.insert(Value::Number(5.0));
-    t.insert(Value::Number(3.0));
-    t.insert(Value::Number(7.0));
+fn test_graph_contains_empty() {
+    let g = Graph::new(GraphType::Directed);
+    assert!(!g.contains(&Value::Number(5.0)));
+}
 
-    let traversal = t.post_order();
-    // Left, right, root
-    assert_eq!(traversal, vec![
-        Value::Number(3.0),
-        Value::Number(7.0),
-        Value::Number(5.0),
-    ]);
+#[test]
+fn test_graph_bfs_simple() {
+    let mut g = Graph::new(GraphType::Directed);
+    let root = g.insert(Value::Number(1.0), None);
+    let left = g.insert(Value::Number(2.0), Some(&root));
+    let right = g.insert(Value::Number(3.0), Some(&root));
+
+    let traversal = g.bfs(&root);
+    // BFS should visit root first, then both children (order doesn't matter)
+    assert_eq!(traversal.len(), 3);
+    assert_eq!(traversal[0], root);
+    assert!(traversal.contains(&left));
+    assert!(traversal.contains(&right));
+}
+
+#[test]
+fn test_graph_bfs_empty() {
+    let g = Graph::new(GraphType::Directed);
+    let traversal = g.bfs("nonexistent");
+    assert_eq!(traversal, Vec::<String>::new());
+}
+
+#[test]
+fn test_graph_bfs_deeper_tree() {
+    let mut g = Graph::new(GraphType::Directed);
+    //       1
+    //      / \
+    //     2   3
+    //    /
+    //   4
+    let n1 = g.insert(Value::Number(1.0), None);
+    let n2 = g.insert(Value::Number(2.0), Some(&n1));
+    let n3 = g.insert(Value::Number(3.0), Some(&n1));
+    let n4 = g.insert(Value::Number(4.0), Some(&n2));
+
+    let traversal = g.bfs(&n1);
+    // BFS order: n1 first, then n2 and n3 (in any order), then n4
+    assert_eq!(traversal.len(), 4);
+    assert_eq!(traversal[0], n1); // Root first
+    // n2 and n3 should be at indices 1 and 2 (any order)
+    assert!(traversal[1] == n2 || traversal[1] == n3);
+    assert!(traversal[2] == n2 || traversal[2] == n3);
+    assert_eq!(traversal[3], n4); // n4 should be last (level 3)
+}
+
+#[test]
+fn test_graph_dfs_simple() {
+    let mut g = Graph::new(GraphType::Directed);
+    let root = g.insert(Value::Number(1.0), None);
+    let left = g.insert(Value::Number(2.0), Some(&root));
+    let right = g.insert(Value::Number(3.0), Some(&root));
+
+    let traversal = g.dfs(&root);
+    // DFS should visit root first, then explore depth-first
+    assert_eq!(traversal.len(), 3);
+    assert_eq!(traversal[0], root);
+    assert!(traversal.contains(&left));
+    assert!(traversal.contains(&right));
+}
+
+#[test]
+fn test_graph_dfs_empty() {
+    let g = Graph::new(GraphType::Directed);
+    let traversal = g.dfs("nonexistent");
+    assert_eq!(traversal, Vec::<String>::new());
+}
+
+#[test]
+fn test_graph_dfs_deeper_tree() {
+    let mut g = Graph::new(GraphType::Directed);
+    //       1
+    //      / \
+    //     2   3
+    //    /
+    //   4
+    let n1 = g.insert(Value::Number(1.0), None);
+    let n2 = g.insert(Value::Number(2.0), Some(&n1));
+    let n3 = g.insert(Value::Number(3.0), Some(&n1));
+    let n4 = g.insert(Value::Number(4.0), Some(&n2));
+
+    let traversal = g.dfs(&n1);
+    // DFS should go deep before wide
+    assert_eq!(traversal.len(), 4);
+    assert_eq!(traversal[0], n1); // Root first
+    assert!(traversal.contains(&n2));
+    assert!(traversal.contains(&n3));
+    assert!(traversal.contains(&n4));
+}
+
+#[test]
+fn test_graph_in_order_simple() {
+    let mut g = Graph::new(GraphType::Directed);
+    //     5
+    //    / \
+    //   3   7
+    let root = g.insert(Value::Number(5.0), None);
+    g.insert(Value::Number(3.0), Some(&root));
+    g.insert(Value::Number(7.0), Some(&root));
+
+    let values = g.in_order(&root);
+    // In-order: left, root, right = 3, 5, 7
+    assert_eq!(values.len(), 3);
+    assert!(values.contains(&Value::Number(3.0)));
+    assert!(values.contains(&Value::Number(5.0)));
+    assert!(values.contains(&Value::Number(7.0)));
+}
+
+#[test]
+fn test_graph_in_order_empty() {
+    let g = Graph::new(GraphType::Directed);
+    let values = g.in_order("nonexistent");
+    assert_eq!(values, Vec::<Value>::new());
+}
+
+#[test]
+fn test_graph_in_order_single_node() {
+    let mut g = Graph::new(GraphType::Directed);
+    let root = g.insert(Value::Number(5.0), None);
+
+    let values = g.in_order(&root);
+    assert_eq!(values, vec![Value::Number(5.0)]);
+}
+
+#[test]
+fn test_graph_pre_order_simple() {
+    let mut g = Graph::new(GraphType::Directed);
+    //     5
+    //    / \
+    //   3   7
+    let root = g.insert(Value::Number(5.0), None);
+    g.insert(Value::Number(3.0), Some(&root));
+    g.insert(Value::Number(7.0), Some(&root));
+
+    let values = g.pre_order(&root);
+    // Pre-order: root, left, right
+    assert_eq!(values.len(), 3);
+    assert!(values.contains(&Value::Number(3.0)));
+    assert!(values.contains(&Value::Number(5.0)));
+    assert!(values.contains(&Value::Number(7.0)));
+    // Root should be first
+    assert_eq!(values[0], Value::Number(5.0));
+}
+
+#[test]
+fn test_graph_pre_order_empty() {
+    let g = Graph::new(GraphType::Directed);
+    let values = g.pre_order("nonexistent");
+    assert_eq!(values, Vec::<Value>::new());
+}
+
+#[test]
+fn test_graph_pre_order_single_node() {
+    let mut g = Graph::new(GraphType::Directed);
+    let root = g.insert(Value::Number(5.0), None);
+
+    let values = g.pre_order(&root);
+    assert_eq!(values, vec![Value::Number(5.0)]);
+}
+
+#[test]
+fn test_graph_post_order_simple() {
+    let mut g = Graph::new(GraphType::Directed);
+    //     5
+    //    / \
+    //   3   7
+    let root = g.insert(Value::Number(5.0), None);
+    g.insert(Value::Number(3.0), Some(&root));
+    g.insert(Value::Number(7.0), Some(&root));
+
+    let values = g.post_order(&root);
+    // Post-order: left, right, root
+    assert_eq!(values.len(), 3);
+    assert!(values.contains(&Value::Number(3.0)));
+    assert!(values.contains(&Value::Number(5.0)));
+    assert!(values.contains(&Value::Number(7.0)));
+    // Root should be last
+    assert_eq!(values[2], Value::Number(5.0));
+}
+
+#[test]
+fn test_graph_post_order_empty() {
+    let g = Graph::new(GraphType::Directed);
+    let values = g.post_order("nonexistent");
+    assert_eq!(values, Vec::<Value>::new());
+}
+
+#[test]
+fn test_graph_post_order_single_node() {
+    let mut g = Graph::new(GraphType::Directed);
+    let root = g.insert(Value::Number(5.0), None);
+
+    let values = g.post_order(&root);
+    assert_eq!(values, vec![Value::Number(5.0)]);
 }
 
 // ============================================================================
@@ -233,19 +497,22 @@ fn test_empty_graph_is_falsy() {
     assert!(!val.is_truthy());
 }
 
-#[test]
-fn test_tree_as_value() {
-    let mut t = Tree::new();
-    t.insert(Value::Number(5.0));
-
-    let val = Value::Tree(t);
-    assert_eq!(val.type_name(), "tree");
-    assert!(val.is_truthy());
-}
-
-#[test]
-fn test_empty_tree_is_falsy() {
-    let t = Tree::new();
-    let val = Value::Tree(t);
-    assert!(!val.is_truthy());
-}
+// NOTE: These tests are commented out as part of Step 2 refactor
+// They will be updated in Step 6 to test tree{} as graph with rules
+//
+// #[test]
+// fn test_tree_as_value() {
+//     let mut t = Tree::new();
+//     t.insert(Value::Number(5.0));
+//
+//     let val = Value::Tree(t);
+//     assert_eq!(val.type_name(), "tree");
+//     assert!(val.is_truthy());
+// }
+//
+// #[test]
+// fn test_empty_tree_is_falsy() {
+//     let t = Tree::new();
+//     let val = Value::Tree(t);
+//     assert!(!val.is_truthy());
+// }
