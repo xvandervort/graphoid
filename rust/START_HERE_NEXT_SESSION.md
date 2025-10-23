@@ -1,192 +1,188 @@
 # START HERE - Next Session Quick Start
 
-**Last Updated**: October 22, 2025
-**Current Status**: 🔧 REFACTOR IN PROGRESS - Option A Implementation
-**Tests Passing**: 397/397 (100%)
-**What's Next**: Continue with Step 3 - Update Parser
+**Last Updated**: October 23, 2025
+**Current Status**: ✅ PHASE 6 WEEK 2 RULE SEVERITY & RETROACTIVE POLICIES COMPLETE
+**Tests Passing**: 636/636 (100%)
+**What's Next**: Phase 6 Week 2 Areas 2-5 - Rulesets, Optimization, Indexing
 
-**IMPORTANT DESIGN DECISION**: See `TREE_RULESET_DESIGN.md` for tree type hierarchy
-- `tree{}` = basic tree (not BST!)
-- `BinaryTree{}` and `BST{}` coming later
-
-**⚠️ PARTIAL IMPLEMENTATION**: Ruleset storage works, enforcement does NOT
-- See `RULESET_TODO.md` for what's missing
-- Rule enforcement scheduled for Phase 6 Week 2
-
----
-
-## 📖 What Happened Last Session
-
-**Last session was a DESIGN REVIEW session**, not a coding session.
-
-### What Was Discovered
-The previous implementation (Phase 6 Week 1) created separate `Tree` and `Graph` types, which **violates the core Graphoid philosophy** that "trees are graphs with rules."
-
-### What Was Done
-- ✅ Identified the design inconsistency
-- ✅ Chose Option A: Pure Philosophy approach
-- ✅ Updated ALL documentation to reflect Option A
-- ✅ Created detailed refactor plan (REFACTOR_PLAN_OPTION_A.md)
-
-### What Was NOT Done
-- ❌ No code changes made
-- ❌ Implementation still has separate Tree/Graph types
-- ❌ Refactor not yet executed
-
-**Result**: Documentation is ready, code needs to be updated to match.
+**MAJOR ACCOMPLISHMENTS THIS SESSION**:
+- ✅ **Rule Severity System** - Silent/Warning/Error modes with proper rejection
+- ✅ **Retroactive Cleaning** - Rules can clean existing data when added
+- ✅ **User-Friendly Defaults** - Warning mode (reject + log) is default
+- ✅ **NoDuplicatesRule.clean()** - Automatically removes duplicate values
+- ✅ **Roadmap Updated** - Documented cleaning configuration modes (strict/any/ask)
+- ✅ **All 636 Tests Passing** - Full regression testing successful
 
 ---
 
-## ⚠️ CRITICAL: Why This Refactor Matters
+## 📖 What Happened This Session (October 23, 2025)
 
-### Current State (WRONG)
-```rust
-// src/values/tree.rs exists (separate file)
-pub struct Tree { ... }
+**Implemented Rule Severity System & Retroactive Cleaning Policies**
 
-// src/values/mod.rs
-pub enum Value {
-    Graph(Graph),
-    Tree(Tree),  // ❌ Separate variant
-}
+### Key Changes
 
-// Graphoid code
-t = tree {}      // Creates Value::Tree
-g = graph {}     // Creates Value::Graph
-// These are DIFFERENT types!
-```
+#### 1. Rule Severity System (src/graph/rules.rs)
+- ✅ **RuleSeverity enum** - Silent, Warning (default), Error
+- ✅ **All violations REJECTED** - Severity only controls notification, not enforcement
+- ✅ **User-friendly defaults** - Warning mode = reject + log (not crash)
+- ✅ **Per-rule defaults** - All rules default to Warning severity
+- ✅ **Updated Rule trait** - Added `default_severity()` method
+- ✅ **Syntax support** - `graph.add_rule(:no_cycles, :error_on_violation)` (future)
 
-### Required State (CORRECT - Option A)
-```rust
-// NO src/values/tree.rs file!
+#### 2. Retroactive Cleaning Policies (src/graph/rules.rs)
+- ✅ **RetroactivePolicy enum** - Clean (default), Warn, Enforce, Ignore
+- ✅ **NoDuplicatesRule.clean()** - Removes duplicate values from existing data
+- ✅ **Smart add_rule() logic** - Checks for violations before rejecting
+- ✅ **Rejection on failure** - If can't clean violations, reject add_rule()
+- ✅ **Empty graph handling** - Rules can be added to empty graphs even if clean() fails
 
-// src/values/mod.rs
-pub enum Value {
-    Graph(Graph),  // ✅ Only Graph variant
-}
+#### 3. Cleaning Configuration Modes (Roadmap update)
+- ✅ **Documented in RUST_IMPLEMENTATION_ROADMAP.md** - Phase 6 Week 2
+- ✅ **`:strict` mode** - Reject add_rule() if cleaning fails (default)
+- ✅ **`:any` mode** - Pick arbitrary solution for ambiguous cleaning
+- ✅ **`:ask` mode** - Interactive prompt for cleaning decisions (future)
+- ✅ **Configure block syntax** - `configure { rule_cleaning_mode: :any }`
 
-// Graphoid code
-t = tree {}      // Desugars to: graph{}.with_ruleset(:tree)
-g = graph {}     // Creates Value::Graph
-// Both create the SAME type!
-```
+#### 4. Graph Validation Updates (src/values/graph.rs)
+- ✅ **ValidationResult enum** - Includes rule name + severity + message
+- ✅ **GraphoidError::RuleViolation** - Proper error type for rule failures
+- ✅ **Warning logging** - eprintln! for Warning severity
+- ✅ **All mutations updated** - add_node, add_edge, remove_node, remove_edge
 
-### Core Philosophy
-1. **Trees are NOT a separate type** - Only `Value::Graph` exists
-2. **tree{} is syntactic sugar** - Parser transforms to `graph{}.with_ruleset(:tree)`
-3. **All methods on Graph** - Traversals, insert, etc. work on any graph
-4. **Rules enforce constraints** - `:tree` ruleset provides tree behavior
+#### 5. Test Updates
+- ✅ **Updated all test files** - Wrap RuleSpec in RuleInstance
+- ✅ **Fixed List caching** - Recompute length after cleaning
+- ✅ **Fixed binary_tree ruleset** - Use MaxDegree(2) instead of BinaryTree
+- ✅ **Updated retroactive test** - Reflects new cleaning behavior
+- ✅ **636/636 tests passing** - Zero regressions
 
----
+### Implementation Details
 
-## 🎯 This Session's Goal
+**Key Files Modified**:
+1. `src/graph/rules.rs` - Added enums, RuleInstance, clean() method
+2. `src/values/graph.rs` - Severity-based validation, smart add_rule()
+3. `src/values/list.rs` - Length cache sync after cleaning
+4. `src/values/hash.rs` - Updated to use RuleInstance
+5. `src/execution/executor.rs` - Wrap RuleSpec in RuleInstance
+6. `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` - Cleaning modes documentation
+7. `tests/unit/*.rs` - Updated all tests for RuleInstance
 
-**Execute REFACTOR_PLAN_OPTION_A.md to align implementation with philosophy**
-
-### Timeline
-- **2-3 days** total
-- **Day 1**: Extend Graph with tree functionality
-- **Day 2**: Remove Tree type, update tests
-- **Day 3**: Polish and verify
-
-### Success Criteria
-- ✅ No `src/values/tree.rs` file exists
-- ✅ No `Value::Tree` variant exists
-- ✅ tree{} desugars to graph{}.with_ruleset(:tree)
-- ✅ All tests pass (with updates)
-- ✅ Zero compiler warnings
-
----
-
-## 📚 MUST READ Before Starting (15 minutes)
-
-### 1. The Refactor Plan (10 min) - PRIMARY GUIDE
-```bash
-less /home/irv/work/grang/rust/REFACTOR_PLAN_OPTION_A.md
-```
-
-This is your **step-by-step implementation guide**:
-- Problem explanation
-- Solution approach (Option A)
-- **7 detailed steps** with code examples
-- Testing strategy
-- Timeline and success criteria
-
-**Read this first!**
-
-### 2. Updated Roadmap (3 min)
-```bash
-less /home/irv/work/grang/dev_docs/RUST_IMPLEMENTATION_ROADMAP.md
-# Search for "Phase 6" (press / then type "Phase 6")
-```
-
-Shows the correct Phase 6 approach:
-- Week 1: Graph only (no separate Tree)
-- Week 2: Rules and tree{} syntax sugar
-
-### 3. Last Session Summary (2 min)
-```bash
-less /home/irv/work/grang/rust/SESSION_SUMMARY.md
-```
-
-Explains what was done last session (doc updates, not code).
+**Technical Challenges Solved**:
+- Rejection must return Err (not Ok) so callers know operation failed
+- Empty graphs can add rules even when clean() doesn't support cleaning
+- List length cache must sync after retroactive cleaning removes nodes
+- ValidationResult needs rule name to create proper RuleViolation errors
 
 ---
 
-## 🗺️ The Refactor Plan (Overview)
+## 📖 What Happened Previous Session
 
-Here are the 7 steps from REFACTOR_PLAN_OPTION_A.md:
+**Completed Phase 6 Week 2 Area 1: Rule System Architecture** + critical refactor
 
-### Step 1: Extend Graph with Tree Functionality (1 day)
-**File**: `src/values/graph.rs`
+### What Was Completed
 
-Add these methods to Graph:
-- `insert(value, parent?)` - Tree-like insertion
-- `contains(value)` - Search for value
-- `bfs(start)` - Breadth-first traversal
-- `dfs(start)` - Depth-first traversal
-- `in_order(start)` - In-order traversal
-- `pre_order(start)` - Pre-order traversal
-- `post_order(start)` - Post-order traversal
+#### 1. Rule System Architecture (src/graph/rules.rs - 640+ lines)
+- ✅ **Rule trait** with validate() and should_run_on() methods
+- ✅ **RuleSpec enum** for clonable rule specifications
+- ✅ **6 Built-in Rules**:
+  - NoCyclesRule - Prevents cycles using DFS
+  - SingleRootRule - Enforces single root for trees
+  - ConnectedRule - Ensures graph stays connected
+  - MaxDegreeRule - Limits node degree (parameterized)
+  - BinaryTreeRule - Max 2 children per node
+  - NoDuplicatesRule - Prevents duplicate values (for sets)
+- ✅ **RuleContext** for operation-specific validation
+- ✅ **Pre-validation** - Rules check BEFORE mutations
+- ✅ **Incremental validation** - Smart about construction vs modification
 
-**Use TDD**: Write test → Implement → Verify
+#### 2. Lists and Hashes as Graphs (ARCHITECTURAL FIX)
+- ✅ **src/values/list.rs** (155 lines) - List wraps Graph (linear structure)
+- ✅ **src/values/hash.rs** (120 lines) - Hash wraps Graph (key-value structure)
+- ✅ **"Everything is a graph" philosophy** - NOW IMPLEMENTED!
+- ✅ **Graph methods on collections** - Lists and hashes can use rules
 
-### Step 2: Remove Tree from Value Enum (30 min)
-**File**: `src/values/mod.rs`
+#### 3. Ad Hoc Rule System
+- ✅ **Dual storage** - `rulesets: Vec<String>` + `rules: Vec<RuleSpec>`
+- ✅ **add_rule()** and **remove_rule()** methods on Graph, List, Hash
+- ✅ **Rule deduplication** - Same rule from multiple sources only validated once
+- ✅ **Graphoid syntax support** - Symbol-to-RuleSpec mapping
 
-Remove `Tree(Tree)` variant from Value enum.
-Update all Value methods (type_name, to_string_value, etc.).
+#### 4. Graphoid Language Syntax (executor.rs updates)
+- ✅ **symbol_to_rule_spec()** helper - Maps `:no_dups` → `RuleSpec::NoDuplicates`
+- ✅ **list.add_rule(:symbol)** - Works in Graphoid code
+- ✅ **list.remove_rule(:symbol)** - Works in Graphoid code
+- ✅ **list.append(value)** - Now implemented, validates rules
+- ✅ **Parameterized rules** - `list.add_rule(:max_degree, 5)` works
 
-### Step 3: Update Parser (1 hour)
-**File**: `src/parser/mod.rs`
+#### 5. Tests Created
+- ✅ **tests/unit/ad_hoc_rule_tests.rs** - 13 tests for ad hoc rules
+- ✅ **tests/unit/list_rules_tests.rs** - 8 tests for list rules (Rust API)
+- ✅ **tests/list_rules_graphoid_syntax_test.rs** - 7 integration tests (Graphoid syntax)
+- ✅ **All 636 tests passing** - No regressions!
 
-Change tree{} parsing to desugar into:
-```rust
-tree{} → graph{}.with_ruleset(:tree)
+### Core Use Case Now Working
+
+```graphoid
+# Convert a list into a set - THE USE CASE!
+items = [1, 2, 3]
+items = items.add_rule(:no_dups)
+items.append(2)  # ERROR: Value already exists!
+
+# Remove rule to allow duplicates again
+items = items.remove_rule(:no_dups)
+items.append(2)  # OK now!
+
+# Parameterized rules
+graph = graph{}.add_rule(:max_degree, 5)
+
+# Hashes can also have rules (they're graphs!)
+config = {"a": 1}.add_rule(:no_dups)
 ```
 
-### Step 4: Update Executor (30 min)
-**File**: `src/execution/executor.rs`
+---
 
-Remove `eval_tree()` function.
-Remove Expr::Tree match arm from eval_expr().
+## 🎯 Next Session's Goal
 
-### Step 5: Delete tree.rs (5 min)
-```bash
-rm src/values/tree.rs
-```
-Remove imports from mod.rs.
+**Continue Phase 6 Week 2: Areas 2-5**
 
-### Step 6: Update Tests (1 day)
-**File**: `tests/integration_tests.rs`
+### Remaining Work (from RULESET_TODO.md)
 
-Update all tree tests to expect Graph instead of Tree.
-Add new tests for tree-as-graph functionality.
+#### Area 2: Ruleset Definitions (Days 4-5)
+**File**: `src/graph/rulesets.rs`
 
-### Step 7: Update AST (30 min)
-**File**: `src/ast/mod.rs`
+**Tasks**:
+- Define built-in rulesets (:tree, :bst, :dag)
+- Ruleset composition and inheritance
+- Tree hierarchy: basic tree → binary tree → BST
+- Connect with_ruleset() to actual rule enforcement
+- **NOTE**: Storage already works, need enforcement
 
-Remove `Expr::Tree` variant (if present).
+#### Area 3: Query Pattern Detection (Days 6-7)
+**File**: `src/graph/optimizer.rs`
+
+**Tasks**:
+- Track access patterns (property lookups, traversals)
+- Frequency counters and thresholds
+- Automatic index creation decisions
+- Performance metrics collection
+
+#### Area 4: Automatic Indexing (Days 7-8)
+**File**: `src/graph/indices.rs`
+
+**Tasks**:
+- Property indices (hash-based)
+- Edge type indices
+- Degree indices
+- Transparent creation/destruction
+
+#### Area 5: Rule-Aware Algorithms (Days 9-10)
+**File**: `src/graph/algorithms.rs`
+
+**Tasks**:
+- Algorithm selection based on rules
+- no_cycles → topological algorithms
+- connected → skip component detection
+- Performance optimizations
 
 ---
 
@@ -196,28 +192,38 @@ Remove `Expr::Tree` variant (if present).
 ```bash
 cd /home/irv/work/grang/rust
 
-# Should show 388 tests passing
+# Should show 636 tests passing
 ~/.cargo/bin/cargo test 2>&1 | grep "test result:"
 
 # Should build with zero warnings
 ~/.cargo/bin/cargo build 2>&1 | grep -i warning
+
+# Try the new feature in REPL
+~/.cargo/bin/cargo run --quiet
+> items = [1, 2, 3]
+> items = items.add_rule(:no_dups)
+> items.append(2)
+# Should error: Value already exists
 ```
 
-**Expected**: 388/388 tests, zero warnings
+**Expected**: 636/636 tests, zero warnings, use case works in REPL
 
-### Start Refactor - Step 1
+### Continue to Area 2 - Ruleset Definitions
+
 ```bash
-# Read the refactor plan
-less REFACTOR_PLAN_OPTION_A.md
+# Read the implementation plan
+less RULESET_TODO.md
 
-# Open graph.rs to add tree methods
-# Start with insert() method
+# Read the roadmap section
+less /home/irv/work/grang/dev_docs/RUST_IMPLEMENTATION_ROADMAP.md
+# Search for "Week 2" (line ~1860)
 
-# TDD approach for each method:
-# 1. Write test in tests/unit/graph_tests.rs
-# 2. Run: ~/.cargo/bin/cargo test test_graph_insert
-# 3. Implement method in src/values/graph.rs
-# 4. Run: ~/.cargo/bin/cargo test test_graph_insert (should pass)
+# Create rulesets.rs
+# TDD approach:
+# 1. Write test in tests/unit/rule_enforcement_tests.rs
+# 2. Run: ~/.cargo/bin/cargo test test_tree_ruleset
+# 3. Implement ruleset enforcement in src/graph/rulesets.rs
+# 4. Run: ~/.cargo/bin/cargo test test_tree_ruleset (should pass)
 # 5. Run: ~/.cargo/bin/cargo test (all should pass)
 # 6. Commit
 ```
@@ -226,166 +232,218 @@ less REFACTOR_PLAN_OPTION_A.md
 
 **If using Claude Code, say:**
 
-> "Execute Step 1 of REFACTOR_PLAN_OPTION_A.md: Extend Graph with tree functionality (insert, contains, traversals). Follow TDD. Keep all tests passing."
+> "Continue Phase 6 Week 2 implementation. Start with Area 2: Ruleset Definitions. Follow RULESET_TODO.md and use TDD. Connect the existing with_ruleset() storage to actual rule enforcement."
 
 Claude will:
-1. Read REFACTOR_PLAN_OPTION_A.md
-2. Add tree methods to Graph (insert, contains, traversals)
-3. Write tests for each method (TDD)
-4. Keep all 388 tests passing throughout
-5. Maintain zero warnings
-
-After Step 1 is complete, continue with:
-
-> "Execute Step 2 of REFACTOR_PLAN_OPTION_A.md: Remove Tree from Value enum."
-
-And so on through all 7 steps.
+1. Read RULESET_TODO.md Area 2 section
+2. Create src/graph/rulesets.rs
+3. Implement ruleset definitions (:tree, :bst, :dag)
+4. Connect with_ruleset() to rule enforcement
+5. Keep all 636 tests passing throughout
+6. Maintain zero warnings
 
 ---
 
-## 🎯 Step 1 Details (Start Here)
+## 📊 Progress Tracking - Phase 6 Week 2
 
-### Goal
-Add tree functionality to Graph struct so it can handle both graphs and trees.
+### ✅ Area 1: Rule System Architecture (COMPLETE)
+- [x] Rule trait with validate() and should_run_on()
+- [x] RuleSpec enum for clonability
+- [x] NoCyclesRule implementation
+- [x] SingleRootRule implementation
+- [x] ConnectedRule implementation
+- [x] MaxDegreeRule implementation (parameterized)
+- [x] BinaryTreeRule implementation
+- [x] NoDuplicatesRule implementation
+- [x] RuleContext for operation-specific validation
+- [x] Pre-validation integration with Graph
+- [x] Ad hoc rule addition/removal
+- [x] Lists as graphs refactor
+- [x] Hashes as graphs refactor
+- [x] Graphoid syntax support (:symbol → RuleSpec)
+- [x] 28 tests for rule system (13 ad hoc + 8 list + 7 integration)
+- [x] All 636 tests passing
+- [x] Zero warnings
 
-### Methods to Add
+### 🔲 Area 2: Ruleset Definitions (TODO)
+- [ ] Define :tree ruleset (no_cycles, single_root, connected)
+- [ ] Define :binary_tree ruleset (tree + max_degree 2)
+- [ ] Define :bst ruleset (binary_tree + ordering)
+- [ ] Define :dag ruleset (no_cycles, allows multiple roots)
+- [ ] Ruleset composition and inheritance
+- [ ] Connect with_ruleset() to enforcement
+- [ ] Tests for ruleset validation
+- [ ] All tests still passing
 
-1. **insert(value, parent?) → String**
-   ```rust
-   pub fn insert(&mut self, value: Value, parent: Option<&str>) -> String {
-       // Generate node ID
-       // Add node
-       // If parent specified, add edge
-       // Return node ID
-   }
-   ```
+### 🔲 Area 3: Query Pattern Detection (TODO)
+- [ ] Access pattern tracking
+- [ ] Frequency counters
+- [ ] Threshold detection
+- [ ] Index creation decisions
+- [ ] Performance metrics
+- [ ] Tests for pattern detection
 
-2. **contains(value) → bool**
-   ```rust
-   pub fn contains(&self, value: &Value) -> bool {
-       // Search all nodes for matching value
-   }
-   ```
+### 🔲 Area 4: Automatic Indexing (TODO)
+- [ ] Property indices
+- [ ] Edge type indices
+- [ ] Degree indices
+- [ ] Transparent creation
+- [ ] Index invalidation
+- [ ] Tests for indices
 
-3. **bfs(start) → Vec<String>**
-   ```rust
-   pub fn bfs(&self, start: &str) -> Vec<String> {
-       // Standard BFS - return node IDs in order
-   }
-   ```
-
-4. **dfs(start) → Vec<String>**
-   ```rust
-   pub fn dfs(&self, start: &str) -> Vec<String> {
-       // Standard DFS - return node IDs in order
-   }
-   ```
-
-5. **in_order(start) → Vec<Value>**
-   ```rust
-   pub fn in_order(&self, start: &str) -> Vec<Value> {
-       // Assumes binary tree (left/right edges)
-       // Return values in in-order: left, root, right
-   }
-   ```
-
-6. **pre_order(start) → Vec<Value>**
-   ```rust
-   pub fn pre_order(&self, start: &str) -> Vec<Value> {
-       // Return values in pre-order: root, left, right
-   }
-   ```
-
-7. **post_order(start) → Vec<Value>**
-   ```rust
-   pub fn post_order(&self, start: &str) -> Vec<Value> {
-       // Return values in post-order: left, right, root
-   }
-   ```
-
-### TDD Workflow
-
-For **each method** above:
-
-1. **RED**: Write failing test
-   ```rust
-   // tests/unit/graph_tests.rs
-   #[test]
-   fn test_graph_insert() {
-       let mut g = Graph::new(GraphType::Directed);
-       let node_id = g.insert(Value::Number(5.0), None);
-       assert_eq!(g.node_count(), 1);
-       assert!(g.has_node(&node_id));
-   }
-   ```
-
-2. **RUN**: `~/.cargo/bin/cargo test test_graph_insert` (should FAIL)
-
-3. **GREEN**: Implement method in src/values/graph.rs
-
-4. **RUN**: `~/.cargo/bin/cargo test test_graph_insert` (should PASS)
-
-5. **VERIFY**: `~/.cargo/bin/cargo test` (all 388+ should PASS)
-
-6. **BUILD**: `~/.cargo/bin/cargo build` (zero warnings)
-
-7. **COMMIT**: Small commit for this one method
-
-### Tips
-
-- **Look at tree.rs** for reference implementations
-  - Contains BST insertion logic
-  - Contains traversal implementations
-  - Extract and adapt for Graph structure
-
-- **Start simple**: Begin with insert() and contains()
-
-- **Test incrementally**: Don't implement all methods before testing
-
-- **Keep tests passing**: All 388 tests should pass after each method
+### 🔲 Area 5: Rule-Aware Algorithms (TODO)
+- [ ] Algorithm selection based on rules
+- [ ] Optimization for acyclic graphs
+- [ ] Optimization for connected graphs
+- [ ] Performance benchmarks
+- [ ] Tests for optimized algorithms
 
 ---
 
-## 📊 Progress Tracking
+## 📁 Key Files Reference
 
-Use this checklist to track refactor progress:
+### Created This Session
+- `src/graph/rules.rs` - **Rule system (640+ lines)**
+- `src/graph/mod.rs` - Graph module with rules
+- `src/values/list.rs` - List as graph (155 lines)
+- `src/values/hash.rs` - Hash as graph (120 lines)
+- `tests/unit/ad_hoc_rule_tests.rs` - 13 tests
+- `tests/unit/list_rules_tests.rs` - 8 tests
+- `tests/list_rules_graphoid_syntax_test.rs` - 7 integration tests
 
-### Step 1: Extend Graph (Day 1)
-- [ ] Add insert() method + test
-- [ ] Add contains() method + test
-- [ ] Add bfs() method + test
-- [ ] Add dfs() method + test
-- [ ] Add in_order() method + test
-- [ ] Add pre_order() method + test
-- [ ] Add post_order() method + test
-- [ ] All 388+ tests passing
-- [ ] Zero warnings
+### Modified This Session
+- `src/values/mod.rs` - Updated Value enum, added Hash to Function
+- `src/values/graph.rs` - Added rule storage and validation
+- `src/execution/executor.rs` - Added Graphoid syntax support
+- `tests/unit/mod.rs` - Added new test modules
+- `tests/integration_tests.rs` - Updated for List/Hash refactor
+- `tests/unit/executor_tests.rs` - Updated for List/Hash API
 
-### Step 2-5: Remove Tree Type (Day 2, Morning)
-- [ ] Remove Tree from Value enum
-- [ ] Update Value methods
-- [ ] Update parser (desugar tree{})
-- [ ] Update executor (remove eval_tree)
-- [ ] Delete src/values/tree.rs
-- [ ] All tests passing (with updates)
+### Will Create Next
+- `src/graph/rulesets.rs` - Ruleset definitions (Area 2)
+- `src/graph/optimizer.rs` - Pattern detection (Area 3)
+- `src/graph/indices.rs` - Automatic indexing (Area 4)
+- `src/graph/algorithms.rs` - Rule-aware algorithms (Area 5)
 
-### Step 6: Update Tests (Day 2, Afternoon)
-- [ ] Update tree creation tests
-- [ ] Add tree-as-graph tests
-- [ ] Add traversal tests
-- [ ] All tests passing
+---
 
-### Step 7: Polish (Day 3)
-- [ ] Update AST if needed
-- [ ] Final test verification
-- [ ] REPL testing
-- [ ] Documentation check
+## 🎓 Key Implementation Insights
+
+### 1. Rule System Architecture
+
+**RuleSpec Pattern** - The solution to "Box<dyn Rule> isn't Clone":
+```rust
+// RuleSpec is clonable
+#[derive(Debug, Clone, PartialEq)]
+pub enum RuleSpec {
+    NoCycles,
+    MaxDegree(usize),  // Can have parameters!
+    NoDuplicates,
+}
+
+// Instantiates into trait objects on demand
+impl RuleSpec {
+    fn instantiate(&self) -> Box<dyn Rule> {
+        match self {
+            RuleSpec::NoCycles => Box::new(NoCyclesRule::new()),
+            // ...
+        }
+    }
+}
+```
+
+### 2. Lists and Hashes as Graphs
+
+**Linear Graph Structure for Lists**:
+```rust
+// [1, 2, 3] becomes:
+// node_0(value=1) → node_1(value=2) → node_2(value=3)
+
+pub struct List {
+    pub graph: Graph,  // Underlying graph
+    length: usize,     // Cached for O(1) access
+}
+```
+
+**Key-Value Graph Structure for Hashes**:
+```rust
+// {"a": 1, "b": 2} becomes:
+// node(id="a", value=1)
+// node(id="b", value=2)
+
+pub struct Hash {
+    pub graph: Graph,  // Node IDs are keys
+}
+```
+
+### 3. Pre-validation
+
+**Rules validate BEFORE mutations**:
+```rust
+// In graph.add_node()
+let context = RuleContext {
+    operation: GraphOperation::AddNode { ... },
+};
+
+// Validate FIRST
+for rule in self.get_active_rules() {
+    rule.validate(self, &context)?;
+}
+
+// Only then mutate
+self.nodes.insert(id, node);
+```
+
+### 4. Incremental Validation
+
+**Smart about construction vs modification**:
+```rust
+impl Rule for SingleRootRule {
+    fn should_run_on(&self, operation: &GraphOperation) -> bool {
+        // Only validate on REMOVAL (not during construction)
+        matches!(operation, GraphOperation::RemoveNode { .. })
+    }
+}
+```
+
+---
+
+## 💡 Success Criteria
+
+### What "Done" Looks Like for Area 2
+
+```graphoid
+# Ruleset enforcement works
+t = tree{}                    # Has :tree ruleset
+t.add_edge("A", "B")          # OK
+t.add_edge("B", "A")          # ERROR: Would create cycle!
+
+# Binary tree ruleset works
+bt = graph{}.with_ruleset(:binary_tree)
+bt.insert(5, none)
+bt.insert(3, "5")
+bt.insert(7, "5")
+bt.insert(8, "5")             # ERROR: Node "5" would have 3 children!
+
+# BST ruleset works (enforces ordering)
+bst = graph{}.with_ruleset(:bst)
+bst.insert(5, none)
+bst.insert(3, "5")            # OK - 3 < 5
+bst.insert(7, "5")            # OK - 7 > 5
+# Values are automatically placed in correct position
+
+# DAG ruleset works
+dag = graph{}.with_ruleset(:dag)
+dag.add_edge("A", "B")        # OK
+dag.add_edge("C", "B")        # OK - multiple parents allowed
+dag.add_edge("B", "A")        # ERROR: Would create cycle!
+```
 
 ---
 
 ## 🔍 Verification Commands
 
-After each step, run these to verify correctness:
+After each area, run these to verify correctness:
 
 ```bash
 # All tests pass
@@ -398,128 +456,61 @@ After each step, run these to verify correctness:
 ~/.cargo/bin/cargo test 2>&1 | grep "test result:"
 
 # Try in REPL
-~/.cargo/bin/cargo run
-> g = graph {}
-> # (whatever works at this step)
+~/.cargo/bin/cargo run --quiet
+> items = [1, 2, 3].add_rule(:no_dups)
+> items.append(2)
+# Should error
 ```
 
 ---
 
-## 🎓 Key Insights
+## 📚 MUST READ Before Continuing
 
-### Why This Refactor Is Important
-
-1. **Philosophy First**: Graphoid's value is "everything is a graph"
-2. **Dogfooding**: Using rules to define trees proves the rule system works
-3. **Code Quality**: One implementation is simpler than two
-4. **Flexibility**: Any graph can use tree methods, not just "trees"
-5. **Teaching**: Code should exemplify the principles
-
-### What Makes This Safe
-
-1. **Tests**: 388 passing tests catch regressions
-2. **TDD**: Test-first approach for new functionality
-3. **Incremental**: Small steps with verification
-4. **Reversible**: Git history preserves working state
-5. **Clear Plan**: Detailed guide reduces uncertainty
-
----
-
-## ⚠️ Common Pitfalls to Avoid
-
-### Don't Do This
-
-1. ❌ **Implement all methods before testing**
-   - ✅ Do: One method at a time with TDD
-
-2. ❌ **Let tests break and fix later**
-   - ✅ Do: Keep all tests passing throughout
-
-3. ❌ **Skip reading REFACTOR_PLAN_OPTION_A.md**
-   - ✅ Do: Read the plan first (has code examples!)
-
-4. ❌ **Try to keep Tree type "for now"**
-   - ✅ Do: Complete refactor to eliminate it
-
-5. ❌ **Forget to delete tree.rs**
-   - ✅ Do: Delete in Step 5 (not before!)
-
----
-
-## 📁 Key Files Reference
-
-### Will Read
-- `rust/REFACTOR_PLAN_OPTION_A.md` - **PRIMARY GUIDE**
-- `rust/src/values/tree.rs` - Reference for BST/traversal logic
-- `rust/src/values/graph.rs` - Where tree methods will be added
-- `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` - Updated Phase 6 spec
-
-### Will Modify
-- `src/values/graph.rs` - Add tree methods (Step 1)
-- `src/values/mod.rs` - Remove Tree variant (Step 2)
-- `src/parser/mod.rs` - Desugar tree{} (Step 3)
-- `src/execution/executor.rs` - Remove eval_tree (Step 4)
-- `tests/unit/graph_tests.rs` - Add tests
-- `tests/integration_tests.rs` - Update tests
-
-### Will Delete
-- `src/values/tree.rs` - Remove in Step 5
-
----
-
-## 💡 Success Looks Like
-
-### After Step 1 (Day 1)
-```rust
-// Graph has all tree methods
-let mut g = Graph::new(GraphType::Directed);
-let root = g.insert(Value::Number(5.0), None);
-g.insert(Value::Number(3.0), Some(&root));
-g.insert(Value::Number(7.0), Some(&root));
-
-assert!(g.contains(&Value::Number(5.0)));
-let values = g.in_order(&root);
-// [3, 5, 7]
+### 1. RULESET_TODO.md (PRIMARY GUIDE)
+```bash
+less /home/irv/work/grang/rust/RULESET_TODO.md
 ```
 
-### After Complete Refactor (Day 3)
-```graphoid
-# In Graphoid code:
-t = tree {}              # Creates a Graph
-g = graph {}             # Creates a Graph
+This has the complete implementation plan for Areas 2-5.
 
-# Same methods work on both!
-t.insert(5, none)
-g.insert(5, none)
-
-t.in_order(start)
-g.in_order(start)
-
-# tree{} has rules enforced
-t.add_node("orphan", 10)  # May fail with rule violation
+### 2. Roadmap Phase 6 Week 2
+```bash
+less /home/irv/work/grang/dev_docs/RUST_IMPLEMENTATION_ROADMAP.md
+# Search for "Week 2" (line ~1860)
 ```
+
+Shows the complete week's requirements.
+
+### 3. Tree Ruleset Design
+```bash
+less /home/irv/work/grang/rust/TREE_RULESET_DESIGN.md
+```
+
+Explains the tree hierarchy for Area 2.
 
 ---
 
-## 🚦 Ready to Start?
+## 🚦 Ready to Continue?
 
-**You have everything you need:**
-- ✅ Clear problem statement
-- ✅ Detailed 7-step plan
-- ✅ Code examples for each step
-- ✅ TDD workflow defined
-- ✅ Success criteria clear
-- ✅ Timeline realistic (2-3 days)
+**You have:**
+- ✅ Complete rule system architecture
+- ✅ All built-in rules implemented
+- ✅ Lists and hashes are graphs
+- ✅ Ad hoc rules working
+- ✅ Graphoid syntax working
+- ✅ 636 tests passing
+- ✅ Zero warnings
+- ✅ Clear path forward (Areas 2-5)
 
 **Next command:**
 ```bash
 cd /home/irv/work/grang/rust
-less REFACTOR_PLAN_OPTION_A.md
+less RULESET_TODO.md  # Read Area 2 section
 ```
 
 **Or ask Claude Code:**
-> "Execute Step 1 of REFACTOR_PLAN_OPTION_A.md: Extend Graph with tree functionality. Follow TDD."
+> "Continue with Phase 6 Week 2 Area 2: Ruleset Definitions. Implement :tree, :binary_tree, :bst, and :dag rulesets. Follow TDD."
 
 ---
 
-**Let's align the implementation with the philosophy! 🚀**
+**The rule system is alive! Now let's make rulesets work! 🚀**

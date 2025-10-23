@@ -1872,6 +1872,25 @@ fn test_bfs_dfs_traversal() {
    - Built-in rulesets: `:tree` (no_cycles, single_root, connected)
    - Rule validation on mutations
    - Rule metadata for optimizer
+   - **Rule Severity System**:
+     - `RuleSeverity` enum: `Silent`, `Warning` (default), `Error`
+     - All violations are REJECTED (operation prevented)
+     - Severity controls notification only, not enforcement
+     - Syntax: `graph.add_rule(:no_cycles, :error_on_violation)` for strict mode
+     - Default is `Warning` (user-friendly: reject + log)
+   - **Retroactive Cleaning Policies**:
+     - When adding a rule to existing data, handle existing violations
+     - `RetroactivePolicy::Clean` (default) - Try to fix violations automatically
+     - `RetroactivePolicy::Warn` - Keep data, warn about violations
+     - `RetroactivePolicy::Enforce` - Error if violations exist
+     - `RetroactivePolicy::Ignore` - Don't check existing data
+     - If cleaning fails, reject the `add_rule()` operation itself
+   - **Cleaning Configuration Modes** (implemented in Phase 11 via configure blocks):
+     - `:strict` mode (default) - If automatic cleaning fails, reject `add_rule()` with warning
+     - `:any` mode - For ambiguous cleanings (e.g., which edge to remove from cycle), pick arbitrary solution (e.g., first edge encountered)
+     - `:ask` mode (future) - Interactive mode prompting user for cleaning decisions
+     - Configure syntax: `configure { rule_cleaning_mode: :any } { graph.add_rule(:no_cycles) }`
+     - Mode affects behavior when `clean()` method has multiple valid solutions
 
 2. **Tree Syntax Sugar** (parser/AST)
    - Parse `tree{}` as syntactic sugar for `graph{}.with_ruleset(:tree)`

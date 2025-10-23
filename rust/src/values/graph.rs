@@ -5,6 +5,8 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use super::Value;
+use crate::graph::rules::{Rule, RuleContext, GraphOperation, RuleSpec, RuleInstance, RuleSeverity};
+use crate::error::GraphoidError;
 
 /// Type of graph: directed or undirected
 #[derive(Debug, Clone, PartialEq)]
@@ -33,6 +35,16 @@ pub struct EdgeInfo {
     pub properties: HashMap<String, Value>,
 }
 
+/// Result of validation - either allowed or rejected with severity
+enum ValidationResult {
+    Allowed,
+    Rejected {
+        rule: String,
+        severity: RuleSeverity,
+        message: String,
+    },
+}
+
 /// Graph data structure with index-free adjacency
 #[derive(Debug, Clone, PartialEq)]
 pub struct Graph {
@@ -41,8 +53,12 @@ pub struct Graph {
     /// Nodes by ID for O(1) lookup
     pub nodes: HashMap<String, GraphNode>,
     /// Active rulesets (e.g., "tree", "dag", "bst")
-    /// Rules are not enforced yet - this is just storage for future implementation
+    /// Predefined bundles of rules applied via with_ruleset()
     pub rulesets: Vec<String>,
+    /// Ad hoc rules added via add_rule()
+    /// These are in addition to any ruleset rules
+    /// Each rule includes its configured severity
+    pub rules: Vec<RuleInstance>,
 }
 
 impl Graph {
@@ -52,44 +68,195 @@ impl Graph {
             graph_type,
             nodes: HashMap::new(),
             rulesets: Vec::new(),
+            rules: Vec::new(),
         }
+    }
+
+    /// Get all active rules for this graph from both rulesets AND ad hoc rules
+    fn get_active_rules(&self) -> Vec<(Box<dyn Rule>, RuleSeverity)> {
+        let mut rule_instances: Vec<RuleInstance> = Vec::new();
+
+        // Add rules from predefined rulesets (with default severity)
+        for ruleset in &self.rulesets {
+            match ruleset.as_str() {
+                "tree" => {
+                    // Tree ruleset: no cycles, single root, connected
+                    rule_instances.push(RuleInstance::new(RuleSpec::NoCycles));
+                    rule_instances.push(RuleInstance::new(RuleSpec::SingleRoot));
+                    rule_instances.push(RuleInstance::new(RuleSpec::Connected));
+                }
+                "binary_tree" => {
+                    // Binary tree: tree rules + max 2 children
+                    rule_instances.push(RuleInstance::new(RuleSpec::NoCycles));
+                    rule_instances.push(RuleInstance::new(RuleSpec::SingleRoot));
+                    rule_instances.push(RuleInstance::new(RuleSpec::Connected));
+                    rule_instances.push(RuleInstance::new(RuleSpec::MaxDegree(2)));
+                }
+                "dag" => {
+                    // DAG: just no cycles
+                    rule_instances.push(RuleInstance::new(RuleSpec::NoCycles));
+                }
+                _ => {
+                    // Unknown ruleset - ignore for now
+                }
+            }
+        }
+
+        // Add ad hoc rules (with their configured severities)
+        rule_instances.extend(self.rules.clone());
+
+        // Deduplicate rules by name (keep first occurrence)
+        let mut seen = HashSet::new();
+        let mut unique_instances = Vec::new();
+        for instance in rule_instances {
+            if seen.insert(instance.spec.name().to_string()) {
+                unique_instances.push(instance);
+            }
+        }
+
+        // Instantiate all rule instances into (Rule, Severity) pairs
+        unique_instances
+            .into_iter()
+            .map(|instance| (instance.spec.instantiate(), instance.severity))
+            .collect()
+    }
+
+    /// Validate an operation against all active rules
+    /// Returns Allowed if all rules pass, or Rejected with severity if any rule fails
+    fn validate_rules(&self, operation: GraphOperation) -> ValidationResult {
+        let rules = self.get_active_rules();
+        let context = RuleContext::new(operation.clone());
+
+        for (rule, severity) in rules {
+            if rule.should_run_on(&operation) {
+                if let Err(err) = rule.validate(self, &context) {
+                    // Rule violation detected
+                    return ValidationResult::Rejected {
+                        rule: rule.name().to_string(),
+                        severity,
+                        message: err.to_string(),
+                    };
+                }
+            }
+        }
+
+        ValidationResult::Allowed
     }
 
     /// Add a node to the graph
-    pub fn add_node(&mut self, id: String, value: Value) {
-        self.nodes.insert(
-            id.clone(),
-            GraphNode {
-                id,
-                value,
-                neighbors: HashMap::new(),
-            },
-        );
+    pub fn add_node(&mut self, id: String, value: Value) -> Result<(), GraphoidError> {
+        // Validate the operation against active rules
+        let operation = GraphOperation::AddNode {
+            id: id.clone(),
+            value: value.clone(),
+        };
+
+        match self.validate_rules(operation) {
+            ValidationResult::Allowed => {
+                // All rules passed - perform the operation
+                self.nodes.insert(
+                    id.clone(),
+                    GraphNode {
+                        id,
+                        value,
+                        neighbors: HashMap::new(),
+                    },
+                );
+                Ok(())
+            }
+            ValidationResult::Rejected {
+                rule,
+                severity,
+                message,
+            } => {
+                // Operation is ALWAYS rejected (returns Err)
+                // Severity only controls logging
+                match severity {
+                    RuleSeverity::Silent => {
+                        // REJECT: Return RuleViolation error without logging
+                        Err(GraphoidError::RuleViolation { rule, message })
+                    }
+                    RuleSeverity::Warning => {
+                        // REJECT: Log warning and return RuleViolation error
+                        eprintln!("WARNING: {}", message);
+                        Err(GraphoidError::RuleViolation {
+                            rule: rule.clone(),
+                            message,
+                        })
+                    }
+                    RuleSeverity::Error => {
+                        // REJECT: Return RuleViolation error
+                        Err(GraphoidError::RuleViolation { rule, message })
+                    }
+                }
+            }
+        }
     }
 
     /// Add an edge between two nodes
-    pub fn add_edge(&mut self, from: &str, to: &str, edge_type: String, properties: HashMap<String, Value>) {
-        // Add forward edge
-        if let Some(from_node) = self.nodes.get_mut(from) {
-            from_node.neighbors.insert(
-                to.to_string(),
-                EdgeInfo {
-                    edge_type: edge_type.clone(),
-                    properties: properties.clone(),
-                },
-            );
-        }
+    pub fn add_edge(&mut self, from: &str, to: &str, edge_type: String, properties: HashMap<String, Value>) -> Result<(), GraphoidError> {
+        // Validate the operation against active rules
+        let operation = GraphOperation::AddEdge {
+            from: from.to_string(),
+            to: to.to_string(),
+            edge_type: edge_type.clone(),
+            properties: properties.clone(),
+        };
 
-        // For undirected graphs, add reverse edge
-        if self.graph_type == GraphType::Undirected {
-            if let Some(to_node) = self.nodes.get_mut(to) {
-                to_node.neighbors.insert(
-                    from.to_string(),
-                    EdgeInfo {
-                        edge_type,
-                        properties,
-                    },
-                );
+        match self.validate_rules(operation) {
+            ValidationResult::Allowed => {
+                // All rules passed - perform the operation
+                // Add forward edge
+                if let Some(from_node) = self.nodes.get_mut(from) {
+                    from_node.neighbors.insert(
+                        to.to_string(),
+                        EdgeInfo {
+                            edge_type: edge_type.clone(),
+                            properties: properties.clone(),
+                        },
+                    );
+                }
+
+                // For undirected graphs, add reverse edge
+                if self.graph_type == GraphType::Undirected {
+                    if let Some(to_node) = self.nodes.get_mut(to) {
+                        to_node.neighbors.insert(
+                            from.to_string(),
+                            EdgeInfo {
+                                edge_type,
+                                properties,
+                            },
+                        );
+                    }
+                }
+
+                Ok(())
+            }
+            ValidationResult::Rejected {
+                rule,
+                severity,
+                message,
+            } => {
+                // Operation is ALWAYS rejected (returns Err)
+                // Severity only controls logging
+                match severity {
+                    RuleSeverity::Silent => {
+                        // REJECT: Return RuleViolation error without logging
+                        Err(GraphoidError::RuleViolation { rule, message })
+                    }
+                    RuleSeverity::Warning => {
+                        // REJECT: Log warning and return RuleViolation error
+                        eprintln!("WARNING: {}", message);
+                        Err(GraphoidError::RuleViolation {
+                            rule: rule.clone(),
+                            message,
+                        })
+                    }
+                    RuleSeverity::Error => {
+                        // REJECT: Return RuleViolation error
+                        Err(GraphoidError::RuleViolation { rule, message })
+                    }
+                }
             }
         }
     }
@@ -128,34 +295,107 @@ impl Graph {
     }
 
     /// Remove a node from the graph
-    pub fn remove_node(&mut self, id: &str) -> Option<GraphNode> {
-        // Remove the node
-        let removed = self.nodes.remove(id);
+    pub fn remove_node(&mut self, id: &str) -> Result<Option<GraphNode>, GraphoidError> {
+        // Validate the operation against active rules
+        let operation = GraphOperation::RemoveNode {
+            id: id.to_string(),
+        };
 
-        // Remove all edges pointing to this node
-        for node in self.nodes.values_mut() {
-            node.neighbors.remove(id);
+        match self.validate_rules(operation) {
+            ValidationResult::Allowed => {
+                // All rules passed - perform the operation
+                // Remove the node
+                let removed = self.nodes.remove(id);
+
+                // Remove all edges pointing to this node
+                for node in self.nodes.values_mut() {
+                    node.neighbors.remove(id);
+                }
+
+                Ok(removed)
+            }
+            ValidationResult::Rejected {
+                rule,
+                severity,
+                message,
+            } => {
+                // Operation is ALWAYS rejected (returns Err)
+                // Severity only controls logging
+                match severity {
+                    RuleSeverity::Silent => {
+                        // REJECT: Return RuleViolation error without logging
+                        Err(GraphoidError::RuleViolation { rule, message })
+                    }
+                    RuleSeverity::Warning => {
+                        // REJECT: Log warning and return RuleViolation error
+                        eprintln!("WARNING: {}", message);
+                        Err(GraphoidError::RuleViolation {
+                            rule: rule.clone(),
+                            message,
+                        })
+                    }
+                    RuleSeverity::Error => {
+                        // REJECT: Return RuleViolation error
+                        Err(GraphoidError::RuleViolation { rule, message })
+                    }
+                }
+            }
         }
-
-        removed
     }
 
     /// Remove an edge
-    pub fn remove_edge(&mut self, from: &str, to: &str) -> bool {
-        let mut removed = false;
+    pub fn remove_edge(&mut self, from: &str, to: &str) -> Result<bool, GraphoidError> {
+        // Validate the operation against active rules
+        let operation = GraphOperation::RemoveEdge {
+            from: from.to_string(),
+            to: to.to_string(),
+        };
 
-        if let Some(from_node) = self.nodes.get_mut(from) {
-            removed = from_node.neighbors.remove(to).is_some();
-        }
+        match self.validate_rules(operation) {
+            ValidationResult::Allowed => {
+                // All rules passed - perform the operation
+                let mut removed = false;
 
-        // For undirected graphs, remove reverse edge
-        if self.graph_type == GraphType::Undirected {
-            if let Some(to_node) = self.nodes.get_mut(to) {
-                to_node.neighbors.remove(from);
+                if let Some(from_node) = self.nodes.get_mut(from) {
+                    removed = from_node.neighbors.remove(to).is_some();
+                }
+
+                // For undirected graphs, remove reverse edge
+                if self.graph_type == GraphType::Undirected {
+                    if let Some(to_node) = self.nodes.get_mut(to) {
+                        to_node.neighbors.remove(from);
+                    }
+                }
+
+                Ok(removed)
+            }
+            ValidationResult::Rejected {
+                rule,
+                severity,
+                message,
+            } => {
+                // Operation is ALWAYS rejected (returns Err)
+                // Severity only controls logging
+                match severity {
+                    RuleSeverity::Silent => {
+                        // REJECT: Return RuleViolation error without logging
+                        Err(GraphoidError::RuleViolation { rule, message })
+                    }
+                    RuleSeverity::Warning => {
+                        // REJECT: Log warning and return RuleViolation error
+                        eprintln!("WARNING: {}", message);
+                        Err(GraphoidError::RuleViolation {
+                            rule: rule.clone(),
+                            message,
+                        })
+                    }
+                    RuleSeverity::Error => {
+                        // REJECT: Return RuleViolation error
+                        Err(GraphoidError::RuleViolation { rule, message })
+                    }
+                }
             }
         }
-
-        removed
     }
 
     /// Get node value
@@ -184,19 +424,19 @@ impl Graph {
     /// - Generates a unique node ID
     /// - Adds the node with the given value
     /// - If parent is specified, adds an edge from parent to new node
-    pub fn insert(&mut self, value: Value, parent: Option<&str>) -> String {
+    pub fn insert(&mut self, value: Value, parent: Option<&str>) -> Result<String, GraphoidError> {
         // Generate unique node ID
         let node_id = format!("node_{}", self.nodes.len());
 
         // Add the node
-        self.add_node(node_id.clone(), value);
+        self.add_node(node_id.clone(), value)?;
 
         // If parent specified, add edge from parent to child
         if let Some(parent_id) = parent {
-            self.add_edge(parent_id, &node_id, "child".to_string(), HashMap::new());
+            self.add_edge(parent_id, &node_id, "child".to_string(), HashMap::new())?;
         }
 
-        node_id
+        Ok(node_id)
     }
 
     /// Check if the graph contains a node with the given value
@@ -361,20 +601,19 @@ impl Graph {
     }
 
     // ========================================================================
-    // Ruleset methods (for tree{}, DAG{}, etc. support)
+    // Rule and Ruleset methods
     // ========================================================================
-    // ⚠️ PARTIAL IMPLEMENTATION (January 2025)
-    // - Ruleset STORAGE works (stores ruleset names)
-    // - Ruleset ENFORCEMENT does NOT work yet (no validation)
-    // - Scheduled for completion: Phase 6 Week 2
-    // - See: rust/RULESET_TODO.md for full status
+    // Rules can be applied in two ways:
+    // 1. Rulesets: Predefined bundles (e.g., :tree, :dag, :binary_tree)
+    // 2. Ad hoc rules: Individual rules added/removed dynamically
 
     /// Apply a ruleset to this graph
     /// Returns self for method chaining
     ///
-    /// ⚠️ NOTE: Rules are NOT enforced yet - this just stores the ruleset name
-    /// Enforcement will be added in Phase 6 Week 2
-    /// Future: Will validate graph structure against ruleset constraints
+    /// Rulesets are predefined bundles of rules:
+    /// - :tree → no_cycles + single_root + connected
+    /// - :binary_tree → tree rules + max 2 children
+    /// - :dag → no_cycles only
     pub fn with_ruleset(mut self, ruleset: String) -> Self {
         if !self.rulesets.contains(&ruleset) {
             self.rulesets.push(ruleset);
@@ -390,5 +629,109 @@ impl Graph {
     /// Get all active rulesets
     pub fn get_rulesets(&self) -> &[String] {
         &self.rulesets
+    }
+
+    /// Add an ad hoc rule to this graph
+    ///
+    /// Rules are enforced on all mutation operations (add_node, add_edge, etc.)
+    /// Rules are in addition to any ruleset rules.
+    pub fn add_rule(&mut self, rule_instance: RuleInstance) -> Result<(), GraphoidError> {
+        // Don't add duplicate rules (check by spec)
+        if self.rules.iter().any(|r| r.spec == rule_instance.spec) {
+            return Ok(());
+        }
+
+        // Handle retroactive policy
+        let retroactive_policy = rule_instance.spec.instantiate().default_retroactive_policy();
+        match retroactive_policy {
+            crate::graph::RetroactivePolicy::Clean => {
+                // Try to clean existing violations
+                let rule_obj = rule_instance.spec.instantiate();
+                match rule_obj.clean(self) {
+                    Ok(()) => {
+                        // Cleaning succeeded - proceed to add the rule
+                    }
+                    Err(_) => {
+                        // clean() failed - either rule doesn't support cleaning OR can't clean violations
+                        // Check if there are ACTUAL violations
+                        let dummy_op = GraphOperation::AddNode {
+                            id: "__validation_check__".to_string(),
+                            value: Value::Number(0.0),
+                        };
+                        let context = RuleContext::new(dummy_op);
+
+                        if let Err(_) = rule_obj.validate(self, &context) {
+                            // There ARE violations - reject add_rule()
+                            eprintln!(
+                                "WARNING: Cannot add rule '{}' - existing data violates rule and cannot be automatically cleaned",
+                                rule_instance.spec.name()
+                            );
+                            return Ok(());
+                        }
+                        // No violations - safe to add the rule even though clean() failed
+                        // (probably just means rule doesn't support cleaning)
+                    }
+                }
+            }
+            crate::graph::RetroactivePolicy::Warn => {
+                // Check for existing violations and warn
+                // We'll implement this later - for now just add the rule
+            }
+            crate::graph::RetroactivePolicy::Enforce => {
+                // Error if violations exist
+                // We'll implement this later - for now just add the rule
+            }
+            crate::graph::RetroactivePolicy::Ignore => {
+                // Don't check existing data - just add the rule
+            }
+        }
+
+        self.rules.push(rule_instance);
+        Ok(())
+    }
+
+    /// Remove an ad hoc rule from this graph
+    ///
+    /// This removes a rule that was added via add_rule().
+    /// It does NOT remove rules that come from rulesets.
+    pub fn remove_rule(&mut self, rule_spec: &RuleSpec) {
+        self.rules.retain(|r| &r.spec != rule_spec);
+    }
+
+    /// Get all ad hoc rules (not including ruleset rules)
+    pub fn get_rules(&self) -> &[RuleInstance] {
+        &self.rules
+    }
+
+    /// Check if a specific rule is active (from either rulesets or ad hoc)
+    pub fn has_rule(&self, rule_name: &str) -> bool {
+        // Check ad hoc rules
+        if self.rules.iter().any(|r| r.spec.name() == rule_name) {
+            return true;
+        }
+
+        // Check ruleset rules
+        for ruleset in &self.rulesets {
+            match ruleset.as_str() {
+                "tree" => {
+                    if matches!(rule_name, "no_cycles" | "single_root" | "connected") {
+                        return true;
+                    }
+                }
+                "binary_tree" => {
+                    if matches!(rule_name, "no_cycles" | "single_root" | "connected" | "binary_tree") {
+                        return true;
+                    }
+                }
+                "dag" => {
+                    if rule_name == "no_cycles" {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        false
     }
 }

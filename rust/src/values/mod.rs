@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
@@ -6,9 +5,13 @@ use crate::ast::Stmt;
 use crate::execution::Environment;
 
 pub mod graph;
+pub mod list;
+pub mod hash;
 // pub mod tree; // DELETED in Step 5 - trees are now graphs with rules
 
 pub use graph::{Graph, GraphType};
+pub use list::List;
+pub use hash::Hash;
 // Tree type removed - use graph{}.with_ruleset(:tree) instead
 
 /// A function value with its captured environment (closure).
@@ -32,7 +35,20 @@ impl PartialEq for Function {
     }
 }
 
+impl Eq for Function {}
+
+impl std::hash::Hash for Function {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Hash based on name and parameters only
+        self.name.hash(state);
+        self.params.hash(state);
+    }
+}
+
 /// Runtime value types in Graphoid.
+///
+/// IMPORTANT: List and Map are graphs internally.
+/// This means ALL collections have the full rule system available.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     /// Numeric value (64-bit floating point)
@@ -45,10 +61,10 @@ pub enum Value {
     None,
     /// Symbol literal (e.g., :symbol_name)
     Symbol(String),
-    /// List/array of values
-    List(Vec<Value>),
-    /// Map/dictionary with string keys
-    Map(HashMap<String, Value>),
+    /// List/array of values (backed by linear graph)
+    List(List),
+    /// Map/dictionary with string keys (backed by key-value graph)
+    Map(Hash),
     /// Function value (Phase 4)
     Function(Function),
     /// Graph value (Phase 6)
@@ -65,7 +81,7 @@ impl Value {
             Value::Number(n) => *n != 0.0,
             Value::String(s) => !s.is_empty(),
             Value::List(l) => !l.is_empty(),
-            Value::Map(m) => !m.is_empty(),
+            Value::Map(h) => !h.is_empty(),
             Value::Symbol(_) => true,
             Value::Function(_) => true, // Functions are always truthy
             Value::Graph(g) => g.node_count() > 0,
@@ -99,12 +115,12 @@ impl Value {
             Value::Boolean(b) => b.to_string(),
             Value::None => "none".to_string(),
             Value::Symbol(s) => format!(":{}", s),
-            Value::List(items) => {
-                let strs: Vec<String> = items.iter().map(|v| v.to_string_value()).collect();
+            Value::List(list) => {
+                let strs: Vec<String> = list.to_vec().iter().map(|v| v.to_string_value()).collect();
                 format!("[{}]", strs.join(", "))
             }
-            Value::Map(map) => {
-                let pairs: Vec<String> = map
+            Value::Map(hash) => {
+                let pairs: Vec<String> = hash.to_hashmap()
                     .iter()
                     .map(|(k, v)| format!("\"{}\": {}", k, v.to_string_value()))
                     .collect();
@@ -149,6 +165,7 @@ impl fmt::Display for Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_value_creation() {
@@ -176,8 +193,8 @@ mod tests {
         assert!(Value::String("hello".to_string()).is_truthy());
         assert!(!Value::String("".to_string()).is_truthy());
         assert!(Value::Symbol("test".to_string()).is_truthy());
-        assert!(Value::List(vec![Value::Number(1.0)]).is_truthy());
-        assert!(!Value::List(vec![]).is_truthy());
+        assert!(Value::List(List::from_vec(vec![Value::Number(1.0)])).is_truthy());
+        assert!(!Value::List(List::new()).is_truthy());
     }
 
     #[test]
@@ -208,21 +225,21 @@ mod tests {
         assert_eq!(Value::Boolean(true).type_name(), "bool");
         assert_eq!(Value::None.type_name(), "none");
         assert_eq!(Value::Symbol("test".to_string()).type_name(), "symbol");
-        assert_eq!(Value::List(vec![]).type_name(), "list");
-        assert_eq!(Value::Map(HashMap::new()).type_name(), "map");
+        assert_eq!(Value::List(List::new()).type_name(), "list");
+        assert_eq!(Value::Map(Hash::new()).type_name(), "map");
     }
 
     #[test]
     fn test_list_creation() {
-        let list = Value::List(vec![
+        let list = Value::List(List::from_vec(vec![
             Value::Number(1.0),
             Value::Number(2.0),
             Value::Number(3.0),
-        ]);
+        ]));
 
-        if let Value::List(items) = list {
-            assert_eq!(items.len(), 3);
-            assert_eq!(items[0], Value::Number(1.0));
+        if let Value::List(l) = list {
+            assert_eq!(l.len(), 3);
+            assert_eq!(l.get(0), Some(&Value::Number(1.0)));
         } else {
             panic!("Expected List variant");
         }
@@ -234,12 +251,12 @@ mod tests {
         map.insert("name".to_string(), Value::String("Alice".to_string()));
         map.insert("age".to_string(), Value::Number(30.0));
 
-        let map_val = Value::Map(map);
+        let map_val = Value::Map(Hash::from_hashmap(map));
 
-        if let Value::Map(m) = map_val {
-            assert_eq!(m.len(), 2);
-            assert_eq!(m.get("name"), Some(&Value::String("Alice".to_string())));
-            assert_eq!(m.get("age"), Some(&Value::Number(30.0)));
+        if let Value::Map(h) = map_val {
+            assert_eq!(h.len(), 2);
+            assert_eq!(h.get("name"), Some(&Value::String("Alice".to_string())));
+            assert_eq!(h.get("age"), Some(&Value::Number(30.0)));
         } else {
             panic!("Expected Map variant");
         }

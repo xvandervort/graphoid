@@ -1,7 +1,7 @@
 use graphoid::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Stmt, UnaryOp};
 use graphoid::error::SourcePosition;
 use graphoid::execution::Executor;
-use graphoid::values::Value;
+use graphoid::values::{Hash, List, Value};
 use std::collections::HashMap;
 
 // Helper function to create a dummy source position
@@ -711,7 +711,7 @@ fn test_eval_empty_list() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::List(vec![]));
+    assert_eq!(result, Value::List(List::from_vec(vec![])));
 }
 
 #[test]
@@ -738,11 +738,11 @@ fn test_eval_list_with_elements() {
     let result = executor.eval_expr(&expr).unwrap();
     assert_eq!(
         result,
-        Value::List(vec![
+        Value::List(List::from_vec(vec![
             Value::Number(1.0),
             Value::Number(2.0),
             Value::Number(3.0)
-        ])
+        ]))
     );
 }
 
@@ -755,7 +755,7 @@ fn test_eval_empty_map() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Map(HashMap::new()));
+    assert_eq!(result, Value::Map(Hash::from_hashmap(HashMap::new())));
 }
 
 #[test]
@@ -2180,7 +2180,7 @@ fn test_function_returning_list() {
     let result = executor.eval_expr(&call).unwrap();
     assert_eq!(
         result,
-        Value::List(vec![Value::Number(1.0), Value::Number(2.0)])
+        Value::List(List::from_vec(vec![Value::Number(1.0), Value::Number(2.0)]))
     );
 }
 
@@ -2706,11 +2706,11 @@ fn test_lambda_returning_list() {
     let result = executor.eval_expr(&call).unwrap();
     assert_eq!(
         result,
-        Value::List(vec![
+        Value::List(List::from_vec(vec![
             Value::Number(3.0),
             Value::Number(4.0),
             Value::Number(7.0)
-        ])
+        ]))
     );
 }
 
@@ -4612,9 +4612,9 @@ fn test_list_method_map() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(2.0));
-            assert_eq!(elements[1], Value::Number(4.0));
-            assert_eq!(elements[2], Value::Number(6.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(2.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(4.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(6.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4669,8 +4669,8 @@ fn test_list_method_filter() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 2);
-            assert_eq!(elements[0], Value::Number(2.0));
-            assert_eq!(elements[1], Value::Number(4.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(2.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(4.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4719,9 +4719,9 @@ fn test_list_method_each() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(1.0));
-            assert_eq!(elements[1], Value::Number(2.0));
-            assert_eq!(elements[2], Value::Number(3.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(1.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(2.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(3.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4768,8 +4768,8 @@ fn test_list_method_map_with_strings() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 2);
-            assert_eq!(elements[0], Value::String("hello!".to_string()));
-            assert_eq!(elements[1], Value::String("world!".to_string()));
+            assert_eq!(*elements.get(0).unwrap(), Value::String("hello!".to_string()));
+            assert_eq!(*elements.get(1).unwrap(), Value::String("world!".to_string()));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4819,8 +4819,8 @@ fn test_list_method_filter_greater_than() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 2);
-            assert_eq!(elements[0], Value::Number(15.0));
-            assert_eq!(elements[1], Value::Number(20.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(15.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(20.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4861,9 +4861,9 @@ fn test_list_method_map_with_named_transform_double() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(2.0));
-            assert_eq!(elements[1], Value::Number(4.0));
-            assert_eq!(elements[2], Value::Number(6.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(2.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(4.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(6.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4900,9 +4900,9 @@ fn test_list_method_map_with_named_transform_square() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(4.0));
-            assert_eq!(elements[1], Value::Number(9.0));
-            assert_eq!(elements[2], Value::Number(16.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(4.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(9.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(16.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4939,9 +4939,9 @@ fn test_list_method_map_with_named_transform_negate() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(-1.0));
-            assert_eq!(elements[1], Value::Number(2.0));
-            assert_eq!(elements[2], Value::Number(-3.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(-1.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(2.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(-3.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4985,9 +4985,9 @@ fn test_list_method_filter_with_named_predicate_even() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(2.0));
-            assert_eq!(elements[1], Value::Number(4.0));
-            assert_eq!(elements[2], Value::Number(6.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(2.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(4.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(6.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5026,8 +5026,8 @@ fn test_list_method_filter_with_named_predicate_positive() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 2);
-            assert_eq!(elements[0], Value::Number(1.0));
-            assert_eq!(elements[1], Value::Number(2.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(1.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(2.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5066,9 +5066,9 @@ fn test_list_method_filter_with_named_predicate_odd() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(1.0));
-            assert_eq!(elements[1], Value::Number(3.0));
-            assert_eq!(elements[2], Value::Number(5.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(1.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(3.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(5.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5124,9 +5124,9 @@ fn test_element_wise_add() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(5.0));
-            assert_eq!(elements[1], Value::Number(7.0));
-            assert_eq!(elements[2], Value::Number(9.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(5.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(7.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(9.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5178,9 +5178,9 @@ fn test_element_wise_multiply() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(20.0));
-            assert_eq!(elements[1], Value::Number(60.0));
-            assert_eq!(elements[2], Value::Number(120.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(20.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(60.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(120.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5217,9 +5217,9 @@ fn test_element_wise_scalar_broadcast() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(10.0));
-            assert_eq!(elements[1], Value::Number(20.0));
-            assert_eq!(elements[2], Value::Number(30.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(10.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(20.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(30.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5271,9 +5271,9 @@ fn test_element_wise_subtract() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(9.0));
-            assert_eq!(elements[1], Value::Number(18.0));
-            assert_eq!(elements[2], Value::Number(27.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(9.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(18.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(27.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5319,8 +5319,8 @@ fn test_list_method_slice_basic() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 2);
-            assert_eq!(elements[0], Value::Number(20.0));
-            assert_eq!(elements[1], Value::Number(30.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(20.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(30.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5362,9 +5362,9 @@ fn test_list_method_slice_from_start() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(10.0));
-            assert_eq!(elements[1], Value::Number(20.0));
-            assert_eq!(elements[2], Value::Number(30.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(10.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(20.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(30.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5406,9 +5406,9 @@ fn test_list_method_slice_to_end() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(elements[0], Value::Number(30.0));
-            assert_eq!(elements[1], Value::Number(40.0));
-            assert_eq!(elements[2], Value::Number(50.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(30.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(40.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::Number(50.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5450,8 +5450,8 @@ fn test_list_method_slice_negative_indices() {
     match result {
         Value::List(elements) => {
             assert_eq!(elements.len(), 2);
-            assert_eq!(elements[0], Value::Number(30.0));
-            assert_eq!(elements[1], Value::Number(40.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::Number(30.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::Number(40.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5498,7 +5498,7 @@ fn test_map_method_keys() {
         Value::List(elements) => {
             assert_eq!(elements.len(), 2);
             // Keys may be in any order, so check both are present
-            let keys: Vec<String> = elements.iter().filter_map(|v| {
+            let keys: Vec<String> = elements.to_vec().iter().filter_map(|v| {
                 if let Value::String(s) = v {
                     Some(s.clone())
                 } else {
@@ -5549,7 +5549,7 @@ fn test_map_method_values() {
         Value::List(elements) => {
             assert_eq!(elements.len(), 2);
             // Values may be in any order, so check both are present
-            let values: Vec<f64> = elements.iter().filter_map(|v| {
+            let values: Vec<f64> = elements.to_vec().iter().filter_map(|v| {
                 if let Value::Number(n) = v {
                     Some(*n)
                 } else {

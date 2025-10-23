@@ -1,7 +1,8 @@
 use crate::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Stmt, UnaryOp};
 use crate::error::{GraphoidError, Result};
 use crate::execution::Environment;
-use crate::values::{Function, Value};
+use crate::values::{Function, Value, List, Hash};
+use crate::graph::{RuleSpec, RuleInstance};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -25,6 +26,26 @@ impl Executor {
         Executor {
             env,
             call_stack: Vec::new(),
+        }
+    }
+
+    /// Convert a symbol name to a RuleSpec
+    fn symbol_to_rule_spec(symbol: &str, param: Option<f64>) -> Result<RuleSpec> {
+        match (symbol, param) {
+            ("no_cycles", None) => Ok(RuleSpec::NoCycles),
+            ("single_root", None) => Ok(RuleSpec::SingleRoot),
+            ("connected", None) => Ok(RuleSpec::Connected),
+            ("binary_tree", None) => Ok(RuleSpec::BinaryTree),
+            ("no_dups" | "no_duplicates", None) => Ok(RuleSpec::NoDuplicates),
+            ("max_degree", Some(n)) => Ok(RuleSpec::MaxDegree(n as usize)),
+            (name, None) => Err(GraphoidError::runtime(format!(
+                "Unknown rule: :{}",
+                name
+            ))),
+            (name, Some(_)) => Err(GraphoidError::runtime(format!(
+                "Rule :{} does not accept parameters",
+                name
+            ))),
         }
     }
 
@@ -177,7 +198,7 @@ impl Executor {
 
                 // Get the list of values to iterate over
                 let values = match iterable_value {
-                    Value::List(ref items) => items.clone(),
+                    Value::List(ref items) => items.to_vec(),
                     other => {
                         return Err(GraphoidError::type_error(
                             "list",
@@ -285,7 +306,7 @@ impl Executor {
         for elem in elements {
             values.push(self.eval_expr(elem)?);
         }
-        Ok(Value::List(values))
+        Ok(Value::List(List::from_vec(values)))
     }
 
     /// Evaluates a map expression.
@@ -295,7 +316,7 @@ impl Executor {
             let value = self.eval_expr(value_expr)?;
             map.insert(key.clone(), value);
         }
-        Ok(Value::Map(map))
+        Ok(Value::Map(Hash::from_hashmap(map)))
     }
 
     /// Evaluates a graph expression.
@@ -355,7 +376,7 @@ impl Executor {
         let index_value = self.eval_expr(index)?;
 
         match object_value {
-            Value::List(ref elements) => {
+            Value::List(ref list) => {
                 // Index must be a number for lists
                 let idx = match index_value {
                     Value::Number(n) => n,
@@ -373,24 +394,24 @@ impl Executor {
                 // Calculate actual index (handle negative indices)
                 let actual_index = if idx_int < 0 {
                     // Negative index: count from end
-                    let len = elements.len() as i64;
+                    let len = list.len() as i64;
                     len + idx_int
                 } else {
                     idx_int
                 };
 
                 // Check bounds
-                if actual_index < 0 || actual_index >= elements.len() as i64 {
+                if actual_index < 0 || actual_index >= list.len() as i64 {
                     return Err(GraphoidError::runtime(format!(
                         "List index out of bounds: index {} for list of length {}",
                         idx_int,
-                        elements.len()
+                        list.len()
                     )));
                 }
 
-                Ok(elements[actual_index as usize].clone())
+                Ok(list.get(actual_index as usize).unwrap().clone())
             }
-            Value::Map(ref map) => {
+            Value::Map(ref hash) => {
                 // Index must be a string for maps
                 let key = match index_value {
                     Value::String(s) => s,
@@ -403,7 +424,7 @@ impl Executor {
                 };
 
                 // Look up the key
-                match map.get(&key) {
+                match hash.get(&key) {
                     Some(value) => Ok(value.clone()),
                     None => Err(GraphoidError::runtime(format!(
                         "Map key not found: '{}'",
@@ -433,8 +454,8 @@ impl Executor {
 
         // Dispatch based on object type and method name
         match object_value {
-            Value::List(elements) => self.eval_list_method(&elements, method, &arg_values),
-            Value::Map(map) => self.eval_map_method(&map, method, &arg_values),
+            Value::List(list) => self.eval_list_method(&list, method, &arg_values),
+            Value::Map(hash) => self.eval_map_method(&hash, method, &arg_values),
             Value::Graph(graph) => self.eval_graph_method(graph, method, &arg_values),
             other => Err(GraphoidError::runtime(format!(
                 "Type '{}' does not have method '{}'",
@@ -445,7 +466,8 @@ impl Executor {
     }
 
     /// Evaluates a method call on a list.
-    fn eval_list_method(&mut self, elements: &[Value], method: &str, args: &[Value]) -> Result<Value> {
+    fn eval_list_method(&mut self, list: &List, method: &str, args: &[Value]) -> Result<Value> {
+        let elements = list.to_vec();
         match method {
             "size" => {
                 if !args.is_empty() {
@@ -454,7 +476,7 @@ impl Executor {
                         args.len()
                     )));
                 }
-                Ok(Value::Number(elements.len() as f64))
+                Ok(Value::Number(list.len() as f64))
             }
             "first" => {
                 if !args.is_empty() {
@@ -486,7 +508,7 @@ impl Executor {
                     )));
                 }
                 let search_value = &args[0];
-                for element in elements {
+                for element in &elements {
                     if element == search_value {
                         return Ok(Value::Boolean(true));
                     }
@@ -500,7 +522,7 @@ impl Executor {
                         args.len()
                     )));
                 }
-                Ok(Value::Boolean(elements.is_empty()))
+                Ok(Value::Boolean(list.is_empty()))
             }
             "map" => {
                 if args.len() != 1 {
@@ -515,21 +537,21 @@ impl Executor {
                     Value::Symbol(transform_name) => {
                         // Apply named transformation
                         let mut results = Vec::new();
-                        for element in elements {
+                        for element in &elements {
                             let result = self.apply_named_transformation(element, transform_name)?;
                             results.push(result);
                         }
-                        Ok(Value::List(results))
+                        Ok(Value::List(List::from_vec(results)))
                     }
                     Value::Function(func) => {
                         // Apply the function to each element
                         let mut results = Vec::new();
-                        for element in elements {
+                        for element in &elements {
                             // Call the function with this element
                             let result = self.call_function(func, &[element.clone()])?;
                             results.push(result);
                         }
-                        Ok(Value::List(results))
+                        Ok(Value::List(List::from_vec(results)))
                     }
                     other => {
                         return Err(GraphoidError::runtime(format!(
@@ -552,17 +574,17 @@ impl Executor {
                     Value::Symbol(predicate_name) => {
                         // Apply named predicate
                         let mut results = Vec::new();
-                        for element in elements {
+                        for element in &elements {
                             if self.apply_named_predicate(element, predicate_name)? {
                                 results.push(element.clone());
                             }
                         }
-                        Ok(Value::List(results))
+                        Ok(Value::List(List::from_vec(results)))
                     }
                     Value::Function(func) => {
                         // Filter elements based on predicate function
                         let mut results = Vec::new();
-                        for element in elements {
+                        for element in &elements {
                             // Call the function with this element
                             let result = self.call_function(func, &[element.clone()])?;
 
@@ -571,7 +593,7 @@ impl Executor {
                                 results.push(element.clone());
                             }
                         }
-                        Ok(Value::List(results))
+                        Ok(Value::List(List::from_vec(results)))
                     }
                     other => {
                         return Err(GraphoidError::runtime(format!(
@@ -601,13 +623,13 @@ impl Executor {
                 };
 
                 // Execute the function for each element (for side effects)
-                for element in elements {
+                for element in &elements {
                     // Call the function with this element, ignore result
                     let _ = self.call_function(func, &[element.clone()])?;
                 }
 
                 // Return the original list
-                Ok(Value::List(elements.to_vec()))
+                Ok(Value::List(list.clone()))
             }
             "slice" => {
                 if args.len() != 2 {
@@ -655,12 +677,111 @@ impl Executor {
 
                 // Ensure start <= end
                 if actual_start > actual_end {
-                    return Ok(Value::List(Vec::new()));
+                    return Ok(Value::List(List::new()));
                 }
 
                 // Extract slice
                 let slice = elements[actual_start as usize..actual_end as usize].to_vec();
-                Ok(Value::List(slice))
+                Ok(Value::List(List::from_vec(slice)))
+            }
+            "add_rule" => {
+                // add_rule(rule_symbol) or add_rule(rule_symbol, param)
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "add_rule() expects 1 or 2 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get rule symbol
+                let rule_symbol = match &args[0] {
+                    Value::Symbol(name) => name.as_str(),
+                    other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "add_rule() expects a symbol, got {}",
+                            other.type_name()
+                        )));
+                    }
+                };
+
+                // Get optional parameter
+                let param = if args.len() == 2 {
+                    match &args[1] {
+                        Value::Number(n) => Some(*n),
+                        other => {
+                            return Err(GraphoidError::runtime(format!(
+                                "add_rule() parameter must be a number, got {}",
+                                other.type_name()
+                            )));
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                // Convert to RuleSpec
+                let rule_spec = Self::symbol_to_rule_spec(rule_symbol, param)?;
+
+                // Clone list, add rule, return
+                let mut new_list = list.clone();
+                new_list.add_rule(RuleInstance::new(rule_spec))?;
+                Ok(Value::List(new_list))
+            }
+            "remove_rule" => {
+                // remove_rule(rule_symbol) or remove_rule(rule_symbol, param)
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "remove_rule() expects 1 or 2 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get rule symbol
+                let rule_symbol = match &args[0] {
+                    Value::Symbol(name) => name.as_str(),
+                    other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "remove_rule() expects a symbol, got {}",
+                            other.type_name()
+                        )));
+                    }
+                };
+
+                // Get optional parameter
+                let param = if args.len() == 2 {
+                    match &args[1] {
+                        Value::Number(n) => Some(*n),
+                        other => {
+                            return Err(GraphoidError::runtime(format!(
+                                "remove_rule() parameter must be a number, got {}",
+                                other.type_name()
+                            )));
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                // Convert to RuleSpec
+                let rule_spec = Self::symbol_to_rule_spec(rule_symbol, param)?;
+
+                // Clone list, remove rule, return
+                let mut new_list = list.clone();
+                new_list.remove_rule(&rule_spec);
+                Ok(Value::List(new_list))
+            }
+            "append" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "append() expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Clone list and append value (this will validate rules)
+                let mut new_list = list.clone();
+                new_list.append(args[0].clone())?;
+                Ok(Value::List(new_list))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "List does not have method '{}'",
@@ -670,7 +791,7 @@ impl Executor {
     }
 
     /// Evaluates a method call on a map.
-    fn eval_map_method(&mut self, map: &HashMap<String, Value>, method: &str, args: &[Value]) -> Result<Value> {
+    fn eval_map_method(&mut self, hash: &Hash, method: &str, args: &[Value]) -> Result<Value> {
         match method {
             "keys" => {
                 // Return list of all keys
@@ -679,10 +800,11 @@ impl Executor {
                         "keys() takes no arguments".to_string()
                     ));
                 }
-                let keys: Vec<Value> = map.keys()
+                let keys: Vec<Value> = hash.keys()
+                    .iter()
                     .map(|k| Value::String(k.clone()))
                     .collect();
-                Ok(Value::List(keys))
+                Ok(Value::List(List::from_vec(keys)))
             }
             "values" => {
                 // Return list of all values
@@ -691,8 +813,8 @@ impl Executor {
                         "values() takes no arguments".to_string()
                     ));
                 }
-                let values: Vec<Value> = map.values().cloned().collect();
-                Ok(Value::List(values))
+                let values: Vec<Value> = hash.values();
+                Ok(Value::List(List::from_vec(values)))
             }
             "has_key" => {
                 // Check if key exists
@@ -707,7 +829,7 @@ impl Executor {
                         "has_key() requires a string argument".to_string()
                     )),
                 };
-                Ok(Value::Boolean(map.contains_key(key)))
+                Ok(Value::Boolean(hash.contains_key(key)))
             }
             "size" => {
                 // Return number of entries
@@ -716,7 +838,93 @@ impl Executor {
                         "size() takes no arguments".to_string()
                     ));
                 }
-                Ok(Value::Number(map.len() as f64))
+                Ok(Value::Number(hash.len() as f64))
+            }
+            "add_rule" => {
+                // add_rule(rule_symbol) or add_rule(rule_symbol, param)
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "add_rule() expects 1 or 2 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get rule symbol
+                let rule_symbol = match &args[0] {
+                    Value::Symbol(name) => name.as_str(),
+                    other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "add_rule() expects a symbol, got {}",
+                            other.type_name()
+                        )));
+                    }
+                };
+
+                // Get optional parameter
+                let param = if args.len() == 2 {
+                    match &args[1] {
+                        Value::Number(n) => Some(*n),
+                        other => {
+                            return Err(GraphoidError::runtime(format!(
+                                "add_rule() parameter must be a number, got {}",
+                                other.type_name()
+                            )));
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                // Convert to RuleSpec
+                let rule_spec = Self::symbol_to_rule_spec(rule_symbol, param)?;
+
+                // Clone hash, add rule, return
+                let mut new_hash = hash.clone();
+                new_hash.add_rule(RuleInstance::new(rule_spec))?;
+                Ok(Value::Map(new_hash))
+            }
+            "remove_rule" => {
+                // remove_rule(rule_symbol) or remove_rule(rule_symbol, param)
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "remove_rule() expects 1 or 2 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get rule symbol
+                let rule_symbol = match &args[0] {
+                    Value::Symbol(name) => name.as_str(),
+                    other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "remove_rule() expects a symbol, got {}",
+                            other.type_name()
+                        )));
+                    }
+                };
+
+                // Get optional parameter
+                let param = if args.len() == 2 {
+                    match &args[1] {
+                        Value::Number(n) => Some(*n),
+                        other => {
+                            return Err(GraphoidError::runtime(format!(
+                                "remove_rule() parameter must be a number, got {}",
+                                other.type_name()
+                            )));
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                // Convert to RuleSpec
+                let rule_spec = Self::symbol_to_rule_spec(rule_symbol, param)?;
+
+                // Clone hash, remove rule, return
+                let mut new_hash = hash.clone();
+                new_hash.remove_rule(&rule_spec);
+                Ok(Value::Map(new_hash))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Map does not have method '{}'",
@@ -1032,7 +1240,10 @@ impl Executor {
     fn eval_element_wise(&mut self, left: Value, right: Value, base_op: BinaryOp) -> Result<Value> {
         match (left, right) {
             // List-List element-wise operation
-            (Value::List(left_elements), Value::List(right_elements)) => {
+            (Value::List(left_list), Value::List(right_list)) => {
+                let left_elements = left_list.to_vec();
+                let right_elements = right_list.to_vec();
+
                 // Check that lists have same length
                 if left_elements.len() != right_elements.len() {
                     return Err(GraphoidError::runtime(format!(
@@ -1048,25 +1259,27 @@ impl Executor {
                     let result = self.apply_scalar_op(left_elem.clone(), right_elem.clone(), &base_op)?;
                     results.push(result);
                 }
-                Ok(Value::List(results))
+                Ok(Value::List(List::from_vec(results)))
             }
             // List-Scalar element-wise operation (broadcast scalar)
-            (Value::List(elements), scalar) => {
+            (Value::List(list), scalar) => {
+                let elements = list.to_vec();
                 let mut results = Vec::new();
                 for elem in elements.iter() {
                     let result = self.apply_scalar_op(elem.clone(), scalar.clone(), &base_op)?;
                     results.push(result);
                 }
-                Ok(Value::List(results))
+                Ok(Value::List(List::from_vec(results)))
             }
             // Scalar-List element-wise operation (broadcast scalar)
-            (scalar, Value::List(elements)) => {
+            (scalar, Value::List(list)) => {
+                let elements = list.to_vec();
                 let mut results = Vec::new();
                 for elem in elements.iter() {
                     let result = self.apply_scalar_op(scalar.clone(), elem.clone(), &base_op)?;
                     results.push(result);
                 }
-                Ok(Value::List(results))
+                Ok(Value::List(List::from_vec(results)))
             }
             // Scalar-Scalar: not element-wise, error
             (left, right) => Err(GraphoidError::runtime(format!(
