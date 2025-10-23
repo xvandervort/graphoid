@@ -9,7 +9,7 @@ pub mod list;
 pub mod hash;
 // pub mod tree; // DELETED in Step 5 - trees are now graphs with rules
 
-pub use graph::{Graph, GraphType};
+pub use graph::{Graph, GraphType, ExecutionPlan};
 pub use list::List;
 pub use hash::Hash;
 // Tree type removed - use graph{}.with_ruleset(:tree) instead

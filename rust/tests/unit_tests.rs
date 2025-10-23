@@ -6,4 +6,5 @@ mod unit {
     pub mod executor_tests;
     pub mod graph_tests;
     pub mod auto_index_tests;
+    pub mod explain_tests;
 }

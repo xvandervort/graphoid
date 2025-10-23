@@ -143,3 +143,35 @@ fn test_stats_includes_edge_count() {
     assert!(stats.contains_key("edge_count"));
     assert_eq!(stats.get("edge_count").unwrap().as_u64().unwrap(), 1);
 }
+
+#[test]
+fn test_stats_includes_degree_distribution() {
+    let mut graph = Graph::new(GraphType::Directed);
+
+    // Create a graph with varied degrees
+    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("D".to_string(), Value::Number(4.0)).unwrap();
+
+    // A has degree 2 (out to B and C)
+    graph.add_edge("A", "B", "link".to_string(), HashMap::new()).unwrap();
+    graph.add_edge("A", "C", "link".to_string(), HashMap::new()).unwrap();
+
+    // B has degree 1 (out to D)
+    graph.add_edge("B", "D", "link".to_string(), HashMap::new()).unwrap();
+
+    let stats = graph.stats();
+
+    assert!(stats.contains_key("degree_distribution"));
+
+    let degree_dist = stats.get("degree_distribution").unwrap().as_object().unwrap();
+    assert!(degree_dist.contains_key("min"));
+    assert!(degree_dist.contains_key("max"));
+    assert!(degree_dist.contains_key("average"));
+
+    // D has degree 0, so min should be 0
+    assert_eq!(degree_dist.get("min").unwrap().as_u64().unwrap(), 0);
+    // A has the highest degree (2)
+    assert_eq!(degree_dist.get("max").unwrap().as_u64().unwrap(), 2);
+}

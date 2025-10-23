@@ -37,6 +37,70 @@ pub struct EdgeInfo {
     pub properties: HashMap<String, Value>,
 }
 
+/// Execution plan for graph operations
+///
+/// Shows what algorithm will be used, why, and estimated cost
+#[derive(Debug, Clone)]
+pub struct ExecutionPlan {
+    /// Name of the operation
+    pub operation: String,
+    /// Steps in the execution plan
+    pub steps: Vec<String>,
+    /// Estimated cost (number of operations)
+    pub estimated_cost: usize,
+    /// Rule optimizations applied
+    pub optimizations: Vec<String>,
+}
+
+impl ExecutionPlan {
+    /// Create a new execution plan
+    pub fn new(operation: String) -> Self {
+        ExecutionPlan {
+            operation,
+            steps: Vec::new(),
+            estimated_cost: 0,
+            optimizations: Vec::new(),
+        }
+    }
+
+    /// Add a step to the execution plan
+    pub fn add_step(&mut self, step: String) {
+        self.steps.push(step);
+    }
+
+    /// Add an optimization note
+    pub fn add_optimization(&mut self, optimization: String) {
+        self.optimizations.push(optimization);
+    }
+
+    /// Set the estimated cost
+    pub fn set_cost(&mut self, cost: usize) {
+        self.estimated_cost = cost;
+    }
+
+    /// Check if the plan shows an estimated cost
+    pub fn shows_estimated_cost(&self) -> bool {
+        self.estimated_cost > 0
+    }
+}
+
+impl std::fmt::Display for ExecutionPlan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Execution Plan: {}", self.operation)?;
+        for (i, step) in self.steps.iter().enumerate() {
+            writeln!(f, "  {}. {}", i + 1, step)?;
+        }
+        writeln!(f, "Estimated cost: {} operations", self.estimated_cost)?;
+        if !self.optimizations.is_empty() {
+            writeln!(f, "Optimizations applied:")?;
+            for opt in &self.optimizations {
+                writeln!(f, "  - {}", opt)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Result of validation - either allowed or rejected with severity
 enum ValidationResult {
     Allowed,
@@ -833,23 +897,143 @@ impl Graph {
         self.property_indices.insert(property.to_string(), index);
     }
 
-    /// Get statistics about auto-created indices
+    /// Get comprehensive statistics about the graph
     ///
-    /// Returns information about which properties have been indexed
+    /// Returns detailed information including:
+    /// - Node and edge counts
+    /// - Degree distribution (min, max, average)
+    /// - Auto-created indices
+    /// - Active rules and rulesets
     pub fn stats(&self) -> HashMap<String, serde_json::Value> {
         let mut stats = HashMap::new();
 
-        let auto_indices: Vec<String> = self.property_indices.keys().cloned().collect();
-        stats.insert("auto_indices".to_string(), serde_json::json!(auto_indices));
-
+        // Basic counts
         stats.insert("node_count".to_string(), serde_json::json!(self.nodes.len()));
         stats.insert("edge_count".to_string(), serde_json::json!(self.edge_count()));
 
+        // Degree distribution
+        let degrees = self.degree_distribution();
+        stats.insert("degree_distribution".to_string(), serde_json::json!(degrees));
+
+        // Auto-optimization info
+        let auto_indices: Vec<String> = self.property_indices.keys().cloned().collect();
+        stats.insert("auto_indices".to_string(), serde_json::json!(auto_indices));
+
+        // Auto-optimizations summary
+        let mut auto_opts = Vec::new();
+        for property in &auto_indices {
+            auto_opts.push(format!("{} indexed", property));
+        }
+        stats.insert("auto_optimizations".to_string(), serde_json::json!(auto_opts));
+
+        // Rules information
+        stats.insert("rulesets".to_string(), serde_json::json!(self.rulesets));
+        stats.insert("ad_hoc_rules".to_string(), serde_json::json!(self.rules.len()));
+
         stats
+    }
+
+    /// Calculate degree distribution statistics
+    fn degree_distribution(&self) -> HashMap<String, usize> {
+        let mut dist = HashMap::new();
+
+        if self.nodes.is_empty() {
+            dist.insert("min".to_string(), 0);
+            dist.insert("max".to_string(), 0);
+            dist.insert("average".to_string(), 0);
+            return dist;
+        }
+
+        let mut degrees: Vec<usize> = self.nodes.values()
+            .map(|node| node.neighbors.len())
+            .collect();
+
+        degrees.sort_unstable();
+
+        let min = *degrees.first().unwrap_or(&0);
+        let max = *degrees.last().unwrap_or(&0);
+        let sum: usize = degrees.iter().sum();
+        let avg = sum / degrees.len();
+
+        dist.insert("min".to_string(), min);
+        dist.insert("max".to_string(), max);
+        dist.insert("average".to_string(), avg);
+
+        dist
     }
 
     /// Check if a property has an auto-created index
     pub fn has_auto_index(&self, property: &str) -> bool {
         self.property_indices.contains_key(property)
+    }
+
+    // ========================================================================
+    // Explain: Show Execution Plans
+    // ========================================================================
+
+    /// Explain how a property lookup would be executed
+    ///
+    /// Shows whether an index exists, what algorithm will be used, and estimated cost
+    pub fn explain_find_property(&self, property: &str) -> ExecutionPlan {
+        let mut plan = ExecutionPlan::new(format!("find_nodes_by_property('{}')", property));
+
+        // Check if index exists
+        if self.has_auto_index(property) {
+            plan.add_step("Use property index (O(1) lookup)".to_string());
+            plan.add_optimization(format!("Property '{}' is indexed", property));
+            plan.set_cost(1); // O(1) hash lookup
+        } else {
+            plan.add_step("Linear scan through all nodes (O(n))".to_string());
+            let access_count = self.property_access_counts.get(property).unwrap_or(&0);
+            plan.add_step(format!(
+                "Access count: {}/{} (index created after {} accesses)",
+                access_count, self.auto_index_threshold, self.auto_index_threshold
+            ));
+            // O(n) linear scan - minimum cost of 1 even for empty graphs
+            plan.set_cost(self.nodes.len().max(1));
+        }
+
+        plan
+    }
+
+    /// Explain how a shortest path operation would be executed
+    ///
+    /// Shows which algorithm will be used based on active rules
+    pub fn explain_shortest_path(&self, from: &str, to: &str) -> ExecutionPlan {
+        let mut plan = ExecutionPlan::new(format!("shortest_path('{}', '{}')", from, to));
+
+        // Check for no_cycles rule (enables topological algorithms)
+        if self.has_rule("no_cycles") {
+            plan.add_step("Topological sort (DAG-optimized)".to_string());
+            plan.add_step(format!("BFS from '{}'", from));
+            plan.add_step("Path reconstruction".to_string());
+            plan.add_optimization("no_cycles → enabled topological algorithms".to_string());
+            plan.set_cost(self.nodes.len() + self.edge_count());
+        } else {
+            plan.add_step(format!("BFS from '{}'", from));
+            plan.add_step("Path reconstruction".to_string());
+            plan.set_cost(self.nodes.len() + self.edge_count());
+        }
+
+        plan
+    }
+
+    /// Explain how a BFS traversal would be executed
+    pub fn explain_bfs(&self, start: &str) -> ExecutionPlan {
+        let mut plan = ExecutionPlan::new(format!("bfs('{}')", start));
+
+        plan.add_step("Initialize queue with start node".to_string());
+        plan.add_step("Mark start node as visited".to_string());
+        plan.add_step("While queue not empty: dequeue, visit neighbors".to_string());
+        plan.add_step("Add unvisited neighbors to queue".to_string());
+
+        // Check for connected rule
+        if self.has_rule("connected") {
+            plan.add_optimization("connected → skip component check".to_string());
+        }
+
+        plan.set_cost(self.nodes.len() + self.edge_count());
+
+        plan
     }
 }
