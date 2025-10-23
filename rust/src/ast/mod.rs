@@ -124,6 +124,13 @@ pub enum Expr {
         position: SourcePosition,
     },
     // Tree variant removed in Step 7 - tree{} now desugars to graph{}.with_ruleset(:tree)
+    Conditional {
+        condition: Box<Expr>,
+        then_expr: Box<Expr>,
+        else_expr: Option<Box<Expr>>, // None for suffix if/unless
+        is_unless: bool,               // true for unless, false for if
+        position: SourcePosition,
+    },
 }
 
 impl Expr {
@@ -140,6 +147,7 @@ impl Expr {
             Expr::List { position, .. } => position,
             Expr::Map { position, .. } => position,
             Expr::Graph { position, .. } => position,
+            Expr::Conditional { position, .. } => position,
         }
     }
 }

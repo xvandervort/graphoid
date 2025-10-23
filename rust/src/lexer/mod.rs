@@ -600,6 +600,7 @@ impl Lexer {
             "bool" => TokenType::BoolType,
             "list" => TokenType::ListType,
             "map" => TokenType::MapType,
+            "hash" => TokenType::MapType,  // Alias for map
             "tree" => TokenType::TreeType,
             "graph" => TokenType::GraphType,
             "data" => TokenType::DataType,

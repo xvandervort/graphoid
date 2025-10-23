@@ -592,7 +592,55 @@ impl Parser {
     // Expression parsing with precedence climbing
     fn expression(&mut self) -> Result<Expr> {
         // TODO: Add lambda parsing
-        self.or_expression()
+        self.conditional_expression()
+    }
+
+    fn conditional_expression(&mut self) -> Result<Expr> {
+        // Parse the base expression
+        let expr = self.or_expression()?;
+
+        // Check for inline conditional (if-then-else or suffix if/unless)
+        if self.check(&TokenType::If) || self.check(&TokenType::Unless) {
+            let is_unless = self.check(&TokenType::Unless);
+            let if_position = self.peek().position();
+            self.advance(); // consume 'if' or 'unless'
+
+            // Parse condition
+            let condition = self.or_expression()?;
+
+            // Check for 'else' (if-then-else form)
+            if self.match_token(&TokenType::Else) {
+                if is_unless {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "'unless' cannot be used with 'else'".to_string(),
+                        position: if_position,
+                    });
+                }
+                // Parse else expression
+                let else_expr = self.or_expression()?;
+
+                // For if-then-else: `then_expr if condition else else_expr`
+                // expr is the then_expr
+                return Ok(Expr::Conditional {
+                    condition: Box::new(condition),
+                    then_expr: Box::new(expr),
+                    else_expr: Some(Box::new(else_expr)),
+                    is_unless: false,
+                    position: if_position,
+                });
+            } else {
+                // Suffix if/unless form (no else)
+                return Ok(Expr::Conditional {
+                    condition: Box::new(condition),
+                    then_expr: Box::new(expr),
+                    else_expr: None,
+                    is_unless,
+                    position: if_position,
+                });
+            }
+        }
+
+        Ok(expr)
     }
 
     fn or_expression(&mut self) -> Result<Expr> {
@@ -1048,7 +1096,64 @@ impl Parser {
             return Ok(Expr::Variable { name, position });
         }
 
-        // Lists
+        // Lists with optional type constraint: list<num>[] or just []
+        if self.match_token(&TokenType::ListType) {
+            // Parse optional type parameter: list<type>
+            if self.match_token(&TokenType::Less) {
+                // Parse the type constraint (but we'll ignore it for now - runtime checks only)
+                // Accept any identifier or type keyword as the type parameter
+                let is_valid_type = matches!(
+                    self.peek().token_type,
+                    TokenType::Identifier(_) | TokenType::NumType | TokenType::StringType |
+                    TokenType::BoolType | TokenType::ListType | TokenType::MapType |
+                    TokenType::GraphType | TokenType::TreeType
+                );
+
+                if !is_valid_type {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected type name after 'list<'".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
+                self.advance(); // consume type name
+
+                if !self.match_token(&TokenType::Greater) {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected '>' after type parameter".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
+            }
+
+            // Now parse the list literal
+            if !self.match_token(&TokenType::LeftBracket) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '[' after 'list' or 'list<type>'".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            let mut elements = Vec::new();
+            if !self.check(&TokenType::RightBracket) {
+                loop {
+                    elements.push(self.expression()?);
+                    if !self.match_token(&TokenType::Comma) {
+                        break;
+                    }
+                }
+            }
+
+            if !self.match_token(&TokenType::RightBracket) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected ']' after list elements".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            return Ok(Expr::List { elements, position });
+        }
+
+        // Lists without type: []
         if self.match_token(&TokenType::LeftBracket) {
             let mut elements = Vec::new();
 
@@ -1130,7 +1235,91 @@ impl Parser {
             });
         }
 
-        // Maps
+        // Maps with optional type constraint: hash<type>{} (note: hash is tokenized as MapType)
+        if self.match_token(&TokenType::MapType) {
+            // Parse optional type parameter: hash<type>
+            if self.match_token(&TokenType::Less) {
+                // Parse the type constraint (but we'll ignore it for now - runtime checks only)
+                // Accept any identifier or type keyword as the type parameter
+                let is_valid_type = matches!(
+                    self.peek().token_type,
+                    TokenType::Identifier(_) | TokenType::NumType | TokenType::StringType |
+                    TokenType::BoolType | TokenType::ListType | TokenType::MapType |
+                    TokenType::GraphType | TokenType::TreeType
+                );
+
+                if !is_valid_type {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected type name after 'hash<'".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
+                self.advance(); // consume type name
+
+                if !self.match_token(&TokenType::Greater) {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected '>' after type parameter".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
+            }
+
+            // Now parse the map literal
+            if !self.match_token(&TokenType::LeftBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '{' after 'hash' or 'hash<type>'".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            let mut entries = Vec::new();
+            if !self.check(&TokenType::RightBrace) {
+                loop {
+                    // Parse key (must be string or identifier)
+                    let key = if let TokenType::String(s) = &self.peek().token_type {
+                        let k = s.clone();
+                        self.advance();
+                        k
+                    } else if let TokenType::Identifier(id) = &self.peek().token_type {
+                        let k = id.clone();
+                        self.advance();
+                        k
+                    } else {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected string or identifier as map key".to_string(),
+                            position: self.peek().position(),
+                        });
+                    };
+
+                    // Expect ':'
+                    if !self.match_token(&TokenType::Colon) {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected ':' after map key".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+
+                    // Parse value
+                    let value = self.expression()?;
+                    entries.push((key, value));
+
+                    if !self.match_token(&TokenType::Comma) {
+                        break;
+                    }
+                }
+            }
+
+            if !self.match_token(&TokenType::RightBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '}' after map entries".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            return Ok(Expr::Map { entries, position });
+        }
+
+        // Maps without type: {}
         if self.match_token(&TokenType::LeftBrace) {
             let mut entries = Vec::new();
 

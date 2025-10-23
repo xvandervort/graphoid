@@ -69,6 +69,13 @@ impl Executor {
             Expr::MethodCall { object, method, args, .. } => self.eval_method_call(object, method, args),
             Expr::Graph { config, .. } => self.eval_graph(config),
             // Expr::Tree removed in Step 7 - tree{} now desugars to graph{}.with_ruleset(:tree) in parser
+            Expr::Conditional {
+                condition,
+                then_expr,
+                else_expr,
+                is_unless,
+                ..
+            } => self.eval_conditional(condition, then_expr, else_expr, *is_unless),
         }
     }
 
@@ -98,9 +105,68 @@ impl Executor {
                         }
                         Ok(None)
                     }
-                    _ => Err(GraphoidError::runtime(
-                        "Index assignment not yet supported".to_string(),
-                    )),
+                    AssignmentTarget::Index { object, index } => {
+                        // Evaluate object and index
+                        let obj = self.eval_expr(object)?;
+                        let idx = self.eval_expr(index)?;
+
+                        // Handle different collection types
+                        match obj {
+                            Value::Graph(mut graph) => {
+                                // For graphs, index must be a string (node ID)
+                                let node_id = match idx {
+                                    Value::String(s) => s,
+                                    _ => return Err(GraphoidError::type_error("string", idx.type_name())),
+                                };
+
+                                // Add or update the node
+                                graph.add_node(node_id, val)?;
+
+                                // Update the graph in the environment
+                                // We need to get the variable name from the object expression
+                                if let Expr::Variable { name, .. } = object.as_ref() {
+                                    self.env.set(name, Value::Graph(graph))?;
+                                }
+                                Ok(None)
+                            }
+                            Value::Map(mut hash) => {
+                                // For maps, index must be a string (key)
+                                let key = match idx {
+                                    Value::String(s) => s,
+                                    _ => return Err(GraphoidError::type_error("string", idx.type_name())),
+                                };
+
+                                // Insert key-value pair
+                                hash.insert(key, val)?;
+
+                                // Update the map in the environment
+                                if let Expr::Variable { name, .. } = object.as_ref() {
+                                    self.env.set(name, Value::Map(hash))?;
+                                }
+                                Ok(None)
+                            }
+                            Value::List(mut list) => {
+                                // For lists, index must be a number
+                                let index_num = match idx {
+                                    Value::Number(n) => n as usize,
+                                    _ => return Err(GraphoidError::type_error("number", idx.type_name())),
+                                };
+
+                                // Update element at index
+                                list.set(index_num, val)?;
+
+                                // Update the list in the environment
+                                if let Expr::Variable { name, .. } = object.as_ref() {
+                                    self.env.set(name, Value::List(list))?;
+                                }
+                                Ok(None)
+                            }
+                            _ => Err(GraphoidError::runtime(format!(
+                                "Cannot use index assignment on type {}",
+                                obj.type_name()
+                            ))),
+                        }
+                    }
                 }
             }
             Stmt::FunctionDecl {
@@ -347,6 +413,44 @@ impl Executor {
         Ok(Value::Graph(Graph::new(graph_type)))
     }
 
+    /// Evaluates a conditional expression (inline if-then-else or suffix if/unless).
+    fn eval_conditional(
+        &mut self,
+        condition: &Expr,
+        then_expr: &Expr,
+        else_expr: &Option<Box<Expr>>,
+        is_unless: bool,
+    ) -> Result<Value> {
+        // Evaluate the condition
+        let condition_value = self.eval_expr(condition)?;
+
+        // Check if condition is truthy
+        let is_truthy = match condition_value {
+            Value::Boolean(b) => b,
+            Value::None => false,
+            Value::Number(n) => n != 0.0,
+            Value::String(ref s) => !s.is_empty(),
+            Value::List(ref l) => l.len() > 0,
+            Value::Map(ref h) => h.len() > 0,
+            Value::Graph(ref g) => g.node_count() > 0,
+            _ => true, // Everything else is truthy
+        };
+
+        // For unless, invert the condition
+        let should_execute = if is_unless { !is_truthy } else { is_truthy };
+
+        if should_execute {
+            // Execute then branch
+            self.eval_expr(then_expr)
+        } else {
+            // Execute else branch (or return none if suffix form)
+            match else_expr {
+                Some(else_e) => self.eval_expr(else_e),
+                None => Ok(Value::None),
+            }
+        }
+    }
+
     /// Evaluates a lambda expression.
     /// Creates an anonymous function that captures the current environment.
     fn eval_lambda(&self, params: &[String], body: &Expr) -> Result<Value> {
@@ -432,6 +536,27 @@ impl Executor {
                     ))),
                 }
             }
+            Value::Graph(ref graph) => {
+                // Index must be a string for graphs (node ID)
+                let node_id = match index_value {
+                    Value::String(s) => s,
+                    other => {
+                        return Err(GraphoidError::type_error(
+                            "string",
+                            other.type_name(),
+                        ));
+                    }
+                };
+
+                // Look up the node
+                match graph.get_node(&node_id) {
+                    Some(value) => Ok(value.clone()),
+                    None => Err(GraphoidError::runtime(format!(
+                        "Graph node not found: '{}'",
+                        node_id
+                    ))),
+                }
+            }
             other => {
                 Err(GraphoidError::runtime(format!(
                     "Cannot index value of type '{}'",
@@ -456,7 +581,7 @@ impl Executor {
         match object_value {
             Value::List(list) => self.eval_list_method(&list, method, &arg_values),
             Value::Map(hash) => self.eval_map_method(&hash, method, &arg_values),
-            Value::Graph(graph) => self.eval_graph_method(graph, method, &arg_values),
+            Value::Graph(graph) => self.eval_graph_method(graph, method, &arg_values, object),
             other => Err(GraphoidError::runtime(format!(
                 "Type '{}' does not have method '{}'",
                 other.type_name(),
@@ -934,8 +1059,149 @@ impl Executor {
     }
 
     /// Evaluates a method call on a graph.
-    fn eval_graph_method(&mut self, mut graph: crate::values::Graph, method: &str, args: &[Value]) -> Result<Value> {
+    fn eval_graph_method(&mut self, mut graph: crate::values::Graph, method: &str, args: &[Value], object_expr: &Expr) -> Result<Value> {
         match method {
+            "add_node" => {
+                // Add a node to the graph
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "add_node() expects 2 arguments (node_id, value), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get node ID (must be string)
+                let node_id = match &args[0] {
+                    Value::String(s) => s.clone(),
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                // Get node value
+                let node_value = args[1].clone();
+
+                // Add the node
+                graph.add_node(node_id, node_value)?;
+
+                // Update graph in environment
+                if let Expr::Variable { name, .. } = object_expr {
+                    self.env.set(name, Value::Graph(graph))?;
+                }
+
+                Ok(Value::None)
+            }
+            "add_edge" => {
+                // Add an edge between two nodes
+                if args.len() < 2 || args.len() > 3 {
+                    return Err(GraphoidError::runtime(format!(
+                        "add_edge() expects 2-3 arguments (from, to, [edge_type]), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get from node ID
+                let from = match &args[0] {
+                    Value::String(s) => s.as_str(),
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                // Get to node ID
+                let to = match &args[1] {
+                    Value::String(s) => s.as_str(),
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                // Get optional edge type (default to "edge")
+                let edge_type = if args.len() == 3 {
+                    match &args[2] {
+                        Value::String(s) => s.clone(),
+                        other => {
+                            return Err(GraphoidError::type_error("string", other.type_name()));
+                        }
+                    }
+                } else {
+                    "edge".to_string()
+                };
+
+                // Add the edge with empty properties
+                use std::collections::HashMap;
+                let properties = HashMap::new();
+                graph.add_edge(from, to, edge_type, properties)?;
+
+                // Update graph in environment
+                if let Expr::Variable { name, .. } = object_expr {
+                    self.env.set(name, Value::Graph(graph))?;
+                }
+
+                Ok(Value::None)
+            }
+            "remove_node" => {
+                // Remove a node from the graph
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "remove_node() expects 1 argument (node_id), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get node ID
+                let node_id = match &args[0] {
+                    Value::String(s) => s.as_str(),
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                // Remove the node
+                graph.remove_node(node_id)?;
+
+                // Update graph in environment
+                if let Expr::Variable { name, .. } = object_expr {
+                    self.env.set(name, Value::Graph(graph))?;
+                }
+
+                Ok(Value::None)
+            }
+            "remove_edge" => {
+                // Remove an edge from the graph
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "remove_edge() expects 2 arguments (from, to), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get from node ID
+                let from = match &args[0] {
+                    Value::String(s) => s.as_str(),
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                // Get to node ID
+                let to = match &args[1] {
+                    Value::String(s) => s.as_str(),
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                // Remove the edge
+                graph.remove_edge(from, to)?;
+
+                // Update graph in environment
+                if let Expr::Variable { name, .. } = object_expr {
+                    self.env.set(name, Value::Graph(graph))?;
+                }
+
+                Ok(Value::None)
+            }
             "with_ruleset" => {
                 // Apply a ruleset to the graph
                 if args.len() != 1 {
