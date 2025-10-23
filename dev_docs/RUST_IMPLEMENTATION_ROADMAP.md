@@ -2302,8 +2302,587 @@ See `dev_docs/FUTURE_FEATURES.md` for complete v2.0+ roadmap.
 - Transparent optimization
 - Clear error messages when rules violated
 
+---
 
-### Phase 7: Behavior System (5-7 days)
+## Phase 6.5: Foundational Gaps & Verification (5-7 days)
+
+**Duration**: 5-7 days
+**Goal**: Complete all missing foundational features from Phases 0-6 before proceeding to Phase 7
+**Philosophy**: "Solid foundations enable rapid progress" - Fix gaps now to avoid technical debt
+
+**CRITICAL**: Phase 7+ cannot begin until Phase 6.5 is complete. The behavior system, module system, and all subsequent phases depend on these foundational features being fully implemented.
+
+### Overview
+
+Gap analysis revealed several critical features specified in the language spec that are missing from Phases 0-6 implementation:
+
+1. **Parser completeness gaps** - Tokens exist but parsing/execution incomplete
+2. **Mutation operator convention** - Fundamental design pattern not implemented
+3. **Missing collection methods** - Spec-required methods absent
+4. **Graph querying levels** - Only partial implementation (Level 1 + partial Level 4)
+5. **Verification tasks** - Assumptions not validated
+
+This phase systematically addresses all gaps to create a solid foundation for Phase 7+.
+
+---
+
+### Area 1: Verification & Validation (Day 1)
+
+**Goal**: Verify that existing implementations match architectural assumptions
+
+#### Tasks
+
+1. **Verify Graph-Backed Collections** (`tests/integration/architecture_verification.rs`)
+   - Write tests confirming `List` uses graph internally (src/values/list.rs)
+   - Write tests confirming `Hash` uses graph internally (src/values/hash.rs)
+   - Verify graph operations accessible through collection methods
+   - Document actual architecture vs assumed architecture
+
+2. **Verify Tree Syntax Sugar** (`tests/unit/parser_tests.rs`)
+   - Test that `tree{}` parses to `graph{}.with_ruleset(:tree)`
+   - Test that `tree<num>{}` parses to `graph<num>{}.with_ruleset(:tree)`
+   - Verify no separate Tree type exists in runtime
+   - Test tree operations work via graph operations
+
+3. **Verify Graph Indexing** (`tests/unit/graph_tests.rs`)
+   - Test `graph["node_id"]` returns node value
+   - Test `graph["node_id"] = value` adds/updates node
+   - Verify consistency with hash/list indexing syntax
+   - Test error handling for missing nodes
+
+4. **Verify NO_GENERICS_POLICY Enforcement** (`tests/unit/parser_tests.rs`)
+   - Test parser rejects `hash<string, num>` (multiple params)
+   - Test parser rejects `fn process<T>(x: T)` (generic functions)
+   - Test parser rejects `list<list<num>>` (nested constraints)
+   - Test parser accepts `list<num>`, `hash<string>` (single param)
+   - Verify error messages reference NO_GENERICS_POLICY.md
+
+5. **Document Verification Results** (`rust/PHASE_6_5_VERIFICATION_REPORT.md`)
+   - Create report of all verification findings
+   - List confirmed behaviors
+   - List discrepancies found
+   - Recommendations for fixes
+
+#### Tests (Area 1)
+
+Minimum **15 tests**:
+- 3 tests for graph-backed lists
+- 3 tests for graph-backed hashes
+- 3 tests for tree syntax sugar
+- 3 tests for graph indexing
+- 3 tests for NO_GENERICS_POLICY enforcement
+
+#### Acceptance Criteria (Area 1)
+
+- ✅ All architectural assumptions verified or corrected
+- ✅ Verification report documents findings
+- ✅ Any discrepancies have filed issues or immediate fixes
+- ✅ 15+ verification tests passing
+- ✅ Zero compiler warnings
+
+---
+
+### Area 2: Parser Completeness (Days 2-3)
+
+**Goal**: Complete parser/executor support for tokens that lexer already recognizes
+
+#### Tasks
+
+1. **Inline Conditionals** (`src/parser/expression.rs`, `src/execution/executor.rs`)
+
+   **Syntax to support**:
+   ```graphoid
+   # if-then-else expression
+   status = if age >= 18 then "adult" else "minor"
+
+   # Suffix if (evaluates when true, otherwise none)
+   value = compute() if condition
+   result = x.round(2) if x > threshold
+
+   # Suffix unless (evaluates when false, otherwise none)
+   message = "OK" unless error_occurred
+   status = "active" unless paused
+   ```
+
+   **Implementation**:
+   - Add `parse_inline_conditional()` to parser
+   - Add `IfThenElse` AST node with condition, then_expr, else_expr
+   - Add `SuffixIf` and `SuffixUnless` AST nodes
+   - Implement execution in executor
+   - Handle none return values for suffix forms
+
+   **Tests**: 10+ tests covering:
+   - Simple if-then-else
+   - Nested inline conditionals
+   - Suffix if with various expressions
+   - Suffix unless with various expressions
+   - Edge cases (none values, type mismatches)
+
+2. **Element-Wise Operations** (`src/parser/expression.rs`, `src/execution/executor.rs`)
+
+   **Syntax to support**:
+   ```graphoid
+   # Scalar operations
+   [1, 2, 3] .* 2        # [2, 4, 6]
+   [1, 2, 3] .+ 10       # [11, 12, 13]
+   [10, 20, 30] ./ 5     # [2, 4, 6]
+
+   # Vector operations (zip)
+   [1, 2, 3] .+ [4, 5, 6]    # [5, 7, 9]
+   [2, 3, 4] .^ [2, 2, 2]    # [4, 9, 16]
+
+   # Comparisons (returns list of bools)
+   [10, 20, 30] .> 15        # [false, true, true]
+   ```
+
+   **Implementation**:
+   - Parser already recognizes `.+`, `.*`, `./`, `.//`, `.%`, `.^` tokens
+   - Add `parse_element_wise_operation()` handling
+   - Add `ElementWiseOp` AST node with operator, left, right
+   - Implement in executor:
+     - Scalar case: Apply op to each element
+     - Vector case: Zip lists, apply pairwise
+     - Handle length mismatch (use shorter length)
+   - Return new list (immutable operation)
+
+   **Tests**: 15+ tests covering:
+   - All operators with scalars
+   - All operators with vectors
+   - Comparison operators
+   - Length mismatches
+   - Type errors
+   - Chaining element-wise ops
+
+3. **Integer Division** (`src/parser/expression.rs`, `src/execution/executor.rs`)
+
+   **Syntax to support**:
+   ```graphoid
+   10 // 3      # 3 (not 3.333...)
+   -10 // 3     # -3 (truncates toward zero)
+   10.5 // 2    # 5 (works on floats)
+   ```
+
+   **Implementation**:
+   - Parser already recognizes `//` token
+   - Add handling in `parse_binary_op()`
+   - Implement in executor: `(a / b).trunc()` (truncate toward zero)
+   - Ensure precedence matches `/` operator
+
+   **Tests**: 5+ tests covering:
+   - Positive integers
+   - Negative integers
+   - Float operands
+   - Edge cases (division by zero, very large numbers)
+
+4. **Optional Parentheses for Zero-Arg Methods** (`src/parser/expression.rs`)
+
+   **Syntax to support**:
+   ```graphoid
+   # Both should work
+   count = items.size()
+   count = items.size
+
+   # But multi-arg always needs parens
+   items.insert(0, value)    # OK
+   items.insert 0, value     # ERROR
+   ```
+
+   **Implementation**:
+   - When parsing method call, check if `(` follows
+   - If no `(` and method is known zero-arg, treat as call with no args
+   - Requires method signature lookup or runtime checking
+   - May defer to Phase 8 if too complex (not critical)
+
+   **Tests**: 5+ tests (if implemented in this phase)
+
+#### Acceptance Criteria (Area 2)
+
+- ✅ Inline conditionals fully functional (if-then-else, suffix if/unless)
+- ✅ Element-wise operators work for all arithmetic/comparison ops
+- ✅ Integer division (`//`) returns integers, truncates toward zero
+- ✅ 30+ parser/executor tests passing
+- ✅ All tests work in both REPL and CLI modes (parity)
+- ✅ Zero compiler warnings
+
+---
+
+### Area 3: Mutation Operator Convention (Days 4-5)
+
+**Goal**: Implement dual-version methods (immutable and mutating) across all collections
+
+**CRITICAL DESIGN PATTERN**: This is a fundamental language design principle. Every transformative method must have two versions:
+- **Immutable** (no suffix): Returns new collection, original unchanged
+- **Mutating** (`!` suffix): Modifies in place, returns none
+
+#### Tasks
+
+1. **List Methods** (`src/values/list.rs`)
+
+   **Current state**: Only single versions exist (behavior varies)
+
+   **Implement dual versions**:
+   - `sort()` / `sort!()` - Sort elements
+   - `reverse()` / `reverse!()` - Reverse order
+   - `uniq()` / `uniq!()` - Remove duplicates
+   - `map(transform)` / `map!(transform)` - Transform elements
+   - `filter(predicate)` / `filter!(predicate)` - Keep matching
+   - `select(predicate)` / `select!(predicate)` - Alias for filter
+   - `reject(predicate)` / `reject!(predicate)` - Remove matching
+   - `compact()` / `compact!()` - Remove none values
+
+   **Implementation**:
+   - Immutable: Clone graph, apply transformation, return new List
+   - Mutating: Transform graph in place, return Value::None
+   - Ensure consistent behavior across all methods
+
+   **Tests**: 24 tests minimum (8 methods × 3 test cases each)
+
+2. **Hash Methods** (`src/values/hash.rs`)
+
+   **Note**: Hashes have fewer transformative methods (mostly mutation-by-nature)
+
+   **Implement dual versions** (if applicable):
+   - `freeze()` / `freeze!()` - Make immutable (deferred to freeze implementation)
+
+   **Tests**: Defer until freeze system implemented
+
+3. **Graph Methods** (`src/values/graph.rs`)
+
+   **Implement dual versions**:
+   - `freeze()` / `freeze!()` - Make immutable (deferred to freeze implementation)
+
+   **Tests**: Defer until freeze system implemented
+
+4. **Update Method Dispatch** (`src/execution/executor.rs`)
+   - Recognize `!` suffix in method names
+   - Route to correct implementation
+   - Ensure error messages distinguish between versions
+
+5. **Document Convention** (`rust/MUTATION_OPERATOR_CONVENTION.md`)
+   - Explain immutable vs mutating pattern
+   - List all dual-version methods
+   - Provide examples
+   - Guidelines for adding new methods
+
+#### Tests (Area 3)
+
+Minimum **30 tests**:
+- 24 tests for list methods (8 methods × 3 cases)
+- 3 tests for method dispatch with `!`
+- 3 tests for error messages
+
+#### Acceptance Criteria (Area 3)
+
+- ✅ All list transformative methods have both versions
+- ✅ Immutable methods return new collection, original unchanged
+- ✅ Mutating methods modify in place, return none
+- ✅ Naming convention consistent (`method` / `method!`)
+- ✅ Method dispatch handles `!` suffix correctly
+- ✅ 30+ tests passing
+- ✅ Convention documented
+- ✅ Zero compiler warnings
+
+---
+
+### Area 4: Missing Collection Methods (Day 6)
+
+**Goal**: Implement spec-required methods missing from collections
+
+#### Tasks
+
+1. **List Slicing with Step** (`src/values/list.rs`)
+   ```graphoid
+   items.slice(start, end, step)
+   [1,2,3,4,5,6].slice(0, 6, 2)  # [1, 3, 5]
+   ```
+
+   **Tests**: 5 tests
+
+2. **List Generators** (`src/values/list.rs`)
+   ```graphoid
+   # Range mode
+   list.generate(1, 10, 2)       # [1, 3, 5, 7, 9]
+
+   # Function mode
+   list.generate(1, 5, x => x * x)  # [1, 4, 9, 16, 25]
+
+   # upto helper
+   list.upto(5)                  # [0, 1, 2, 3, 4, 5]
+   ```
+
+   **Tests**: 8 tests
+
+3. **Additional Predicates** (`src/values/list.rs`)
+
+   Ensure all spec predicates are implemented:
+   - `:frozen` / `:unfrozen` (deferred to freeze system)
+   - Verify existing: `:positive`, `:negative`, `:even`, `:odd`, `:empty`, `:non_empty`, etc.
+
+   **Tests**: 3 tests for any missing predicates
+
+4. **Additional Transformations** (`src/values/list.rs`)
+
+   Ensure all spec transformations are implemented:
+   - Verify existing: `:double`, `:square`, `:negate`, `:increment`, `:decrement`, etc.
+
+   **Tests**: 3 tests for any missing transformations
+
+#### Acceptance Criteria (Area 4)
+
+- ✅ slice() supports step parameter
+- ✅ generate() works in range and function modes
+- ✅ upto() helper implemented
+- ✅ All spec predicates available
+- ✅ All spec transformations available
+- ✅ 15+ tests passing
+- ✅ Zero compiler warnings
+
+---
+
+### Area 5: Enhanced Graph Querying (Day 7)
+
+**Goal**: Complete missing levels of graph querying system
+
+**Current State**: Level 1 (basic navigation) + partial Level 4 (shortest_path only)
+
+**Note**: Full 5-level querying is a large feature. This area implements **critical gaps** only. Full implementation may require dedicated phase.
+
+#### Tasks
+
+1. **Level 4: Additional Path Algorithms** (`src/values/graph.rs`)
+
+   **Currently have**: `shortest_path(from, to)`, `topological_sort()`
+
+   **Implement critical missing algorithms**:
+   ```graphoid
+   graph.has_path(from, to)              # Boolean path existence
+   graph.distance(from, to)              # Shortest path length
+   graph.all_paths(from, to, max_len)    # All paths up to max length
+   ```
+
+   **Defer to later** (not critical for Phase 7):
+   - `dijkstra()` (weighted shortest path)
+   - `nodes_within()` (N-hop neighbors)
+
+   **Tests**: 12 tests (4 per new method)
+
+2. **Level 2: Method Chaining on Results** (Defer to Phase 7/11)
+
+   **Rationale**: Requires returning graph node collections with chainable methods. Complex feature, not blocking for Phase 7.
+
+   **Status**: Document as deferred feature
+
+3. **Level 3: Pattern-Based Querying** (Defer to Phase 11)
+
+   **Rationale**: Requires pattern matching DSL, parser extensions. Major feature deserving dedicated phase.
+
+   **Status**: Document as deferred feature
+
+4. **Level 5: Subgraph Operations** (Defer to Phase 11)
+
+   **Rationale**: Complex graph manipulation, not needed for behavior system.
+
+   **Status**: Document as deferred feature
+
+#### Acceptance Criteria (Area 5)
+
+- ✅ has_path() implemented and tested
+- ✅ distance() implemented and tested
+- ✅ all_paths() implemented and tested
+- ✅ 12+ tests passing
+- ✅ Deferred features documented in roadmap
+- ✅ Zero compiler warnings
+
+---
+
+### Complete Phase 6.5 Acceptance Criteria
+
+**Verification**:
+- ✅ All architectural assumptions validated
+- ✅ Verification report completed
+- ✅ 15+ verification tests passing
+
+**Parser Completeness**:
+- ✅ Inline conditionals functional
+- ✅ Element-wise operators functional
+- ✅ Integer division functional
+- ✅ 30+ parser tests passing
+
+**Mutation Convention**:
+- ✅ All transformative list methods have dual versions
+- ✅ Convention documented
+- ✅ 30+ mutation tests passing
+
+**Collection Methods**:
+- ✅ slice(start, end, step) implemented
+- ✅ generate() and upto() implemented
+- ✅ All spec predicates/transformations available
+- ✅ 15+ collection tests passing
+
+**Graph Querying**:
+- ✅ has_path(), distance(), all_paths() implemented
+- ✅ 12+ graph algorithm tests passing
+
+**Overall**:
+- ✅ 100+ new tests passing (15+30+30+15+12 = 102)
+- ✅ Total test count: ~800+ (704 current + ~100 new)
+- ✅ Zero compiler warnings
+- ✅ All tests pass in both REPL and CLI modes (parity maintained)
+- ✅ **Quality Gate passed** - Spec conformance verified
+- ✅ Ready to proceed to Phase 7
+
+---
+
+### Files to Create/Modify
+
+**New files**:
+- `tests/integration/architecture_verification.rs` - Verify graph-backed collections
+- `rust/PHASE_6_5_VERIFICATION_REPORT.md` - Document verification findings
+- `rust/MUTATION_OPERATOR_CONVENTION.md` - Document dual-version pattern
+
+**Modified files**:
+- `src/parser/expression.rs` - Inline conditionals, element-wise ops, integer division
+- `src/ast/nodes.rs` - New AST nodes for inline conditionals
+- `src/execution/executor.rs` - Execute new syntax features, method dispatch
+- `src/values/list.rs` - Dual-version methods, slice with step, generators
+- `src/values/graph.rs` - Additional path algorithms
+- `tests/unit/parser_tests.rs` - Parser verification and new syntax tests
+- `tests/unit/executor_tests.rs` - Execution tests for new features
+- `tests/unit/list_tests.rs` - Dual-version method tests
+- `tests/unit/graph_tests.rs` - New algorithm tests
+
+**Documentation updates**:
+- `rust/START_HERE_NEXT_SESSION.md` - Update with Phase 6.5 status
+- `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` - Mark Phase 6.5 complete when done
+
+---
+
+### Success Metrics
+
+**Code Quality**:
+- Zero compiler warnings
+- 80%+ test coverage
+- Idiomatic Rust
+- Clear, documented code
+
+**Functionality**:
+- All spec-required Phases 0-6 features implemented
+- Parser handles all declared syntax
+- Collections support dual-version methods
+- Graph querying at functional level
+
+**Testing**:
+- 100+ new tests passing
+- All tests work in REPL and CLI modes
+- No regressions in existing tests
+
+**Documentation**:
+- Verification report complete
+- Mutation convention documented
+- Deferred features clearly marked
+
+**Readiness**:
+- **Phase 7 can begin** with confidence
+- Solid foundation for behavior system
+- No known foundational gaps
+
+---
+
+### Why This Phase Is Critical
+
+**Without Phase 6.5**:
+- ❌ Behavior system built on incomplete foundation
+- ❌ Mutation convention inconsistent across language
+- ❌ Parser gaps create confusion and bugs
+- ❌ Missing methods require workarounds
+- ❌ Technical debt accumulates
+
+**With Phase 6.5**:
+- ✅ Solid foundation for all future phases
+- ✅ Consistent design patterns throughout
+- ✅ Complete parser coverage
+- ✅ Spec compliance for Phases 0-6
+- ✅ Confidence in architecture
+
+**Phase 7 (Behavior System) depends on**:
+- Mutation convention (behaviors may trigger transforms)
+- Complete collection methods (behaviors attach to methods)
+- Parser completeness (behavior syntax)
+- Verified architecture (behaviors integrate with graphs)
+
+**Timeline Impact**: 5-7 days investment now saves weeks of refactoring later.
+
+---
+
+### Quality Gate: Spec Conformance Check
+
+**CRITICAL**: Before proceeding to Phase 7, perform a comprehensive conformance check.
+
+#### Tasks
+
+1. **Re-Analyze Language Specification** (`PHASE_6_5_CONFORMANCE_REPORT.md`)
+   - Re-read LANGUAGE_SPECIFICATION.md thoroughly
+   - Cross-reference against Phase 6.5 implementation
+   - Identify any remaining gaps in Phases 0-6.5
+   - Document findings with severity levels:
+     - **BLOCKER**: Must fix before Phase 7
+     - **CRITICAL**: Should fix before Phase 7
+     - **IMPORTANT**: Can defer but document
+     - **NICE-TO-HAVE**: Defer to later phase
+
+2. **Verify All Phase 6.5 Deliverables**
+   - ✅ 100+ new tests passing
+   - ✅ ~800 total tests passing
+   - ✅ Zero compiler warnings
+   - ✅ REPL/CLI parity maintained
+   - ✅ Verification report complete
+   - ✅ Mutation convention documented
+   - ✅ All deferred features documented
+
+3. **Update Future Phases Based on Findings**
+   - Review Phase 7 roadmap section
+   - Update with any new requirements discovered
+   - Add detailed specification if missing
+   - Review Phases 8-14 for potential gaps
+   - Document dependencies between phases
+
+4. **Create Go/No-Go Decision**
+   - **GO**: All blockers resolved, foundation solid
+   - **NO-GO**: Critical gaps remain, continue Phase 6.5
+
+#### Acceptance Criteria (Quality Gate)
+
+- ✅ Conformance report completed and reviewed
+- ✅ No BLOCKER-level gaps remaining
+- ✅ All CRITICAL gaps either fixed or have mitigation plan
+- ✅ Future phases updated with new requirements
+- ✅ Phase 7 specification adequate for implementation
+- ✅ User approval to proceed to Phase 7
+
+#### Deliverables
+
+**Required before Phase 7**:
+1. `rust/PHASE_6_5_CONFORMANCE_REPORT.md` - Comprehensive spec analysis
+2. Updated roadmap sections for Phases 7+ (if needed)
+3. Phase 7 detailed specification (if currently inadequate)
+4. Go/No-Go decision documented in START_HERE_NEXT_SESSION.md
+
+#### Timeline
+
+**Duration**: 0.5-1 day
+- Analysis: 2-3 hours
+- Updates: 1-2 hours
+- Review and approval: 1 hour
+
+**Total Phase 6.5 Duration**: 5.5-8 days (including quality gate)
+
+---
+
+**Phase 6.5 is NOT complete until quality gate is passed.**
+
+---
+
+## Phase 7: Behavior System (5-7 days)
 - Standard behaviors
 - Custom function behaviors
 - Conditional behaviors
