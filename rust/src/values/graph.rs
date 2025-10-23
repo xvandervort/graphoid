@@ -587,6 +587,257 @@ impl Graph {
         result
     }
 
+    /// Find the shortest path between two nodes using BFS (or optimized algorithm if rules apply)
+    ///
+    /// Returns a vector of node IDs representing the path from `from` to `to`.
+    /// If no path exists, returns an empty vector.
+    ///
+    /// # Algorithm Selection (Rule-Aware)
+    ///
+    /// - If `no_cycles` rule is active: Uses topological-sort-based algorithm for DAGs
+    /// - Otherwise: Uses standard BFS algorithm
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use graphoid::values::{Graph, GraphType, Value};
+    /// use std::collections::HashMap;
+    ///
+    /// let mut g = Graph::new(GraphType::Directed);
+    /// g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    /// g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    /// g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    /// g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
+    /// g.add_edge("B", "C", "edge".to_string(), HashMap::new()).unwrap();
+    ///
+    /// let path = g.shortest_path("A", "C");
+    /// assert_eq!(path, vec!["A", "B", "C"]);
+    /// ```
+    pub fn shortest_path(&self, from: &str, to: &str) -> Vec<String> {
+        // Rule-aware algorithm selection
+        if self.has_rule("no_cycles") {
+            // Use topological-sort-based algorithm for DAGs
+            self.shortest_path_dag(from, to)
+        } else {
+            // Use standard BFS for general graphs
+            self.shortest_path_bfs(from, to)
+        }
+    }
+
+    /// Standard BFS-based shortest path (for general graphs)
+    fn shortest_path_bfs(&self, from: &str, to: &str) -> Vec<String> {
+        // Handle special cases
+        if !self.has_node(from) || !self.has_node(to) {
+            return Vec::new();
+        }
+
+        if from == to {
+            return vec![from.to_string()];
+        }
+
+        // BFS with parent tracking for path reconstruction
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        let mut parent: HashMap<String, String> = HashMap::new();
+
+        queue.push_back(from.to_string());
+        visited.insert(from.to_string());
+
+        while let Some(current) = queue.pop_front() {
+            // Found the target?
+            if current == to {
+                // Reconstruct path from parent pointers
+                let mut path = Vec::new();
+                let mut node = current.clone();
+
+                while node != from {
+                    path.push(node.clone());
+                    node = parent.get(&node).unwrap().clone();
+                }
+                path.push(from.to_string());
+                path.reverse();
+                return path;
+            }
+
+            // Explore neighbors
+            if let Some(node) = self.nodes.get(&current) {
+                for neighbor_id in node.neighbors.keys() {
+                    if !visited.contains(neighbor_id) {
+                        visited.insert(neighbor_id.clone());
+                        parent.insert(neighbor_id.clone(), current.clone());
+                        queue.push_back(neighbor_id.clone());
+                    }
+                }
+            }
+        }
+
+        // No path found
+        Vec::new()
+    }
+
+    /// Topological-sort-based shortest path (optimized for DAGs)
+    fn shortest_path_dag(&self, from: &str, to: &str) -> Vec<String> {
+        // Handle special cases
+        if !self.has_node(from) || !self.has_node(to) {
+            return Vec::new();
+        }
+
+        if from == to {
+            return vec![from.to_string()];
+        }
+
+        // Get topological ordering
+        let topo_order = self.topological_sort();
+        if topo_order.is_empty() {
+            // Graph has cycles - fall back to BFS
+            return self.shortest_path_bfs(from, to);
+        }
+
+        // Find positions in topological order
+        let from_pos = topo_order.iter().position(|n| n == from);
+        let to_pos = topo_order.iter().position(|n| n == to);
+
+        if from_pos.is_none() || to_pos.is_none() {
+            return Vec::new();
+        }
+
+        let from_idx = from_pos.unwrap();
+        let to_idx = to_pos.unwrap();
+
+        // If 'to' comes before 'from' in topological order, no path exists
+        if to_idx < from_idx {
+            return Vec::new();
+        }
+
+        // Use dynamic programming to find shortest path in DAG
+        // dist[node] = shortest distance from 'from' to 'node'
+        // parent[node] = previous node in shortest path
+        let mut dist: HashMap<String, usize> = HashMap::new();
+        let mut parent: HashMap<String, String> = HashMap::new();
+
+        dist.insert(from.to_string(), 0);
+
+        // Process nodes in topological order
+        for node_id in &topo_order[from_idx..=to_idx] {
+            if let Some(&current_dist) = dist.get(node_id) {
+                if let Some(node) = self.nodes.get(node_id) {
+                    for neighbor_id in node.neighbors.keys() {
+                        let new_dist = current_dist + 1;
+                        let neighbor_dist = dist.get(neighbor_id).copied().unwrap_or(usize::MAX);
+
+                        if new_dist < neighbor_dist {
+                            dist.insert(neighbor_id.clone(), new_dist);
+                            parent.insert(neighbor_id.clone(), node_id.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check if we reached the target
+        if !dist.contains_key(to) {
+            return Vec::new();
+        }
+
+        // Reconstruct path
+        let mut path = Vec::new();
+        let mut current = to.to_string();
+
+        while current != from {
+            path.push(current.clone());
+            if let Some(prev) = parent.get(&current) {
+                current = prev.clone();
+            } else {
+                // No path
+                return Vec::new();
+            }
+        }
+        path.push(from.to_string());
+        path.reverse();
+
+        path
+    }
+
+    /// Perform topological sort on the graph
+    ///
+    /// Returns a vector of node IDs in topological order.
+    /// Returns an empty vector if the graph contains cycles.
+    ///
+    /// Topological sort is only valid for Directed Acyclic Graphs (DAGs).
+    /// For graphs with cycles, this method returns an empty vector.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use graphoid::values::{Graph, GraphType, Value};
+    /// use std::collections::HashMap;
+    ///
+    /// let mut g = Graph::new(GraphType::Directed);
+    /// g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    /// g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    /// g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    /// g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
+    /// g.add_edge("B", "C", "edge".to_string(), HashMap::new()).unwrap();
+    ///
+    /// let sorted = g.topological_sort();
+    /// // A must come before B, B must come before C
+    /// assert_eq!(sorted, vec!["A", "B", "C"]);
+    /// ```
+    pub fn topological_sort(&self) -> Vec<String> {
+        if self.nodes.is_empty() {
+            return Vec::new();
+        }
+
+        // Kahn's algorithm for topological sort
+        // Calculate in-degree for each node
+        let mut in_degree: HashMap<String, usize> = HashMap::new();
+
+        // Initialize all nodes with in-degree 0
+        for node_id in self.nodes.keys() {
+            in_degree.insert(node_id.clone(), 0);
+        }
+
+        // Count incoming edges
+        for node in self.nodes.values() {
+            for neighbor_id in node.neighbors.keys() {
+                *in_degree.get_mut(neighbor_id).unwrap() += 1;
+            }
+        }
+
+        // Queue nodes with in-degree 0
+        let mut queue = VecDeque::new();
+        for (node_id, &degree) in &in_degree {
+            if degree == 0 {
+                queue.push_back(node_id.clone());
+            }
+        }
+
+        let mut result = Vec::new();
+
+        while let Some(node_id) = queue.pop_front() {
+            result.push(node_id.clone());
+
+            // Reduce in-degree of neighbors
+            if let Some(node) = self.nodes.get(&node_id) {
+                for neighbor_id in node.neighbors.keys() {
+                    let degree = in_degree.get_mut(neighbor_id).unwrap();
+                    *degree -= 1;
+
+                    if *degree == 0 {
+                        queue.push_back(neighbor_id.clone());
+                    }
+                }
+            }
+        }
+
+        // If we didn't process all nodes, there's a cycle
+        if result.len() != self.nodes.len() {
+            return Vec::new();
+        }
+
+        result
+    }
+
     /// In-order traversal (left, root, right) starting from a given node
     /// Assumes binary tree structure where first child is left, second is right
     /// Returns values in in-order

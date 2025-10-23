@@ -8,4 +8,5 @@ mod unit {
     pub mod auto_index_tests;
     pub mod explain_tests;
     pub mod ruleset_enforcement_tests;
+    pub mod algorithm_tests;
 }
