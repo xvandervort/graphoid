@@ -40,6 +40,9 @@ pub struct Graph {
     pub graph_type: GraphType,
     /// Nodes by ID for O(1) lookup
     pub nodes: HashMap<String, GraphNode>,
+    /// Active rulesets (e.g., "tree", "dag", "bst")
+    /// Rules are not enforced yet - this is just storage for future implementation
+    pub rulesets: Vec<String>,
 }
 
 impl Graph {
@@ -48,6 +51,7 @@ impl Graph {
         Graph {
             graph_type,
             nodes: HashMap::new(),
+            rulesets: Vec::new(),
         }
     }
 
@@ -354,5 +358,37 @@ impl Graph {
             // Process current node last
             result.push(node.value.clone());
         }
+    }
+
+    // ========================================================================
+    // Ruleset methods (for tree{}, DAG{}, etc. support)
+    // ========================================================================
+    // ⚠️ PARTIAL IMPLEMENTATION (January 2025)
+    // - Ruleset STORAGE works (stores ruleset names)
+    // - Ruleset ENFORCEMENT does NOT work yet (no validation)
+    // - Scheduled for completion: Phase 6 Week 2
+    // - See: rust/RULESET_TODO.md for full status
+
+    /// Apply a ruleset to this graph
+    /// Returns self for method chaining
+    ///
+    /// ⚠️ NOTE: Rules are NOT enforced yet - this just stores the ruleset name
+    /// Enforcement will be added in Phase 6 Week 2
+    /// Future: Will validate graph structure against ruleset constraints
+    pub fn with_ruleset(mut self, ruleset: String) -> Self {
+        if !self.rulesets.contains(&ruleset) {
+            self.rulesets.push(ruleset);
+        }
+        self
+    }
+
+    /// Check if graph has a specific ruleset applied
+    pub fn has_ruleset(&self, ruleset: &str) -> bool {
+        self.rulesets.contains(&ruleset.to_string())
+    }
+
+    /// Get all active rulesets
+    pub fn get_rulesets(&self) -> &[String] {
+        &self.rulesets
     }
 }

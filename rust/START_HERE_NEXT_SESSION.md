@@ -1,9 +1,17 @@
 # START HERE - Next Session Quick Start
 
 **Last Updated**: October 22, 2025
-**Current Status**: 🔧 REFACTOR REQUIRED - Option A Implementation
-**Tests Passing**: 388/388 (100%)
-**What's Next**: Execute refactor plan to align with philosophy
+**Current Status**: 🔧 REFACTOR IN PROGRESS - Option A Implementation
+**Tests Passing**: 397/397 (100%)
+**What's Next**: Continue with Step 3 - Update Parser
+
+**IMPORTANT DESIGN DECISION**: See `TREE_RULESET_DESIGN.md` for tree type hierarchy
+- `tree{}` = basic tree (not BST!)
+- `BinaryTree{}` and `BST{}` coming later
+
+**⚠️ PARTIAL IMPLEMENTATION**: Ruleset storage works, enforcement does NOT
+- See `RULESET_TODO.md` for what's missing
+- Rule enforcement scheduled for Phase 6 Week 2
 
 ---
 

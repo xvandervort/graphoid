@@ -438,9 +438,10 @@ impl Executor {
         }
 
         // Dispatch based on object type and method name
-        match &object_value {
-            Value::List(elements) => self.eval_list_method(elements, method, &arg_values),
-            Value::Map(map) => self.eval_map_method(map, method, &arg_values),
+        match object_value {
+            Value::List(elements) => self.eval_list_method(&elements, method, &arg_values),
+            Value::Map(map) => self.eval_map_method(&map, method, &arg_values),
+            Value::Graph(graph) => self.eval_graph_method(graph, method, &arg_values),
             other => Err(GraphoidError::runtime(format!(
                 "Type '{}' does not have method '{}'",
                 other.type_name(),
@@ -725,6 +726,61 @@ impl Executor {
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Map does not have method '{}'",
+                method
+            ))),
+        }
+    }
+
+    /// Evaluates a method call on a graph.
+    fn eval_graph_method(&mut self, mut graph: crate::values::Graph, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "with_ruleset" => {
+                // Apply a ruleset to the graph
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "with_ruleset() expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get the ruleset name from symbol argument
+                let ruleset_name = match &args[0] {
+                    Value::Symbol(name) => name.clone(),
+                    other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "with_ruleset() expects a symbol argument, got {}",
+                            other.type_name()
+                        )));
+                    }
+                };
+
+                // Apply the ruleset (currently just stores the name)
+                graph = graph.with_ruleset(ruleset_name);
+                Ok(Value::Graph(graph))
+            }
+            "has_ruleset" => {
+                // Check if graph has a specific ruleset
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "has_ruleset() expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let ruleset_name = match &args[0] {
+                    Value::Symbol(name) => name.as_str(),
+                    other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "has_ruleset() expects a symbol argument, got {}",
+                            other.type_name()
+                        )));
+                    }
+                };
+
+                Ok(Value::Boolean(graph.has_ruleset(ruleset_name)))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "Graph does not have method '{}'",
                 method
             ))),
         }

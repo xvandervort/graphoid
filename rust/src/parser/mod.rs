@@ -1092,7 +1092,8 @@ impl Parser {
             return Ok(Expr::Graph { config, position });
         }
 
-        // Trees: tree {}
+        // Trees: tree {} desugars to graph{}.with_ruleset(:tree)
+        // This implements Option A: trees are graphs with rules
         if self.match_token(&TokenType::TreeType) {
             if !self.match_token(&TokenType::LeftBrace) {
                 return Err(GraphoidError::SyntaxError {
@@ -1110,7 +1111,23 @@ impl Parser {
                 });
             }
 
-            return Ok(Expr::Tree { config, position });
+            // Desugar: tree{} → graph{}.with_ruleset(:tree)
+            let graph_expr = Expr::Graph {
+                config,
+                position: position.clone()
+            };
+
+            let symbol_expr = Expr::Literal {
+                value: crate::ast::LiteralValue::Symbol("tree".to_string()),
+                position: position.clone(),
+            };
+
+            return Ok(Expr::MethodCall {
+                object: Box::new(graph_expr),
+                method: "with_ruleset".to_string(),
+                args: vec![symbol_expr],
+                position,
+            });
         }
 
         // Maps

@@ -1,8 +1,12 @@
 # Session Summary - Documentation Refactor for Option A Philosophy
 
 **Date**: October 22, 2025
-**Session Type**: Design Review & Documentation Update
-**Status**: ✅ COMPLETE - All docs updated, ready for refactor implementation
+**Session Type**: Refactor Execution (Steps 1-2 Complete)
+**Status**: ✅ IN PROGRESS - Steps 1-2 done, Step 3 next
+
+**CRITICAL DESIGN DECISION**: See `TREE_RULESET_DESIGN.md` for tree hierarchy
+- `tree{}` = basic tree (not BST!)
+- `BinaryTree{}` and `BST{}` coming as future enhancements
 
 ---
 

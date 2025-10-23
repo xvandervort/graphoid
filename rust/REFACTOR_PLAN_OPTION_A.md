@@ -1,8 +1,19 @@
 # Refactor Plan: Option A - Pure Philosophy
 
 **Created**: October 22, 2025
-**Status**: REQUIRED - Current implementation violates philosophy
+**Status**: IN PROGRESS - Steps 1-2 complete
 **Estimated Time**: 2-3 days
+
+**CRITICAL DESIGN DECISION**: See `TREE_RULESET_DESIGN.md`
+- `tree{}` desugars to `:tree` ruleset (basic tree, NOT BST)
+- `BinaryTree{}` → `:binary_tree` (future)
+- `BST{}` → `:bst` (future)
+
+**⚠️ RULESET IMPLEMENTATION STATUS**:
+- ✅ PARTIAL: Ruleset storage and methods implemented (refactor requirement)
+- ❌ INCOMPLETE: Rule enforcement NOT implemented yet
+- 📅 Rule enforcement scheduled for Phase 6 Week 2
+- See `TREE_RULESET_DESIGN.md` for full status
 
 ---
 
