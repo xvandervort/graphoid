@@ -574,6 +574,18 @@ impl Executor {
 
     /// Evaluates a method call expression (object.method(args)).
     fn eval_method_call(&mut self, object: &Expr, method: &str, args: &[Expr]) -> Result<Value> {
+        // Check for static method calls on type identifiers (e.g., list.generate)
+        if let Expr::Variable { name, .. } = object {
+            if name == "list" {
+                // Evaluate argument expressions
+                let mut arg_values = Vec::new();
+                for arg in args {
+                    arg_values.push(self.eval_expr(arg)?);
+                }
+                return self.eval_list_static_method(method, &arg_values);
+            }
+        }
+
         // Check if this is a mutating method (ends with !)
         let is_mutating = method.ends_with('!');
         let base_method = if is_mutating {
@@ -623,6 +635,101 @@ impl Executor {
             other => Err(GraphoidError::runtime(format!(
                 "Type '{}' does not have method '{}'",
                 other.type_name(),
+                method
+            ))),
+        }
+    }
+
+    /// Evaluates static methods on the list type (e.g., list.generate, list.upto).
+    fn eval_list_static_method(&mut self, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "generate" => {
+                if args.len() != 3 {
+                    return Err(GraphoidError::runtime(format!(
+                        "list.generate() expects 3 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let start = match &args[0] {
+                    Value::Number(n) => *n,
+                    other => {
+                        return Err(GraphoidError::type_error("number", other.type_name()));
+                    }
+                };
+
+                let end = match &args[1] {
+                    Value::Number(n) => *n,
+                    other => {
+                        return Err(GraphoidError::type_error("number", other.type_name()));
+                    }
+                };
+
+                // Check if third argument is a function or a number (step)
+                match &args[2] {
+                    Value::Number(step) => {
+                        // Range mode with step
+                        let mut result = Vec::new();
+                        if *step > 0.0 {
+                            let mut current = start;
+                            while current <= end {
+                                result.push(Value::Number(current));
+                                current += step;
+                            }
+                        } else if *step < 0.0 {
+                            let mut current = start;
+                            while current >= end {
+                                result.push(Value::Number(current));
+                                current += step;
+                            }
+                        } else {
+                            return Err(GraphoidError::runtime("generate step cannot be zero".to_string()));
+                        }
+                        Ok(Value::List(List::from_vec(result)))
+                    }
+                    Value::Function(func) => {
+                        // Function mode
+                        let mut result = Vec::new();
+                        let start_i = start as i64;
+                        let end_i = end as i64;
+                        for i in start_i..=end_i {
+                            let arg = Value::Number(i as f64);
+                            let value = self.call_function(func, &[arg])?;
+                            result.push(value);
+                        }
+                        Ok(Value::List(List::from_vec(result)))
+                    }
+                    other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "list.generate() expects third argument to be number or function, got {}",
+                            other.type_name()
+                        )));
+                    }
+                }
+            }
+            "upto" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "list.upto() expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let n = match &args[0] {
+                    Value::Number(num) => *num as i64,
+                    other => {
+                        return Err(GraphoidError::type_error("number", other.type_name()));
+                    }
+                };
+
+                let mut result = Vec::new();
+                for i in 0..=n {
+                    result.push(Value::Number(i as f64));
+                }
+                Ok(Value::List(List::from_vec(result)))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "list does not have static method '{}'",
                 method
             ))),
         }
@@ -795,9 +902,9 @@ impl Executor {
                 Ok(Value::List(list.clone()))
             }
             "slice" => {
-                if args.len() != 2 {
+                if args.len() < 2 || args.len() > 3 {
                     return Err(GraphoidError::runtime(format!(
-                        "Method 'slice' expects 2 arguments, but got {}",
+                        "Method 'slice' expects 2 or 3 arguments, but got {}",
                         args.len()
                     )));
                 }
@@ -823,6 +930,25 @@ impl Executor {
                     }
                 };
 
+                // Get optional step parameter (default 1)
+                let step = if args.len() == 3 {
+                    match &args[2] {
+                        Value::Number(n) => *n as i64,
+                        other => {
+                            return Err(GraphoidError::type_error(
+                                "number",
+                                other.type_name(),
+                            ));
+                        }
+                    }
+                } else {
+                    1
+                };
+
+                if step == 0 {
+                    return Err(GraphoidError::runtime("slice step cannot be zero".to_string()));
+                }
+
                 let len = elements.len() as i64;
 
                 // Normalize negative indices
@@ -843,8 +969,13 @@ impl Executor {
                     return Ok(Value::List(List::new()));
                 }
 
-                // Extract slice
-                let slice = elements[actual_start as usize..actual_end as usize].to_vec();
+                // Extract slice with step
+                let mut slice = Vec::new();
+                let mut i = actual_start;
+                while i < actual_end {
+                    slice.push(elements[i as usize].clone());
+                    i += step;
+                }
                 Ok(Value::List(List::from_vec(slice)))
             }
             "add_rule" => {

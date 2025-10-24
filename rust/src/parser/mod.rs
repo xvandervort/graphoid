@@ -52,7 +52,11 @@ impl Parser {
         }
 
         // Check for type annotations or keywords
-        let result = if self.check(&TokenType::NumType)
+        // BUT: If ListType is followed by dot, it's a static method call, not a declaration
+        let is_list_static_call = self.check(&TokenType::ListType) && self.check_next(&TokenType::Dot);
+
+        let result = if !is_list_static_call && (
+            self.check(&TokenType::NumType)
             || self.check(&TokenType::StringType)
             || self.check(&TokenType::BoolType)
             || self.check(&TokenType::ListType)
@@ -61,7 +65,7 @@ impl Parser {
             || self.check(&TokenType::GraphType)
             || self.check(&TokenType::DataType)
             || self.check(&TokenType::TimeType)
-        {
+        ) {
             self.variable_declaration()
         } else if self.match_token(&TokenType::Func) {
             self.function_declaration()
@@ -1110,7 +1114,17 @@ impl Parser {
         }
 
         // Lists with optional type constraint: list<num>[] or just []
+        // OR static method call on list type: list.generate()
         if self.match_token(&TokenType::ListType) {
+            // Check if this is a static method call (list.method())
+            if self.check(&TokenType::Dot) {
+                // Treat "list" as a variable/type identifier for static method calls
+                return Ok(Expr::Variable {
+                    name: "list".to_string(),
+                    position,
+                });
+            }
+
             // Parse optional type parameter: list<type>
             if self.match_token(&TokenType::Less) {
                 // Parse the type constraint (but we'll ignore it for now - runtime checks only)
@@ -1429,6 +1443,13 @@ impl Parser {
             return false;
         }
         std::mem::discriminant(&self.peek().token_type) == std::mem::discriminant(token_type)
+    }
+
+    fn check_next(&self, token_type: &TokenType) -> bool {
+        if self.current + 1 >= self.tokens.len() {
+            return false;
+        }
+        std::mem::discriminant(&self.tokens[self.current + 1].token_type) == std::mem::discriminant(token_type)
     }
 
     fn match_token(&mut self, token_type: &TokenType) -> bool {
