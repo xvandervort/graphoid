@@ -345,6 +345,12 @@ impl Executor {
             BinaryOp::DotIntDiv => self.eval_element_wise(left_val, right_val, BinaryOp::IntDiv),
             BinaryOp::DotModulo => self.eval_element_wise(left_val, right_val, BinaryOp::Modulo),
             BinaryOp::DotPower => self.eval_element_wise(left_val, right_val, BinaryOp::Power),
+            BinaryOp::DotEqual => self.eval_element_wise(left_val, right_val, BinaryOp::Equal),
+            BinaryOp::DotNotEqual => self.eval_element_wise(left_val, right_val, BinaryOp::NotEqual),
+            BinaryOp::DotLess => self.eval_element_wise(left_val, right_val, BinaryOp::Less),
+            BinaryOp::DotLessEqual => self.eval_element_wise(left_val, right_val, BinaryOp::LessEqual),
+            BinaryOp::DotGreater => self.eval_element_wise(left_val, right_val, BinaryOp::Greater),
+            BinaryOp::DotGreaterEqual => self.eval_element_wise(left_val, right_val, BinaryOp::GreaterEqual),
 
             _ => Err(GraphoidError::runtime(format!(
                 "Unsupported binary operator: {:?}",
@@ -1505,21 +1511,12 @@ impl Executor {
     /// Supports list-list and list-scalar operations (broadcasting).
     fn eval_element_wise(&mut self, left: Value, right: Value, base_op: BinaryOp) -> Result<Value> {
         match (left, right) {
-            // List-List element-wise operation
+            // List-List element-wise operation (zips to shorter length)
             (Value::List(left_list), Value::List(right_list)) => {
                 let left_elements = left_list.to_vec();
                 let right_elements = right_list.to_vec();
 
-                // Check that lists have same length
-                if left_elements.len() != right_elements.len() {
-                    return Err(GraphoidError::runtime(format!(
-                        "Element-wise operation requires lists of same length, got {} and {}",
-                        left_elements.len(),
-                        right_elements.len()
-                    )));
-                }
-
-                // Apply operation element by element
+                // Apply operation element by element (zip stops at shorter length)
                 let mut results = Vec::new();
                 for (left_elem, right_elem) in left_elements.iter().zip(right_elements.iter()) {
                     let result = self.apply_scalar_op(left_elem.clone(), right_elem.clone(), &base_op)?;
@@ -1559,6 +1556,7 @@ impl Executor {
     /// Applies a scalar binary operation (used by element-wise operations).
     fn apply_scalar_op(&mut self, left: Value, right: Value, op: &BinaryOp) -> Result<Value> {
         match op {
+            // Arithmetic operators
             BinaryOp::Add => self.eval_add(left, right),
             BinaryOp::Subtract => self.eval_subtract(left, right),
             BinaryOp::Multiply => self.eval_multiply(left, right),
@@ -1566,6 +1564,13 @@ impl Executor {
             BinaryOp::IntDiv => self.eval_int_div(left, right),
             BinaryOp::Modulo => self.eval_modulo(left, right),
             BinaryOp::Power => self.eval_power(left, right),
+            // Comparison operators
+            BinaryOp::Equal => Ok(Value::Boolean(left == right)),
+            BinaryOp::NotEqual => Ok(Value::Boolean(left != right)),
+            BinaryOp::Less => self.eval_less(left, right),
+            BinaryOp::LessEqual => self.eval_less_equal(left, right),
+            BinaryOp::Greater => self.eval_greater(left, right),
+            BinaryOp::GreaterEqual => self.eval_greater_equal(left, right),
             _ => Err(GraphoidError::runtime(format!(
                 "Unsupported scalar operation: {:?}",
                 op
@@ -1631,7 +1636,8 @@ impl Executor {
                 if r == 0.0 {
                     Err(GraphoidError::division_by_zero())
                 } else {
-                    Ok(Value::Number((l / r).floor()))
+                    // Truncate toward zero (not floor)
+                    Ok(Value::Number((l / r).trunc()))
                 }
             }
             (l, r) => Err(GraphoidError::type_error(

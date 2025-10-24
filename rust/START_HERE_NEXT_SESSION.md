@@ -1,21 +1,93 @@
 # START HERE - Next Session Quick Start
 
 **Last Updated**: October 23, 2025
-**Current Status**: ✅ PHASE 6.5 AREA 1 COMPLETE! Architecture verified.
-**Tests Passing**: 720/722 (99.7%) - 16/18 Area 1 tests passing
-**What's Next**: 🎯 PHASE 6.5 AREA 2 - Parser Completeness
+**Current Status**: ✅ PHASE 6.5 AREA 1 & PARTIAL AREA 2 COMPLETE!
+**Tests Passing**: 737/737 (100%) 🎉
+**What's Next**: 🎯 PHASE 6.5 AREA 2 - Complete remaining parser features
 
 **MAJOR ACCOMPLISHMENTS THIS SESSION**:
-- ✅ **Phase 6 Week 2 Area 2** - Ruleset Definitions (:tree, :binary_tree, :bst, :dag)
-- ✅ **Phase 6 Week 4** - Rule-Aware Algorithms (shortest_path, topological_sort)
-- ✅ **Phase 6.5 Area 1** - Architecture Verification (18 tests, 16 passing)
-- ✅ **TDD Workflow** - Wrote tests first, watched fail, then implemented
-- ✅ **46 New Tests This Session** - 28 Phase 6 + 18 Phase 6.5 Area 1
-- ✅ **Zero Warnings** - Clean build throughout
+- ✅ **Phase 6.5 Area 1** - All 4 verification gaps FIXED (20/20 tests passing)
+- ✅ **Inline Conditionals** - Full support for if-then-else, suffix if/unless (13 tests)
+- ✅ **Graph Index Operations** - Reading and writing via `graph["node_id"]`
+- ✅ **Graph Methods Exposed** - add_node(), add_edge(), remove_node(), remove_edge()
+- ✅ **Type Parameters** - Single param support for list<type>[], hash<type>{}
+- ✅ **17 New Tests Added** - All passing, zero warnings
+- ✅ **100% Test Pass Rate** - 737/737 tests passing
 
 ---
 
-## 📖 What Happened This Session (October 23, 2025 - Phase 6 Completion)
+## 📖 What Happened This Session (October 23, 2025 - Phase 6.5 Progress)
+
+### Part 1: Phase 6.5 Area 1 - Architecture Verification (COMPLETE ✅)
+
+**Created Architecture Verification Test Suite** (tests/architecture_verification_tests.rs - 488 lines)
+
+**20 Comprehensive Tests**:
+1. ✅ Graph-backed lists (10 tests) - ALL PASSING
+2. ✅ Tree syntax sugar (2 tests) - ALL PASSING
+3. ✅ Graph indexing (3 tests) - ALL PASSING (fixed today)
+4. ✅ NO_GENERICS_POLICY (4 tests) - ALL PASSING (fixed today)
+5. ✅ Architecture summary (1 test) - PASSING
+
+**Key Findings - Architecture is SOLID**:
+- Lists ARE graph-backed (public `graph: Graph` field)
+- Hashes ARE graph-backed (public `graph: Graph` field)
+- Tree syntax creates Graph values with :tree ruleset
+- Graph operations accessible through collections
+
+### Part 2: Phase 6.5 Area 2 - Inline Conditionals (COMPLETE ✅)
+
+**Implemented 3 Forms of Inline Conditionals** (13 tests passing)
+
+**Syntax Forms**:
+```graphoid
+# If-then-else
+result = "big" if x > 5 else "small"
+
+# Suffix if (returns none if false)
+result = "go" if ready
+
+# Suffix unless (returns none if true)
+message = "OK" unless error_occurred
+```
+
+**Implementation**:
+- Added `Conditional` expression variant to AST (src/ast/mod.rs:127-133)
+- Added `conditional_expression()` parser method (src/parser/mod.rs:598-644)
+- Added `eval_conditional()` executor method (src/execution/executor.rs:357-393)
+- Truthiness logic: none/0/empty are falsy, everything else truthy
+
+**Tests**: 13 new tests in tests/inline_conditional_tests.rs (all passing)
+
+### Part 3: Phase 6.5 Area 2 - Gap Fixes (ALL COMPLETE ✅)
+
+**Gap 1: Graph Index Assignment** (FIXED)
+- Added Graph support to `eval_index()` for reading: `g["node_id"]`
+- Added Graph support to `AssignmentTarget::Index` for writing: `g["node_id"] = value`
+- Also works for List and Map index assignment
+- **Tests fixed**: 2 (test_graph_index_assignment, test_graph_index_consistency_with_hash)
+
+**Gap 2: Graph Method Exposure** (FIXED)
+- Exposed 4 graph mutation methods to Graphoid code:
+  - `add_node(node_id, value)` - Add/update node
+  - `add_edge(from, to, [edge_type])` - Add edge with optional type
+  - `remove_node(node_id)` - Remove node
+  - `remove_edge(from, to)` - Remove edge
+- Methods properly update graph in environment after mutations
+- **Tests fixed**: 1 (test_graph_index_access)
+
+**Gap 3: Type Parameter Support** (FIXED)
+- Parser now accepts single type parameters: `list<num>[]`, `hash<string>{}`
+- Added "hash" as lexer alias for "map" (both → MapType token)
+- Type constraints parsed but not enforced (runtime-only, per NO_GENERICS_POLICY)
+- Rejects multiple params, nested constraints per policy
+- **Tests fixed**: 1 (test_parser_accepts_single_type_parameter)
+
+**Total Tests Fixed**: 4 failing tests → all passing ✅
+
+---
+
+## 📖 Previous Session (October 23, 2025 - Phase 6 Completion)
 
 ### Part 1: Ruleset Definitions (Phase 6 Week 2 Area 2)
 
@@ -177,24 +249,35 @@
 
 ## 📁 Key Files Reference
 
-### Created This Session
-1. **src/graph/rulesets.rs** (230 lines) - Ruleset definitions module
-2. **tests/unit/ruleset_enforcement_tests.rs** (316 lines) - 17 enforcement tests
-3. **tests/unit/algorithm_tests.rs** (310 lines) - 16 algorithm tests
+### Created Today (Phase 6.5 Session)
+1. **tests/architecture_verification_tests.rs** (488 lines) - 20 architecture verification tests
+2. **tests/inline_conditional_tests.rs** (300 lines) - 13 inline conditional tests
+3. **PHASE_6_5_FINAL_SUMMARY.md** (215 lines) - Area 1 verification summary
 
-### Modified This Session
-1. **src/graph/mod.rs** - Added rulesets module and exports
-2. **src/values/graph.rs** - Added get_active_rule_specs(), shortest_path(), topological_sort()
-3. **tests/unit_tests.rs** - Registered ruleset_enforcement_tests and algorithm_tests modules
+### Modified Today (Phase 6.5 Session)
+1. **src/ast/mod.rs** - Added `Conditional` expression variant (lines 127-133, 150)
+2. **src/parser/mod.rs** - Added:
+   - `conditional_expression()` for inline if/unless (lines 598-644)
+   - Type parameter parsing for `list<type>[]` (lines 1100-1147)
+   - Type parameter parsing for `hash<type>{}` (lines 1238-1306)
+3. **src/execution/executor.rs** - Added:
+   - `eval_conditional()` for inline conditionals (lines 357-393)
+   - Graph index reading support (lines 539-559)
+   - Index assignment for Graph/Map/List (lines 108-170)
+   - Graph method exposure: add_node, add_edge, remove_node, remove_edge (lines 1065-1256)
+4. **src/lexer/mod.rs** - Added "hash" as alias for "map" (line 603)
 
-### Created Earlier Sessions
-- `src/graph/rules.rs` (640+ lines) - Rule system
-- `src/values/list.rs` (155 lines) - List as graph
-- `src/values/hash.rs` (120 lines) - Hash as graph
-- `tests/unit/auto_index_tests.rs` - 9 auto-indexing tests
-- `tests/unit/explain_tests.rs` - 11 explain tests
-- `tests/unit/ad_hoc_rule_tests.rs` - 13 ad hoc rule tests
-- `tests/unit/list_rules_tests.rs` - 8 list rule tests
+### Created Earlier Sessions (Phase 6)
+- **src/graph/rulesets.rs** (230 lines) - Ruleset definitions module
+- **src/graph/rules.rs** (640+ lines) - Rule system
+- **src/values/list.rs** (155 lines) - List as graph
+- **src/values/hash.rs** (120 lines) - Hash as graph
+- **tests/unit/ruleset_enforcement_tests.rs** (316 lines) - 17 enforcement tests
+- **tests/unit/algorithm_tests.rs** (310 lines) - 16 algorithm tests
+- **tests/unit/auto_index_tests.rs** - 9 auto-indexing tests
+- **tests/unit/explain_tests.rs** - 11 explain tests
+- **tests/unit/ad_hoc_rule_tests.rs** - 13 ad hoc rule tests
+- **tests/unit/list_rules_tests.rs** - 8 list rule tests
 
 ---
 
@@ -290,33 +373,71 @@ While Phase 6 is complete (704 tests passing), several **fundamental features sp
 
 ---
 
-## 🚀 Next Steps: Phase 6.5 Area 2 - Parser Completeness
+## 🚀 Next Steps: Complete Phase 6.5 Area 2
 
-### Recommended Approach
+### Current State
 
-**START HERE**: Phase 6.5 Area 2 - Parser Completeness (Days 2-3)
+**Area 1**: ✅ COMPLETE (20/20 tests passing)
+**Area 2**: 🔄 PARTIAL COMPLETE
+- ✅ Inline conditionals (13 tests)
+- ✅ All Area 1 gaps fixed (4 tests)
+- ⚠️ **Still TODO**:
+  - Element-wise operators (`.+`, `.*`, `./`, `.//`, `.^`) - 15+ tests
+  - Integer division (`//`) - 5+ tests
 
-**Area 1 Complete** ✅ - Architecture verified (16/18 tests passing)
+### Immediate Next Steps (IN THIS ORDER)
 
-**Area 2 Focus**: Implement missing parser/executor features:
-1. Inline conditionals (`value if condition else other`)
-2. Suffix conditionals (`do_thing() if ready`)
-3. Element-wise operators (`.+`, `.*`, `./`, `.//`, `.^`)
-4. Integer division (`//`)
-5. Fix Area 1 gaps: graph methods, index assignment, type parameters
+**START HERE**: Complete remaining Area 2 features
 
-**Approach**:
-1. Read Phase 6.5 Area 2 specification in RUST_IMPLEMENTATION_ROADMAP.md (lines 2400-2500)
-2. Start with inline conditionals (most impactful)
-3. Follow TDD: Write tests first, then implement
-4. Target: 30+ new tests for Area 2
-5. Address the 4 gaps from Area 1 verification
+**Step 1: Element-Wise Operators** (Estimated: 2-3 hours)
+```graphoid
+# Scalar operations
+[1, 2, 3] .* 2        # [2, 4, 6]
+[1, 2, 3] .+ 10       # [11, 12, 13]
+
+# Vector operations (zip)
+[1, 2, 3] .+ [4, 5, 6]    # [5, 7, 9]
+[2, 3, 4] .^ [2, 2, 2]    # [4, 9, 16]
+
+# Comparisons
+[10, 20, 30] .> 15        # [false, true, true]
+```
+
+**Implementation Strategy**:
+1. Write tests first in `tests/element_wise_tests.rs`
+2. Parser already recognizes `.+`, `.*`, etc. tokens (lexer complete)
+3. Add `parse_element_wise_operation()` handling
+4. Add `ElementWiseOp` AST node OR use existing Binary with element-wise flag
+5. Implement in executor: scalar case, vector case, comparison case
+6. Target: 15+ tests
+
+**Step 2: Integer Division** (Estimated: 1 hour)
+```graphoid
+10 // 3      # 3 (not 3.333...)
+-10 // 3     # -3 (truncates toward zero)
+10.5 // 2    # 5
+```
+
+**Implementation Strategy**:
+1. Write tests first in `tests/integer_division_tests.rs`
+2. Parser already recognizes `//` token (lexer complete)
+3. Add handling in `parse_binary_op()` / factor parsing
+4. Implement in executor: `(a / b).trunc()` (truncate toward zero)
+5. Target: 5+ tests
+
+**Step 3: Move to Area 3** (After Steps 1-2 complete)
+- Mutation Operator Convention (`sort()` / `sort!()`)
+- 30+ tests for dual-version methods
 
 ### Phase 6.5 Areas Progress
 
-1. ✅ **Area 1**: Verification & Validation - COMPLETE (18 tests, 16 passing)
-2. 🎯 **Area 2**: Parser Completeness (Days 2-3) - NEXT (30+ tests expected)
-3. 🔲 **Area 3**: Mutation Operator Convention (Days 4-5) - 30 tests
+1. ✅ **Area 1**: Verification & Validation - COMPLETE (20 tests)
+2. 🔄 **Area 2**: Parser Completeness - PARTIAL (17/30+ tests)
+   - ✅ Inline conditionals (13 tests)
+   - ✅ Gap fixes (4 tests)
+   - ⚠️ Element-wise operators (TODO - 15+ tests)
+   - ⚠️ Integer division (TODO - 5+ tests)
+3. 🔲 **Area 3**: Mutation Operator Convention - PENDING (30+ tests)
 4. 🔲 **Area 4**: Missing Collection Methods (Day 6) - 15 tests
 5. 🔲 **Area 5**: Enhanced Graph Querying (Day 7) - 12 tests
 6. 🔲 **Quality Gate**: Spec Conformance Check (0.5-1 day) - REQUIRED
@@ -506,21 +627,47 @@ Before implementing, we need to decide:
 
 ---
 
-## 🎉 Phase 6 Complete!
+## 🎉 Today's Session Summary (October 23, 2025)
 
-**What We Accomplished**:
-- ✅ Complete rule system with 6 built-in rules
-- ✅ Ruleset definitions with composition (:tree, :binary_tree, :bst, :dag)
-- ✅ Auto-optimization (property indexing after 10 lookups)
-- ✅ Explain API showing execution plans
-- ✅ Enhanced stats with degree distribution
-- ✅ Rule-aware algorithms (topological sort for DAGs)
-- ✅ 704 tests passing (up from 636 at session start)
-- ✅ Zero warnings throughout
-- ✅ TDD workflow demonstrated
+### Accomplishments
 
-**Next**: Design and implement Phase 7 (Behavior System) or move to Phase 8 (Module System)
+**Phase 6.5 Progress**:
+- ✅ **Area 1 COMPLETE**: All architecture verification (20/20 tests)
+- ✅ **Area 2 PARTIAL**: Inline conditionals + gap fixes (17/30+ tests)
+- ✅ **100% Pass Rate**: 737/737 tests passing
+- ✅ **Zero Warnings**: Clean build throughout
+- ✅ **TDD Workflow**: Wrote tests first, made them pass
+
+**Features Implemented**:
+1. **Inline Conditionals** (13 tests)
+   - If-then-else: `value if condition else other`
+   - Suffix if: `value if condition`
+   - Suffix unless: `value unless condition`
+
+2. **Graph Index Operations** (2 tests fixed)
+   - Reading: `graph["node_id"]`
+   - Writing: `graph["node_id"] = value`
+
+3. **Graph Methods Exposed** (1 test fixed)
+   - `add_node()`, `add_edge()`, `remove_node()`, `remove_edge()`
+
+4. **Type Parameters** (1 test fixed)
+   - Single param support: `list<num>[]`, `hash<string>{}`
+   - "hash" keyword added as map alias
+
+### What's Left in Area 2
+
+**TODO (IN ORDER)**:
+1. ⚠️ **Element-wise operators** (`.+`, `.*`, `./`, `.//`, `.^`) - 15+ tests
+2. ⚠️ **Integer division** (`//`) - 5+ tests
+3. Then proceed to **Area 3** (Mutation Operator Convention)
+
+### Test Count Progress
+
+- **Started Today**: 720 tests
+- **Ending Today**: 737 tests (+17)
+- **Pass Rate**: 100% (was 99.7% with 4 failures)
 
 ---
 
-**The graph system is production-ready! Time to add behaviors! 🚀**
+**Foundation is solid! Ready for element-wise operators tomorrow! 🚀**
