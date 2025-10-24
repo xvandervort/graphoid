@@ -356,7 +356,6 @@ fn test_graph_index_consistency_with_hash() {
 #[test]
 fn test_parser_accepts_single_type_parameter() {
     // Verify that single type parameters ARE allowed (spec compliant)
-    use graphoid::execution::Executor;
     use graphoid::lexer::Lexer;
     use graphoid::parser::Parser;
 

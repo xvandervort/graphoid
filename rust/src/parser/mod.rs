@@ -898,15 +898,28 @@ impl Parser {
                 // We use the lexeme directly to allow keywords as method names
                 let method = match &self.peek().token_type {
                     TokenType::Identifier(id) => {
-                        let m = id.clone();
+                        let mut m = id.clone();
                         self.advance();
+
+                        // Check for ! suffix (mutating method convention)
+                        if self.match_token(&TokenType::Bang) {
+                            m.push('!');
+                        }
+
                         m
                     }
                     // Allow keywords as method names by using their lexeme
                     _ => {
-                        let lexeme = self.peek().lexeme.clone();
+                        let mut lexeme = self.peek().lexeme.clone();
+                        // Check if it's a valid method name (alphanumeric + underscore)
                         if lexeme.chars().all(|c| c.is_alphabetic() || c == '_') && !lexeme.is_empty() {
                             self.advance();
+
+                            // Check for ! suffix (mutating method convention)
+                            if self.match_token(&TokenType::Bang) {
+                                lexeme.push('!');
+                            }
+
                             lexeme
                         } else {
                             return Err(GraphoidError::SyntaxError {

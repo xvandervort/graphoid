@@ -574,8 +574,13 @@ impl Executor {
 
     /// Evaluates a method call expression (object.method(args)).
     fn eval_method_call(&mut self, object: &Expr, method: &str, args: &[Expr]) -> Result<Value> {
-        // Evaluate the object
-        let object_value = self.eval_expr(object)?;
+        // Check if this is a mutating method (ends with !)
+        let is_mutating = method.ends_with('!');
+        let base_method = if is_mutating {
+            &method[..method.len() - 1]
+        } else {
+            method
+        };
 
         // Evaluate all argument expressions
         let mut arg_values = Vec::new();
@@ -583,11 +588,38 @@ impl Executor {
             arg_values.push(self.eval_expr(arg)?);
         }
 
-        // Dispatch based on object type and method name
-        match object_value {
-            Value::List(list) => self.eval_list_method(&list, method, &arg_values),
-            Value::Map(hash) => self.eval_map_method(&hash, method, &arg_values),
-            Value::Graph(graph) => self.eval_graph_method(graph, method, &arg_values, object),
+        if is_mutating {
+            // Extract variable name from object expression
+            let var_name = match object {
+                Expr::Variable { name, .. } => name.clone(),
+                _ => {
+                    return Err(GraphoidError::runtime(format!(
+                        "Mutating method '{}' requires a variable, not an expression",
+                        method
+                    )))
+                }
+            };
+
+            // Get current value, apply method, update variable
+            let object_value = self.env.get(&var_name)?;
+            let new_value = self.apply_method_to_value(object_value, base_method, &arg_values, object)?;
+            self.env.set(&var_name, new_value)?;
+
+            // Mutating methods return none
+            Ok(Value::None)
+        } else {
+            // Immutable method - evaluate and return result
+            let object_value = self.eval_expr(object)?;
+            self.apply_method_to_value(object_value, base_method, &arg_values, object)
+        }
+    }
+
+    /// Applies a method to a value (helper to avoid duplication).
+    fn apply_method_to_value(&mut self, value: Value, method: &str, args: &[Value], object_expr: &Expr) -> Result<Value> {
+        match value {
+            Value::List(list) => self.eval_list_method(&list, method, args),
+            Value::Map(hash) => self.eval_map_method(&hash, method, args),
+            Value::Graph(graph) => self.eval_graph_method(graph, method, args, object_expr),
             other => Err(GraphoidError::runtime(format!(
                 "Type '{}' does not have method '{}'",
                 other.type_name(),
@@ -600,10 +632,10 @@ impl Executor {
     fn eval_list_method(&mut self, list: &List, method: &str, args: &[Value]) -> Result<Value> {
         let elements = list.to_vec();
         match method {
-            "size" => {
+            "size" | "length" => {
                 if !args.is_empty() {
                     return Err(GraphoidError::runtime(format!(
-                        "Method 'size' expects 0 arguments, but got {}",
+                        "Method 'size'/'length' expects 0 arguments, but got {}",
                         args.len()
                     )));
                 }
@@ -900,6 +932,148 @@ impl Executor {
                 let mut new_list = list.clone();
                 new_list.remove_rule(&rule_spec);
                 Ok(Value::List(new_list))
+            }
+            "sort" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'sort' expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Sort numeric lists
+                let mut sorted = elements.clone();
+                sorted.sort_by(|a, b| {
+                    match (a, b) {
+                        (Value::Number(n1), Value::Number(n2)) => {
+                            n1.partial_cmp(n2).unwrap_or(std::cmp::Ordering::Equal)
+                        }
+                        _ => std::cmp::Ordering::Equal,
+                    }
+                });
+                Ok(Value::List(List::from_vec(sorted)))
+            }
+            "reverse" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'reverse' expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let mut reversed = elements.clone();
+                reversed.reverse();
+                Ok(Value::List(List::from_vec(reversed)))
+            }
+            "uniq" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'uniq' expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Remove duplicates (keep first occurrence)
+                let mut seen = std::collections::HashSet::new();
+                let mut unique = Vec::new();
+                for elem in &elements {
+                    // Create a simple hash key from the value
+                    let key = format!("{:?}", elem);
+                    if seen.insert(key) {
+                        unique.push(elem.clone());
+                    }
+                }
+                Ok(Value::List(List::from_vec(unique)))
+            }
+            "reject" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'reject' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Reject is opposite of filter
+                match &args[0] {
+                    Value::Symbol(predicate_name) => {
+                        let mut results = Vec::new();
+                        for element in &elements {
+                            if !self.apply_named_predicate(element, predicate_name)? {
+                                results.push(element.clone());
+                            }
+                        }
+                        Ok(Value::List(List::from_vec(results)))
+                    }
+                    Value::Function(func) => {
+                        let mut results = Vec::new();
+                        for element in &elements {
+                            let result = self.call_function(func, &[element.clone()])?;
+                            if !result.is_truthy() {
+                                results.push(element.clone());
+                            }
+                        }
+                        Ok(Value::List(List::from_vec(results)))
+                    }
+                    other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "Method 'reject' expects function or symbol, got {}",
+                            other.type_name()
+                        )));
+                    }
+                }
+            }
+            "compact" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'compact' expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Remove all none values
+                let compacted: Vec<Value> = elements
+                    .iter()
+                    .filter(|v| !matches!(v, Value::None))
+                    .cloned()
+                    .collect();
+                Ok(Value::List(List::from_vec(compacted)))
+            }
+            "select" => {
+                // select is an alias for filter
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'select' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                match &args[0] {
+                    Value::Symbol(predicate_name) => {
+                        let mut results = Vec::new();
+                        for element in &elements {
+                            if self.apply_named_predicate(element, predicate_name)? {
+                                results.push(element.clone());
+                            }
+                        }
+                        Ok(Value::List(List::from_vec(results)))
+                    }
+                    Value::Function(func) => {
+                        let mut results = Vec::new();
+                        for element in &elements {
+                            let result = self.call_function(func, &[element.clone()])?;
+                            if result.is_truthy() {
+                                results.push(element.clone());
+                            }
+                        }
+                        Ok(Value::List(List::from_vec(results)))
+                    }
+                    other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "Method 'select' expects function or symbol, got {}",
+                            other.type_name()
+                        )));
+                    }
+                }
             }
             "append" => {
                 if args.len() != 1 {
