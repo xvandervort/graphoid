@@ -73,7 +73,7 @@ This roadmap has been significantly expanded based on 10 new language features a
 - Phase 6: +7 days (5-level graph querying is the "make or break" feature)
 - Phase 7: +1 day (freeze control rules)
 - Phase 8: +2 days (graphoid.toml support)
-- Phase 11: +3 days (sophisticated configuration system)
+- Phase 11: +7 days (freeze system: collection freezing, freeze behaviors, ruleset freezing; sophisticated configuration system)
 
 **See**: [ROADMAP_UPDATES_FOR_NEW_FEATURES.md](archive/sessions/2025-01-roadmap-updates/ROADMAP_UPDATES_FOR_NEW_FEATURES.md) for complete details.
 
@@ -2909,7 +2909,13 @@ Minimum **30 tests**:
 - HTML module
 - HTTP module
 
-### Phase 11: Advanced Features (14-21 days)
+### Phase 11: Advanced Features (18-25 days)
+- Freeze system for collections
+  - `.freeze()` method for all collections (deep freeze by default)
+  - `.is_frozen()` introspection
+  - Freeze behaviors: `:no_frozen`, `:copy_elements`, `:shallow_freeze_only`
+  - Ruleset freezing: `.freeze_rules()`, `.unfreeze_rules()`, `.rules_frozen()`
+  - **Note**: Type-level rule freezing with inheritance policies deferred to Phase 15+ (requires mature type system)
 - Precision context blocks
 - Configuration blocks
 - Pattern matching (future)
