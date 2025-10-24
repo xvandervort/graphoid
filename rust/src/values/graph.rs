@@ -783,6 +783,152 @@ impl Graph {
     /// // A must come before B, B must come before C
     /// assert_eq!(sorted, vec!["A", "B", "C"]);
     /// ```
+    ///
+    /// Checks if a path exists from one node to another.
+    ///
+    /// Returns `true` if there is a path from `from` to `to`, `false` otherwise.
+    /// A node always has a path to itself.
+    pub fn has_path(&self, from: &str, to: &str) -> bool {
+        // Handle special cases
+        if !self.has_node(from) || !self.has_node(to) {
+            return false;
+        }
+
+        if from == to {
+            return true;
+        }
+
+        // BFS to check reachability
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        queue.push_back(from.to_string());
+        visited.insert(from.to_string());
+
+        while let Some(current) = queue.pop_front() {
+            if current == to {
+                return true;
+            }
+
+            if let Some(node) = self.nodes.get(&current) {
+                for neighbor_id in node.neighbors.keys() {
+                    if !visited.contains(neighbor_id) {
+                        visited.insert(neighbor_id.clone());
+                        queue.push_back(neighbor_id.clone());
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Returns the shortest path distance (number of edges) between two nodes.
+    ///
+    /// Returns the length of the shortest path from `from` to `to`.
+    /// Returns `-1` if no path exists.
+    /// Returns `0` if from == to.
+    pub fn distance(&self, from: &str, to: &str) -> i64 {
+        // Handle special cases
+        if !self.has_node(from) || !self.has_node(to) {
+            return -1;
+        }
+
+        if from == to {
+            return 0;
+        }
+
+        // BFS with distance tracking
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        let mut distances: HashMap<String, i64> = HashMap::new();
+
+        queue.push_back(from.to_string());
+        visited.insert(from.to_string());
+        distances.insert(from.to_string(), 0);
+
+        while let Some(current) = queue.pop_front() {
+            if current == to {
+                return *distances.get(&current).unwrap();
+            }
+
+            let current_dist = *distances.get(&current).unwrap();
+
+            if let Some(node) = self.nodes.get(&current) {
+                for neighbor_id in node.neighbors.keys() {
+                    if !visited.contains(neighbor_id) {
+                        visited.insert(neighbor_id.clone());
+                        distances.insert(neighbor_id.clone(), current_dist + 1);
+                        queue.push_back(neighbor_id.clone());
+                    }
+                }
+            }
+        }
+
+        -1 // No path found
+    }
+
+    /// Finds all paths from one node to another up to a maximum length.
+    ///
+    /// Returns a list of all paths (each path is a list of node IDs) from `from` to `to`
+    /// where the path has at most `max_len` edges.
+    pub fn all_paths(&self, from: &str, to: &str, max_len: usize) -> Vec<Vec<String>> {
+        // Handle special cases
+        if !self.has_node(from) || !self.has_node(to) {
+            return Vec::new();
+        }
+
+        let mut all_paths = Vec::new();
+        let mut current_path = vec![from.to_string()];
+        let mut visited = HashSet::new();
+        visited.insert(from.to_string());
+
+        self.dfs_all_paths(from, to, max_len, &mut current_path, &mut visited, &mut all_paths);
+
+        all_paths
+    }
+
+    /// Helper for all_paths - DFS with backtracking
+    fn dfs_all_paths(
+        &self,
+        current: &str,
+        target: &str,
+        max_len: usize,
+        current_path: &mut Vec<String>,
+        visited: &mut HashSet<String>,
+        all_paths: &mut Vec<Vec<String>>,
+    ) {
+        // Check if we've reached the target
+        if current == target && current_path.len() > 1 {
+            // Found a path! (length > 1 means we actually moved)
+            all_paths.push(current_path.clone());
+            return;
+        }
+
+        // Check if we've exceeded max length
+        if current_path.len() > max_len {
+            return;
+        }
+
+        // Explore neighbors
+        if let Some(node) = self.nodes.get(current) {
+            for neighbor_id in node.neighbors.keys() {
+                if !visited.contains(neighbor_id) {
+                    // Visit this neighbor
+                    visited.insert(neighbor_id.clone());
+                    current_path.push(neighbor_id.clone());
+
+                    // Recurse
+                    self.dfs_all_paths(neighbor_id, target, max_len, current_path, visited, all_paths);
+
+                    // Backtrack
+                    current_path.pop();
+                    visited.remove(neighbor_id);
+                }
+            }
+        }
+    }
+
     pub fn topological_sort(&self) -> Vec<String> {
         if self.nodes.is_empty() {
             return Vec::new();

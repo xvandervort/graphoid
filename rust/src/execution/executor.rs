@@ -1558,6 +1558,115 @@ impl Executor {
 
                 Ok(Value::Boolean(graph.has_ruleset(ruleset_name)))
             }
+            "has_path" => {
+                // Check if a path exists between two nodes
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "has_path() expects 2 arguments (from, to), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get from node ID
+                let from = match &args[0] {
+                    Value::String(s) => s.as_str(),
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                // Get to node ID
+                let to = match &args[1] {
+                    Value::String(s) => s.as_str(),
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                // Check if path exists
+                let has_path = graph.has_path(from, to);
+                Ok(Value::Boolean(has_path))
+            }
+            "distance" => {
+                // Get shortest path distance between two nodes
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "distance() expects 2 arguments (from, to), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get from node ID
+                let from = match &args[0] {
+                    Value::String(s) => s.as_str(),
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                // Get to node ID
+                let to = match &args[1] {
+                    Value::String(s) => s.as_str(),
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                // Get distance
+                let dist = graph.distance(from, to);
+                Ok(Value::Number(dist as f64))
+            }
+            "all_paths" => {
+                // Find all paths between two nodes up to max length
+                if args.len() != 3 {
+                    return Err(GraphoidError::runtime(format!(
+                        "all_paths() expects 3 arguments (from, to, max_length), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get from node ID
+                let from = match &args[0] {
+                    Value::String(s) => s.as_str(),
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                // Get to node ID
+                let to = match &args[1] {
+                    Value::String(s) => s.as_str(),
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                // Get max length
+                let max_len = match &args[2] {
+                    Value::Number(n) => *n as usize,
+                    other => {
+                        return Err(GraphoidError::type_error("number", other.type_name()));
+                    }
+                };
+
+                // Find all paths
+                let paths = graph.all_paths(from, to, max_len);
+
+                // Convert Vec<Vec<String>> to Value::List(List of Lists)
+                use crate::values::List;
+                let path_values: Vec<Value> = paths
+                    .into_iter()
+                    .map(|path| {
+                        let string_values: Vec<Value> = path
+                            .into_iter()
+                            .map(|s| Value::String(s))
+                            .collect();
+                        Value::List(List::from_vec(string_values))
+                    })
+                    .collect();
+
+                Ok(Value::List(List::from_vec(path_values)))
+            }
             _ => Err(GraphoidError::runtime(format!(
                 "Graph does not have method '{}'",
                 method
