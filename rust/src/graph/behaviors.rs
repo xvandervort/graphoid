@@ -495,10 +495,41 @@ pub fn apply_retroactive_to_hash(
 }
 
 // ============================================================================
-// Stub Behavior Implementations (Sub-phase 7.1 - Framework Only)
+// Helper Functions
 // ============================================================================
-// These are minimal implementations to make the framework tests pass.
-// Full implementations are in Sub-phases 7.2-7.5.
+
+/// Convert a Value to a string key for mapping lookups
+///
+/// This function provides a consistent way to convert any Value to a String
+/// that can be used as a key in HashMap lookups for mapping behaviors.
+///
+/// # Arguments
+/// * `value` - The value to convert
+///
+/// # Returns
+/// A String representation suitable for use as a hash key
+fn value_to_key(value: &Value) -> String {
+    match value {
+        Value::String(s) => s.clone(),
+        Value::Number(n) => {
+            // For integers, use simple format; for floats, use full precision
+            if n.fract() == 0.0 {
+                format!("{}", *n as i64)
+            } else {
+                n.to_string()
+            }
+        }
+        Value::Symbol(s) => s.clone(),
+        Value::Boolean(b) => b.to_string(),
+        Value::None => "none".to_string(),
+        // For complex types, use Debug representation
+        _ => format!("{:?}", value),
+    }
+}
+
+// ============================================================================
+// Behavior Implementations
+// ============================================================================
 
 #[derive(Debug)]
 struct NoneToZeroBehavior;
@@ -655,13 +686,24 @@ struct MappingBehavior {
 
 impl Behavior for MappingBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        // Stub implementation for Sub-phase 7.1
-        // Full implementation in Sub-phase 7.3
-        Ok(value.clone())
+        // Convert value to string key for lookup
+        let key = value_to_key(value);
+
+        // Look up in mapping, use default if not found
+        if let Some(mapped_value) = self.mapping.get(&key) {
+            Ok(mapped_value.clone())
+        } else {
+            Ok(self.default.clone())
+        }
     }
 
     fn name(&self) -> &str {
         "mapping"
+    }
+
+    fn applies_to(&self, _value: &Value) -> bool {
+        // Applies to all values (mapping can transform any type)
+        true
     }
 }
 

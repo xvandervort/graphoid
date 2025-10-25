@@ -11,4 +11,5 @@ mod unit {
     pub mod algorithm_tests;
     pub mod behavior_framework_tests;
     pub mod standard_behaviors_tests;
+    pub mod mapping_behaviors_tests;
 }
