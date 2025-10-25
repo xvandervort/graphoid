@@ -8,3 +8,4 @@ pub mod executor_tests;
 pub mod rule_enforcement_tests;
 pub mod ad_hoc_rule_tests;
 pub mod list_rules_tests;
+pub mod behavior_framework_tests;

@@ -5,7 +5,7 @@
 
 use super::{Value, Graph};
 use crate::values::graph::GraphType;
-use crate::graph::{RuleSpec, RuleInstance};
+use crate::graph::{RuleSpec, RuleInstance, BehaviorInstance};
 use crate::error::GraphoidError;
 
 /// Hash is a key-value graph
@@ -16,6 +16,9 @@ use crate::error::GraphoidError;
 pub struct Hash {
     /// Underlying graph storing key-value pairs
     pub graph: Graph,
+    /// Behaviors attached to this hash
+    /// Applied in order: first added = first applied
+    pub behaviors: Vec<BehaviorInstance>,
 }
 
 impl Hash {
@@ -23,6 +26,7 @@ impl Hash {
     pub fn new() -> Self {
         Hash {
             graph: Graph::new(GraphType::Directed),
+            behaviors: Vec::new(),
         }
     }
 

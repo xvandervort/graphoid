@@ -5,7 +5,7 @@
 
 use super::{Value, Graph};
 use crate::values::graph::GraphType;
-use crate::graph::{RuleSpec, RuleInstance};
+use crate::graph::{RuleSpec, RuleInstance, BehaviorInstance};
 use crate::error::GraphoidError;
 use std::collections::HashMap;
 
@@ -19,6 +19,9 @@ pub struct List {
     pub graph: Graph,
     /// Number of items (cached for O(1) access)
     length: usize,
+    /// Behaviors attached to this list
+    /// Applied in order: first added = first applied
+    pub behaviors: Vec<BehaviorInstance>,
 }
 
 impl List {
@@ -31,6 +34,7 @@ impl List {
         List {
             graph,
             length: 0,
+            behaviors: Vec::new(),
         }
     }
 

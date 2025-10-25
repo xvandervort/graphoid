@@ -9,4 +9,5 @@ mod unit {
     pub mod explain_tests;
     pub mod ruleset_enforcement_tests;
     pub mod algorithm_tests;
+    pub mod behavior_framework_tests;
 }
