@@ -407,6 +407,93 @@ pub fn apply_retroactive_to_list(
     Ok(())
 }
 
+/// Apply behaviors retroactively to all existing values in a hash
+///
+/// Used when a new behavior is added to a hash with existing values.
+/// Respects the RetroactivePolicy setting.
+///
+/// # Arguments
+/// * `hash` - The hash to apply behaviors to
+/// * `new_behavior` - The behavior to apply
+///
+/// # Returns
+/// `Ok(())` if successful, or an error if RetroactivePolicy::Enforce fails
+///
+/// # Retroactive Policies
+///
+/// - **Clean**: Transform all existing values that apply
+/// - **Warn**: Keep existing data, print warnings
+/// - **Enforce**: Error if any values would be transformed
+/// - **Ignore**: Don't check or transform existing values
+pub fn apply_retroactive_to_hash(
+    hash: &mut crate::values::Hash,
+    new_behavior: &BehaviorInstance,
+) -> Result<(), GraphoidError> {
+    let behavior = new_behavior.spec.instantiate();
+    let keys: Vec<String> = hash.keys();
+
+    match new_behavior.retroactive_policy {
+        RetroactivePolicy::Clean => {
+            // Transform all existing values that apply
+            for key in keys {
+                if let Some(value) = hash.get(&key).cloned() {
+                    if behavior.applies_to(&value) {
+                        let transformed = behavior.transform(&value)?;
+                        // Update the value in the graph directly
+                        if let Some(node) = hash.graph.nodes.get_mut(&key) {
+                            node.value = transformed;
+                        }
+                    }
+                }
+            }
+        }
+        RetroactivePolicy::Warn => {
+            // Keep existing data, warn about values that would be transformed
+            let mut warned = false;
+            for key in keys {
+                if let Some(value) = hash.get(&key) {
+                    if behavior.applies_to(value) {
+                        let transformed = behavior.transform(value)?;
+                        if transformed != *value {
+                            eprintln!(
+                                "WARNING: Behavior '{}' would transform value for key '{}' from {:?} to {:?}",
+                                behavior.name(), key, value, transformed
+                            );
+                            warned = true;
+                        }
+                    }
+                }
+            }
+            if warned {
+                eprintln!("WARNING: Existing values NOT transformed. Use RetroactivePolicy::Clean to transform.");
+            }
+        }
+        RetroactivePolicy::Enforce => {
+            // Error if any values would be transformed
+            for key in keys {
+                if let Some(value) = hash.get(&key) {
+                    if behavior.applies_to(value) {
+                        let transformed = behavior.transform(value)?;
+                        if transformed != *value {
+                            return Err(GraphoidError::runtime(format!(
+                                "Behavior '{}' would transform existing value for key '{}' from {:?} to {:?}. \
+                                 Cannot add behavior with RetroactivePolicy::Enforce.",
+                                behavior.name(), key, value, transformed
+                            )));
+                        }
+                    }
+                }
+            }
+        }
+        RetroactivePolicy::Ignore => {
+            // Don't check or transform existing values
+            // Only new values will be transformed
+        }
+    }
+
+    Ok(())
+}
+
 // ============================================================================
 // Stub Behavior Implementations (Sub-phase 7.1 - Framework Only)
 // ============================================================================

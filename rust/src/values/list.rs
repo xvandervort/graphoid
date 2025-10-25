@@ -49,10 +49,15 @@ impl List {
 
     /// Append a value to the end of the list
     pub fn append(&mut self, value: Value) -> Result<(), GraphoidError> {
+        use crate::graph::behaviors::apply_behaviors;
+
+        // Apply behaviors to incoming value (proactive application)
+        let transformed = apply_behaviors(value, &self.behaviors)?;
+
         let new_id = format!("node_{}", self.length);
 
-        // Add the new node
-        self.graph.add_node(new_id.clone(), value)?;
+        // Add the new node with transformed value
+        self.graph.add_node(new_id.clone(), transformed)?;
 
         // If not the first node, link from previous node
         if self.length > 0 {
@@ -86,6 +91,8 @@ impl List {
 
     /// Set value at index
     pub fn set(&mut self, index: usize, value: Value) -> Result<(), GraphoidError> {
+        use crate::graph::behaviors::apply_behaviors;
+
         if index >= self.length {
             return Err(GraphoidError::runtime(format!(
                 "Index {} out of bounds for list of length {}",
@@ -93,11 +100,14 @@ impl List {
             )));
         }
 
+        // Apply behaviors to incoming value (proactive application)
+        let transformed = apply_behaviors(value, &self.behaviors)?;
+
         let node_id = format!("node_{}", index);
 
         // Remove old node and add new one with same ID
         self.graph.remove_node(&node_id)?;
-        self.graph.add_node(node_id.clone(), value)?;
+        self.graph.add_node(node_id.clone(), transformed)?;
 
         // Restore edges
         if index > 0 {
@@ -165,6 +175,37 @@ impl List {
     /// Check if a ruleset is applied
     pub fn has_ruleset(&self, ruleset: &str) -> bool {
         self.graph.has_ruleset(ruleset)
+    }
+
+    /// Add a behavior to this list
+    ///
+    /// The behavior will be applied retroactively to existing values based on
+    /// the RetroactivePolicy, then added to the behaviors list for proactive
+    /// application to future values.
+    ///
+    /// # Arguments
+    /// * `behavior` - The behavior instance to add
+    ///
+    /// # Returns
+    /// `Ok(())` if successful, or an error if retroactive application fails
+    pub fn add_behavior(&mut self, behavior: BehaviorInstance) -> Result<(), GraphoidError> {
+        use crate::graph::behaviors::apply_retroactive_to_list;
+
+        // Apply retroactively based on policy
+        apply_retroactive_to_list(self, &behavior)?;
+
+        // Add to behaviors list for future proactive application
+        self.behaviors.push(behavior);
+
+        Ok(())
+    }
+
+    /// Get all behaviors attached to this list
+    ///
+    /// Returns a slice of behavior instances in the order they were added.
+    /// Behaviors are applied in this order: first added = first applied.
+    pub fn get_behaviors(&self) -> &[BehaviorInstance] {
+        &self.behaviors
     }
 }
 

@@ -10,4 +10,5 @@ mod unit {
     pub mod ruleset_enforcement_tests;
     pub mod algorithm_tests;
     pub mod behavior_framework_tests;
+    pub mod standard_behaviors_tests;
 }

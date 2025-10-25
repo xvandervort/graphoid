@@ -41,6 +41,11 @@ impl Hash {
 
     /// Insert a key-value pair
     pub fn insert(&mut self, key: String, value: Value) -> Result<Option<Value>, GraphoidError> {
+        use crate::graph::behaviors::apply_behaviors;
+
+        // Apply behaviors to incoming value (proactive application)
+        let transformed = apply_behaviors(value, &self.behaviors)?;
+
         // Check if key already exists
         let old_value = self.graph.get_node(&key).cloned();
 
@@ -49,8 +54,8 @@ impl Hash {
             self.graph.remove_node(&key)?;
         }
 
-        // Add new node with key as ID
-        self.graph.add_node(key, value)?;
+        // Add new node with key as ID and transformed value
+        self.graph.add_node(key, transformed)?;
 
         Ok(old_value)
     }
@@ -132,6 +137,37 @@ impl Hash {
     /// Check if a ruleset is applied
     pub fn has_ruleset(&self, ruleset: &str) -> bool {
         self.graph.has_ruleset(ruleset)
+    }
+
+    /// Add a behavior to this hash
+    ///
+    /// The behavior will be applied retroactively to existing values based on
+    /// the RetroactivePolicy, then added to the behaviors list for proactive
+    /// application to future values.
+    ///
+    /// # Arguments
+    /// * `behavior` - The behavior instance to add
+    ///
+    /// # Returns
+    /// `Ok(())` if successful, or an error if retroactive application fails
+    pub fn add_behavior(&mut self, behavior: BehaviorInstance) -> Result<(), GraphoidError> {
+        use crate::graph::behaviors::apply_retroactive_to_hash;
+
+        // Apply retroactively based on policy
+        apply_retroactive_to_hash(self, &behavior)?;
+
+        // Add to behaviors list for future proactive application
+        self.behaviors.push(behavior);
+
+        Ok(())
+    }
+
+    /// Get all behaviors attached to this hash
+    ///
+    /// Returns a slice of behavior instances in the order they were added.
+    /// Behaviors are applied in this order: first added = first applied.
+    pub fn get_behaviors(&self) -> &[BehaviorInstance] {
+        &self.behaviors
     }
 }
 
