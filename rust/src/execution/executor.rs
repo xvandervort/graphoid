@@ -136,8 +136,15 @@ impl Executor {
                                     _ => return Err(GraphoidError::type_error("string", idx.type_name())),
                                 };
 
-                                // Insert key-value pair
-                                hash.insert(key, val)?;
+                                // Apply behaviors with executor context if hash has behaviors
+                                let transformed_val = if !hash.behaviors.is_empty() {
+                                    self.apply_behaviors_with_context(val, &hash.behaviors)?
+                                } else {
+                                    val
+                                };
+
+                                // Insert key-value pair (using raw to avoid double-applying behaviors)
+                                hash.insert_raw(key, transformed_val)?;
 
                                 // Update the map in the environment
                                 if let Expr::Variable { name, .. } = object.as_ref() {
@@ -152,8 +159,15 @@ impl Executor {
                                     _ => return Err(GraphoidError::type_error("number", idx.type_name())),
                                 };
 
-                                // Update element at index
-                                list.set(index_num, val)?;
+                                // Apply behaviors with executor context if list has behaviors
+                                let transformed_val = if !list.behaviors.is_empty() {
+                                    self.apply_behaviors_with_context(val, &list.behaviors)?
+                                } else {
+                                    val
+                                };
+
+                                // Update element at index (using raw to avoid double-applying behaviors)
+                                list.set_raw(index_num, transformed_val)?;
 
                                 // Update the list in the environment
                                 if let Expr::Variable { name, .. } = object.as_ref() {
@@ -1214,9 +1228,18 @@ impl Executor {
                     )));
                 }
 
-                // Clone list and append value (this will validate rules)
+                // Clone list
                 let mut new_list = list.clone();
-                new_list.append(args[0].clone())?;
+
+                // Apply behaviors with executor context (handles both standard and function-based)
+                let transformed_value = if !new_list.behaviors.is_empty() {
+                    self.apply_behaviors_with_context(args[0].clone(), &new_list.behaviors)?
+                } else {
+                    args[0].clone()
+                };
+
+                // Append without re-applying behaviors (already done above)
+                new_list.append_raw(transformed_value)?;
                 Ok(Value::List(new_list))
             }
             _ => Err(GraphoidError::runtime(format!(
@@ -1807,6 +1830,102 @@ impl Executor {
         execution_result?;
 
         Ok(return_value)
+    }
+
+    /// Apply behaviors to a value with executor context for function-based behaviors
+    ///
+    /// This method handles both standard behaviors (via Behavior trait) and
+    /// function-based behaviors (CustomFunction, Conditional) that require
+    /// executor context to call user functions.
+    ///
+    /// # Arguments
+    /// * `value` - The value to transform
+    /// * `behaviors` - The behaviors to apply, in order
+    ///
+    /// # Returns
+    /// The transformed value, or an error if any transformation fails
+    pub fn apply_behaviors_with_context(
+        &mut self,
+        value: Value,
+        behaviors: &[crate::graph::behaviors::BehaviorInstance],
+    ) -> Result<Value> {
+        use crate::graph::behaviors::BehaviorSpec;
+
+        let mut current = value;
+
+        for behavior_instance in behaviors {
+            match &behavior_instance.spec {
+                BehaviorSpec::CustomFunction { function } => {
+                    // Extract function from Value
+                    match function {
+                        Value::Function(func) => {
+                            // Call function with executor context
+                            current = self.call_function(func, &[current])?;
+                        }
+                        _ => {
+                            return Err(GraphoidError::runtime(
+                                "CustomFunction behavior requires a function value".to_string()
+                            ));
+                        }
+                    }
+                }
+                BehaviorSpec::Conditional { condition, transform, fallback } => {
+                    // Call condition predicate
+                    let condition_func = match condition {
+                        Value::Function(f) => f,
+                        _ => {
+                            return Err(GraphoidError::runtime(
+                                "Conditional behavior condition must be a function".to_string()
+                            ));
+                        }
+                    };
+
+                    let condition_result = self.call_function(condition_func, &[current.clone()])?;
+
+                    // Check if condition is truthy
+                    let is_truthy = match condition_result {
+                        Value::Boolean(b) => b,
+                        Value::None => false,
+                        Value::Number(n) => n != 0.0,
+                        _ => true, // Non-false, non-none values are truthy
+                    };
+
+                    if is_truthy {
+                        // Apply transform function
+                        let transform_func = match transform {
+                            Value::Function(f) => f,
+                            _ => {
+                                return Err(GraphoidError::runtime(
+                                    "Conditional behavior transform must be a function".to_string()
+                                ));
+                            }
+                        };
+                        current = self.call_function(transform_func, &[current])?;
+                    } else if let Some(fallback_val) = fallback {
+                        // Apply fallback function
+                        let fallback_func = match fallback_val {
+                            Value::Function(f) => f,
+                            _ => {
+                                return Err(GraphoidError::runtime(
+                                    "Conditional behavior fallback must be a function".to_string()
+                                ));
+                            }
+                        };
+                        current = self.call_function(fallback_func, &[current])?;
+                    }
+                    // else: no fallback, keep current value unchanged
+                }
+                _ => {
+                    // Standard behaviors use trait
+                    let behavior = behavior_instance.spec.instantiate();
+                    if behavior.applies_to(&current) {
+                        current = behavior.transform(&current)?;
+                    }
+                }
+            }
+        }
+
+        Ok(current)
     }
 
     /// Applies a named transformation to a value.

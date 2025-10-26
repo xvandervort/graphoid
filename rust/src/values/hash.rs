@@ -60,6 +60,32 @@ impl Hash {
         Ok(old_value)
     }
 
+    /// Insert a key-value pair without applying behaviors
+    ///
+    /// This is an internal method used by the executor when behaviors have
+    /// already been applied with full executor context (for function-based behaviors).
+    ///
+    /// # Arguments
+    /// * `key` - The key to insert
+    /// * `value` - The value to insert (already transformed)
+    ///
+    /// # Returns
+    /// `Ok(Some(old_value))` if key existed, `Ok(None)` if new key, or an error if the operation fails
+    pub fn insert_raw(&mut self, key: String, value: Value) -> Result<Option<Value>, GraphoidError> {
+        // Check if key already exists
+        let old_value = self.graph.get_node(&key).cloned();
+
+        // Remove old node if it exists
+        if old_value.is_some() {
+            self.graph.remove_node(&key)?;
+        }
+
+        // Add new node with key as ID (no behavior application)
+        self.graph.add_node(key, value)?;
+
+        Ok(old_value)
+    }
+
     /// Get value for a key
     pub fn get(&self, key: &str) -> Option<&Value> {
         self.graph.get_node(key)

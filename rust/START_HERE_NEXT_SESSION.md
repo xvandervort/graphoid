@@ -1,199 +1,188 @@
-# START HERE - Phase 7.4 Implementation Ready! 🚀
+# START HERE - Phase 7.5 Ready! 🚀
 
 **Last Updated**: October 25, 2025
-**Current Status**: ✅ PHASE 7.3 COMPLETE! Phase 7.4 ready to start!
-**Tests Passing**: 371/371 (100%)
-**What's Next**: 🎯 BEGIN PHASE 7.4 - CUSTOM/CONDITIONAL BEHAVIORS
+**Current Status**: ✅ PHASE 7.4 COMPLETE! Phase 7.5 ready to start!
+**Tests Passing**: 386/386 (100%)
+**What's Next**: 🎯 BEGIN PHASE 7.5 - ORDERING BEHAVIORS
 
 ---
 
-## 🎉 Major Milestone: Sub-Phase 7.3 Complete!
+## 🎉 Major Milestone: Sub-Phase 7.4 Complete!
 
-### What Was Accomplished (Sub-Phase 7.3)
+### What Was Accomplished (Sub-Phase 7.4)
 
-**Mapping Behaviors - Fully Implemented**:
-- ✅ MappingBehavior fully functional
-- ✅ value_to_key() helper for Value → String conversion
-- ✅ Default fallback for unmapped keys
-- ✅ Works with all Value types
+**Custom Function & Conditional Behaviors - Fully Implemented**:
+- ✅ CustomFunction behavior with user-defined functions
+- ✅ Conditional behavior with predicate-based transformations
+- ✅ Executor-level behavior application with function execution context
+- ✅ `apply_behaviors_with_context()` method in executor
+- ✅ Support for closures and captured variables
 - ✅ Retroactive and proactive application
-- ✅ 10 mapping behavior tests passing
+- ✅ 15 custom/conditional behavior tests passing
 - ✅ Zero compiler warnings
 
 **Deliverables**:
-1. `tests/unit/mapping_behaviors_tests.rs` (10 tests)
-2. `value_to_key()` helper function
-3. Complete `MappingBehavior::transform()` implementation
+1. `tests/unit/custom_conditional_behaviors_tests.rs` (15 tests)
+2. `Executor::apply_behaviors_with_context()` method for function-based behaviors
+3. `List::append_raw()`, `List::set_raw()`, `Hash::insert_raw()` internal methods
+4. Behavior application wired into executor's index assignment operations
 
-**Key Implementation**:
+**Key Architecture**:
+
+Two-level behavior application system:
+1. **Standard Behaviors**: Use Behavior trait's `transform()` method (no executor context needed)
+2. **Function-based Behaviors**: Handled specially in `apply_behaviors_with_context()` with full executor context
+
 ```rust
-fn value_to_key(value: &Value) -> String {
-    match value {
-        Value::String(s) => s.clone(),
-        Value::Number(n) => {
-            if n.fract() == 0.0 { format!("{}", *n as i64) }
-            else { n.to_string() }
+// In executor
+pub fn apply_behaviors_with_context(
+    &mut self,
+    value: Value,
+    behaviors: &[BehaviorInstance],
+) -> Result<Value> {
+    for behavior in behaviors {
+        match &behavior.spec {
+            BehaviorSpec::CustomFunction { function } => {
+                // Call user function with executor context
+                current = self.call_function(function, &[current])?;
+            }
+            BehaviorSpec::Conditional { condition, transform, fallback } => {
+                // Evaluate predicate, apply transform or fallback
+            }
+            _ => {
+                // Use standard Behavior trait
+                current = behavior.spec.instantiate().transform(&current)?;
+            }
         }
-        Value::Symbol(s) => s.clone(),
-        Value::Boolean(b) => b.to_string(),
-        Value::None => "none".to_string(),
-        _ => format!("{:?}", value),
     }
+    Ok(current)
 }
 ```
 
-**Mapping Features Verified**:
-- Map any value type to any value type ✅
-- Default fallback for unmapped keys ✅
-- Retroactive transformation ✅
-- Proactive transformation ✅
-- Integration with List and Hash ✅
+**Test Coverage**:
+- Custom function basic transformation ✅
+- Custom function with closures ✅
+- Type-specific behavior errors ✅
+- Error handling (division by zero) ✅
+- Retroactive application ✅
+- Proactive application ✅
+- Conditional basic (if-then) ✅
+- Conditional with fallback (if-then-else) ✅
+- Conditional without fallback ✅
+- Conditional chains (multiple predicates) ✅
+- List integration ✅
+- Mixed standard + custom behaviors ✅
 
 ---
 
-## 🚀 Starting Phase 7.4: Custom/Conditional Behaviors
+## 🚀 Starting Phase 7.5: Ordering Behaviors
 
 ### Goal
-Implement user-defined custom functions and conditional behaviors with predicate-based transformations.
+Implement ordering/sorting behaviors that automatically maintain sorted order in collections.
 
 ### Duration
-2-3 days
+1-2 days
 
 ### What You're Building
 
-Two advanced behavior types:
+Ordering behaviors that keep lists sorted:
 
-1. **Custom Function Behaviors** - User-defined transformation functions
-2. **Conditional Behaviors** - Transform based on predicates
-
-**Example Custom Function**:
+**Example Default Ordering**:
 ```graphoid
-# Define custom transformation
-func double(x) { return x * 2 }
+numbers = [3, 1, 4, 1, 5, 9]
+numbers.add_ordering_rule()  # Default numeric ordering
+# Result: [1, 1, 3, 4, 5, 9]
 
-numbers = [1, 2, 3]
-numbers.add_custom_rule(double)
-# Result: [2, 4, 6]
+numbers.append(2)
+# Result: [1, 1, 2, 3, 4, 5, 9]  # Automatically inserted in correct position
 ```
 
-**Example Conditional Behavior**:
+**Example Custom Ordering**:
 ```graphoid
-# Transform if condition met
-numbers = [-5, 3, -2, 7]
+words = ["cat", "elephant", "dog"]
 
-# If negative, make positive; otherwise keep unchanged
-numbers.add_conditional_rule(
-    func(x) { return x < 0 },      # condition
-    func(x) { return -x },          # transform
-    func(x) { return x }            # fallback (optional)
-)
-# Result: [5, 3, 2, 7]
+# Sort by length
+func by_length(a, b) {
+    return len(a) - len(b)
+}
+
+words.add_ordering_rule(by_length)
+# Result: ["cat", "dog", "elephant"]
 ```
 
 ### TDD Workflow (Red → Green → Refactor)
 
-#### Step 1: RED Phase - Write Tests FIRST (15 tests)
+#### Step 1: RED Phase - Write Tests FIRST (12 tests)
 
-Create `tests/unit/custom_conditional_behaviors_tests.rs` with 15 tests:
+Create `tests/unit/ordering_behaviors_tests.rs` with 12 tests:
 
-**Custom Function Tests** (6 tests):
-1. `test_custom_function_basic()` - Simple transformation function
-2. `test_custom_function_with_closure()` - Closure as behavior
-3. `test_custom_function_type_specific()` - Only applies to numbers
-4. `test_custom_function_retroactive()` - Existing values transformed
-5. `test_custom_function_proactive()` - New values transformed
-6. `test_custom_function_error_handling()` - Function errors handled
+**Default Ordering Tests** (4 tests):
+1. `test_ordering_numbers_default()` - Default numeric sort
+2. `test_ordering_strings_default()` - Default string sort (lexicographic)
+3. `test_ordering_retroactive()` - Existing values sorted when rule added
+4. `test_ordering_proactive()` - New values inserted in sorted position
 
-**Conditional Tests** (6 tests):
-7. `test_conditional_basic()` - Simple predicate-based transform
-8. `test_conditional_with_fallback()` - Fallback for false condition
-9. `test_conditional_without_fallback()` - No fallback (keep original)
-10. `test_conditional_retroactive()` - Existing values transformed
-11. `test_conditional_proactive()` - New values transformed
-12. `test_conditional_chain()` - Multiple conditionals
+**Custom Ordering Tests** (4 tests):
+5. `test_ordering_custom_function()` - User-defined comparison function
+6. `test_ordering_reverse()` - Reverse ordering
+7. `test_ordering_by_field()` - Sort by specific field/property
+8. `test_ordering_stability()` - Stable sort (equal elements maintain order)
 
-**Integration Tests** (3 tests):
-13. `test_list_with_custom_function()` - List transformation
-14. `test_list_with_conditional()` - Conditional on list
-15. `test_mixed_behaviors()` - Standard + custom + conditional
+**Integration Tests** (4 tests):
+9. `test_list_maintains_order()` - List stays sorted after multiple operations
+10. `test_ordering_with_other_behaviors()` - Ordering + transformation behaviors
+11. `test_ordering_edge_cases()` - Empty list, single element
+12. `test_ordering_duplicate_values()` - Multiple equal values
 
-**Run tests**: `~/.cargo/bin/cargo test --test custom_conditional_behaviors_tests`
-**Expected**: All 15 tests FAIL (no implementation yet)
+**Run tests**: `~/.cargo/bin/cargo test --test ordering_behaviors_tests`
+**Expected**: All 12 tests FAIL (no implementation yet)
 
 #### Step 2: GREEN Phase - Make Tests Pass
 
 **Implementation Order**:
 
-1. **Complete CustomFunctionBehavior in `src/graph/behaviors.rs`**:
+1. **Complete OrderingBehavior in `src/graph/behaviors.rs`**:
    ```rust
-   impl Behavior for CustomFunctionBehavior {
+   impl Behavior for OrderingBehavior {
        fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-           // Execute function with value as argument
-           match &self.function {
-               Value::Function(func) => {
-                   // Call function with value
-                   func.call(vec![value.clone()])
-               }
-               _ => Err(GraphoidError::runtime("Custom behavior requires function"))
-           }
+           // Ordering doesn't transform individual values
+           // It's applied at collection level when values are added
+           Ok(value.clone())
        }
    }
    ```
 
-2. **Complete ConditionalBehavior in `src/graph/behaviors.rs`**:
-   ```rust
-   impl Behavior for ConditionalBehavior {
-       fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-           // Evaluate condition
-           let condition_result = evaluate_predicate(&self.condition, value)?;
+2. **Add ordering logic to List** in executor:
+   - When appending with ordering behavior, find correct insertion point
+   - Use binary search for efficiency
+   - Support custom comparison functions via executor context
 
-           if condition_result {
-               // Apply transform
-               apply_function(&self.transform, value)
-           } else if let Some(ref fallback) = self.fallback {
-               // Apply fallback
-               apply_function(fallback, value)
-           } else {
-               // No fallback, keep original
-               Ok(value.clone())
-           }
-       }
-   }
-   ```
+3. **Implement default ordering** for different value types:
+   - Numbers: numeric comparison
+   - Strings: lexicographic comparison
+   - Booleans: false < true
+   - None: always sorts first
 
-3. **Note**: Function execution depends on Phase 4 Function implementation
-   - For Sub-Phase 7.4, we may need to stub or skip function-based tests
-   - Or implement minimal function support for testing
-
-**Run tests**: `~/.cargo/bin/cargo test --test custom_conditional_behaviors_tests`
-**Expected**: All 15 tests PASS
+**Run tests**: `~/.cargo/bin/cargo test --test ordering_behaviors_tests`
+**Expected**: All 12 tests PASS
 
 #### Step 3: REFACTOR Phase - Polish
 
 - Add comprehensive rustdoc comments
-- Verify error handling
+- Optimize binary search insertion
 - Test edge cases
 - Zero warnings
 
 ### Acceptance Criteria
 
-- ✅ 15 tests passing (or documented as pending if Functions not ready)
-- ✅ CustomFunctionBehavior implemented
-- ✅ ConditionalBehavior implemented
-- ✅ Retroactive and proactive application work
-- ✅ Error handling for invalid functions
+- ✅ 12 tests passing
+- ✅ OrderingBehavior implemented
+- ✅ Default ordering for all value types
+- ✅ Custom comparison function support
+- ✅ Efficient binary search insertion
+- ✅ Retroactive and proactive sorting work
 - ✅ Zero compiler warnings
 - ✅ All code documented with rustdoc comments
-
-### **IMPORTANT NOTE**: Function Implementation Dependency
-
-Sub-Phase 7.4 depends on Function values from Phase 4, which may not be fully implemented yet. Options:
-
-1. **Option A**: Skip 7.4 and move to 7.5 (Ordering Behaviors)
-2. **Option B**: Implement minimal function support for testing
-3. **Option C**: Write tests but mark as `#[ignore]` until Phase 4
-
-**Recommendation**: Check if Value::Function is usable. If not, **skip to 7.5**.
 
 ---
 
@@ -206,13 +195,13 @@ Sub-Phase 7.4 depends on Function values from Phase 4, which may not be fully im
 | **7.1** | 1-2 days | Behavior Framework | 18 | ✅ COMPLETE |
 | **7.2** | 2-3 days | Standard Behaviors | 20 | ✅ COMPLETE |
 | **7.3** | 1-2 days | Mapping Behaviors | 10 | ✅ COMPLETE |
-| **7.4** | 2-3 days | Custom/Conditional | 15 | 🔜 NEXT (or SKIP) |
-| **7.5** | 1-2 days | Ordering Behaviors | 12 | Alternative Next |
+| **7.4** | 2-3 days | Custom/Conditional | 15 | ✅ COMPLETE |
+| **7.5** | 1-2 days | Ordering Behaviors | 12 | 🔜 NEXT |
 | **7.6** | 1 day | Behavior Management | 8 | Pending |
 | **7.7** | 0.5-1 day | Quality Gate | 12 | Pending |
 
 **Total**: 8-11 days, 95+ tests
-**Progress**: 48/95 tests (51% complete)
+**Progress**: 63/95 tests (66% complete)
 
 ---
 
@@ -222,44 +211,51 @@ Sub-Phase 7.4 depends on Function values from Phase 4, which may not be fully im
 
 1. **PHASE_7_BEHAVIOR_SYSTEM_PLAN.md** (1680 lines)
    - Complete implementation plan
-   - Read lines 850-1050 for Sub-Phase 7.4 details
-   - Read lines 1050-1200 for Sub-Phase 7.5 (Ordering) if skipping 7.4
+   - Read lines 1050-1200 for Sub-Phase 7.5 details
 
-### Files You'll Create (Sub-Phase 7.4 or 7.5)
+2. **PHASE_7_5_ORDERING_BEHAVIORS.md** (if exists)
+   - Detailed ordering behavior specification
 
-If doing **7.4** (Custom/Conditional):
-1. **`tests/unit/custom_conditional_behaviors_tests.rs`** (~500 lines)
+### Files You'll Create (Sub-Phase 7.5)
 
-If doing **7.5** (Ordering):
 1. **`tests/unit/ordering_behaviors_tests.rs`** (~400 lines)
 
 ### Files You'll Modify
 
-1. **`src/graph/behaviors.rs`** - Complete CustomFunctionBehavior and ConditionalBehavior
-2. **`tests/unit/mod.rs`** - Add test module
+1. **`src/graph/behaviors.rs`** - Complete OrderingBehavior implementation
+2. **`src/execution/executor.rs`** - Add sorted insertion logic
+3. **`tests/unit_tests.rs`** - Add test module
 
 ---
 
-## 💡 Decision Point: 7.4 or 7.5?
+## 💡 Implementation Notes
 
-### Check Function Implementation Status
+### Ordering Strategy
 
-```bash
-# Check if Value::Function is implemented
-grep -A 10 "pub enum Value" src/values/mod.rs | grep Function
+**Proactive Application** (when adding new values):
+- Find correct position using binary search
+- Insert value at that position
+- O(log n) search + O(n) insertion
 
-# Check if Function struct exists
-grep -n "pub struct Function" src/values/*.rs
+**Retroactive Application** (when adding ordering rule):
+- Sort existing list using comparison function
+- Replace list contents with sorted version
+- O(n log n) sort
+
+**Comparison Functions**:
+- Default: Compare values directly (numbers, strings, etc.)
+- Custom: User-provided function that returns -1, 0, or 1
+
+**Binary Search in Executor**:
+```rust
+// When appending to list with ordering behavior
+if list has ordering behavior {
+    let insert_pos = binary_search(&list, &value, &compare_fn)?;
+    list.insert_at(insert_pos, value)?;  // New method needed
+} else {
+    list.append(value)?;
+}
 ```
-
-**If Functions are NOT ready**:
-- Skip to Sub-Phase 7.5 (Ordering Behaviors)
-- Ordering doesn't depend on Functions
-- Come back to 7.4 after Phase 4
-
-**If Functions ARE ready**:
-- Continue with Sub-Phase 7.4
-- Implement custom function behaviors
 
 ---
 
@@ -269,9 +265,7 @@ grep -n "pub struct Function" src/values/*.rs
 # Run all tests
 ~/.cargo/bin/cargo test
 
-# Run specific behavior tests
-~/.cargo/bin/cargo test --test custom_conditional_behaviors_tests
-# OR
+# Run specific ordering tests
 ~/.cargo/bin/cargo test --test ordering_behaviors_tests
 
 # Check for warnings
@@ -281,9 +275,8 @@ grep -n "pub struct Function" src/values/*.rs
 ~/.cargo/bin/cargo test 2>&1 | grep "test result:"
 ```
 
-**Current Baseline**: 371 tests passing from Phase 7.3
-**Target After 7.4**: 386 tests passing (+15)
-**Target After 7.5**: 383 tests passing (+12)
+**Current Baseline**: 386 tests passing from Sub-Phase 7.4
+**Target After 7.5**: 398 tests passing (+12)
 
 ---
 
@@ -291,22 +284,21 @@ grep -n "pub struct Function" src/values/*.rs
 
 Before starting implementation:
 
-1. **Check Function status first**
-2. **`dev_docs/PHASE_7_BEHAVIOR_SYSTEM_PLAN.md`**
-   - Lines 850-1050 for Sub-Phase 7.4
-   - Lines 1050-1200 for Sub-Phase 7.5
-3. **`dev_docs/PHASE_7_5_ORDERING_BEHAVIORS.md`** if doing 7.5
+1. **`dev_docs/PHASE_7_BEHAVIOR_SYSTEM_PLAN.md`**
+   - Lines 1050-1200 for Sub-Phase 7.5 details
+2. **`dev_docs/PHASE_7_5_ORDERING_BEHAVIORS.md`** (if exists)
 
 ---
 
 ## 🎯 Recommended Next Step
 
-1. **Check if Functions are implemented** (see Decision Point above)
-2. **If NO**: Skip to Sub-Phase 7.5 (Ordering Behaviors)
-3. **If YES**: Continue with Sub-Phase 7.4 (Custom/Conditional)
+1. **Create test file** `tests/unit/ordering_behaviors_tests.rs` with 12 failing tests (RED phase)
+2. **Implement OrderingBehavior** logic in executor (GREEN phase)
+3. **Add List::insert_at()** method for inserting at specific position
+4. **Test and refine** until all 12 tests pass
 
 ---
 
-## 🎉 Ready for Next Sub-Phase!
+## 🎉 Sub-Phase 7.4 Complete!
 
-**Mapping behaviors complete! Foundation is solid. Phase 7 is 51% done! 🚀**
+**Custom and conditional behaviors fully working! Function-based behaviors integrate seamlessly with executor context. Phase 7 is 66% done! 🚀**

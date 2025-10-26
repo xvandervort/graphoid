@@ -69,6 +69,32 @@ impl List {
         Ok(())
     }
 
+    /// Append a value to the end of the list without applying behaviors
+    ///
+    /// This is an internal method used by the executor when behaviors have
+    /// already been applied with full executor context (for function-based behaviors).
+    ///
+    /// # Arguments
+    /// * `value` - The value to append (already transformed)
+    ///
+    /// # Returns
+    /// `Ok(())` if successful, or an error if the operation fails
+    pub fn append_raw(&mut self, value: Value) -> Result<(), GraphoidError> {
+        let new_id = format!("node_{}", self.length);
+
+        // Add the new node (no behavior application)
+        self.graph.add_node(new_id.clone(), value)?;
+
+        // If not the first node, link from previous node
+        if self.length > 0 {
+            let prev_id = format!("node_{}", self.length - 1);
+            self.graph.add_edge(&prev_id, &new_id, "next".to_string(), HashMap::new())?;
+        }
+
+        self.length += 1;
+        Ok(())
+    }
+
     /// Get value at index
     pub fn get(&self, index: usize) -> Option<&Value> {
         if index >= self.length {
@@ -108,6 +134,44 @@ impl List {
         // Remove old node and add new one with same ID
         self.graph.remove_node(&node_id)?;
         self.graph.add_node(node_id.clone(), transformed)?;
+
+        // Restore edges
+        if index > 0 {
+            let prev_id = format!("node_{}", index - 1);
+            self.graph.add_edge(&prev_id, &node_id, "next".to_string(), HashMap::new())?;
+        }
+        if index < self.length - 1 {
+            let next_id = format!("node_{}", index + 1);
+            self.graph.add_edge(&node_id, &next_id, "next".to_string(), HashMap::new())?;
+        }
+
+        Ok(())
+    }
+
+    /// Set value at index without applying behaviors
+    ///
+    /// This is an internal method used by the executor when behaviors have
+    /// already been applied with full executor context (for function-based behaviors).
+    ///
+    /// # Arguments
+    /// * `index` - The index to set
+    /// * `value` - The value to set (already transformed)
+    ///
+    /// # Returns
+    /// `Ok(())` if successful, or an error if the operation fails
+    pub fn set_raw(&mut self, index: usize, value: Value) -> Result<(), GraphoidError> {
+        if index >= self.length {
+            return Err(GraphoidError::runtime(format!(
+                "Index {} out of bounds for list of length {}",
+                index, self.length
+            )));
+        }
+
+        let node_id = format!("node_{}", index);
+
+        // Remove old node and add new one with same ID (no behavior application)
+        self.graph.remove_node(&node_id)?;
+        self.graph.add_node(node_id.clone(), value)?;
 
         // Restore edges
         if index > 0 {

@@ -12,4 +12,5 @@ mod unit {
     pub mod behavior_framework_tests;
     pub mod standard_behaviors_tests;
     pub mod mapping_behaviors_tests;
+    pub mod custom_conditional_behaviors_tests;
 }
