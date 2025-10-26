@@ -5,7 +5,7 @@
 
 use super::{Value, Graph};
 use crate::values::graph::GraphType;
-use crate::graph::{RuleSpec, RuleInstance, BehaviorInstance};
+use crate::graph::{RuleSpec, RuleInstance};
 use crate::error::GraphoidError;
 use std::collections::HashMap;
 
@@ -19,9 +19,6 @@ pub struct List {
     pub graph: Graph,
     /// Number of items (cached for O(1) access)
     length: usize,
-    /// Behaviors attached to this list
-    /// Applied in order: first added = first applied
-    pub behaviors: Vec<BehaviorInstance>,
 }
 
 impl List {
@@ -34,7 +31,6 @@ impl List {
         List {
             graph,
             length: 0,
-            behaviors: Vec::new(),
         }
     }
 
@@ -49,10 +45,8 @@ impl List {
 
     /// Append a value to the end of the list
     pub fn append(&mut self, value: Value) -> Result<(), GraphoidError> {
-        use crate::graph::behaviors::apply_behaviors;
-
-        // Apply behaviors to incoming value (proactive application)
-        let transformed = apply_behaviors(value, &self.behaviors)?;
+        // Apply transformation rules to incoming value (proactive application)
+        let transformed = self.apply_transformation_rules(value)?;
 
         let new_id = format!("node_{}", self.length);
 
@@ -117,8 +111,6 @@ impl List {
 
     /// Set value at index
     pub fn set(&mut self, index: usize, value: Value) -> Result<(), GraphoidError> {
-        use crate::graph::behaviors::apply_behaviors;
-
         if index >= self.length {
             return Err(GraphoidError::runtime(format!(
                 "Index {} out of bounds for list of length {}",
@@ -126,8 +118,8 @@ impl List {
             )));
         }
 
-        // Apply behaviors to incoming value (proactive application)
-        let transformed = apply_behaviors(value, &self.behaviors)?;
+        // Apply transformation rules to incoming value (proactive application)
+        let transformed = self.apply_transformation_rules(value)?;
 
         let node_id = format!("node_{}", index);
 
@@ -207,9 +199,122 @@ impl List {
         result
     }
 
+    /// Insert a value at a specific index
+    ///
+    /// This method inserts a value at the given index, shifting all subsequent
+    /// values to the right. Behaviors are automatically applied to the inserted value.
+    ///
+    /// # Arguments
+    /// * `index` - The position to insert at (0 = beginning, length = end)
+    /// * `value` - The value to insert
+    ///
+    /// # Returns
+    /// `Ok(())` if successful, or an error if the index is out of bounds
+    pub fn insert_at(&mut self, index: usize, value: Value) -> Result<(), GraphoidError> {
+        if index > self.length {
+            return Err(GraphoidError::runtime(format!(
+                "Index {} out of bounds for list of length {} (insert)",
+                index, self.length
+            )));
+        }
+
+        // Apply transformation rules to incoming value (proactive application)
+        let transformed = self.apply_transformation_rules(value)?;
+
+        // Collect all values
+        let mut values = self.to_vec();
+
+        // Insert transformed value at position
+        values.insert(index, transformed);
+
+        // Save the rules before rebuilding
+        let saved_rules = self.graph.rules.clone();
+        let saved_rulesets = self.graph.rulesets.clone();
+
+        // Rebuild list from scratch
+        // Clear the graph
+        self.graph = Graph::new(GraphType::Directed);
+        self.length = 0;
+
+        // Restore the rules and rulesets
+        self.graph.rules = saved_rules;
+        self.graph.rulesets = saved_rulesets;
+
+        // Re-add all values
+        for val in values {
+            self.append_raw(val)?;
+        }
+
+        Ok(())
+    }
+
+    /// Insert a value at a specific index without applying behaviors
+    ///
+    /// This is an internal method used by the executor when behaviors have
+    /// already been applied with full executor context (for function-based behaviors).
+    ///
+    /// # Arguments
+    /// * `index` - The position to insert at (0 = beginning, length = end)
+    /// * `value` - The value to insert (already transformed)
+    ///
+    /// # Returns
+    /// `Ok(())` if successful, or an error if the index is out of bounds
+    pub fn insert_at_raw(&mut self, index: usize, value: Value) -> Result<(), GraphoidError> {
+        if index > self.length {
+            return Err(GraphoidError::runtime(format!(
+                "Index {} out of bounds for list of length {} (insert)",
+                index, self.length
+            )));
+        }
+
+        // Collect all values
+        let mut values = self.to_vec();
+
+        // Insert value at position (no behavior application)
+        values.insert(index, value);
+
+        // Save the rules before rebuilding
+        let saved_rules = self.graph.rules.clone();
+        let saved_rulesets = self.graph.rulesets.clone();
+
+        // Rebuild list from scratch
+        // Clear the graph
+        self.graph = Graph::new(GraphType::Directed);
+        self.length = 0;
+
+        // Restore the rules and rulesets
+        self.graph.rules = saved_rules;
+        self.graph.rulesets = saved_rulesets;
+
+        // Re-add all values
+        for val in values {
+            self.append_raw(val)?;
+        }
+
+        Ok(())
+    }
+
     /// Add a rule to this list
+    ///
+    /// If the rule is a transformation rule, it will be applied retroactively
+    /// to all existing values in the list (with RetroactivePolicy::Clean).
     pub fn add_rule(&mut self, rule: RuleInstance) -> Result<(), GraphoidError> {
+        // If it's a transformation rule, apply it retroactively to existing values
+        if rule.spec.is_transformation_rule() {
+            let rule_impl = rule.spec.instantiate();
+
+            // Transform all existing values
+            for i in 0..self.length {
+                let node_id = format!("node_{}", i);
+                if let Some(node) = self.graph.nodes.get_mut(&node_id) {
+                    node.value = rule_impl.transform(&node.value)?;
+                }
+            }
+        }
+
+        // Add the rule to the graph
         self.graph.add_rule(rule)?;
+
         // Recompute length in case cleaning removed nodes
         self.length = self.graph.node_count();
         Ok(())
@@ -241,36 +346,30 @@ impl List {
         self.graph.has_ruleset(ruleset)
     }
 
-    /// Add a behavior to this list
+    /// Apply transformation rules to a value
     ///
-    /// The behavior will be applied retroactively to existing values based on
-    /// the RetroactivePolicy, then added to the behaviors list for proactive
-    /// application to future values.
+    /// Filters the graph's rules for transformation rules and applies them in sequence.
+    /// Rules are applied in order: first added = first applied.
     ///
     /// # Arguments
-    /// * `behavior` - The behavior instance to add
+    /// * `value` - The value to transform
     ///
     /// # Returns
-    /// `Ok(())` if successful, or an error if retroactive application fails
-    pub fn add_behavior(&mut self, behavior: BehaviorInstance) -> Result<(), GraphoidError> {
-        use crate::graph::behaviors::apply_retroactive_to_list;
+    /// The transformed value, or an error if transformation fails
+    fn apply_transformation_rules(&self, value: Value) -> Result<Value, GraphoidError> {
+        let mut current = value;
 
-        // Apply retroactively based on policy
-        apply_retroactive_to_list(self, &behavior)?;
+        // Apply transformation rules from graph.rules in order
+        for rule_instance in &self.graph.rules {
+            if rule_instance.spec.is_transformation_rule() {
+                let rule = rule_instance.spec.instantiate();
+                current = rule.transform(&current)?;
+            }
+        }
 
-        // Add to behaviors list for future proactive application
-        self.behaviors.push(behavior);
-
-        Ok(())
+        Ok(current)
     }
 
-    /// Get all behaviors attached to this list
-    ///
-    /// Returns a slice of behavior instances in the order they were added.
-    /// Behaviors are applied in this order: first added = first applied.
-    pub fn get_behaviors(&self) -> &[BehaviorInstance] {
-        &self.behaviors
-    }
 }
 
 impl Default for List {

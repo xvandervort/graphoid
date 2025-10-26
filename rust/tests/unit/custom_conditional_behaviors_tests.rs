@@ -10,8 +10,7 @@
 use graphoid::ast::{Stmt, Expr, LiteralValue, BinaryOp, UnaryOp};
 use graphoid::execution::{Executor, Environment};
 use graphoid::values::{Value, List, Function};
-use graphoid::graph::behaviors::{BehaviorInstance, BehaviorSpec};
-use graphoid::graph::rules::RetroactivePolicy;
+use graphoid::graph::{RuleInstance, RuleSpec};
 use graphoid::error::SourcePosition;
 use std::rc::Rc;
 
@@ -85,17 +84,14 @@ fn create_is_negative_fn() -> Function {
 
 #[test]
 fn test_custom_function_basic() {
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::CustomFunction {
+    let rule = RuleInstance::new(RuleSpec::CustomFunction {
             function: Value::Function(create_double_fn()),
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+        });
 
     let mut executor = Executor::new();
 
     // Test basic transformation
-    let result = executor.apply_behaviors_with_context(Value::Number(5.0), &[behavior]).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(5.0), &[rule]).unwrap();
     assert_eq!(result, Value::Number(10.0)); // 5 * 2
 }
 
@@ -123,15 +119,12 @@ fn test_custom_function_with_closure() {
         env: Rc::new(env),
     };
 
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::CustomFunction {
+    let rule = RuleInstance::new(RuleSpec::CustomFunction {
             function: Value::Function(multiply_fn),
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+        });
 
     let mut executor = Executor::new();
-    let result = executor.apply_behaviors_with_context(Value::Number(5.0), &[behavior]).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(5.0), &[rule]).unwrap();
     assert_eq!(result, Value::Number(15.0)); // 5 * 3
 }
 
@@ -155,21 +148,18 @@ fn test_custom_function_type_specific() {
         env: Rc::new(Environment::new()),
     };
 
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::CustomFunction {
+    let rule = RuleInstance::new(RuleSpec::CustomFunction {
             function: Value::Function(add_ten_fn),
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+        });
 
     let mut executor = Executor::new();
 
     // Test with number
-    let result = executor.apply_behaviors_with_context(Value::Number(5.0), &[behavior.clone()]).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(5.0), &[rule.clone()]).unwrap();
     assert_eq!(result, Value::Number(15.0));
 
     // Test with string - should error because "x" + 10 is not valid
-    let result = executor.apply_behaviors_with_context(Value::String("hello".to_string()), &[behavior]);
+    let result = executor.apply_transformation_rules_with_context(Value::String("hello".to_string()), &[rule]);
     assert!(result.is_err());
 }
 
@@ -193,21 +183,18 @@ fn test_custom_function_error_handling() {
         env: Rc::new(Environment::new()),
     };
 
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::CustomFunction {
+    let rule = RuleInstance::new(RuleSpec::CustomFunction {
             function: Value::Function(divide_fn),
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+        });
 
     let mut executor = Executor::new();
 
     // 10 / 2 = 5
-    let result = executor.apply_behaviors_with_context(Value::Number(2.0), &[behavior.clone()]).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(2.0), &[rule.clone()]).unwrap();
     assert_eq!(result, Value::Number(5.0));
 
     // Division by zero should error
-    let result = executor.apply_behaviors_with_context(Value::Number(0.0), &[behavior]);
+    let result = executor.apply_transformation_rules_with_context(Value::Number(0.0), &[rule]);
     assert!(result.is_err());
 }
 
@@ -215,18 +202,15 @@ fn test_custom_function_error_handling() {
 fn test_custom_function_proactive() {
     // Test that new values added to a list are transformed
     let mut list = List::new();
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::CustomFunction {
+    let rule = RuleInstance::new(RuleSpec::CustomFunction {
             function: Value::Function(create_double_fn()),
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
-    list.behaviors.push(behavior);
+        });
+    list.graph.rules.push(rule);
 
     let mut executor = Executor::new();
 
     // Add value through executor
-    let val = executor.apply_behaviors_with_context(Value::Number(7.0), &list.behaviors).unwrap();
+    let val = executor.apply_transformation_rules_with_context(Value::Number(7.0), &list.graph.rules).unwrap();
     list.append_raw(val).unwrap();
 
     // Verify it was doubled
@@ -240,12 +224,9 @@ fn test_custom_function_retroactive() {
     list.append(Value::Number(5.0)).unwrap();
     list.append(Value::Number(10.0)).unwrap();
 
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::CustomFunction {
+    let rule = RuleInstance::new(RuleSpec::CustomFunction {
             function: Value::Function(create_double_fn()),
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+        });
 
     let mut executor = Executor::new();
 
@@ -253,10 +234,10 @@ fn test_custom_function_retroactive() {
     let existing_values: Vec<Value> = list.to_vec();
     let mut new_list = List::new();
     for val in existing_values {
-        let transformed = executor.apply_behaviors_with_context(val, &[behavior.clone()]).unwrap();
+        let transformed = executor.apply_transformation_rules_with_context(val, &[rule.clone()]).unwrap();
         new_list.append_raw(transformed).unwrap();
     }
-    new_list.behaviors.push(behavior);
+    new_list.graph.rules.push(rule);
 
     // Verify retroactive transformation
     assert_eq!(new_list.get(0), Some(&Value::Number(10.0))); // 5 * 2
@@ -269,45 +250,39 @@ fn test_custom_function_retroactive() {
 
 #[test]
 fn test_conditional_basic() {
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::Conditional {
+    let rule = RuleInstance::new(RuleSpec::Conditional {
             condition: Value::Function(create_is_negative_fn()),
             transform: Value::Function(create_negate_fn()),
             fallback: None,
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+        });
 
     let mut executor = Executor::new();
 
     // Negative: should be transformed to positive
-    let result = executor.apply_behaviors_with_context(Value::Number(-5.0), &[behavior.clone()]).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(-5.0), &[rule.clone()]).unwrap();
     assert_eq!(result, Value::Number(5.0));
 
     // Positive: should stay unchanged (no fallback)
-    let result = executor.apply_behaviors_with_context(Value::Number(3.0), &[behavior]).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(3.0), &[rule]).unwrap();
     assert_eq!(result, Value::Number(3.0));
 }
 
 #[test]
 fn test_conditional_with_fallback() {
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::Conditional {
+    let rule = RuleInstance::new(RuleSpec::Conditional {
             condition: Value::Function(create_is_negative_fn()),
             transform: Value::Function(create_negate_fn()),
             fallback: Some(Value::Function(create_double_fn())),
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+        });
 
     let mut executor = Executor::new();
 
     // Negative: condition true, use transform
-    let result = executor.apply_behaviors_with_context(Value::Number(-5.0), &[behavior.clone()]).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(-5.0), &[rule.clone()]).unwrap();
     assert_eq!(result, Value::Number(5.0));
 
     // Positive: condition false, use fallback
-    let result = executor.apply_behaviors_with_context(Value::Number(3.0), &[behavior]).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(3.0), &[rule]).unwrap();
     assert_eq!(result, Value::Number(6.0)); // 3 * 2
 }
 
@@ -349,26 +324,23 @@ fn test_conditional_without_fallback() {
         env: Rc::new(Environment::new()),
     };
 
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::Conditional {
+    let rule = RuleInstance::new(RuleSpec::Conditional {
             condition: Value::Function(is_positive),
             transform: Value::Function(square),
             fallback: None,
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+        });
 
     let mut executor = Executor::new();
 
     // Positive: square it
-    let result = executor.apply_behaviors_with_context(Value::Number(4.0), &[behavior.clone()]).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(4.0), &[rule.clone()]).unwrap();
     assert_eq!(result, Value::Number(16.0));
 
     // Zero or negative: keep unchanged
-    let result = executor.apply_behaviors_with_context(Value::Number(0.0), &[behavior.clone()]).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(0.0), &[rule.clone()]).unwrap();
     assert_eq!(result, Value::Number(0.0));
 
-    let result = executor.apply_behaviors_with_context(Value::Number(-3.0), &[behavior]).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(-3.0), &[rule]).unwrap();
     assert_eq!(result, Value::Number(-3.0));
 }
 
@@ -376,20 +348,17 @@ fn test_conditional_without_fallback() {
 fn test_conditional_proactive() {
     // Test proactive application
     let mut list = List::new();
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::Conditional {
+    let rule = RuleInstance::new(RuleSpec::Conditional {
             condition: Value::Function(create_is_negative_fn()),
             transform: Value::Function(create_negate_fn()),
             fallback: None,
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
-    list.behaviors.push(behavior);
+        });
+    list.graph.rules.push(rule);
 
     let mut executor = Executor::new();
 
     // Add negative value
-    let val = executor.apply_behaviors_with_context(Value::Number(-8.0), &list.behaviors).unwrap();
+    let val = executor.apply_transformation_rules_with_context(Value::Number(-8.0), &list.graph.rules).unwrap();
     list.append_raw(val).unwrap();
 
     // Verify it was made positive
@@ -403,14 +372,11 @@ fn test_conditional_retroactive() {
     list.append(Value::Number(-5.0)).unwrap();
     list.append(Value::Number(3.0)).unwrap();
 
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::Conditional {
+    let rule = RuleInstance::new(RuleSpec::Conditional {
             condition: Value::Function(create_is_negative_fn()),
             transform: Value::Function(create_negate_fn()),
             fallback: None,
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+        });
 
     let mut executor = Executor::new();
 
@@ -418,10 +384,10 @@ fn test_conditional_retroactive() {
     let existing_values: Vec<Value> = list.to_vec();
     let mut new_list = List::new();
     for val in existing_values {
-        let transformed = executor.apply_behaviors_with_context(val, &[behavior.clone()]).unwrap();
+        let transformed = executor.apply_transformation_rules_with_context(val, &[rule.clone()]).unwrap();
         new_list.append_raw(transformed).unwrap();
     }
-    new_list.behaviors.push(behavior);
+    new_list.graph.rules.push(rule);
 
     // Verify
     assert_eq!(new_list.get(0), Some(&Value::Number(5.0)));  // -5 -> 5
@@ -461,37 +427,31 @@ fn test_conditional_chain() {
         env: Rc::new(Environment::new()),
     };
 
-    let behavior1 = BehaviorInstance {
-        spec: BehaviorSpec::Conditional {
-            condition: Value::Function(create_is_negative_fn()),
-            transform: Value::Function(create_negate_fn()),
-            fallback: None,
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+    let behavior1 = RuleInstance::new(RuleSpec::Conditional {
+        condition: Value::Function(create_is_negative_fn()),
+        transform: Value::Function(create_negate_fn()),
+        fallback: None,
+    });
 
-    let behavior2 = BehaviorInstance {
-        spec: BehaviorSpec::Conditional {
-            condition: Value::Function(is_large),
-            transform: Value::Function(clamp_to_10),
-            fallback: None,
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+    let behavior2 = RuleInstance::new(RuleSpec::Conditional {
+        condition: Value::Function(is_large),
+        transform: Value::Function(clamp_to_10),
+        fallback: None,
+    });
 
     let mut executor = Executor::new();
     let behaviors = vec![behavior1, behavior2];
 
     // Test: -15 -> 15 (negated) -> 10 (clamped)
-    let result = executor.apply_behaviors_with_context(Value::Number(-15.0), &behaviors).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(-15.0), &behaviors).unwrap();
     assert_eq!(result, Value::Number(10.0));
 
     // Test: -5 -> 5 (negated) -> 5 (not clamped)
-    let result = executor.apply_behaviors_with_context(Value::Number(-5.0), &behaviors).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(-5.0), &behaviors).unwrap();
     assert_eq!(result, Value::Number(5.0));
 
     // Test: 20 -> 20 (not negated) -> 10 (clamped)
-    let result = executor.apply_behaviors_with_context(Value::Number(20.0), &behaviors).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(20.0), &behaviors).unwrap();
     assert_eq!(result, Value::Number(10.0));
 }
 
@@ -502,19 +462,16 @@ fn test_conditional_chain() {
 #[test]
 fn test_list_with_custom_function() {
     let mut list = List::new();
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::CustomFunction {
+    let rule = RuleInstance::new(RuleSpec::CustomFunction {
             function: Value::Function(create_double_fn()),
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
-    list.behaviors.push(behavior);
+        });
+    list.graph.rules.push(rule);
 
     let mut executor = Executor::new();
 
     // Add multiple values
     for val in vec![5.0, 10.0, 15.0] {
-        let transformed = executor.apply_behaviors_with_context(Value::Number(val), &list.behaviors).unwrap();
+        let transformed = executor.apply_transformation_rules_with_context(Value::Number(val), &list.graph.rules).unwrap();
         list.append_raw(transformed).unwrap();
     }
 
@@ -527,21 +484,18 @@ fn test_list_with_custom_function() {
 #[test]
 fn test_list_with_conditional() {
     let mut list = List::new();
-    let behavior = BehaviorInstance {
-        spec: BehaviorSpec::Conditional {
+    let rule = RuleInstance::new(RuleSpec::Conditional {
             condition: Value::Function(create_is_negative_fn()),
             transform: Value::Function(create_negate_fn()),
             fallback: None,
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
-    list.behaviors.push(behavior);
+        });
+    list.graph.rules.push(rule);
 
     let mut executor = Executor::new();
 
     // Add mixed positive and negative values
     for val in vec![-5.0, 3.0, -2.0, 7.0] {
-        let transformed = executor.apply_behaviors_with_context(Value::Number(val), &list.behaviors).unwrap();
+        let transformed = executor.apply_transformation_rules_with_context(Value::Number(val), &list.graph.rules).unwrap();
         list.append_raw(transformed).unwrap();
     }
 
@@ -555,26 +509,20 @@ fn test_list_with_conditional() {
 #[test]
 fn test_mixed_behaviors() {
     // Combine standard behavior (NoneToZero) with custom function
-    let behavior1 = BehaviorInstance {
-        spec: BehaviorSpec::NoneToZero,
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+    let behavior1 = RuleInstance::new(RuleSpec::NoneToZero);
 
-    let behavior2 = BehaviorInstance {
-        spec: BehaviorSpec::CustomFunction {
-            function: Value::Function(create_double_fn()),
-        },
-        retroactive_policy: RetroactivePolicy::Clean,
-    };
+    let behavior2 = RuleInstance::new(RuleSpec::CustomFunction {
+        function: Value::Function(create_double_fn()),
+    });
 
     let behaviors = vec![behavior1, behavior2];
     let mut executor = Executor::new();
 
     // Test: None -> 0 (NoneToZero) -> 0 (double)
-    let result = executor.apply_behaviors_with_context(Value::None, &behaviors).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::None, &behaviors).unwrap();
     assert_eq!(result, Value::Number(0.0));
 
     // Test: 5 -> 5 (NoneToZero doesn't apply) -> 10 (double)
-    let result = executor.apply_behaviors_with_context(Value::Number(5.0), &behaviors).unwrap();
+    let result = executor.apply_transformation_rules_with_context(Value::Number(5.0), &behaviors).unwrap();
     assert_eq!(result, Value::Number(10.0));
 }

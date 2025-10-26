@@ -8,9 +8,20 @@
 //!
 //! TDD Red Phase: These tests are written FIRST and should FAIL initially.
 
-use graphoid::graph::behaviors::{BehaviorSpec, BehaviorInstance, apply_behaviors};
+use graphoid::graph::{RuleSpec, RuleInstance};
 use graphoid::values::{Value, List};
+use graphoid::error::GraphoidError;
 use std::collections::HashMap;
+
+// Helper function to apply transformation rules in sequence
+fn apply_rules(value: Value, rules: &[RuleInstance]) -> Result<Value, GraphoidError> {
+    let mut current = value;
+    for rule_instance in rules {
+        let rule = rule_instance.spec.instantiate();
+        current = rule.transform(&current)?;
+    }
+    Ok(current)
+}
 
 // ============================================================================
 // Basic Mapping Tests (4 tests)
@@ -23,18 +34,18 @@ fn test_mapping_basic_string_to_number() {
     mapping.insert("active".to_string(), Value::Number(1.0));
     mapping.insert("inactive".to_string(), Value::Number(0.0));
 
-    let behavior = BehaviorSpec::Mapping {
+    let rule = RuleSpec::Mapping {
         mapping,
         default: Value::Number(-1.0),
     };
 
-    let behaviors = vec![BehaviorInstance::new(behavior)];
+    let rules = vec![RuleInstance::new(rule)];
 
     // Test mapped value
-    let result = apply_behaviors(Value::String("active".to_string()), &behaviors).unwrap();
+    let result = apply_rules(Value::String("active".to_string()), &rules).unwrap();
     assert_eq!(result, Value::Number(1.0));
 
-    let result = apply_behaviors(Value::String("inactive".to_string()), &behaviors).unwrap();
+    let result = apply_rules(Value::String("inactive".to_string()), &rules).unwrap();
     assert_eq!(result, Value::Number(0.0));
 }
 
@@ -44,15 +55,15 @@ fn test_mapping_with_default_fallback() {
     let mut mapping = HashMap::new();
     mapping.insert("active".to_string(), Value::Number(1.0));
 
-    let behavior = BehaviorSpec::Mapping {
+    let rule = RuleSpec::Mapping {
         mapping,
         default: Value::Number(-1.0),
     };
 
-    let behaviors = vec![BehaviorInstance::new(behavior)];
+    let rules = vec![RuleInstance::new(rule)];
 
     // Test unmapped value (should use default)
-    let result = apply_behaviors(Value::String("unknown".to_string()), &behaviors).unwrap();
+    let result = apply_rules(Value::String("unknown".to_string()), &rules).unwrap();
     assert_eq!(result, Value::Number(-1.0));
 }
 
@@ -64,21 +75,21 @@ fn test_mapping_all_values_mapped() {
     mapping.insert("green".to_string(), Value::Number(2.0));
     mapping.insert("blue".to_string(), Value::Number(3.0));
 
-    let behavior = BehaviorSpec::Mapping {
+    let rule = RuleSpec::Mapping {
         mapping,
         default: Value::Number(0.0),
     };
 
-    let behaviors = vec![BehaviorInstance::new(behavior)];
+    let rules = vec![RuleInstance::new(rule)];
 
     // All should map correctly
-    let result = apply_behaviors(Value::String("red".to_string()), &behaviors).unwrap();
+    let result = apply_rules(Value::String("red".to_string()), &rules).unwrap();
     assert_eq!(result, Value::Number(1.0));
 
-    let result = apply_behaviors(Value::String("green".to_string()), &behaviors).unwrap();
+    let result = apply_rules(Value::String("green".to_string()), &rules).unwrap();
     assert_eq!(result, Value::Number(2.0));
 
-    let result = apply_behaviors(Value::String("blue".to_string()), &behaviors).unwrap();
+    let result = apply_rules(Value::String("blue".to_string()), &rules).unwrap();
     assert_eq!(result, Value::Number(3.0));
 }
 
@@ -87,18 +98,18 @@ fn test_mapping_all_values_unmapped() {
     // All values use default (empty mapping)
     let mapping = HashMap::new();
 
-    let behavior = BehaviorSpec::Mapping {
+    let rule = RuleSpec::Mapping {
         mapping,
         default: Value::String("default".to_string()),
     };
 
-    let behaviors = vec![BehaviorInstance::new(behavior)];
+    let rules = vec![RuleInstance::new(rule)];
 
     // All should use default
-    let result = apply_behaviors(Value::String("anything".to_string()), &behaviors).unwrap();
+    let result = apply_rules(Value::String("anything".to_string()), &rules).unwrap();
     assert_eq!(result, Value::String("default".to_string()));
 
-    let result = apply_behaviors(Value::Number(42.0), &behaviors).unwrap();
+    let result = apply_rules(Value::Number(42.0), &rules).unwrap();
     assert_eq!(result, Value::String("default".to_string()));
 }
 
@@ -111,14 +122,14 @@ fn test_mapping_empty_hash() {
     // Empty mapping, all values use default
     let mapping = HashMap::new();
 
-    let behavior = BehaviorSpec::Mapping {
+    let rule = RuleSpec::Mapping {
         mapping,
         default: Value::None,
     };
 
-    let behaviors = vec![BehaviorInstance::new(behavior)];
+    let rules = vec![RuleInstance::new(rule)];
 
-    let result = apply_behaviors(Value::String("test".to_string()), &behaviors).unwrap();
+    let result = apply_rules(Value::String("test".to_string()), &rules).unwrap();
     assert_eq!(result, Value::None);
 }
 
@@ -128,14 +139,14 @@ fn test_mapping_none_values() {
     let mut mapping = HashMap::new();
     mapping.insert("none".to_string(), Value::Number(0.0));
 
-    let behavior = BehaviorSpec::Mapping {
+    let rule = RuleSpec::Mapping {
         mapping,
         default: Value::Number(-1.0),
     };
 
-    let behaviors = vec![BehaviorInstance::new(behavior)];
+    let rules = vec![RuleInstance::new(rule)];
 
-    let result = apply_behaviors(Value::None, &behaviors).unwrap();
+    let result = apply_rules(Value::None, &rules).unwrap();
     assert_eq!(result, Value::Number(0.0));
 }
 
@@ -147,21 +158,21 @@ fn test_mapping_number_to_string() {
     mapping.insert("2".to_string(), Value::String("two".to_string()));
     mapping.insert("3".to_string(), Value::String("three".to_string()));
 
-    let behavior = BehaviorSpec::Mapping {
+    let rule = RuleSpec::Mapping {
         mapping,
         default: Value::String("unknown".to_string()),
     };
 
-    let behaviors = vec![BehaviorInstance::new(behavior)];
+    let rules = vec![RuleInstance::new(rule)];
 
-    let result = apply_behaviors(Value::Number(1.0), &behaviors).unwrap();
+    let result = apply_rules(Value::Number(1.0), &rules).unwrap();
     assert_eq!(result, Value::String("one".to_string()));
 
-    let result = apply_behaviors(Value::Number(2.0), &behaviors).unwrap();
+    let result = apply_rules(Value::Number(2.0), &rules).unwrap();
     assert_eq!(result, Value::String("two".to_string()));
 
     // Unmapped number uses default
-    let result = apply_behaviors(Value::Number(99.0), &behaviors).unwrap();
+    let result = apply_rules(Value::Number(99.0), &rules).unwrap();
     assert_eq!(result, Value::String("unknown".to_string()));
 }
 
@@ -182,13 +193,13 @@ fn test_list_with_mapping_rule() {
     mapping.insert("active".to_string(), Value::Number(1.0));
     mapping.insert("inactive".to_string(), Value::Number(0.0));
 
-    let behavior = BehaviorSpec::Mapping {
+    let rule = RuleSpec::Mapping {
         mapping,
         default: Value::Number(-1.0),
     };
 
     // Add behavior - should transform retroactively
-    list.add_behavior(BehaviorInstance::new(behavior)).unwrap();
+    list.add_rule(RuleInstance::new(rule)).unwrap();
 
     // Check transformed values
     assert_eq!(list.get(0).unwrap(), &Value::Number(1.0));  // active → 1
@@ -215,13 +226,13 @@ fn test_hash_with_mapping_rule() {
     mapping.insert("inactive".to_string(), Value::Number(0.0));
     mapping.insert("pending".to_string(), Value::Number(2.0));
 
-    let behavior = BehaviorSpec::Mapping {
+    let rule = RuleSpec::Mapping {
         mapping,
         default: Value::Number(-1.0),
     };
 
     // Add behavior - should transform retroactively
-    hash.add_behavior(BehaviorInstance::new(behavior)).unwrap();
+    hash.add_rule(RuleInstance::new(rule)).unwrap();
 
     // Check transformed values
     assert_eq!(hash.get("status1").unwrap(), &Value::Number(1.0));
@@ -246,13 +257,13 @@ fn test_mapping_retroactive_application() {
     mapping.insert("dog".to_string(), Value::String("woof".to_string()));
     mapping.insert("bird".to_string(), Value::String("tweet".to_string()));
 
-    let behavior = BehaviorSpec::Mapping {
+    let rule = RuleSpec::Mapping {
         mapping,
         default: Value::String("unknown".to_string()),
     };
 
     // Add behavior - retroactive application
-    list.add_behavior(BehaviorInstance::new(behavior)).unwrap();
+    list.add_rule(RuleInstance::new(rule)).unwrap();
 
     // All existing values should be transformed
     assert_eq!(list.get(0).unwrap(), &Value::String("meow".to_string()));

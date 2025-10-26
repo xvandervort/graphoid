@@ -7,7 +7,6 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use super::Value;
 use crate::graph::rules::{Rule, RuleContext, GraphOperation, RuleSpec, RuleInstance, RuleSeverity};
 use crate::graph::rulesets::get_ruleset_rules;
-use crate::graph::behaviors::BehaviorInstance;
 use crate::error::GraphoidError;
 
 /// Type of graph: directed or undirected
@@ -127,9 +126,6 @@ pub struct Graph {
     /// These are in addition to any ruleset rules
     /// Each rule includes its configured severity
     pub rules: Vec<RuleInstance>,
-    /// Behaviors attached to this graph
-    /// Applied in order: first added = first applied
-    pub behaviors: Vec<BehaviorInstance>,
 
     // Auto-optimization state (not included in PartialEq)
     /// Track property lookup frequencies for auto-indexing
@@ -150,7 +146,6 @@ impl PartialEq for Graph {
             && self.nodes == other.nodes
             && self.rulesets == other.rulesets
             && self.rules == other.rules
-            && self.behaviors == other.behaviors
         // Deliberately ignore: property_access_counts, property_indices, auto_index_threshold
     }
 }
@@ -163,7 +158,6 @@ impl Graph {
             nodes: HashMap::new(),
             rulesets: Vec::new(),
             rules: Vec::new(),
-            behaviors: Vec::new(),
             // Auto-optimization state
             property_access_counts: HashMap::new(),
             property_indices: HashMap::new(),

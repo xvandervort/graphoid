@@ -136,12 +136,8 @@ impl Executor {
                                     _ => return Err(GraphoidError::type_error("string", idx.type_name())),
                                 };
 
-                                // Apply behaviors with executor context if hash has behaviors
-                                let transformed_val = if !hash.behaviors.is_empty() {
-                                    self.apply_behaviors_with_context(val, &hash.behaviors)?
-                                } else {
-                                    val
-                                };
+                                // Apply transformation rules with executor context if hash has them
+                                let transformed_val = self.apply_transformation_rules_with_context(val, &hash.graph.rules)?;
 
                                 // Insert key-value pair (using raw to avoid double-applying behaviors)
                                 hash.insert_raw(key, transformed_val)?;
@@ -159,12 +155,8 @@ impl Executor {
                                     _ => return Err(GraphoidError::type_error("number", idx.type_name())),
                                 };
 
-                                // Apply behaviors with executor context if list has behaviors
-                                let transformed_val = if !list.behaviors.is_empty() {
-                                    self.apply_behaviors_with_context(val, &list.behaviors)?
-                                } else {
-                                    val
-                                };
+                                // Apply transformation rules with executor context if list has them
+                                let transformed_val = self.apply_transformation_rules_with_context(val, &list.graph.rules)?;
 
                                 // Update element at index (using raw to avoid double-applying behaviors)
                                 list.set_raw(index_num, transformed_val)?;
@@ -646,6 +638,7 @@ impl Executor {
             Value::List(list) => self.eval_list_method(&list, method, args),
             Value::Map(hash) => self.eval_map_method(&hash, method, args),
             Value::Graph(graph) => self.eval_graph_method(graph, method, args, object_expr),
+            Value::String(ref s) => self.eval_string_method(s, method, args),
             other => Err(GraphoidError::runtime(format!(
                 "Type '{}' does not have method '{}'",
                 other.type_name(),
@@ -994,6 +987,7 @@ impl Executor {
             }
             "add_rule" => {
                 // add_rule(rule_symbol) or add_rule(rule_symbol, param)
+                // Handles BOTH validation rules AND transformation rules (behaviors)
                 if args.is_empty() || args.len() > 2 {
                     return Err(GraphoidError::runtime(format!(
                         "add_rule() expects 1 or 2 arguments, but got {}",
@@ -1012,6 +1006,10 @@ impl Executor {
                     }
                 };
 
+                // Clone list
+                let mut new_list = list.clone();
+
+                // Try to parse rule from symbol (handles both validation and transformation rules)
                 // Get optional parameter
                 let param = if args.len() == 2 {
                     match &args[1] {
@@ -1030,8 +1028,7 @@ impl Executor {
                 // Convert to RuleSpec
                 let rule_spec = Self::symbol_to_rule_spec(rule_symbol, param)?;
 
-                // Clone list, add rule, return
-                let mut new_list = list.clone();
+                // Add validation rule, return
                 new_list.add_rule(RuleInstance::new(rule_spec))?;
                 Ok(Value::List(new_list))
             }
@@ -1231,12 +1228,8 @@ impl Executor {
                 // Clone list
                 let mut new_list = list.clone();
 
-                // Apply behaviors with executor context (handles both standard and function-based)
-                let transformed_value = if !new_list.behaviors.is_empty() {
-                    self.apply_behaviors_with_context(args[0].clone(), &new_list.behaviors)?
-                } else {
-                    args[0].clone()
-                };
+                // Apply transformation rules with executor context (handles both standard and function-based)
+                let transformed_value = self.apply_transformation_rules_with_context(args[0].clone(), &new_list.graph.rules)?;
 
                 // Append without re-applying behaviors (already done above)
                 new_list.append_raw(transformed_value)?;
@@ -1301,6 +1294,7 @@ impl Executor {
             }
             "add_rule" => {
                 // add_rule(rule_symbol) or add_rule(rule_symbol, param)
+                // Handles BOTH validation rules AND transformation rules (behaviors)
                 if args.is_empty() || args.len() > 2 {
                     return Err(GraphoidError::runtime(format!(
                         "add_rule() expects 1 or 2 arguments, but got {}",
@@ -1319,6 +1313,10 @@ impl Executor {
                     }
                 };
 
+                // Clone hash
+                let mut new_hash = hash.clone();
+
+                // Try to parse rule from symbol (handles both validation and transformation rules)
                 // Get optional parameter
                 let param = if args.len() == 2 {
                     match &args[1] {
@@ -1337,8 +1335,7 @@ impl Executor {
                 // Convert to RuleSpec
                 let rule_spec = Self::symbol_to_rule_spec(rule_symbol, param)?;
 
-                // Clone hash, add rule, return
-                let mut new_hash = hash.clone();
+                // Add validation rule, return
                 new_hash.add_rule(RuleInstance::new(rule_spec))?;
                 Ok(Value::Map(new_hash))
             }
@@ -1387,6 +1384,26 @@ impl Executor {
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Map does not have method '{}'",
+                method
+            ))),
+        }
+    }
+
+    /// Evaluates a method call on a string.
+    fn eval_string_method(&self, s: &str, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "length" | "size" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method '{}' takes no arguments, but got {}",
+                        method,
+                        args.len()
+                    )));
+                }
+                Ok(Value::Number(s.len() as f64))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "String does not have method '{}'",
                 method
             ))),
         }
@@ -1840,22 +1857,27 @@ impl Executor {
     ///
     /// # Arguments
     /// * `value` - The value to transform
-    /// * `behaviors` - The behaviors to apply, in order
+    /// * `rules` - The rules to apply (only transformation rules will be applied), in order
     ///
     /// # Returns
     /// The transformed value, or an error if any transformation fails
-    pub fn apply_behaviors_with_context(
+    pub fn apply_transformation_rules_with_context(
         &mut self,
         value: Value,
-        behaviors: &[crate::graph::behaviors::BehaviorInstance],
+        rules: &[crate::graph::RuleInstance],
     ) -> Result<Value> {
-        use crate::graph::behaviors::BehaviorSpec;
+        use crate::graph::RuleSpec;
 
         let mut current = value;
 
-        for behavior_instance in behaviors {
-            match &behavior_instance.spec {
-                BehaviorSpec::CustomFunction { function } => {
+        for rule_instance in rules {
+            // Skip non-transformation rules
+            if !rule_instance.spec.is_transformation_rule() {
+                continue;
+            }
+
+            match &rule_instance.spec {
+                RuleSpec::CustomFunction { function } => {
                     // Extract function from Value
                     match function {
                         Value::Function(func) => {
@@ -1869,7 +1891,7 @@ impl Executor {
                         }
                     }
                 }
-                BehaviorSpec::Conditional { condition, transform, fallback } => {
+                RuleSpec::Conditional { condition, transform, fallback } => {
                     // Call condition predicate
                     let condition_func = match condition {
                         Value::Function(f) => f,
@@ -1916,16 +1938,137 @@ impl Executor {
                     // else: no fallback, keep current value unchanged
                 }
                 _ => {
-                    // Standard behaviors use trait
-                    let behavior = behavior_instance.spec.instantiate();
-                    if behavior.applies_to(&current) {
-                        current = behavior.transform(&current)?;
-                    }
+                    // Standard transformation rules use Rule trait's transform method
+                    let rule = rule_instance.spec.instantiate();
+                    current = rule.transform(&current)?;
                 }
             }
         }
 
         Ok(current)
+    }
+
+    /// Compare two values using default ordering
+    ///
+    /// Returns std::cmp::Ordering for use with sort functions.
+    ///
+    /// Default ordering:
+    /// - None < Boolean < Number < String < Symbol < List < Map < Graph < Function
+    /// - Within same type: natural ordering (numeric, lexicographic, etc.)
+    pub fn compare_values(&self, a: &Value, b: &Value) -> Result<std::cmp::Ordering> {
+        use std::cmp::Ordering;
+
+        match (a, b) {
+            // Same types - compare naturally
+            (Value::None, Value::None) => Ok(Ordering::Equal),
+            (Value::Boolean(a), Value::Boolean(b)) => Ok(a.cmp(b)),
+            (Value::Number(a), Value::Number(b)) => {
+                // Handle NaN and infinities
+                if a.is_nan() && b.is_nan() {
+                    Ok(Ordering::Equal)
+                } else if a.is_nan() {
+                    Ok(Ordering::Greater)  // NaN sorts last
+                } else if b.is_nan() {
+                    Ok(Ordering::Less)
+                } else {
+                    Ok(a.partial_cmp(b).unwrap_or(Ordering::Equal))
+                }
+            }
+            (Value::String(a), Value::String(b)) => Ok(a.cmp(b)),
+            (Value::Symbol(a), Value::Symbol(b)) => Ok(a.cmp(b)),
+
+            // Different types - use type ordering
+            (Value::None, _) => Ok(Ordering::Less),
+            (_, Value::None) => Ok(Ordering::Greater),
+            (Value::Boolean(_), Value::Number(_)) => Ok(Ordering::Less),
+            (Value::Number(_), Value::Boolean(_)) => Ok(Ordering::Greater),
+            (Value::Boolean(_), Value::String(_)) => Ok(Ordering::Less),
+            (Value::String(_), Value::Boolean(_)) => Ok(Ordering::Greater),
+            (Value::Number(_), Value::String(_)) => Ok(Ordering::Less),
+            (Value::String(_), Value::Number(_)) => Ok(Ordering::Greater),
+            (Value::Number(_), Value::Symbol(_)) => Ok(Ordering::Less),
+            (Value::Symbol(_), Value::Number(_)) => Ok(Ordering::Greater),
+            (Value::String(_), Value::Symbol(_)) => Ok(Ordering::Less),
+            (Value::Symbol(_), Value::String(_)) => Ok(Ordering::Greater),
+
+            // Collections and complex types
+            _ => Ok(Ordering::Equal),  // For now, complex types are equal
+        }
+    }
+
+    /// Compare two values using a custom comparison function
+    ///
+    /// The function should return a number: < 0 (a < b), 0 (a == b), > 0 (a > b)
+    pub fn compare_with_function(
+        &mut self,
+        a: &Value,
+        b: &Value,
+        func: &Function,
+    ) -> Result<std::cmp::Ordering> {
+        use std::cmp::Ordering;
+
+        // Call comparison function with both values
+        let result = self.call_function(func, &[a.clone(), b.clone()])?;
+
+        // Convert result to Ordering
+        match result {
+            Value::Number(n) => {
+                if n < 0.0 {
+                    Ok(Ordering::Less)
+                } else if n > 0.0 {
+                    Ok(Ordering::Greater)
+                } else {
+                    Ok(Ordering::Equal)
+                }
+            }
+            _ => Err(GraphoidError::runtime(
+                "Comparison function must return a number".to_string()
+            )),
+        }
+    }
+
+    /// Find the correct insertion point for a value in a sorted list
+    ///
+    /// Uses binary search to find where to insert a value to maintain sorted order.
+    ///
+    /// # Arguments
+    /// * `values` - The sorted list of values
+    /// * `new_value` - The value to insert
+    /// * `compare_fn` - Optional custom comparison function
+    ///
+    /// # Returns
+    /// The index where the value should be inserted
+    pub fn find_insertion_point(
+        &mut self,
+        values: &[Value],
+        new_value: &Value,
+        compare_fn: &Option<Value>,
+    ) -> Result<usize> {
+        if values.is_empty() {
+            return Ok(0);
+        }
+
+        // Binary search for insertion point
+        let mut left = 0;
+        let mut right = values.len();
+
+        while left < right {
+            let mid = left + (right - left) / 2;
+
+            let ordering = match compare_fn {
+                Some(Value::Function(func)) => {
+                    self.compare_with_function(&values[mid], new_value, func)?
+                }
+                _ => self.compare_values(&values[mid], new_value)?,
+            };
+
+            match ordering {
+                std::cmp::Ordering::Less => left = mid + 1,
+                std::cmp::Ordering::Greater | std::cmp::Ordering::Equal => right = mid,
+            }
+        }
+
+        Ok(left)
     }
 
     /// Applies a named transformation to a value.

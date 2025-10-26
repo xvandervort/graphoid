@@ -5,7 +5,7 @@
 
 use super::{Value, Graph};
 use crate::values::graph::GraphType;
-use crate::graph::{RuleSpec, RuleInstance, BehaviorInstance};
+use crate::graph::{RuleSpec, RuleInstance};
 use crate::error::GraphoidError;
 
 /// Hash is a key-value graph
@@ -16,9 +16,6 @@ use crate::error::GraphoidError;
 pub struct Hash {
     /// Underlying graph storing key-value pairs
     pub graph: Graph,
-    /// Behaviors attached to this hash
-    /// Applied in order: first added = first applied
-    pub behaviors: Vec<BehaviorInstance>,
 }
 
 impl Hash {
@@ -26,7 +23,6 @@ impl Hash {
     pub fn new() -> Self {
         Hash {
             graph: Graph::new(GraphType::Directed),
-            behaviors: Vec::new(),
         }
     }
 
@@ -41,10 +37,8 @@ impl Hash {
 
     /// Insert a key-value pair
     pub fn insert(&mut self, key: String, value: Value) -> Result<Option<Value>, GraphoidError> {
-        use crate::graph::behaviors::apply_behaviors;
-
-        // Apply behaviors to incoming value (proactive application)
-        let transformed = apply_behaviors(value, &self.behaviors)?;
+        // Apply transformation rules to incoming value (proactive application)
+        let transformed = self.apply_transformation_rules(value)?;
 
         // Check if key already exists
         let old_value = self.graph.get_node(&key).cloned();
@@ -135,7 +129,24 @@ impl Hash {
     }
 
     /// Add a rule to this hash
+    ///
+    /// If the rule is a transformation rule, it will be applied retroactively
+    /// to all existing values in the hash (with RetroactivePolicy::Clean).
     pub fn add_rule(&mut self, rule: RuleInstance) -> Result<(), GraphoidError> {
+        // If it's a transformation rule, apply it retroactively to existing values
+        if rule.spec.is_transformation_rule() {
+            let rule_impl = rule.spec.instantiate();
+
+            // Transform all existing values
+            let keys: Vec<String> = self.graph.nodes.keys().cloned().collect();
+            for key in keys {
+                if let Some(node) = self.graph.nodes.get_mut(&key) {
+                    node.value = rule_impl.transform(&node.value)?;
+                }
+            }
+        }
+
+        // Add the rule to the graph
         self.graph.add_rule(rule)
     }
 
@@ -165,35 +176,28 @@ impl Hash {
         self.graph.has_ruleset(ruleset)
     }
 
-    /// Add a behavior to this hash
+    /// Apply transformation rules to a value
     ///
-    /// The behavior will be applied retroactively to existing values based on
-    /// the RetroactivePolicy, then added to the behaviors list for proactive
-    /// application to future values.
+    /// Filters the graph's rules for transformation rules and applies them in sequence.
+    /// Rules are applied in order: first added = first applied.
     ///
     /// # Arguments
-    /// * `behavior` - The behavior instance to add
+    /// * `value` - The value to transform
     ///
     /// # Returns
-    /// `Ok(())` if successful, or an error if retroactive application fails
-    pub fn add_behavior(&mut self, behavior: BehaviorInstance) -> Result<(), GraphoidError> {
-        use crate::graph::behaviors::apply_retroactive_to_hash;
+    /// The transformed value, or an error if transformation fails
+    fn apply_transformation_rules(&self, value: Value) -> Result<Value, GraphoidError> {
+        let mut current = value;
 
-        // Apply retroactively based on policy
-        apply_retroactive_to_hash(self, &behavior)?;
+        // Apply transformation rules from graph.rules in order
+        for rule_instance in &self.graph.rules {
+            if rule_instance.spec.is_transformation_rule() {
+                let rule = rule_instance.spec.instantiate();
+                current = rule.transform(&current)?;
+            }
+        }
 
-        // Add to behaviors list for future proactive application
-        self.behaviors.push(behavior);
-
-        Ok(())
-    }
-
-    /// Get all behaviors attached to this hash
-    ///
-    /// Returns a slice of behavior instances in the order they were added.
-    /// Behaviors are applied in this order: first added = first applied.
-    pub fn get_behaviors(&self) -> &[BehaviorInstance] {
-        &self.behaviors
+        Ok(current)
     }
 }
 

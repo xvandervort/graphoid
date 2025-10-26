@@ -24,8 +24,8 @@
 //! ```
 
 use crate::error::GraphoidError;
-use crate::graph::rules::RetroactivePolicy;
-use crate::values::{Value, List};
+use crate::graph::rules::{RetroactivePolicy, Rule, RuleContext, GraphOperation};
+use crate::values::{Value, List, Graph};
 use std::collections::HashMap;
 
 /// Core behavior trait - transforms a value
@@ -532,7 +532,7 @@ fn value_to_key(value: &Value) -> String {
 // ============================================================================
 
 #[derive(Debug)]
-struct NoneToZeroBehavior;
+pub struct NoneToZeroBehavior;
 
 impl Behavior for NoneToZeroBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
@@ -551,8 +551,33 @@ impl Behavior for NoneToZeroBehavior {
     }
 }
 
+impl Rule for NoneToZeroBehavior {
+    fn name(&self) -> &str {
+        "none_to_zero"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        // Delegate to Behavior trait implementation
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        // Transformation rules don't validate - they transform
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        // Transformation rules are applied during value insertion, not graph operations
+        false
+    }
+}
+
 #[derive(Debug)]
-struct NoneToEmptyBehavior;
+pub struct NoneToEmptyBehavior;
 
 impl Behavior for NoneToEmptyBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
@@ -571,8 +596,30 @@ impl Behavior for NoneToEmptyBehavior {
     }
 }
 
+impl Rule for NoneToEmptyBehavior {
+    fn name(&self) -> &str {
+        "none_to_empty"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
+    }
+}
+
 #[derive(Debug)]
-struct PositiveBehavior;
+pub struct PositiveBehavior;
 
 impl Behavior for PositiveBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
@@ -591,8 +638,30 @@ impl Behavior for PositiveBehavior {
     }
 }
 
+impl Rule for PositiveBehavior {
+    fn name(&self) -> &str {
+        "positive"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
+    }
+}
+
 #[derive(Debug)]
-struct RoundToIntBehavior;
+pub struct RoundToIntBehavior;
 
 impl Behavior for RoundToIntBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
@@ -611,8 +680,30 @@ impl Behavior for RoundToIntBehavior {
     }
 }
 
+impl Rule for RoundToIntBehavior {
+    fn name(&self) -> &str {
+        "round_to_int"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
+    }
+}
+
 #[derive(Debug)]
-struct UppercaseBehavior;
+pub struct UppercaseBehavior;
 
 impl Behavior for UppercaseBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
@@ -631,8 +722,30 @@ impl Behavior for UppercaseBehavior {
     }
 }
 
+impl Rule for UppercaseBehavior {
+    fn name(&self) -> &str {
+        "uppercase"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
+    }
+}
+
 #[derive(Debug)]
-struct LowercaseBehavior;
+pub struct LowercaseBehavior;
 
 impl Behavior for LowercaseBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
@@ -651,10 +764,32 @@ impl Behavior for LowercaseBehavior {
     }
 }
 
+impl Rule for LowercaseBehavior {
+    fn name(&self) -> &str {
+        "lowercase"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
+    }
+}
+
 #[derive(Debug)]
-struct ValidateRangeBehavior {
-    min: f64,
-    max: f64,
+pub struct ValidateRangeBehavior {
+    pub min: f64,
+    pub max: f64,
 }
 
 impl Behavior for ValidateRangeBehavior {
@@ -677,11 +812,32 @@ impl Behavior for ValidateRangeBehavior {
     }
 }
 
+impl Rule for ValidateRangeBehavior {
+    fn name(&self) -> &str {
+        "validate_range"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
+    }
+}
+
 #[derive(Debug)]
-#[allow(dead_code)]  // Stub for Sub-phase 7.3
-struct MappingBehavior {
-    mapping: HashMap<String, Value>,
-    default: Value,
+pub struct MappingBehavior {
+    pub mapping: HashMap<String, Value>,
+    pub default: Value,
 }
 
 impl Behavior for MappingBehavior {
@@ -707,10 +863,31 @@ impl Behavior for MappingBehavior {
     }
 }
 
+impl Rule for MappingBehavior {
+    fn name(&self) -> &str {
+        "mapping"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
+    }
+}
+
 #[derive(Debug)]
-#[allow(dead_code)]  // Stub for Sub-phase 7.4
-struct CustomFunctionBehavior {
-    function: Value,
+pub struct CustomFunctionBehavior {
+    pub function: Value,
 }
 
 impl Behavior for CustomFunctionBehavior {
@@ -725,12 +902,33 @@ impl Behavior for CustomFunctionBehavior {
     }
 }
 
+impl Rule for CustomFunctionBehavior {
+    fn name(&self) -> &str {
+        "custom_function"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
+    }
+}
+
 #[derive(Debug)]
-#[allow(dead_code)]  // Stub for Sub-phase 7.4
-struct ConditionalBehavior {
-    condition: Value,
-    transform: Value,
-    fallback: Option<Value>,
+pub struct ConditionalBehavior {
+    pub condition: Value,
+    pub transform: Value,
+    pub fallback: Option<Value>,
 }
 
 impl Behavior for ConditionalBehavior {
@@ -745,10 +943,31 @@ impl Behavior for ConditionalBehavior {
     }
 }
 
+impl Rule for ConditionalBehavior {
+    fn name(&self) -> &str {
+        "conditional"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
+    }
+}
+
 #[derive(Debug)]
-#[allow(dead_code)]  // Stub for Sub-phase 7.5
-struct OrderingBehavior {
-    compare_fn: Option<Value>,
+pub struct OrderingBehavior {
+    pub compare_fn: Option<Value>,
 }
 
 impl Behavior for OrderingBehavior {
@@ -760,5 +979,27 @@ impl Behavior for OrderingBehavior {
 
     fn name(&self) -> &str {
         "ordering"
+    }
+}
+
+impl Rule for OrderingBehavior {
+    fn name(&self) -> &str {
+        "ordering"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
     }
 }

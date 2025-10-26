@@ -79,8 +79,16 @@ impl RuleInstance {
 }
 
 /// Specification for a rule that can be stored and cloned
+///
+/// Rules can be either:
+/// - **Validation rules**: Enforce structural constraints (reject invalid operations)
+/// - **Transformation rules**: Transform values (accept after transformation)
 #[derive(Debug, Clone, PartialEq)]
 pub enum RuleSpec {
+    // ========================================================================
+    // Validation Rules (Structural constraints)
+    // ========================================================================
+
     /// No cycles allowed (for DAGs and trees)
     NoCycles,
     /// Must have exactly one root node
@@ -93,31 +101,144 @@ pub enum RuleSpec {
     BinaryTree,
     /// No duplicate values allowed (for lists/sets)
     NoDuplicates,
+
+    // ========================================================================
+    // Transformation Rules (Value transformations)
+    // ========================================================================
+
+    /// Transform `none` values to `0`
+    NoneToZero,
+    /// Transform `none` values to empty string `""`
+    NoneToEmpty,
+    /// Transform negative numbers to their absolute value
+    Positive,
+    /// Round numbers to nearest integer
+    RoundToInt,
+    /// Convert strings to uppercase
+    Uppercase,
+    /// Convert strings to lowercase
+    Lowercase,
+    /// Clamp numbers to a specified range [min, max]
+    ValidateRange { min: f64, max: f64 },
+    /// Map values using a hash table, with default for unmapped values
+    Mapping {
+        mapping: HashMap<String, Value>,
+        default: Value,
+    },
+    /// User-defined transformation function
+    CustomFunction {
+        function: Value,  // Must be Value::Function
+    },
+    /// Apply transformation based on a condition
+    Conditional {
+        condition: Value,   // Predicate function
+        transform: Value,   // Transform function
+        fallback: Option<Value>,  // Optional fallback function
+    },
+    /// Maintain sorted order using comparison function
+    Ordering {
+        compare_fn: Option<Value>,  // Optional comparison function
+    },
 }
 
 impl RuleSpec {
     /// Convert this specification into an actual Rule instance
     pub fn instantiate(&self) -> Box<dyn Rule> {
+        use crate::graph::behaviors::*;
+
         match self {
+            // Validation rules
             RuleSpec::NoCycles => Box::new(NoCyclesRule::new()),
             RuleSpec::SingleRoot => Box::new(SingleRootRule::new()),
             RuleSpec::Connected => Box::new(ConnectedRule::new()),
             RuleSpec::MaxDegree(n) => Box::new(MaxDegreeRule::new(*n)),
             RuleSpec::BinaryTree => Box::new(BinaryTreeRule::new()),
             RuleSpec::NoDuplicates => Box::new(NoDuplicatesRule::new()),
+
+            // Transformation rules (from behaviors.rs for now)
+            RuleSpec::NoneToZero => Box::new(NoneToZeroBehavior),
+            RuleSpec::NoneToEmpty => Box::new(NoneToEmptyBehavior),
+            RuleSpec::Positive => Box::new(PositiveBehavior),
+            RuleSpec::RoundToInt => Box::new(RoundToIntBehavior),
+            RuleSpec::Uppercase => Box::new(UppercaseBehavior),
+            RuleSpec::Lowercase => Box::new(LowercaseBehavior),
+            RuleSpec::ValidateRange { min, max } => Box::new(ValidateRangeBehavior { min: *min, max: *max }),
+            RuleSpec::Mapping { mapping, default } => Box::new(MappingBehavior { mapping: mapping.clone(), default: default.clone() }),
+            RuleSpec::CustomFunction { function } => Box::new(CustomFunctionBehavior { function: function.clone() }),
+            RuleSpec::Conditional { condition, transform, fallback } => Box::new(ConditionalBehavior {
+                condition: condition.clone(),
+                transform: transform.clone(),
+                fallback: fallback.clone(),
+            }),
+            RuleSpec::Ordering { compare_fn } => Box::new(OrderingBehavior { compare_fn: compare_fn.clone() }),
         }
     }
 
     /// Get the name of this rule
     pub fn name(&self) -> &str {
         match self {
+            // Validation rules
             RuleSpec::NoCycles => "no_cycles",
             RuleSpec::SingleRoot => "single_root",
             RuleSpec::Connected => "connected",
             RuleSpec::MaxDegree(_) => "max_degree",
             RuleSpec::BinaryTree => "binary_tree",
             RuleSpec::NoDuplicates => "no_duplicates",
+
+            // Transformation rules
+            RuleSpec::NoneToZero => "none_to_zero",
+            RuleSpec::NoneToEmpty => "none_to_empty",
+            RuleSpec::Positive => "positive",
+            RuleSpec::RoundToInt => "round_to_int",
+            RuleSpec::Uppercase => "uppercase",
+            RuleSpec::Lowercase => "lowercase",
+            RuleSpec::ValidateRange { .. } => "validate_range",
+            RuleSpec::Mapping { .. } => "mapping",
+            RuleSpec::CustomFunction { .. } => "custom_function",
+            RuleSpec::Conditional { .. } => "conditional",
+            RuleSpec::Ordering { .. } => "ordering",
         }
+    }
+
+    /// Parse a rule from a symbol name
+    ///
+    /// Handles both validation and transformation rules.
+    pub fn from_symbol(sym: &str) -> Option<RuleSpec> {
+        match sym {
+            // Validation rules
+            "no_cycles" => Some(RuleSpec::NoCycles),
+            "single_root" => Some(RuleSpec::SingleRoot),
+            "connected" => Some(RuleSpec::Connected),
+            "binary_tree" => Some(RuleSpec::BinaryTree),
+            "no_duplicates" => Some(RuleSpec::NoDuplicates),
+
+            // Transformation rules
+            "none_to_zero" => Some(RuleSpec::NoneToZero),
+            "none_to_empty" => Some(RuleSpec::NoneToEmpty),
+            "positive" => Some(RuleSpec::Positive),
+            "round_to_int" => Some(RuleSpec::RoundToInt),
+            "uppercase" => Some(RuleSpec::Uppercase),
+            "lowercase" => Some(RuleSpec::Lowercase),
+
+            _ => None,
+        }
+    }
+
+    /// Check if this is a transformation rule (as opposed to a validation rule)
+    pub fn is_transformation_rule(&self) -> bool {
+        matches!(self,
+            RuleSpec::NoneToZero |
+            RuleSpec::NoneToEmpty |
+            RuleSpec::Positive |
+            RuleSpec::RoundToInt |
+            RuleSpec::Uppercase |
+            RuleSpec::Lowercase |
+            RuleSpec::ValidateRange { .. } |
+            RuleSpec::Mapping { .. } |
+            RuleSpec::CustomFunction { .. } |
+            RuleSpec::Conditional { .. } |
+            RuleSpec::Ordering { .. }
+        )
     }
 }
 
@@ -188,6 +309,26 @@ pub trait Rule {
     /// Most rules default to Clean (fix existing violations)
     fn default_retroactive_policy(&self) -> RetroactivePolicy {
         RetroactivePolicy::Clean
+    }
+
+    /// Check if this is a transformation rule (vs validation rule)
+    ///
+    /// Validation rules: Enforce structural constraints, reject invalid operations
+    /// Transformation rules: Transform values, accept after transformation
+    fn is_transformation_rule(&self) -> bool {
+        false  // Default: validation rule
+    }
+
+    /// Transform a value (for transformation rules only)
+    ///
+    /// This is called for transformation rules to transform incoming values.
+    /// Validation rules should not override this method.
+    ///
+    /// # Returns
+    /// The transformed value, or an error if transformation fails
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        // Default: no transformation (for validation rules)
+        Ok(value.clone())
     }
 
     /// Validate the graph against this rule

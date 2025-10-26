@@ -13,4 +13,5 @@ mod unit {
     pub mod standard_behaviors_tests;
     pub mod mapping_behaviors_tests;
     pub mod custom_conditional_behaviors_tests;
+    pub mod ordering_behaviors_tests;
 }
