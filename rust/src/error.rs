@@ -11,6 +11,17 @@ pub struct SourcePosition {
     pub file: Option<String>,
 }
 
+impl SourcePosition {
+    /// Creates an unknown source position (for internal errors)
+    pub fn unknown() -> Self {
+        Self {
+            line: 0,
+            column: 0,
+            file: None,
+        }
+    }
+}
+
 impl fmt::Display for SourcePosition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "line {}, column {}", self.line, self.column)?;
@@ -40,6 +51,18 @@ pub enum GraphoidError {
 
     #[error("Graph rule violated: {rule} - {message}")]
     RuleViolation { rule: String, message: String },
+
+    #[error("Module not found: '{module}' at {position}")]
+    ModuleNotFound {
+        module: String,
+        position: SourcePosition,
+    },
+
+    #[error("I/O error: {message} at {position}")]
+    IOError {
+        message: String,
+        position: SourcePosition,
+    },
 
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
