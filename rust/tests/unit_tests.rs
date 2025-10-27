@@ -15,4 +15,5 @@ mod unit {
     pub mod custom_conditional_behaviors_tests;
     pub mod ordering_behaviors_tests;
     pub mod module_manager_tests;
+    pub mod circular_dependency_tests;
 }

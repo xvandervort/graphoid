@@ -10,3 +10,4 @@ pub mod ad_hoc_rule_tests;
 pub mod list_rules_tests;
 pub mod behavior_framework_tests;
 pub mod module_manager_tests;
+pub mod circular_dependency_tests;

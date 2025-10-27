@@ -64,6 +64,12 @@ pub enum GraphoidError {
         position: SourcePosition,
     },
 
+    #[error("Circular dependency detected at {position}: {}", chain.join(" → "))]
+    CircularDependency {
+        chain: Vec<String>,
+        position: SourcePosition,
+    },
+
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }

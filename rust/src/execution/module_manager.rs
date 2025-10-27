@@ -36,12 +36,10 @@ pub struct ModuleManager {
     /// Loaded modules: name → Module
     modules: HashMap<String, Module>,
 
-    /// Import stack for cycle detection (used in Day 2)
-    #[allow(dead_code)]
+    /// Import stack for cycle detection
     import_stack: Vec<PathBuf>,
 
-    /// Currently being loaded (for cycle detection, used in Day 2)
-    #[allow(dead_code)]
+    /// Currently being loaded (for cycle detection)
     loading: HashSet<PathBuf>,
 
     /// Module search paths
@@ -171,5 +169,49 @@ impl ModuleManager {
     /// Check if module is already loaded
     pub fn is_loaded(&self, name: &str) -> bool {
         self.modules.contains_key(name)
+    }
+
+    /// Check if path is currently being loaded
+    pub fn is_loading(&self, path: &Path) -> bool {
+        self.loading.contains(path)
+    }
+
+    /// Check for circular dependency
+    pub fn check_circular(&self, path: &Path) -> Result<()> {
+        if self.loading.contains(path) {
+            // Circular dependency detected!
+            let mut chain: Vec<String> = self.import_stack.iter()
+                .map(|p| p.display().to_string())
+                .collect();
+            chain.push(path.display().to_string());
+
+            return Err(GraphoidError::CircularDependency {
+                chain,
+                position: SourcePosition::unknown(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Mark module as being loaded
+    pub fn begin_loading(&mut self, path: PathBuf) -> Result<()> {
+        self.check_circular(&path)?;
+        self.loading.insert(path.clone());
+        self.import_stack.push(path);
+        Ok(())
+    }
+
+    /// Mark module as finished loading
+    pub fn end_loading(&mut self, path: &Path) {
+        self.loading.remove(path);
+        // Remove from stack
+        if let Some(pos) = self.import_stack.iter().position(|p| p == path) {
+            self.import_stack.remove(pos);
+        }
+    }
+
+    /// Get import stack depth (for testing)
+    pub fn import_stack_depth(&self) -> usize {
+        self.import_stack.len()
     }
 }
