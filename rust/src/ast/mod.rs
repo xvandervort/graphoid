@@ -63,6 +63,10 @@ pub enum Stmt {
         alias: Option<String>,
         position: SourcePosition,
     },
+    Load {
+        path: String,
+        position: SourcePosition,
+    },
     Expression {
         expr: Expr,
         position: SourcePosition,

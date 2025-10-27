@@ -85,6 +85,8 @@ impl Parser {
             Ok(Stmt::Continue { position })
         } else if self.match_token(&TokenType::Import) {
             self.import_statement()
+        } else if self.match_token(&TokenType::Load) {
+            self.load_statement()
         } else if self.match_token(&TokenType::Module) {
             self.module_declaration()
         } else {
@@ -488,6 +490,24 @@ impl Parser {
             alias,
             position,
         })
+    }
+
+    fn load_statement(&mut self) -> Result<Stmt> {
+        let position = self.previous_position();
+
+        // Expect string literal
+        let path = if let TokenType::String(s) = &self.peek().token_type {
+            let p = s.clone();
+            self.advance();
+            p
+        } else {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected string literal after 'load'".to_string(),
+                position: self.peek().position(),
+            });
+        };
+
+        Ok(Stmt::Load { path, position })
     }
 
     fn module_declaration(&mut self) -> Result<Stmt> {
