@@ -851,5 +851,218 @@ fn test_parse_lambda_as_argument() {
 }
 
 // ============================================================================
-// Total: 36 comprehensive parser tests (31 original + 5 lambda tests)
+// PHASE 9: Configuration and Precision Tests
+// ============================================================================
+
+#[test]
+fn test_parse_configure_file_level() {
+    let mut lexer = Lexer::new("configure { skip_none: true }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    assert_eq!(program.statements.len(), 1);
+    match &program.statements[0] {
+        Stmt::Configure { settings, body, .. } => {
+            assert_eq!(settings.len(), 1);
+            assert!(settings.contains_key("skip_none"));
+            assert!(body.is_none());
+        }
+        _ => panic!("Expected configure statement"),
+    }
+}
+
+#[test]
+fn test_parse_configure_with_block() {
+    let mut lexer = Lexer::new("configure { skip_none: true } { x = 1 }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Configure { settings, body, .. } => {
+            assert_eq!(settings.len(), 1);
+            assert!(body.is_some());
+            let body_stmts = body.as_ref().unwrap();
+            assert_eq!(body_stmts.len(), 1);
+        }
+        _ => panic!("Expected configure statement with body"),
+    }
+}
+
+#[test]
+fn test_parse_configure_multiple_settings() {
+    let mut lexer = Lexer::new("configure { skip_none: true, error_mode: :lenient, decimal_places: 2 }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Configure { settings, .. } => {
+            assert_eq!(settings.len(), 3);
+            assert!(settings.contains_key("skip_none"));
+            assert!(settings.contains_key("error_mode"));
+            assert!(settings.contains_key("decimal_places"));
+        }
+        _ => panic!("Expected configure statement"),
+    }
+}
+
+#[test]
+fn test_parse_configure_with_symbol_value() {
+    let mut lexer = Lexer::new("configure { error_mode: :strict }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Configure { settings, .. } => {
+            assert!(settings.contains_key("error_mode"));
+            match settings.get("error_mode").unwrap() {
+                Expr::Literal { value: LiteralValue::Symbol(s), .. } => {
+                    assert_eq!(s, "strict");
+                }
+                _ => panic!("Expected symbol value"),
+            }
+        }
+        _ => panic!("Expected configure statement"),
+    }
+}
+
+#[test]
+fn test_parse_configure_with_newlines() {
+    let code = r#"configure {
+    skip_none: true,
+    error_mode: :lenient
+}"#;
+    let mut lexer = Lexer::new(code);
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Configure { settings, .. } => {
+            assert_eq!(settings.len(), 2);
+        }
+        _ => panic!("Expected configure statement"),
+    }
+}
+
+#[test]
+fn test_parse_precision_with_number() {
+    let mut lexer = Lexer::new("precision 2 { x = 1.234 }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    assert_eq!(program.statements.len(), 1);
+    match &program.statements[0] {
+        Stmt::Precision { places, body, .. } => {
+            assert_eq!(*places, Some(2));
+            assert_eq!(body.len(), 1);
+        }
+        _ => panic!("Expected precision statement"),
+    }
+}
+
+#[test]
+fn test_parse_precision_with_int_symbol() {
+    let mut lexer = Lexer::new("precision :int { x = 1.234 }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Precision { places, .. } => {
+            assert_eq!(*places, Some(0)); // :int maps to 0
+        }
+        _ => panic!("Expected precision statement"),
+    }
+}
+
+#[test]
+fn test_parse_precision_with_zero() {
+    let mut lexer = Lexer::new("precision 0 { x = 1.234 }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Precision { places, .. } => {
+            assert_eq!(*places, Some(0));
+        }
+        _ => panic!("Expected precision statement"),
+    }
+}
+
+#[test]
+fn test_parse_precision_with_multiple_statements() {
+    let code = r#"precision 3 {
+    x = 1.234
+    y = 2.567
+    z = x + y
+}"#;
+    let mut lexer = Lexer::new(code);
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Precision { places, body, .. } => {
+            assert_eq!(*places, Some(3));
+            assert_eq!(body.len(), 3);
+        }
+        _ => panic!("Expected precision statement"),
+    }
+}
+
+#[test]
+fn test_parse_nested_configure_and_precision() {
+    let code = r#"configure { skip_none: true } {
+    precision 2 {
+        x = 1.234
+    }
+}"#;
+    let mut lexer = Lexer::new(code);
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Configure { body, .. } => {
+            let body_stmts = body.as_ref().unwrap();
+            assert_eq!(body_stmts.len(), 1);
+            match &body_stmts[0] {
+                Stmt::Precision { places, .. } => {
+                    assert_eq!(*places, Some(2));
+                }
+                _ => panic!("Expected nested precision statement"),
+            }
+        }
+        _ => panic!("Expected configure statement"),
+    }
+}
+
+#[test]
+fn test_parse_precision_error_negative() {
+    let mut lexer = Lexer::new("precision -1 { x = 1 }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let result = parser.parse();
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_parse_precision_error_float() {
+    let mut lexer = Lexer::new("precision 2.5 { x = 1 }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let result = parser.parse();
+
+    assert!(result.is_err());
+}
+
+// ============================================================================
+// Total: 48 comprehensive parser tests (36 original + 12 configure/precision)
 // ============================================================================

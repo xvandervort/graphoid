@@ -2893,31 +2893,25 @@ Minimum **30 tests**:
 - Import/export
 - Stdlib structure
 
-### Phase 9: Native Stdlib Modules (14-21 days)
-- Constants module
-- Random module
-- Time module
-- Regex module
-- I/O module
-- JSON module
-- Crypto module
+### Phase 9: Advanced Features (18-25 days)
 
-### Phase 10: Pure Graphoid Stdlib (10-14 days)
-- Statistics module
-- CSV module
-- SQL module
-- HTML module
-- HTTP module
+**📋 Detailed Implementation Plan**: See [`rust/dev_docs/PHASE_9_DETAILED_PLAN.md`](../rust/dev_docs/PHASE_9_DETAILED_PLAN.md) for:
+- Complete architecture with copy-paste ready Rust structs
+- 5 milestones with detailed task breakdowns
+- 200+ test specifications
+- 4-week timeline with task dependencies
+- Integration strategy and risk mitigation
 
-### Phase 11: Advanced Features (18-25 days)
-- Freeze system for collections
-  - `.freeze()` method for all collections (deep freeze by default)
-  - `.is_frozen()` introspection
-  - Freeze behaviors: `:no_frozen`, `:copy_elements`, `:shallow_freeze_only`
-  - Ruleset freezing: `.freeze_rules()`, `.unfreeze_rules()`, `.rules_frozen()`
-  - **Note**: Type-level rule freezing with inheritance policies deferred to Phase 15+ (requires mature type system)
-- Precision context blocks
-- Configuration blocks
+**Overview**:
+- **Configuration System** - Scoped settings for error handling, type coercion, precision
+- **Error Handling** - Try/catch/finally with three modes (strict/lenient/collect)
+- **Precision Context Blocks** - Decimal place control for numeric operations
+- **Freeze System** - Immutability for collections (deep/shallow freeze)
+- **Freeze Control Rules** - `:no_frozen`, `:copy_elements`, `:shallow_freeze_only`
+
+**Why This Phase Comes First**: Stdlib modules (Phases 10-11) need these features for production-quality error handling, configuration options, and data protection.
+
+**Legacy/Future Features** (lower priority):
 - Pattern matching (future)
 - Trailing-block sugar (Ruby-style) for last-argument lambdas [low priority]
   - Overview: Provide Ruby/Smalltalk-like trailing block syntax as pure sugar for a function's last lambda parameter. No new runtime type beyond existing lambdas; blocks are lambdas. Avoid Ruby's nonlocal-return semantics; `return` within a block returns from the block, not the enclosing function.
@@ -2966,8 +2960,24 @@ Minimum **30 tests**:
     - Clear errors for arity/type in `:strict`; configurable behavior in other modes.
     - 25+ tests: chaining with blocks, zero/one/multi-param blocks, yield() equivalence, interactions with try/catch and configure blocks, parser disambiguation with pattern matching.
   - Scheduling and priority:
-    - Non-critical ergonomics feature; defer until after core features are stable. Target Phase 11 with a 1–2 day timebox, contingent on parser stability and lambda semantics being complete.
+    - Non-critical ergonomics feature; defer until after core features are stable. Target Phase 9 with a 1–2 day timebox, contingent on parser stability and lambda semantics being complete.
 - Optimizations
+
+### Phase 10: Pure Graphoid Stdlib (10-14 days)
+- Statistics module (in .gr, using config for missing data handling)
+- CSV module
+- SQL module
+- HTML module
+- HTTP module
+
+### Phase 11: Native Stdlib Modules (14-21 days)
+- Constants module
+- Random module
+- Time module
+- Regex module
+- I/O module
+- JSON module
+- Crypto module
 
 ### Phase 12: Testing Framework (7-10 days)
 - Built-in `assert` module with rich assertions

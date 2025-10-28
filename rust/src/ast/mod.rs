@@ -67,6 +67,16 @@ pub enum Stmt {
         path: String,
         position: SourcePosition,
     },
+    Configure {
+        settings: std::collections::HashMap<String, Expr>,
+        body: Option<Vec<Stmt>>,
+        position: SourcePosition,
+    },
+    Precision {
+        places: Option<usize>,  // None for :int mode, Some(n) for n decimal places
+        body: Vec<Stmt>,
+        position: SourcePosition,
+    },
     Expression {
         expr: Expr,
         position: SourcePosition,

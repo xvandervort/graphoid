@@ -72,6 +72,9 @@ pub enum GraphoidError {
 
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+
+    #[error("Configuration error: {message}")]
+    ConfigError { message: String },
 }
 
 impl GraphoidError {

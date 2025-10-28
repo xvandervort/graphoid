@@ -89,6 +89,10 @@ impl Parser {
             self.load_statement()
         } else if self.match_token(&TokenType::Module) {
             self.module_declaration()
+        } else if self.match_token(&TokenType::Configure) {
+            self.configure_statement()
+        } else if self.match_token(&TokenType::Precision) {
+            self.precision_statement()
         } else {
             // Try to parse as assignment or expression
             self.assignment_or_expression()
@@ -544,6 +548,152 @@ impl Parser {
         Ok(Stmt::ModuleDecl {
             name,
             alias,
+            position,
+        })
+    }
+
+    fn configure_statement(&mut self) -> Result<Stmt> {
+        use std::collections::HashMap;
+        let position = self.previous_position();
+
+        // Expect opening brace for settings
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' after 'configure'".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse settings as key: value pairs
+        let mut settings = HashMap::new();
+
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            // Skip newlines
+            while self.match_token(&TokenType::Newline) {}
+
+            // Check if we're at the end of settings
+            if self.check(&TokenType::RightBrace) {
+                break;
+            }
+
+            // Parse key (must be identifier)
+            let key = if let TokenType::Identifier(id) = &self.peek().token_type {
+                let k = id.clone();
+                self.advance();
+                k
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: format!("Expected configuration key, got {:?}", self.peek().token_type),
+                    position: self.peek().position(),
+                });
+            };
+
+            // Expect colon
+            if !self.match_token(&TokenType::Colon) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected ':' after configuration key".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            // Parse value (expression)
+            let value = self.expression()?;
+
+            settings.insert(key, value);
+
+            // Optional comma or newline
+            if !self.check(&TokenType::RightBrace) {
+                if !self.match_token(&TokenType::Comma) {
+                    self.match_token(&TokenType::Newline);
+                }
+            }
+        }
+
+        // Expect closing brace
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' after configuration settings".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Check for optional body block
+        let body = if self.match_token(&TokenType::LeftBrace) {
+            let stmts = self.block()?;
+            if !self.match_token(&TokenType::RightBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '}' after configure body".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+            Some(stmts)
+        } else {
+            None
+        };
+
+        Ok(Stmt::Configure {
+            settings,
+            body,
+            position,
+        })
+    }
+
+    fn precision_statement(&mut self) -> Result<Stmt> {
+        let position = self.previous_position();
+
+        // Parse precision value (number or :int symbol)
+        let places = if let TokenType::Number(n) = &self.peek().token_type {
+            let num = *n;
+            self.advance();
+
+            // Validate it's a non-negative integer
+            if num < 0.0 || num.fract() != 0.0 {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Precision must be a non-negative integer".to_string(),
+                    position: self.previous_position(),
+                });
+            }
+
+            Some(num as usize)
+        } else if let TokenType::Symbol(s) = &self.peek().token_type {
+            if s == "int" {
+                self.advance();
+                Some(0) // :int is equivalent to precision 0
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: format!("Invalid precision specifier :{}, expected :int", s),
+                    position: self.peek().position(),
+                });
+            }
+        } else {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected number or :int after 'precision'".to_string(),
+                position: self.peek().position(),
+            });
+        };
+
+        // Expect opening brace for body
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' after precision value".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse body block
+        let body = self.block()?;
+
+        // Expect closing brace
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' after precision body".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        Ok(Stmt::Precision {
+            places,
+            body,
             position,
         })
     }

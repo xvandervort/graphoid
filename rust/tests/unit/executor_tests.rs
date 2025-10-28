@@ -1,6 +1,6 @@
 use graphoid::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Stmt, UnaryOp};
 use graphoid::error::SourcePosition;
-use graphoid::execution::Executor;
+use graphoid::execution::{Executor, ErrorMode};
 use graphoid::values::{Hash, List, Value};
 use std::collections::HashMap;
 
@@ -5673,3 +5673,319 @@ fn test_map_method_size() {
     let result2 = executor.eval_expr(&method_call2).unwrap();
     assert_eq!(result2, Value::Number(3.0));
 }
+
+// ============================================================================
+// PHASE 9: Configuration and Precision Execution Tests
+// ============================================================================
+
+#[test]
+fn test_execute_configure_file_level() {
+    let source = r#"
+configure { skip_none: true }
+x = 1
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Verify config was applied (file-level stays active)
+    assert_eq!(executor.config_stack.current().skip_none, true);
+}
+
+#[test]
+fn test_execute_configure_with_block() {
+    let source = r#"
+configure { skip_none: true } {
+    y = 2
+}
+x = 1
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Config should be restored after block
+    assert_eq!(executor.config_stack.current().skip_none, false);
+
+    // Variables should be defined
+    let y = executor.eval_expr(&Expr::Variable {
+        name: "y".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(y, Value::Number(2.0));
+}
+
+#[test]
+fn test_execute_nested_configure() {
+    let source = r#"
+configure { skip_none: true } {
+    configure { strict_types: false } {
+        z = 3
+    }
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // After execution, should be back to defaults
+    assert_eq!(executor.config_stack.current().skip_none, false);
+    assert_eq!(executor.config_stack.current().strict_types, true);
+}
+
+#[test]
+fn test_execute_precision_block() {
+    let source = r#"
+precision 2 {
+    x = 1.234
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Precision stack should be empty after block
+    assert!(executor.precision_stack.is_empty());
+}
+
+#[test]
+fn test_execute_precision_int_mode() {
+    let source = r#"
+precision :int {
+    x = 5
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Should execute without errors
+    assert!(executor.precision_stack.is_empty());
+}
+
+#[test]
+fn test_execute_nested_precision() {
+    let source = r#"
+precision 2 {
+    precision 0 {
+        y = 1.234
+    }
+    x = 5.678
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Precision stack should be empty after nested blocks
+    assert!(executor.precision_stack.is_empty());
+}
+
+#[test]
+fn test_execute_configure_and_precision_together() {
+    let source = r#"
+configure { skip_none: true } {
+    precision 2 {
+        x = 1.234
+    }
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Both stacks should be restored
+    assert_eq!(executor.config_stack.current().skip_none, false);
+    assert!(executor.precision_stack.is_empty());
+}
+
+#[test]
+fn test_configure_error_mode() {
+    let source = "configure { error_mode: :lenient }";
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    assert_eq!(executor.config_stack.current().error_mode, ErrorMode::Lenient);
+}
+
+#[test]
+fn test_configure_multiple_settings() {
+    let source = r#"
+configure {
+    skip_none: true,
+    error_mode: :strict,
+    strict_types: false
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    assert_eq!(executor.config_stack.current().skip_none, true);
+    assert_eq!(executor.config_stack.current().error_mode, ErrorMode::Strict);
+    assert_eq!(executor.config_stack.current().strict_types, false);
+}
+
+#[test]
+fn test_configure_invalid_key_error() {
+    let source = "configure { invalid_key: true }";
+    let mut executor = Executor::new();
+    let result = executor.execute_source(source);
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_configure_bounds_checking_mode() {
+    let source = "configure { bounds_checking: :lenient }";
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    use graphoid::execution::BoundsCheckingMode;
+    assert_eq!(executor.config_stack.current().bounds_checking, BoundsCheckingMode::Lenient);
+}
+
+#[test]
+fn test_configure_type_coercion_mode() {
+    let source = "configure { type_coercion: :lenient }";
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    use graphoid::execution::TypeCoercionMode;
+    assert_eq!(executor.config_stack.current().type_coercion, TypeCoercionMode::Lenient);
+}
+
+#[test]
+fn test_configure_none_handling_mode() {
+    let source = "configure { none_handling: :skip }";
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    use graphoid::execution::NoneHandlingMode;
+    assert_eq!(executor.config_stack.current().none_handling, NoneHandlingMode::Skip);
+}
+
+#[test]
+fn test_precision_stack_depth_during_execution() {
+    let source = r#"
+precision 3 {
+    x = 1
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Precision should be popped after block
+    assert_eq!(executor.precision_stack.len(), 0);
+}
+
+#[test]
+fn test_configure_decimal_places() {
+    let source = "configure { decimal_places: 3 }";
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    assert_eq!(executor.config_stack.current().decimal_places, Some(3));
+}
+
+#[test]
+fn test_configure_edge_validation() {
+    let source = "configure { edge_validation: false }";
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    assert_eq!(executor.config_stack.current().edge_validation, false);
+}
+
+#[test]
+fn test_configure_strict_edge_rules() {
+    let source = "configure { strict_edge_rules: false }";
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    assert_eq!(executor.config_stack.current().strict_edge_rules, false);
+}
+
+#[test]
+fn test_configure_none_conversions() {
+    let source = "configure { none_conversions: false }";
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    assert_eq!(executor.config_stack.current().none_conversions, false);
+}
+
+#[test]
+fn test_deeply_nested_configure() {
+    let source = r#"
+configure { skip_none: true } {
+    configure { error_mode: :lenient } {
+        configure { strict_types: false } {
+            x = 1
+        }
+    }
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // All configs should be popped, back to defaults
+    assert_eq!(executor.config_stack.current().skip_none, false);
+    assert_eq!(executor.config_stack.current().error_mode, ErrorMode::Strict);
+    assert_eq!(executor.config_stack.current().strict_types, true);
+}
+
+#[test]
+fn test_precision_and_configure_complex_nesting() {
+    let source = r#"
+configure { skip_none: true } {
+    precision 2 {
+        configure { strict_types: false } {
+            precision 0 {
+                y = 5
+            }
+        }
+    }
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Everything should be restored
+    assert_eq!(executor.config_stack.current().skip_none, false);
+    assert_eq!(executor.config_stack.current().strict_types, true);
+    assert!(executor.precision_stack.is_empty());
+}
+
+#[test]
+fn test_configure_with_variable_definition() {
+    let source = r#"
+configure { skip_none: true } {
+    num x = 10
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Variable should be accessible after config block
+    let x = executor.eval_expr(&Expr::Variable {
+        name: "x".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(x, Value::Number(10.0));
+}
+
+#[test]
+fn test_precision_with_arithmetic() {
+    let source = r#"
+precision 1 {
+    result = 2.5 + 3.7
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Variable should be accessible
+    let result = executor.eval_expr(&Expr::Variable {
+        name: "result".to_string(),
+        position: pos(),
+    }).unwrap();
+    // Result should be calculated (precision will be applied in future milestones)
+    assert_eq!(result, Value::Number(6.2));
+}
+
+// ============================================================================
+// Total: 23 configuration and precision execution tests
+// ============================================================================

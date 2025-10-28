@@ -1,6 +1,7 @@
 use crate::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Stmt, UnaryOp};
 use crate::error::{GraphoidError, Result};
 use crate::execution::Environment;
+use crate::execution::config::ConfigStack;
 use crate::execution::module_manager::{ModuleManager, Module};
 use crate::values::{Function, Value, List, Hash};
 use crate::graph::{RuleSpec, RuleInstance};
@@ -16,6 +17,8 @@ pub struct Executor {
     call_stack: Vec<String>,
     module_manager: ModuleManager,
     current_file: Option<PathBuf>,
+    pub config_stack: ConfigStack,
+    pub precision_stack: Vec<Option<usize>>,
 }
 
 impl Executor {
@@ -26,6 +29,8 @@ impl Executor {
             call_stack: Vec::new(),
             module_manager: ModuleManager::new(),
             current_file: None,
+            config_stack: ConfigStack::new(),
+            precision_stack: Vec::new(),
         }
     }
 
@@ -36,6 +41,8 @@ impl Executor {
             call_stack: Vec::new(),
             module_manager: ModuleManager::new(),
             current_file: None,
+            config_stack: ConfigStack::new(),
+            precision_stack: Vec::new(),
         }
     }
 
@@ -362,6 +369,55 @@ impl Executor {
                 // Load statement - inline file contents into current scope
                 // TODO: Implement in Day 5
                 Err(GraphoidError::runtime("Load statement not yet implemented".to_string()))
+            }
+            Stmt::Configure { settings, body, .. } => {
+                // Evaluate settings and push new config
+                let mut config_changes = HashMap::new();
+                for (key, value_expr) in settings {
+                    let value = self.eval_expr(value_expr)?;
+                    config_changes.insert(key.clone(), value);
+                }
+
+                // Push new config with changes
+                self.config_stack.push_with_changes(config_changes)?;
+
+                // If there's a body, execute it and pop config after (scoped)
+                // If no body (file-level), keep config active
+                if let Some(body_stmts) = body {
+                    let mut result = None;
+                    for stmt in body_stmts {
+                        if let Some(val) = self.eval_stmt(stmt)? {
+                            result = Some(val);
+                            break;
+                        }
+                    }
+
+                    // Pop config after block (restore previous)
+                    self.config_stack.pop();
+
+                    Ok(result)
+                } else {
+                    // File-level configure: keep config active, don't pop
+                    Ok(None)
+                }
+            }
+            Stmt::Precision { places, body, .. } => {
+                // Push precision onto stack
+                self.precision_stack.push(*places);
+
+                // Execute body
+                let mut result = None;
+                for stmt in body {
+                    if let Some(val) = self.eval_stmt(stmt)? {
+                        result = Some(val);
+                        break;
+                    }
+                }
+
+                // Pop precision (restore previous)
+                self.precision_stack.pop();
+
+                Ok(result)
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Unsupported statement type: {:?}",
