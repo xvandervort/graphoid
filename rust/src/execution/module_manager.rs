@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::error::{Result, GraphoidError, SourcePosition};
 use crate::execution::environment::Environment;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     pub name: String,
     pub alias: Option<String>,
@@ -12,21 +12,21 @@ pub struct Module {
     pub config: Option<ConfigScope>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConfigScope {
     pub decimal_places: Option<u8>,
     pub error_mode: Option<ErrorMode>,
     pub bounds_checking: Option<BoundsMode>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ErrorMode {
     Strict,
     Lenient,
     Collect,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BoundsMode {
     Strict,
     Lenient,
@@ -118,7 +118,40 @@ impl ModuleManager {
             });
         }
 
-        // 2. Project modules (search in search paths)
+        // 2. Try same directory as current file (for non-relative imports)
+        if let Some(from) = from_file {
+            if let Some(base) = from.parent() {
+                let candidate = base.join(module_name);
+
+                // Try direct path
+                if candidate.exists() && candidate.is_file() {
+                    return candidate.canonicalize().map_err(|e| {
+                        GraphoidError::IOError {
+                            message: format!("Failed to canonicalize path: {}", e),
+                            position: SourcePosition::unknown(),
+                        }
+                    });
+                }
+
+                // Try with .gr extension
+                let with_ext = if candidate.extension().is_none() {
+                    candidate.with_extension("gr")
+                } else {
+                    candidate
+                };
+
+                if with_ext.exists() {
+                    return with_ext.canonicalize().map_err(|e| {
+                        GraphoidError::IOError {
+                            message: format!("Failed to canonicalize path: {}", e),
+                            position: SourcePosition::unknown(),
+                        }
+                    });
+                }
+            }
+        }
+
+        // 3. Project modules (search in search paths)
         for search_path in &self.search_paths {
             let candidate = search_path.join(module_name);
 

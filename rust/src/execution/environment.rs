@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 /// Execution environment for variable storage.
 /// Supports nested scopes via parent pointer.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
     /// Variables defined in this scope
     variables: HashMap<String, Value>,

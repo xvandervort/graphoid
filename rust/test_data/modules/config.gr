@@ -1,0 +1,3 @@
+debug = true
+max_connections = 100
+timeout = 30

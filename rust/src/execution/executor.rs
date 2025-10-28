@@ -1,15 +1,21 @@
 use crate::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Stmt, UnaryOp};
 use crate::error::{GraphoidError, Result};
 use crate::execution::Environment;
+use crate::execution::module_manager::{ModuleManager, Module};
 use crate::values::{Function, Value, List, Hash};
 use crate::graph::{RuleSpec, RuleInstance};
+use crate::lexer::Lexer;
+use crate::parser::Parser;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::path::PathBuf;
 
 /// The executor evaluates AST nodes and produces values.
 pub struct Executor {
     env: Environment,
     call_stack: Vec<String>,
+    module_manager: ModuleManager,
+    current_file: Option<PathBuf>,
 }
 
 impl Executor {
@@ -18,6 +24,8 @@ impl Executor {
         Executor {
             env: Environment::new(),
             call_stack: Vec::new(),
+            module_manager: ModuleManager::new(),
+            current_file: None,
         }
     }
 
@@ -26,7 +34,38 @@ impl Executor {
         Executor {
             env,
             call_stack: Vec::new(),
+            module_manager: ModuleManager::new(),
+            current_file: None,
         }
+    }
+
+    /// Sets the current file path (for module resolution).
+    pub fn set_current_file(&mut self, path: Option<PathBuf>) {
+        self.current_file = path;
+    }
+
+    /// Executes Graphoid source code and returns the result.
+    /// This parses and executes the source in the current environment.
+    pub fn execute_source(&mut self, source: &str) -> Result<()> {
+        // Tokenize
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize()?;
+
+        // Parse
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse()?;
+
+        // Execute all statements
+        for stmt in &program.statements {
+            self.eval_stmt(stmt)?;
+        }
+
+        Ok(())
+    }
+
+    /// Gets a variable from the environment (for testing).
+    pub fn get_variable(&self, name: &str) -> Option<Value> {
+        self.env.get(name).ok()
     }
 
     /// Convert a symbol name to a RuleSpec
@@ -297,6 +336,32 @@ impl Executor {
                     }
                 }
                 Ok(None)
+            }
+            Stmt::Import { module, alias, .. } => {
+                // Import a module and create a namespace in the current environment
+                let module_value = self.load_module(module, alias.as_ref())?;
+
+                // Determine the binding name (alias or module name)
+                let binding_name = alias.as_ref().unwrap_or(module);
+
+                // Bind the module to the environment
+                self.env.define(binding_name.clone(), module_value);
+                Ok(None)
+            }
+            Stmt::ModuleDecl { name, alias, .. } => {
+                // Module declaration - store metadata for later use
+                // For now, we just note that this file declares itself as a module
+                // The actual module name/alias are used when importing this file
+                self.env.define("__module_name__".to_string(), Value::String(name.clone()));
+                if let Some(alias_name) = alias {
+                    self.env.define("__module_alias__".to_string(), Value::String(alias_name.clone()));
+                }
+                Ok(None)
+            }
+            Stmt::Load { .. } => {
+                // Load statement - inline file contents into current scope
+                // TODO: Implement in Day 5
+                Err(GraphoidError::runtime("Load statement not yet implemented".to_string()))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Unsupported statement type: {:?}",
@@ -592,6 +657,36 @@ impl Executor {
             }
         }
 
+        // Evaluate the object once
+        let object_value = self.eval_expr(object)?;
+
+        // Check for module member access (e.g., module.function(args) or module.variable)
+        if let Value::Module(ref module) = object_value {
+            // Look up the member in the module's namespace
+            let member = module.namespace.get(method)?;
+
+            // If it's a function, call it with args
+            if let Value::Function(func) = member {
+                // Evaluate argument expressions
+                let mut arg_values = Vec::new();
+                for arg in args {
+                    arg_values.push(self.eval_expr(arg)?);
+                }
+                return self.call_function(&func, &arg_values);
+            } else {
+                // If it's a variable and no args, return it directly
+                if args.is_empty() {
+                    return Ok(member);
+                } else {
+                    // Can't call non-functions with arguments
+                    return Err(GraphoidError::runtime(format!(
+                        "Module member '{}' is not a function, cannot be called with arguments",
+                        method
+                    )));
+                }
+            }
+        }
+
         // Check if this is a mutating method (ends with !)
         let is_mutating = method.ends_with('!');
         let base_method = if is_mutating {
@@ -618,16 +713,14 @@ impl Executor {
                 }
             };
 
-            // Get current value, apply method, update variable
-            let object_value = self.env.get(&var_name)?;
+            // Apply method to the already-evaluated value, update variable
             let new_value = self.apply_method_to_value(object_value, base_method, &arg_values, object)?;
             self.env.set(&var_name, new_value)?;
 
             // Mutating methods return none
             Ok(Value::None)
         } else {
-            // Immutable method - evaluate and return result
-            let object_value = self.eval_expr(object)?;
+            // Immutable method - use the already-evaluated value
             self.apply_method_to_value(object_value, base_method, &arg_values, object)
         }
     }
@@ -2401,6 +2494,76 @@ impl Executor {
     /// Gets the current call stack (for debugging and error reporting).
     pub fn call_stack(&self) -> &[String] {
         &self.call_stack
+    }
+
+    /// Loads a module from a file path or module name.
+    /// Creates an isolated environment, executes the module, and returns a Module value.
+    fn load_module(&mut self, module_path: &str, _alias: Option<&String>) -> Result<Value> {
+        use std::fs;
+
+        // Resolve the module path
+        let resolved_path = if let Some(ref current) = self.current_file {
+            self.module_manager.resolve_module_path(module_path, Some(current))?
+        } else {
+            self.module_manager.resolve_module_path(module_path, None)?
+        };
+
+        // Check if already loaded (cached)
+        if let Some(module) = self.module_manager.get_module(&resolved_path.to_string_lossy().to_string()) {
+            return Ok(Value::Module(module.clone()));
+        }
+
+        // Check for circular dependency
+        self.module_manager.check_circular(&resolved_path)?;
+
+        // Begin loading
+        self.module_manager.begin_loading(resolved_path.clone())?;
+
+        // Read module source
+        let source = fs::read_to_string(&resolved_path)?;
+
+        // Create isolated environment for module
+        let module_env = Environment::new();
+        let mut module_executor = Executor::with_env(module_env);
+        module_executor.set_current_file(Some(resolved_path.clone()));
+
+        // Execute module source
+        module_executor.execute_source(&source)?;
+
+        // Extract module name and alias (from module declarations or filename)
+        let module_name = if let Some(Value::String(name)) = module_executor.get_variable("__module_name__") {
+            name
+        } else {
+            // Use filename without extension as module name
+            resolved_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unnamed")
+                .to_string()
+        };
+
+        let module_alias = if let Some(Value::String(alias)) = module_executor.get_variable("__module_alias__") {
+            Some(alias)
+        } else {
+            None
+        };
+
+        // Create Module value
+        let module = Module {
+            name: module_name,
+            alias: module_alias,
+            namespace: module_executor.env.clone(),
+            file_path: resolved_path.clone(),
+            config: None, // TODO: Extract config from module
+        };
+
+        // Register module in manager
+        self.module_manager.register_module(resolved_path.to_string_lossy().to_string(), module.clone());
+
+        // End loading
+        self.module_manager.end_loading(&resolved_path);
+
+        Ok(Value::Module(module))
     }
 }
 

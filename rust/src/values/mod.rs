@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use crate::ast::Stmt;
 use crate::execution::Environment;
+use crate::execution::module_manager::Module;
 
 pub mod graph;
 pub mod list;
@@ -69,6 +70,8 @@ pub enum Value {
     Function(Function),
     /// Graph value (Phase 6)
     Graph(Graph),
+    /// Module value (Phase 8) - imported module namespace
+    Module(Module),
 }
 
 impl Value {
@@ -85,6 +88,7 @@ impl Value {
             Value::Symbol(_) => true,
             Value::Function(_) => true, // Functions are always truthy
             Value::Graph(g) => g.node_count() > 0,
+            Value::Module(_) => true, // Modules are always truthy
         }
     }
 
@@ -136,6 +140,9 @@ impl Value {
             Value::Graph(g) => {
                 format!("<graph: {} nodes, {} edges>", g.node_count(), g.edge_count())
             }
+            Value::Module(m) => {
+                format!("<module {}>", m.name)
+            }
         }
     }
 
@@ -151,6 +158,7 @@ impl Value {
             Value::Map(_) => "map",
             Value::Function(_) => "function",
             Value::Graph(_) => "graph",
+            Value::Module(_) => "module",
         }
     }
 }

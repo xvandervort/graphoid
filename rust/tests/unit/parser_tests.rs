@@ -551,7 +551,7 @@ fn test_parse_for_loop() {
 
 #[test]
 fn test_parse_function_declaration() {
-    let source = r#"func add(x, y) {
+    let source = r#"fn add(x, y) {
         return x + y
     }"#;
     let mut lexer = Lexer::new(source);

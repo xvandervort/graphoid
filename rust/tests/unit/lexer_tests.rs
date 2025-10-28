@@ -139,7 +139,7 @@ fn test_string_with_escapes() {
 
 #[test]
 fn test_keywords() {
-    let mut lexer = Lexer::new("func if else while for in return break continue");
+    let mut lexer = Lexer::new("fn if else while for in return break continue");
     let tokens = lexer.tokenize().unwrap();
 
     assert_eq!(tokens[0].token_type, TokenType::Func);
@@ -357,7 +357,7 @@ fn test_complete_expression() {
 
 #[test]
 fn test_function_declaration() {
-    let source = r#"func add(x, y) {
+    let source = r#"fn add(x, y) {
     return x + y
 }"#;
     let mut lexer = Lexer::new(source);

@@ -1,0 +1,11 @@
+module simple alias sim
+
+helper_value = 42
+
+fn double(x) {
+    return x * 2
+}
+
+fn add(a, b) {
+    return a + b
+}

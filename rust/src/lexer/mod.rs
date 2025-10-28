@@ -558,7 +558,7 @@ impl Lexer {
 
         let token_type = match lexeme.as_str() {
             // Keywords
-            "func" => TokenType::Func,
+            "fn" => TokenType::Func,
             "if" => TokenType::If,
             "then" => TokenType::Then,
             "else" => TokenType::Else,
