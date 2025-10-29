@@ -68,6 +68,24 @@ impl Environment {
         self.variables.contains_key(name)
             || self.parent.as_ref().map_or(false, |p| p.exists(name))
     }
+
+    /// Gets all variable names in the current scope only (not parent scopes).
+    /// Used for tracking which variables are defined locally.
+    pub fn get_variable_names(&self) -> Vec<String> {
+        self.variables.keys().cloned().collect()
+    }
+
+    /// Removes a variable from the current scope only (not parent scopes).
+    /// Returns true if the variable was found and removed, false otherwise.
+    pub fn remove_variable(&mut self, name: &str) -> bool {
+        self.variables.remove(name).is_some()
+    }
+
+    /// Takes the parent environment, leaving None in its place.
+    /// Used when extracting a modified parent from a child scope.
+    pub fn take_parent(&mut self) -> Option<Box<Environment>> {
+        self.parent.take()
+    }
 }
 
 impl Default for Environment {

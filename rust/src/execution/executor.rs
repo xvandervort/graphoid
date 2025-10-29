@@ -3080,7 +3080,13 @@ impl Executor {
             };
 
             if matches {
-                // Bind error to variable if specified (in current scope)
+                // Create a child scope for the catch block
+                // This ensures that variables defined in catch don't leak to outer scope,
+                // but modifications to existing variables (via set()) persist to parent scope
+                let parent_env_clone = self.env.clone();
+                self.env = Environment::with_parent(self.env.clone());
+
+                // Bind error to variable if specified (in the catch scope)
                 if let Some(ref var_name) = catch_clause.variable {
                     // Create an Error object from the GraphoidError with call stack
                     let error_obj = ErrorObject::with_stack_trace(
@@ -3094,7 +3100,7 @@ impl Executor {
                     self.env.define(var_name.clone(), Value::Error(error_obj));
                 }
 
-                // Execute catch body
+                // Execute catch body in the child scope
                 let mut result = None;
                 for stmt in &catch_clause.body {
                     if let Some(val) = self.eval_stmt(stmt)? {
@@ -3103,8 +3109,14 @@ impl Executor {
                     }
                 }
 
-                // Note: We're not removing the error variable to keep this simple
-                // In a real implementation, we'd need a proper scoping mechanism
+                // Extract the modified parent environment from the child
+                // The parent field contains any modifications made via set()
+                if let Some(boxed_parent) = self.env.take_parent() {
+                    self.env = *boxed_parent;
+                } else {
+                    // This shouldn't happen since we just created a child with a parent
+                    self.env = parent_env_clone;
+                }
 
                 return Ok(result);
             }

@@ -6340,7 +6340,6 @@ catch {
 }
 
 #[test]
-#[ignore = "Scope isolation not implemented yet - catch variables leak into outer scope"]
 fn test_catch_scope_isolation() {
     let source = r#"
 try {
@@ -6390,7 +6389,6 @@ catch {
 }
 
 #[test]
-#[ignore = "Modulo by zero doesn't throw error yet - returns NaN"]
 fn test_try_with_modulo_by_zero() {
     let source = r#"
 result = 0
@@ -6436,6 +6434,7 @@ catch as e {
 fn test_raise_expression_evaluation() {
     let source = r#"
 msg = "error: code "
+error_msg = ""
 try {
     raise msg + "42"
 }
@@ -7094,6 +7093,7 @@ result = 42
 #[test]
 fn test_error_stack_trace_basic() {
     let source = r#"
+trace = ""
 try {
     raise ValueError("test error")
 }
@@ -7113,6 +7113,7 @@ catch as e {
 fn test_error_stack_trace_in_function() {
     let source = r#"
 # Simpler test without function definitions
+trace = ""
 try {
     raise ValueError("test error in try block")
 }
@@ -7256,6 +7257,7 @@ cause_msg = cause.message()
 fn test_stack_trace_shows_nested_calls() {
     let source = r#"
 # Simplified test - stack trace should capture location info
+trace = ""
 try {
     raise ValueError("deep error")
 }
