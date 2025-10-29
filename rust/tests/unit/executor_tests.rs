@@ -1049,13 +1049,10 @@ fn test_eval_modulo_by_zero() {
         position: pos(),
     };
 
-    let result = executor.eval_expr(&expr).unwrap();
-    // Modulo by zero in f64 returns NaN
-    if let Value::Number(n) = result {
-        assert!(n.is_nan());
-    } else {
-        panic!("Expected Number value");
-    }
+    // Modulo by zero now raises an error in strict mode (default)
+    let result = executor.eval_expr(&expr);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Modulo by zero"));
 }
 
 #[test]
@@ -7299,4 +7296,141 @@ trace = error.stack_trace()
 
 // ============================================================================
 // Total: 12 enhanced error feature tests
+// ============================================================================
+
+// ============================================================================
+// LENIENT MODE FOR BUILT-IN OPERATIONS TESTS
+// ============================================================================
+
+#[test]
+fn test_lenient_mode_division_by_zero() {
+    let source = r#"
+result = 10
+configure { error_mode: :lenient } {
+    result = 10 / 0  # Should return none
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert_eq!(result, Value::None);
+}
+
+#[test]
+fn test_lenient_mode_int_division_by_zero() {
+    let source = r#"
+result = 10
+configure { error_mode: :lenient } {
+    result = 10 // 0  # Should return none
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert_eq!(result, Value::None);
+}
+
+#[test]
+fn test_lenient_mode_modulo_by_zero() {
+    let source = r#"
+result = 10
+configure { error_mode: :lenient } {
+    result = 10 % 0  # Should return none
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert_eq!(result, Value::None);
+}
+
+#[test]
+fn test_lenient_mode_list_out_of_bounds() {
+    let source = r#"
+my_list = [1, 2, 3]
+result = 0
+configure { error_mode: :lenient } {
+    result = my_list[999]  # Should return none
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert_eq!(result, Value::None);
+}
+
+#[test]
+fn test_lenient_mode_map_missing_key() {
+    let source = r#"
+my_map = {"a": 1, "b": 2}
+result = 0
+configure { error_mode: :lenient } {
+    result = my_map["missing"]  # Should return none
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert_eq!(result, Value::None);
+}
+
+#[test]
+fn test_collect_mode_for_division() {
+    let source = r#"
+configure { error_mode: :collect } {
+    a = 10 / 0  # Collected
+    b = 20 / 0  # Collected
+    c = 5 / 2   # OK
+}
+
+errors = get_errors()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let errors = executor.get_variable("errors").unwrap();
+    if let Value::List(err_list) = errors {
+        assert_eq!(err_list.len(), 2, "Should have collected 2 division by zero errors");
+    } else {
+        panic!("Expected list of errors");
+    }
+}
+
+#[test]
+fn test_override_module_lenient_defaults() {
+    let source = r#"
+# Outer scope uses lenient mode (like a module default)
+outer_result = 999
+configure { error_mode: :lenient } {
+    outer_result = 10 / 0  # Returns none
+
+    # User overrides to strict within lenient scope
+    inner_result = 888
+    try {
+        configure { error_mode: :strict } {
+            inner_result = 10 / 0  # Raises error!
+        }
+    }
+    catch {
+        inner_result = 777  # Caught the error
+    }
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let outer_result = executor.get_variable("outer_result").unwrap();
+    assert_eq!(outer_result, Value::None);  // Lenient mode returned none
+
+    let inner_result = executor.get_variable("inner_result").unwrap();
+    assert_eq!(inner_result, Value::Number(777.0));  // Strict mode raised, was caught
+}
+
+// ============================================================================
+// Total: 7 lenient mode tests
 // ============================================================================

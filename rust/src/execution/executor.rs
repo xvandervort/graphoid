@@ -1,5 +1,5 @@
 use crate::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Stmt, UnaryOp};
-use crate::error::{GraphoidError, Result};
+use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::execution::Environment;
 use crate::execution::config::{ConfigStack, ErrorMode};
 use crate::execution::error_collector::ErrorCollector;
@@ -679,11 +679,32 @@ impl Executor {
 
                 // Check bounds
                 if actual_index < 0 || actual_index >= list.len() as i64 {
-                    return Err(GraphoidError::runtime(format!(
-                        "List index out of bounds: index {} for list of length {}",
-                        idx_int,
-                        list.len()
-                    )));
+                    // Check error mode
+                    match self.config_stack.current().error_mode {
+                        ErrorMode::Lenient => {
+                            return Ok(Value::None);
+                        }
+                        ErrorMode::Collect => {
+                            let error = GraphoidError::runtime(format!(
+                                "List index out of bounds: index {} for list of length {}",
+                                idx_int,
+                                list.len()
+                            ));
+                            self.error_collector.collect(
+                                error,
+                                self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
+                                SourcePosition::unknown(),
+                            );
+                            return Ok(Value::None);
+                        }
+                        ErrorMode::Strict => {
+                            return Err(GraphoidError::runtime(format!(
+                                "List index out of bounds: index {} for list of length {}",
+                                idx_int,
+                                list.len()
+                            )));
+                        }
+                    }
                 }
 
                 Ok(list.get(actual_index as usize).unwrap().clone())
@@ -703,10 +724,32 @@ impl Executor {
                 // Look up the key
                 match hash.get(&key) {
                     Some(value) => Ok(value.clone()),
-                    None => Err(GraphoidError::runtime(format!(
-                        "Map key not found: '{}'",
-                        key
-                    ))),
+                    None => {
+                        // Check error mode
+                        match self.config_stack.current().error_mode {
+                            ErrorMode::Lenient => {
+                                return Ok(Value::None);
+                            }
+                            ErrorMode::Collect => {
+                                let error = GraphoidError::runtime(format!(
+                                    "Map key not found: '{}'",
+                                    key
+                                ));
+                                self.error_collector.collect(
+                                    error,
+                                    self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
+                                    SourcePosition::unknown(),
+                                );
+                                return Ok(Value::None);
+                            }
+                            ErrorMode::Strict => {
+                                return Err(GraphoidError::runtime(format!(
+                                    "Map key not found: '{}'",
+                                    key
+                                )));
+                            }
+                        }
+                    }
                 }
             }
             Value::Graph(ref graph) => {
@@ -2641,11 +2684,31 @@ impl Executor {
         }
     }
 
-    fn eval_divide(&self, left: Value, right: Value) -> Result<Value> {
+    fn eval_divide(&mut self, left: Value, right: Value) -> Result<Value> {
         match (left, right) {
             (Value::Number(l), Value::Number(r)) => {
                 if r == 0.0 {
-                    Err(GraphoidError::division_by_zero())
+                    // Check error mode
+                    match self.config_stack.current().error_mode {
+                        ErrorMode::Lenient => {
+                            // Return none in lenient mode
+                            return Ok(Value::None);
+                        }
+                        ErrorMode::Collect => {
+                            // Collect error and return none
+                            let error = GraphoidError::division_by_zero();
+                            self.error_collector.collect(
+                                error,
+                                self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
+                                SourcePosition::unknown(),
+                            );
+                            return Ok(Value::None);
+                        }
+                        ErrorMode::Strict => {
+                            // Default behavior - raise error
+                            return Err(GraphoidError::division_by_zero());
+                        }
+                    }
                 } else {
                     Ok(Value::Number(l / r))
                 }
@@ -2657,11 +2720,28 @@ impl Executor {
         }
     }
 
-    fn eval_int_div(&self, left: Value, right: Value) -> Result<Value> {
+    fn eval_int_div(&mut self, left: Value, right: Value) -> Result<Value> {
         match (left, right) {
             (Value::Number(l), Value::Number(r)) => {
                 if r == 0.0 {
-                    Err(GraphoidError::division_by_zero())
+                    // Check error mode
+                    match self.config_stack.current().error_mode {
+                        ErrorMode::Lenient => {
+                            return Ok(Value::None);
+                        }
+                        ErrorMode::Collect => {
+                            let error = GraphoidError::division_by_zero();
+                            self.error_collector.collect(
+                                error,
+                                self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
+                                SourcePosition::unknown(),
+                            );
+                            return Ok(Value::None);
+                        }
+                        ErrorMode::Strict => {
+                            return Err(GraphoidError::division_by_zero());
+                        }
+                    }
                 } else {
                     // Truncate toward zero (not floor)
                     Ok(Value::Number((l / r).trunc()))
@@ -2674,9 +2754,32 @@ impl Executor {
         }
     }
 
-    fn eval_modulo(&self, left: Value, right: Value) -> Result<Value> {
+    fn eval_modulo(&mut self, left: Value, right: Value) -> Result<Value> {
         match (left, right) {
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l % r)),
+            (Value::Number(l), Value::Number(r)) => {
+                if r == 0.0 {
+                    // Check error mode for modulo by zero
+                    match self.config_stack.current().error_mode {
+                        ErrorMode::Lenient => {
+                            return Ok(Value::None);
+                        }
+                        ErrorMode::Collect => {
+                            let error = GraphoidError::runtime("Modulo by zero".to_string());
+                            self.error_collector.collect(
+                                error,
+                                self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
+                                SourcePosition::unknown(),
+                            );
+                            return Ok(Value::None);
+                        }
+                        ErrorMode::Strict => {
+                            return Err(GraphoidError::runtime("Modulo by zero".to_string()));
+                        }
+                    }
+                } else {
+                    Ok(Value::Number(l % r))
+                }
+            }
             (l, r) => Err(GraphoidError::type_error(
                 "number",
                 &format!("{} and {}", l.type_name(), r.type_name()),
