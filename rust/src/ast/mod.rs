@@ -77,10 +77,25 @@ pub enum Stmt {
         body: Vec<Stmt>,
         position: SourcePosition,
     },
+    Try {
+        body: Vec<Stmt>,
+        catch_clauses: Vec<CatchClause>,
+        finally_block: Option<Vec<Stmt>>,
+        position: SourcePosition,
+    },
     Expression {
         expr: Expr,
         position: SourcePosition,
     },
+}
+
+/// A catch clause in a try/catch statement
+#[derive(Debug, Clone, PartialEq)]
+pub struct CatchClause {
+    pub error_type: Option<String>,  // None = catch all errors
+    pub variable: Option<String>,    // None = no binding
+    pub body: Vec<Stmt>,
+    pub position: SourcePosition,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -145,6 +160,10 @@ pub enum Expr {
         is_unless: bool,               // true for unless, false for if
         position: SourcePosition,
     },
+    Raise {
+        error: Box<Expr>,  // Error value/message to raise
+        position: SourcePosition,
+    },
 }
 
 impl Expr {
@@ -162,6 +181,7 @@ impl Expr {
             Expr::Map { position, .. } => position,
             Expr::Graph { position, .. } => position,
             Expr::Conditional { position, .. } => position,
+            Expr::Raise { position, .. } => position,
         }
     }
 }

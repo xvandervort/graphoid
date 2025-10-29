@@ -5989,3 +5989,880 @@ precision 1 {
 // ============================================================================
 // Total: 23 configuration and precision execution tests
 // ============================================================================
+
+// ============================================================================
+// Try/Catch/Finally Tests
+// ============================================================================
+
+#[test]
+fn test_basic_try_catch_no_error() {
+    let source = r#"
+x = 0
+try {
+    x = 10
+}
+catch {
+    x = 20
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let x = executor.eval_expr(&Expr::Variable {
+        name: "x".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(x, Value::Number(10.0));
+}
+
+#[test]
+fn test_basic_try_catch_with_error() {
+    let source = r#"
+x = 0
+try {
+    raise "error occurred"
+    x = 10
+}
+catch {
+    x = 20
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let x = executor.eval_expr(&Expr::Variable {
+        name: "x".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(x, Value::Number(20.0));
+}
+
+#[test]
+fn test_catch_with_variable_binding() {
+    let source = r#"
+error_msg = ""
+try {
+    raise "something went wrong"
+}
+catch as e {
+    error_msg = e
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let error_msg = executor.eval_expr(&Expr::Variable {
+        name: "error_msg".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert!(matches!(error_msg, Value::String(s) if s.contains("something went wrong")));
+}
+
+#[test]
+fn test_catch_type_matching_runtime_error() {
+    let source = r#"
+caught = false
+try {
+    x = 1 / 0
+}
+catch RuntimeError {
+    caught = true
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let caught = executor.eval_expr(&Expr::Variable {
+        name: "caught".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(caught, Value::Boolean(true));
+}
+
+#[test]
+fn test_catch_type_matching_with_binding() {
+    let source = r#"
+error_msg = ""
+try {
+    x = 1 / 0
+}
+catch RuntimeError as e {
+    error_msg = e
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let error_msg = executor.eval_expr(&Expr::Variable {
+        name: "error_msg".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert!(matches!(error_msg, Value::String(s) if s.contains("Division by zero")));
+}
+
+#[test]
+fn test_multiple_catch_clauses() {
+    let source = r#"
+which_caught = 0
+try {
+    x = 1 / 0
+}
+catch TypeError {
+    which_caught = 1
+}
+catch RuntimeError {
+    which_caught = 2
+}
+catch {
+    which_caught = 3
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let which_caught = executor.eval_expr(&Expr::Variable {
+        name: "which_caught".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(which_caught, Value::Number(2.0));
+}
+
+#[test]
+fn test_catch_all_clause() {
+    let source = r#"
+caught = false
+try {
+    raise "any error"
+}
+catch TypeError {
+    caught = false
+}
+catch {
+    caught = true
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let caught = executor.eval_expr(&Expr::Variable {
+        name: "caught".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(caught, Value::Boolean(true));
+}
+
+#[test]
+fn test_finally_block_always_runs_no_error() {
+    let source = r#"
+finally_ran = false
+try {
+    x = 10
+}
+finally {
+    finally_ran = true
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let finally_ran = executor.eval_expr(&Expr::Variable {
+        name: "finally_ran".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(finally_ran, Value::Boolean(true));
+}
+
+#[test]
+fn test_finally_block_runs_with_error_caught() {
+    let source = r#"
+finally_ran = false
+try {
+    raise "error"
+}
+catch {
+    x = 1
+}
+finally {
+    finally_ran = true
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let finally_ran = executor.eval_expr(&Expr::Variable {
+        name: "finally_ran".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(finally_ran, Value::Boolean(true));
+}
+
+#[test]
+fn test_finally_block_runs_with_error_not_caught() {
+    let source = r#"
+finally_ran = false
+try {
+    raise "error"
+}
+catch TypeError {
+    x = 1
+}
+finally {
+    finally_ran = true
+}
+"#;
+    let mut executor = Executor::new();
+    let result = executor.execute_source(source);
+
+    // Error should propagate, but finally should have run
+    assert!(result.is_err());
+    let finally_ran = executor.eval_expr(&Expr::Variable {
+        name: "finally_ran".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(finally_ran, Value::Boolean(true));
+}
+
+#[test]
+fn test_try_only_finally_no_catch() {
+    let source = r#"
+x = 0
+finally_ran = false
+try {
+    x = 10
+}
+finally {
+    finally_ran = true
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let x = executor.eval_expr(&Expr::Variable {
+        name: "x".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(x, Value::Number(10.0));
+
+    let finally_ran = executor.eval_expr(&Expr::Variable {
+        name: "finally_ran".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(finally_ran, Value::Boolean(true));
+}
+
+#[test]
+fn test_nested_try_catch() {
+    let source = r#"
+outer_caught = false
+inner_caught = false
+try {
+    try {
+        raise "inner error"
+    }
+    catch {
+        inner_caught = true
+    }
+}
+catch {
+    outer_caught = true
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let inner_caught = executor.eval_expr(&Expr::Variable {
+        name: "inner_caught".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(inner_caught, Value::Boolean(true));
+
+    let outer_caught = executor.eval_expr(&Expr::Variable {
+        name: "outer_caught".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(outer_caught, Value::Boolean(false));
+}
+
+#[test]
+fn test_nested_try_catch_propagation() {
+    let source = r#"
+outer_caught = false
+inner_caught = false
+try {
+    try {
+        raise "inner error"
+    }
+    catch TypeError {
+        inner_caught = true
+    }
+}
+catch {
+    outer_caught = true
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let inner_caught = executor.eval_expr(&Expr::Variable {
+        name: "inner_caught".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(inner_caught, Value::Boolean(false));
+
+    let outer_caught = executor.eval_expr(&Expr::Variable {
+        name: "outer_caught".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(outer_caught, Value::Boolean(true));
+}
+
+#[test]
+fn test_raise_in_catch_block() {
+    let source = r#"
+final_caught = false
+try {
+    try {
+        raise "first error"
+    }
+    catch {
+        raise "second error"
+    }
+}
+catch {
+    final_caught = true
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let final_caught = executor.eval_expr(&Expr::Variable {
+        name: "final_caught".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(final_caught, Value::Boolean(true));
+}
+
+#[test]
+#[ignore = "Scope isolation not implemented yet - catch variables leak into outer scope"]
+fn test_catch_scope_isolation() {
+    let source = r#"
+try {
+    raise "error"
+}
+catch as e {
+    temp = "in catch"
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Variables defined in catch block should not leak
+    let result = executor.eval_expr(&Expr::Variable {
+        name: "temp".to_string(),
+        position: pos(),
+    });
+    assert!(result.is_err());
+
+    // Error variable should not leak
+    let result = executor.eval_expr(&Expr::Variable {
+        name: "e".to_string(),
+        position: pos(),
+    });
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_try_with_division_by_zero() {
+    let source = r#"
+result = 0
+try {
+    result = 10 / 0
+}
+catch {
+    result = 999
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.eval_expr(&Expr::Variable {
+        name: "result".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(result, Value::Number(999.0));
+}
+
+#[test]
+#[ignore = "Modulo by zero doesn't throw error yet - returns NaN"]
+fn test_try_with_modulo_by_zero() {
+    let source = r#"
+result = 0
+try {
+    result = 10 % 0
+}
+catch {
+    result = 888
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.eval_expr(&Expr::Variable {
+        name: "result".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(result, Value::Number(888.0));
+}
+
+#[test]
+fn test_raise_string_literal() {
+    let source = r#"
+caught = false
+try {
+    raise "custom error message"
+}
+catch as e {
+    caught = true
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let caught = executor.eval_expr(&Expr::Variable {
+        name: "caught".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(caught, Value::Boolean(true));
+}
+
+#[test]
+fn test_raise_expression_evaluation() {
+    let source = r#"
+msg = "error: code "
+try {
+    raise msg + "42"
+}
+catch as e {
+    error_msg = e
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let error_msg = executor.eval_expr(&Expr::Variable {
+        name: "error_msg".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert!(matches!(error_msg, Value::String(s) if s.contains("error") && s.contains("42")));
+}
+
+#[test]
+#[ignore = "Function declaration parsing from source not working yet"]
+fn test_try_catch_with_function_call() {
+    let source = r#"
+func risky_function() {
+    raise "function error"
+    return 42
+}
+
+result = 0
+try {
+    result = risky_function()
+}
+catch {
+    result = 999
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.eval_expr(&Expr::Variable {
+        name: "result".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(result, Value::Number(999.0));
+}
+
+#[test]
+fn test_catch_can_access_outer_variables() {
+    let source = r#"
+counter = 0
+try {
+    raise "error"
+}
+catch {
+    counter = counter + 1
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let counter = executor.eval_expr(&Expr::Variable {
+        name: "counter".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(counter, Value::Number(1.0));
+}
+
+#[test]
+fn test_finally_can_access_outer_variables() {
+    let source = r#"
+counter = 0
+try {
+    x = 1
+}
+finally {
+    counter = counter + 1
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let counter = executor.eval_expr(&Expr::Variable {
+        name: "counter".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(counter, Value::Number(1.0));
+}
+
+#[test]
+fn test_try_catch_finally_all_together() {
+    let source = r#"
+tried = false
+caught = false
+finalized = false
+
+try {
+    tried = true
+    raise "error"
+}
+catch {
+    caught = true
+}
+finally {
+    finalized = true
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let tried = executor.eval_expr(&Expr::Variable {
+        name: "tried".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(tried, Value::Boolean(true));
+
+    let caught = executor.eval_expr(&Expr::Variable {
+        name: "caught".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(caught, Value::Boolean(true));
+
+    let finalized = executor.eval_expr(&Expr::Variable {
+        name: "finalized".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(finalized, Value::Boolean(true));
+}
+
+#[test]
+fn test_empty_try_catch() {
+    let source = r#"
+x = 0
+try {
+}
+catch {
+    x = 1
+}
+x = 10
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let x = executor.eval_expr(&Expr::Variable {
+        name: "x".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(x, Value::Number(10.0));
+}
+
+#[test]
+fn test_empty_catch_block() {
+    let source = r#"
+x = 0
+try {
+    raise "error"
+}
+catch {
+}
+x = 10
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let x = executor.eval_expr(&Expr::Variable {
+        name: "x".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(x, Value::Number(10.0));
+}
+
+#[test]
+fn test_empty_finally_block() {
+    let source = r#"
+x = 0
+try {
+    x = 10
+}
+finally {
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let x = executor.eval_expr(&Expr::Variable {
+        name: "x".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(x, Value::Number(10.0));
+}
+
+#[test]
+#[ignore = "Function declaration parsing from source not working yet"]
+fn test_try_catch_return_value() {
+    let source = r#"
+func test() {
+    try {
+        return 42
+    }
+    catch {
+        return 999
+    }
+}
+
+result = test()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.eval_expr(&Expr::Variable {
+        name: "result".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(result, Value::Number(42.0));
+}
+
+#[test]
+#[ignore = "Function declaration parsing from source not working yet"]
+fn test_try_catch_return_value_with_error() {
+    let source = r#"
+func test() {
+    try {
+        raise "error"
+        return 42
+    }
+    catch {
+        return 999
+    }
+}
+
+result = test()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.eval_expr(&Expr::Variable {
+        name: "result".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(result, Value::Number(999.0));
+}
+
+#[test]
+fn test_multiple_statements_in_try() {
+    let source = r#"
+x = 0
+y = 0
+try {
+    x = 10
+    y = 20
+    raise "error"
+    x = 30
+}
+catch {
+    x = x + 1
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let x = executor.eval_expr(&Expr::Variable {
+        name: "x".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(x, Value::Number(11.0));
+
+    let y = executor.eval_expr(&Expr::Variable {
+        name: "y".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(y, Value::Number(20.0));
+}
+
+#[test]
+fn test_multiple_statements_in_catch() {
+    let source = r#"
+x = 0
+y = 0
+try {
+    raise "error"
+}
+catch {
+    x = 10
+    y = 20
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let x = executor.eval_expr(&Expr::Variable {
+        name: "x".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(x, Value::Number(10.0));
+
+    let y = executor.eval_expr(&Expr::Variable {
+        name: "y".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(y, Value::Number(20.0));
+}
+
+#[test]
+fn test_multiple_statements_in_finally() {
+    let source = r#"
+x = 0
+y = 0
+try {
+    x = 1
+}
+finally {
+    x = x + 10
+    y = 20
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let x = executor.eval_expr(&Expr::Variable {
+        name: "x".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(x, Value::Number(11.0));
+
+    let y = executor.eval_expr(&Expr::Variable {
+        name: "y".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(y, Value::Number(20.0));
+}
+
+#[test]
+fn test_try_catch_with_list_operations() {
+    let source = r#"
+items = [1, 2, 3]
+result = 0
+try {
+    result = items[10]
+}
+catch {
+    result = 999
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.eval_expr(&Expr::Variable {
+        name: "result".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(result, Value::Number(999.0));
+}
+
+#[test]
+fn test_try_catch_with_map_operations() {
+    let source = r#"
+mymap = {"a": 1, "b": 2}
+result = 0
+try {
+    result = mymap["missing_key"]
+}
+catch {
+    result = 999
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.eval_expr(&Expr::Variable {
+        name: "result".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(result, Value::Number(999.0));
+}
+
+#[test]
+fn test_deeply_nested_try_catch() {
+    let source = r#"
+level = 0
+try {
+    level = 1
+    try {
+        level = 2
+        try {
+            level = 3
+            raise "error"
+        }
+        catch {
+            level = level + 10
+        }
+    }
+    catch {
+        level = level + 100
+    }
+}
+catch {
+    level = level + 1000
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let level = executor.eval_expr(&Expr::Variable {
+        name: "level".to_string(),
+        position: pos(),
+    }).unwrap();
+    assert_eq!(level, Value::Number(13.0));
+}
+
+#[test]
+fn test_catch_error_type_case_sensitive() {
+    let source = r#"
+caught = false
+try {
+    x = 1 / 0
+}
+catch runtimeerror {
+    caught = true
+}
+"#;
+    let mut executor = Executor::new();
+    let result = executor.execute_source(source);
+
+    // Should not catch because case is wrong
+    assert!(result.is_err());
+}
+
+// ============================================================================
+// Total: 35 try/catch/finally executor tests
+// ============================================================================

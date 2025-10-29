@@ -2,6 +2,7 @@ use crate::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Stmt, UnaryOp};
 use crate::error::{GraphoidError, Result};
 use crate::execution::Environment;
 use crate::execution::config::ConfigStack;
+use crate::execution::error_collector::ErrorCollector;
 use crate::execution::module_manager::{ModuleManager, Module};
 use crate::values::{Function, Value, List, Hash};
 use crate::graph::{RuleSpec, RuleInstance};
@@ -19,6 +20,7 @@ pub struct Executor {
     current_file: Option<PathBuf>,
     pub config_stack: ConfigStack,
     pub precision_stack: Vec<Option<usize>>,
+    pub error_collector: ErrorCollector,
 }
 
 impl Executor {
@@ -31,6 +33,7 @@ impl Executor {
             current_file: None,
             config_stack: ConfigStack::new(),
             precision_stack: Vec::new(),
+            error_collector: ErrorCollector::new(),
         }
     }
 
@@ -43,6 +46,7 @@ impl Executor {
             current_file: None,
             config_stack: ConfigStack::new(),
             precision_stack: Vec::new(),
+            error_collector: ErrorCollector::new(),
         }
     }
 
@@ -122,6 +126,15 @@ impl Executor {
                 is_unless,
                 ..
             } => self.eval_conditional(condition, then_expr, else_expr, *is_unless),
+            Expr::Raise { error, .. } => {
+                // Evaluate the error expression and raise it
+                let error_value = self.eval_expr(error)?;
+                let message = match error_value {
+                    Value::String(s) => s,
+                    other => format!("{:?}", other),
+                };
+                Err(GraphoidError::runtime(message))
+            }
         }
     }
 
@@ -418,6 +431,9 @@ impl Executor {
                 self.precision_stack.pop();
 
                 Ok(result)
+            }
+            Stmt::Try { body, catch_clauses, finally_block, .. } => {
+                self.execute_try(body, catch_clauses, finally_block)
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Unsupported statement type: {:?}",
@@ -2620,6 +2636,116 @@ impl Executor {
         self.module_manager.end_loading(&resolved_path);
 
         Ok(Value::Module(module))
+    }
+
+    /// Executes a try/catch/finally statement
+    fn execute_try(
+        &mut self,
+        body: &[Stmt],
+        catch_clauses: &[crate::ast::CatchClause],
+        finally_block: &Option<Vec<Stmt>>,
+    ) -> Result<Option<Value>> {
+        // Try to execute the try body
+        let try_result = self.execute_try_body(body);
+
+        // Determine if we need to execute a catch clause
+        // Don't use ? here - we need to run finally block regardless
+        let catch_result = if let Err(ref error) = try_result {
+            // Try to find a matching catch clause
+            self.find_and_execute_catch(error, catch_clauses)
+        } else {
+            // No error, use try result
+            try_result
+        };
+
+        // Always execute finally block if present
+        if let Some(finally_stmts) = finally_block {
+            for stmt in finally_stmts {
+                self.eval_stmt(stmt)?;
+            }
+        }
+
+        // Return the catch result (which may be an error)
+        catch_result
+    }
+
+    /// Executes the try body and returns the result
+    fn execute_try_body(&mut self, body: &[Stmt]) -> Result<Option<Value>> {
+        let mut result = None;
+        for stmt in body {
+            match self.eval_stmt(stmt) {
+                Ok(Some(val)) => {
+                    result = Some(val);
+                    break;
+                }
+                Ok(None) => {
+                    // Statement executed successfully with no return value
+                    continue;
+                }
+                Err(e) => {
+                    // Error occurred - propagate it so execute_try can catch it
+                    return Err(e);
+                }
+            }
+        }
+        Ok(result)
+    }
+
+    /// Finds a matching catch clause and executes it
+    fn find_and_execute_catch(
+        &mut self,
+        error: &GraphoidError,
+        catch_clauses: &[crate::ast::CatchClause],
+    ) -> Result<Option<Value>> {
+        // Extract error type from GraphoidError
+        let error_type_name = match error {
+            GraphoidError::SyntaxError { .. } => "SyntaxError",
+            GraphoidError::TypeError { .. } => "TypeError",
+            GraphoidError::RuntimeError { .. } => "RuntimeError",
+            GraphoidError::RuleViolation { .. } => "RuleViolation",
+            GraphoidError::ModuleNotFound { .. } => "ModuleNotFound",
+            GraphoidError::IOError { .. } => "IOError",
+            GraphoidError::CircularDependency { .. } => "CircularDependency",
+            GraphoidError::IoError(_) => "IoError",
+            GraphoidError::ConfigError { .. } => "ConfigError",
+        };
+
+        // Search for a matching catch clause
+        for catch_clause in catch_clauses {
+            // Check if this catch clause matches the error type
+            let matches = if let Some(ref expected_type) = catch_clause.error_type {
+                expected_type == error_type_name
+            } else {
+                // Catch-all clause (no type specified)
+                true
+            };
+
+            if matches {
+                // Bind error to variable if specified (in current scope)
+                if let Some(ref var_name) = catch_clause.variable {
+                    // Convert error to a string value for binding
+                    let error_message = error.to_string();
+                    self.env.define(var_name.clone(), Value::String(error_message));
+                }
+
+                // Execute catch body
+                let mut result = None;
+                for stmt in &catch_clause.body {
+                    if let Some(val) = self.eval_stmt(stmt)? {
+                        result = Some(val);
+                        break;
+                    }
+                }
+
+                // Note: We're not removing the error variable to keep this simple
+                // In a real implementation, we'd need a proper scoping mechanism
+
+                return Ok(result);
+            }
+        }
+
+        // No matching catch clause found - re-throw the error
+        Err(error.clone())
     }
 }
 

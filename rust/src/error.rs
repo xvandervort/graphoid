@@ -104,3 +104,62 @@ impl GraphoidError {
         GraphoidError::RuntimeError { message }
     }
 }
+
+impl Clone for GraphoidError {
+    fn clone(&self) -> Self {
+        match self {
+            GraphoidError::SyntaxError { message, position } => {
+                GraphoidError::SyntaxError {
+                    message: message.clone(),
+                    position: position.clone(),
+                }
+            }
+            GraphoidError::TypeError { message, position } => {
+                GraphoidError::TypeError {
+                    message: message.clone(),
+                    position: position.clone(),
+                }
+            }
+            GraphoidError::RuntimeError { message } => {
+                GraphoidError::RuntimeError {
+                    message: message.clone(),
+                }
+            }
+            GraphoidError::RuleViolation { rule, message } => {
+                GraphoidError::RuleViolation {
+                    rule: rule.clone(),
+                    message: message.clone(),
+                }
+            }
+            GraphoidError::ModuleNotFound { module, position } => {
+                GraphoidError::ModuleNotFound {
+                    module: module.clone(),
+                    position: position.clone(),
+                }
+            }
+            GraphoidError::IOError { message, position } => {
+                GraphoidError::IOError {
+                    message: message.clone(),
+                    position: position.clone(),
+                }
+            }
+            GraphoidError::CircularDependency { chain, position } => {
+                GraphoidError::CircularDependency {
+                    chain: chain.clone(),
+                    position: position.clone(),
+                }
+            }
+            // Convert IoError to RuntimeError when cloning
+            GraphoidError::IoError(e) => {
+                GraphoidError::RuntimeError {
+                    message: format!("IO error: {}", e),
+                }
+            }
+            GraphoidError::ConfigError { message } => {
+                GraphoidError::ConfigError {
+                    message: message.clone(),
+                }
+            }
+        }
+    }
+}

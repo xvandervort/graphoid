@@ -93,6 +93,8 @@ impl Parser {
             self.configure_statement()
         } else if self.match_token(&TokenType::Precision) {
             self.precision_statement()
+        } else if self.match_token(&TokenType::Try) {
+            self.try_catch_statement()
         } else {
             // Try to parse as assignment or expression
             self.assignment_or_expression()
@@ -698,6 +700,139 @@ impl Parser {
         })
     }
 
+    fn try_catch_statement(&mut self) -> Result<Stmt> {
+        use crate::ast::CatchClause;
+        let position = self.previous_position();
+
+        // Expect opening brace for try body
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' after 'try'".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse try body
+        let body = self.block()?;
+
+        // Expect closing brace
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' after try body".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Skip newlines before catch/finally
+        while self.match_token(&TokenType::Newline) {}
+
+        // Parse catch clauses (zero or more)
+        let mut catch_clauses = Vec::new();
+
+        while self.match_token(&TokenType::Catch) {
+            let catch_pos = self.previous_position();
+            let mut error_type = None;
+            let mut variable = None;
+
+            // Check for optional error type
+            if let TokenType::Identifier(type_name) = &self.peek().token_type {
+                error_type = Some(type_name.clone());
+                self.advance();
+
+                // Check for 'as' keyword and variable binding
+                if self.match_token(&TokenType::As) {
+                    if let TokenType::Identifier(var_name) = &self.peek().token_type {
+                        variable = Some(var_name.clone());
+                        self.advance();
+                    } else {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected variable name after 'as'".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+                }
+            } else if self.match_token(&TokenType::As) {
+                // Catch all with variable binding: catch as e
+                if let TokenType::Identifier(var_name) = &self.peek().token_type {
+                    variable = Some(var_name.clone());
+                    self.advance();
+                } else {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected variable name after 'as'".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
+            }
+
+            // Expect opening brace for catch body
+            if !self.match_token(&TokenType::LeftBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '{' after catch clause".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            // Parse catch body
+            let catch_body = self.block()?;
+
+            // Expect closing brace
+            if !self.match_token(&TokenType::RightBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '}' after catch body".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            catch_clauses.push(CatchClause {
+                error_type,
+                variable,
+                body: catch_body,
+                position: catch_pos,
+            });
+
+            // Skip newlines before next catch or finally
+            while self.match_token(&TokenType::Newline) {}
+        }
+
+        // Parse optional finally block
+        let finally_block = if self.match_token(&TokenType::Finally) {
+            if !self.match_token(&TokenType::LeftBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '{' after 'finally'".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            let finally_body = self.block()?;
+
+            if !self.match_token(&TokenType::RightBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '}' after finally body".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            Some(finally_body)
+        } else {
+            None
+        };
+
+        // Validate: must have at least one catch or finally
+        if catch_clauses.is_empty() && finally_block.is_none() {
+            return Err(GraphoidError::SyntaxError {
+                message: "Try statement must have at least one catch or finally block".to_string(),
+                position,
+            });
+        }
+
+        Ok(Stmt::Try {
+            body,
+            catch_clauses,
+            finally_block,
+            position,
+        })
+    }
+
     fn assignment_or_expression(&mut self) -> Result<Stmt> {
         let position = self.peek().position();
 
@@ -1223,6 +1358,15 @@ impl Parser {
 
     fn primary(&mut self) -> Result<Expr> {
         let position = self.peek().position();
+
+        // Raise expressions
+        if self.match_token(&TokenType::Raise) {
+            let error_expr = Box::new(self.expression()?);
+            return Ok(Expr::Raise {
+                error: error_expr,
+                position,
+            });
+        }
 
         // Numbers
         if let TokenType::Number(n) = self.peek().token_type {

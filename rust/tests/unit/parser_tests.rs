@@ -1064,5 +1064,249 @@ fn test_parse_precision_error_float() {
 }
 
 // ============================================================================
-// Total: 48 comprehensive parser tests (36 original + 12 configure/precision)
+// PHASE 9: Try/Catch/Finally Parser Tests
+// ============================================================================
+
+#[test]
+fn test_parse_basic_try_catch() {
+    let mut lexer = Lexer::new("try { x = 1 } catch { y = 2 }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    assert_eq!(program.statements.len(), 1);
+    match &program.statements[0] {
+        Stmt::Try { body, catch_clauses, finally_block, .. } => {
+            assert_eq!(body.len(), 1);
+            assert_eq!(catch_clauses.len(), 1);
+            assert!(finally_block.is_none());
+            assert_eq!(catch_clauses[0].error_type, None);
+            assert_eq!(catch_clauses[0].variable, None);
+        }
+        _ => panic!("Expected try statement"),
+    }
+}
+
+#[test]
+fn test_parse_try_catch_with_error_type() {
+    let mut lexer = Lexer::new("try { x = 1 } catch RuntimeError { y = 2 }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Try { catch_clauses, .. } => {
+            assert_eq!(catch_clauses[0].error_type, Some("RuntimeError".to_string()));
+            assert_eq!(catch_clauses[0].variable, None);
+        }
+        _ => panic!("Expected try statement"),
+    }
+}
+
+#[test]
+fn test_parse_try_catch_with_variable_binding() {
+    let mut lexer = Lexer::new("try { x = 1 } catch as e { print(e) }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Try { catch_clauses, .. } => {
+            assert_eq!(catch_clauses[0].error_type, None);
+            assert_eq!(catch_clauses[0].variable, Some("e".to_string()));
+        }
+        _ => panic!("Expected try statement"),
+    }
+}
+
+#[test]
+fn test_parse_try_catch_with_type_and_variable() {
+    let mut lexer = Lexer::new("try { x = 1 } catch TypeError as err { handle(err) }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Try { catch_clauses, .. } => {
+            assert_eq!(catch_clauses[0].error_type, Some("TypeError".to_string()));
+            assert_eq!(catch_clauses[0].variable, Some("err".to_string()));
+        }
+        _ => panic!("Expected try statement"),
+    }
+}
+
+#[test]
+fn test_parse_try_with_finally() {
+    let mut lexer = Lexer::new("try { x = 1 } finally { cleanup() }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Try { body, catch_clauses, finally_block, .. } => {
+            assert_eq!(body.len(), 1);
+            assert_eq!(catch_clauses.len(), 0);
+            assert!(finally_block.is_some());
+            assert_eq!(finally_block.as_ref().unwrap().len(), 1);
+        }
+        _ => panic!("Expected try statement"),
+    }
+}
+
+#[test]
+fn test_parse_try_catch_finally() {
+    let mut lexer = Lexer::new("try { x = 1 } catch { y = 2 } finally { z = 3 }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Try { body, catch_clauses, finally_block, .. } => {
+            assert_eq!(body.len(), 1);
+            assert_eq!(catch_clauses.len(), 1);
+            assert!(finally_block.is_some());
+        }
+        _ => panic!("Expected try statement"),
+    }
+}
+
+#[test]
+fn test_parse_multiple_catch_clauses() {
+    let source = r#"
+try {
+    risky_operation()
+}
+catch TypeError as e {
+    handle_type_error(e)
+}
+catch RuntimeError as e {
+    handle_runtime_error(e)
+}
+catch {
+    handle_other_error()
+}
+"#;
+    let mut lexer = Lexer::new(source);
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Try { catch_clauses, .. } => {
+            assert_eq!(catch_clauses.len(), 3);
+            assert_eq!(catch_clauses[0].error_type, Some("TypeError".to_string()));
+            assert_eq!(catch_clauses[1].error_type, Some("RuntimeError".to_string()));
+            assert_eq!(catch_clauses[2].error_type, None);
+        }
+        _ => panic!("Expected try statement"),
+    }
+}
+
+#[test]
+fn test_parse_nested_try_catch() {
+    let source = r#"
+try {
+    try {
+        inner_operation()
+    } catch {
+        handle_inner()
+    }
+} catch {
+    handle_outer()
+}
+"#;
+    let mut lexer = Lexer::new(source);
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Try { body, .. } => {
+            assert_eq!(body.len(), 1);
+            match &body[0] {
+                Stmt::Try { .. } => {}, // Inner try statement
+                _ => panic!("Expected nested try statement"),
+            }
+        }
+        _ => panic!("Expected try statement"),
+    }
+}
+
+#[test]
+fn test_parse_try_without_catch_or_finally_error() {
+    let mut lexer = Lexer::new("try { x = 1 }");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let result = parser.parse();
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_parse_try_with_multiple_statements() {
+    let source = r#"
+try {
+    x = 1
+    y = 2
+    z = x + y
+} catch as e {
+    print(e)
+}
+"#;
+    let mut lexer = Lexer::new(source);
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Try { body, .. } => {
+            assert_eq!(body.len(), 3);
+        }
+        _ => panic!("Expected try statement"),
+    }
+}
+
+#[test]
+fn test_parse_raise_expression() {
+    let mut lexer = Lexer::new("raise \"error message\"");
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    match &program.statements[0] {
+        Stmt::Expression { expr, .. } => {
+            match expr {
+                Expr::Raise { .. } => {}, // Found raise expression
+                _ => panic!("Expected raise expression"),
+            }
+        }
+        _ => panic!("Expected expression statement"),
+    }
+}
+
+#[test]
+fn test_parse_try_catch_with_raise() {
+    let source = r#"
+try {
+    if error_condition {
+        raise "Something went wrong"
+    }
+} catch as e {
+    print(e)
+}
+"#;
+    let mut lexer = Lexer::new(source);
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().unwrap();
+
+    assert_eq!(program.statements.len(), 1);
+    match &program.statements[0] {
+        Stmt::Try { .. } => {},
+        _ => panic!("Expected try statement"),
+    }
+}
+
+// ============================================================================
+// Total: 60 comprehensive parser tests (48 previous + 12 try/catch)
 // ============================================================================
