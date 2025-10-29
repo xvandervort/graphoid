@@ -428,6 +428,7 @@ mod tests {
             params: vec!["x".to_string()],
             body: vec![],
             env: Rc::new(Environment::new()),
+            node_id: None,
         }
     }
 

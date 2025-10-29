@@ -6454,10 +6454,9 @@ catch as e {
 }
 
 #[test]
-#[ignore = "Function declaration parsing from source not working yet"]
 fn test_try_catch_with_function_call() {
     let source = r#"
-func risky_function() {
+fn risky_function() {
     raise "function error"
     return 42
 }
@@ -6625,10 +6624,9 @@ finally {
 }
 
 #[test]
-#[ignore = "Function declaration parsing from source not working yet"]
 fn test_try_catch_return_value() {
     let source = r#"
-func test() {
+fn test() {
     try {
         return 42
     }
@@ -6650,10 +6648,9 @@ result = test()
 }
 
 #[test]
-#[ignore = "Function declaration parsing from source not working yet"]
 fn test_try_catch_return_value_with_error() {
     let source = r#"
-func test() {
+fn test() {
     try {
         raise "error"
         return 42

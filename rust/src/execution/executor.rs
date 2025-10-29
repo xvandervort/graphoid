@@ -83,6 +83,7 @@ impl Executor {
             params: Vec::new(),
             body: Vec::new(),
             env: Rc::new(self.env.clone()),
+            node_id: None,
         };
 
         let toplevel_id = self.function_graph.borrow_mut().register_function(toplevel_func);
@@ -306,18 +307,20 @@ impl Executor {
                 let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
 
                 // Create function value
-                let func = Function {
+                let mut func = Function {
                     name: Some(name.clone()),
                     params: param_names,
                     body: body.clone(),
                     env: Rc::new(self.env.clone()),
+                    node_id: None,
                 };
+
+                // Register function in the function graph and store its node_id
+                let node_id = self.function_graph.borrow_mut().register_function(func.clone());
+                func.node_id = Some(node_id);
 
                 // Store in global functions table (for recursion support)
                 self.global_functions.insert(name.clone(), func.clone());
-
-                // Register function in the function graph
-                self.function_graph.borrow_mut().register_function(func.clone());
 
                 // Store function in environment
                 self.env.define(name.clone(), Value::Function(func));
@@ -678,15 +681,17 @@ impl Executor {
         };
 
         // Create anonymous function with captured environment
-        let func = Function {
+        let mut func = Function {
             name: None, // Anonymous
             params: params.to_vec(),
             body: vec![return_stmt],
             env: Rc::new(self.env.clone()),
+            node_id: None,
         };
 
-        // Register lambda in the function graph
-        self.function_graph.borrow_mut().register_function(func.clone());
+        // Register lambda in the function graph and store its node_id
+        let node_id = self.function_graph.borrow_mut().register_function(func.clone());
+        func.node_id = Some(node_id);
 
         Ok(Value::Function(func))
     }
@@ -2195,18 +2200,21 @@ impl Executor {
         }
 
         // Find or register function in the function graph
-        let func_id = if let Some(fname) = &func.name {
-            // Named function: look up existing node
+        let func_id = if let Some(node_id) = &func.node_id {
+            // Function already has a node_id (was registered at definition time)
+            node_id.clone()
+        } else if let Some(fname) = &func.name {
+            // Named function without node_id: look up existing node
             let graph = self.function_graph.borrow();
             if let Some(node) = graph.get_function_by_name(fname) {
                 node.node_id.clone()
             } else {
-                // Not found, this shouldn't happen but handle it
+                // Not found, register it
                 drop(graph);
                 self.function_graph.borrow_mut().register_function(func.clone())
             }
         } else {
-            // Lambda: register at first call
+            // Lambda without node_id: register it now
             self.function_graph.borrow_mut().register_function(func.clone())
         };
 

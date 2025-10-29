@@ -185,6 +185,8 @@ pub struct Function {
     pub body: Vec<Stmt>,
     /// Captured environment (for closures)
     pub env: Rc<Environment>,
+    /// Node ID in the function graph (set when registered, prevents duplicate registration)
+    pub node_id: Option<String>,
 }
 
 impl PartialEq for Function {

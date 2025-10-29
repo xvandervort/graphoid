@@ -201,6 +201,7 @@ fn test_ordering_custom_function() {
             }
         ],
         env: Rc::new(Environment::new()),
+            node_id: None,
     };
 
     let mut list = List::new();
@@ -254,6 +255,7 @@ fn test_ordering_reverse() {
             }
         ],
         env: Rc::new(Environment::new()),
+            node_id: None,
     };
 
     let mut list = List::new();

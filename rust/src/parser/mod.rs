@@ -1169,6 +1169,9 @@ impl Parser {
         let mut expr = self.primary()?;
 
         loop {
+            // Skip newlines to allow method chaining across lines
+            while self.match_token(&TokenType::Newline) {}
+
             if self.match_token(&TokenType::LeftParen) {
                 // Function call
                 let position = expr.position().clone();

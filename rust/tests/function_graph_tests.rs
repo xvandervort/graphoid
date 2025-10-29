@@ -142,7 +142,6 @@ fn test_multiple_calls_increment_count() {
 }
 
 #[test]
-#[ignore] // TODO: Requires instrumenting builtin collection methods to track lambda calls
 fn test_lambda_functions_tracked() {
     let source = r#"
         numbers = [1, 2, 3, 4, 5]
@@ -323,7 +322,6 @@ fn test_total_calls_across_program() {
 }
 
 #[test]
-#[ignore] // TODO: Requires parser support for method chaining (.map().filter().map())
 fn test_multiple_lambdas_in_chain() {
     let source = r#"
         numbers = [1, 2, 3, 4, 5]
