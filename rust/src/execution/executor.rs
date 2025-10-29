@@ -1,10 +1,10 @@
 use crate::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Stmt, UnaryOp};
 use crate::error::{GraphoidError, Result};
 use crate::execution::Environment;
-use crate::execution::config::ConfigStack;
+use crate::execution::config::{ConfigStack, ErrorMode};
 use crate::execution::error_collector::ErrorCollector;
 use crate::execution::module_manager::{ModuleManager, Module};
-use crate::values::{Function, Value, List, Hash};
+use crate::values::{Function, Value, List, Hash, ErrorObject};
 use crate::graph::{RuleSpec, RuleInstance};
 use crate::lexer::Lexer;
 use crate::parser::Parser;
@@ -126,14 +126,38 @@ impl Executor {
                 is_unless,
                 ..
             } => self.eval_conditional(condition, then_expr, else_expr, *is_unless),
-            Expr::Raise { error, .. } => {
+            Expr::Raise { error, position } => {
                 // Evaluate the error expression and raise it
                 let error_value = self.eval_expr(error)?;
-                let message = match error_value {
-                    Value::String(s) => s,
-                    other => format!("{:?}", other),
+
+                // Convert to GraphoidError based on value type
+                let graphoid_error = match error_value {
+                    // If it's already an Error value, convert to GraphoidError
+                    Value::Error(err_obj) => {
+                        // All user-raised errors become RuntimeError in GraphoidError
+                        // The error type is preserved in the Error object itself
+                        GraphoidError::runtime(err_obj.full_message())
+                    },
+                    // If it's a string, create a RuntimeError
+                    Value::String(s) => GraphoidError::runtime(s),
+                    // Any other value, convert to string and create RuntimeError
+                    other => GraphoidError::runtime(format!("{:?}", other)),
                 };
-                Err(GraphoidError::runtime(message))
+
+                // Check if we're in error collection mode
+                if self.config_stack.current().error_mode == ErrorMode::Collect {
+                    // Collect the error instead of propagating it
+                    self.error_collector.collect(
+                        graphoid_error,
+                        self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
+                        position.clone(),
+                    );
+                    // Return None to continue execution
+                    Ok(Value::None)
+                } else {
+                    // Propagate the error (default behavior)
+                    Err(graphoid_error)
+                }
             }
         }
     }
@@ -804,6 +828,7 @@ impl Executor {
             Value::Map(hash) => self.eval_map_method(&hash, method, args),
             Value::Graph(graph) => self.eval_graph_method(graph, method, args, object_expr),
             Value::String(ref s) => self.eval_string_method(s, method, args),
+            Value::Error(ref err) => self.eval_error_method(err, method, args),
             other => Err(GraphoidError::runtime(format!(
                 "Type '{}' does not have method '{}'",
                 other.type_name(),
@@ -1574,6 +1599,38 @@ impl Executor {
         }
     }
 
+    /// Evaluates a method call on an error object.
+    fn eval_error_method(&self, err: &ErrorObject, method: &str, args: &[Value]) -> Result<Value> {
+        // All error methods take no arguments
+        if !args.is_empty() {
+            return Err(GraphoidError::runtime(format!(
+                "Error method '{}' takes no arguments, but got {}",
+                method,
+                args.len()
+            )));
+        }
+
+        match method {
+            "type" => Ok(Value::String(err.error_type.clone())),
+            "message" => Ok(Value::String(err.message.clone())),
+            "file" => Ok(err.file.as_ref().map(|f| Value::String(f.clone())).unwrap_or(Value::None)),
+            "line" => Ok(Value::Number(err.line as f64)),
+            "column" => Ok(Value::Number(err.column as f64)),
+            "stack_trace" => {
+                // TODO: Implement stack trace when we have call stack tracking
+                Ok(Value::String(format!("{}:{}:{}",
+                    err.file.as_ref().map(|f| f.as_str()).unwrap_or("<unknown>"),
+                    err.line,
+                    err.column
+                )))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "Error does not have method '{}'",
+                method
+            ))),
+        }
+    }
+
     /// Evaluates a method call on a graph.
     fn eval_graph_method(&mut self, mut graph: crate::values::Graph, method: &str, args: &[Value], object_expr: &Expr) -> Result<Value> {
         match method {
@@ -1881,6 +1938,74 @@ impl Executor {
 
     /// Evaluates a function call expression.
     fn eval_call(&mut self, callee: &Expr, args: &[Expr]) -> Result<Value> {
+        // Check if this is a builtin function call (special handling)
+        if let Expr::Variable { name, .. } = callee {
+            match name.as_str() {
+                "RuntimeError" | "ValueError" | "TypeError" | "IOError" | "NetworkError" | "ParseError" => {
+                    // Evaluate the message argument
+                    if args.len() != 1 {
+                        return Err(GraphoidError::runtime(format!(
+                            "{} constructor expects 1 argument (message), got {}",
+                            name, args.len()
+                        )));
+                    }
+                    let message_value = self.eval_expr(&args[0])?;
+                    let message = message_value.to_string_value();
+
+                    // Create the error object
+                    let error_obj = ErrorObject::new(
+                        name.clone(),
+                        message,
+                        None, // file
+                        0,    // line
+                        0,    // column
+                    );
+                    return Ok(Value::Error(error_obj));
+                }
+                "get_errors" => {
+                    // get_errors() - returns list of collected errors
+                    if !args.is_empty() {
+                        return Err(GraphoidError::runtime(format!(
+                            "get_errors() takes no arguments, got {}",
+                            args.len()
+                        )));
+                    }
+
+                    // Get collected errors from error_collector
+                    let errors = self.error_collector.get_errors();
+
+                    // Convert to list of error objects
+                    let error_values: Vec<Value> = errors
+                        .iter()
+                        .map(|collected_err| {
+                            Value::Error(ErrorObject::new(
+                                "RuntimeError".to_string(), // TODO: preserve actual error type
+                                collected_err.error.to_string(),
+                                collected_err.file.clone(),
+                                collected_err.position.line,
+                                collected_err.position.column,
+                            ))
+                        })
+                        .collect();
+
+                    return Ok(Value::List(List::from_vec(error_values)));
+                }
+                "clear_errors" => {
+                    // clear_errors() - clears the error collection
+                    if !args.is_empty() {
+                        return Err(GraphoidError::runtime(format!(
+                            "clear_errors() takes no arguments, got {}",
+                            args.len()
+                        )));
+                    }
+
+                    self.error_collector.clear();
+                    return Ok(Value::None);
+                }
+                _ => {}
+            }
+        }
+
         // Evaluate the callee to get the function
         let callee_value = self.eval_expr(callee)?;
 
@@ -2698,23 +2823,53 @@ impl Executor {
         catch_clauses: &[crate::ast::CatchClause],
     ) -> Result<Option<Value>> {
         // Extract error type from GraphoidError
-        let error_type_name = match error {
-            GraphoidError::SyntaxError { .. } => "SyntaxError",
-            GraphoidError::TypeError { .. } => "TypeError",
-            GraphoidError::RuntimeError { .. } => "RuntimeError",
-            GraphoidError::RuleViolation { .. } => "RuleViolation",
-            GraphoidError::ModuleNotFound { .. } => "ModuleNotFound",
-            GraphoidError::IOError { .. } => "IOError",
-            GraphoidError::CircularDependency { .. } => "CircularDependency",
-            GraphoidError::IoError(_) => "IoError",
-            GraphoidError::ConfigError { .. } => "ConfigError",
-        };
+        // First check if the error message contains a user-raised error type (e.g., "ValueError: message")
+        let error_message = error.to_string();
+        let error_type_name: String;
+        let actual_message: String;
+
+        if let Some(colon_pos) = error_message.find(':') {
+            let potential_type = &error_message[..colon_pos];
+            // Check if it's a known error type
+            if matches!(potential_type, "ValueError" | "TypeError" | "IOError" | "NetworkError" | "ParseError" | "RuntimeError") {
+                error_type_name = potential_type.to_string();
+                actual_message = error_message[(colon_pos + 1)..].trim().to_string();
+            } else {
+                // Not a recognized error type prefix, use GraphoidError type
+                error_type_name = match error {
+                    GraphoidError::SyntaxError { .. } => "SyntaxError".to_string(),
+                    GraphoidError::TypeError { .. } => "TypeError".to_string(),
+                    GraphoidError::RuntimeError { .. } => "RuntimeError".to_string(),
+                    GraphoidError::RuleViolation { .. } => "RuleViolation".to_string(),
+                    GraphoidError::ModuleNotFound { .. } => "ModuleNotFound".to_string(),
+                    GraphoidError::IOError { .. } => "IOError".to_string(),
+                    GraphoidError::CircularDependency { .. } => "CircularDependency".to_string(),
+                    GraphoidError::IoError(_) => "IoError".to_string(),
+                    GraphoidError::ConfigError { .. } => "ConfigError".to_string(),
+                };
+                actual_message = error_message.clone();
+            }
+        } else {
+            // No colon, use GraphoidError type
+            error_type_name = match error {
+                GraphoidError::SyntaxError { .. } => "SyntaxError".to_string(),
+                GraphoidError::TypeError { .. } => "TypeError".to_string(),
+                GraphoidError::RuntimeError { .. } => "RuntimeError".to_string(),
+                GraphoidError::RuleViolation { .. } => "RuleViolation".to_string(),
+                GraphoidError::ModuleNotFound { .. } => "ModuleNotFound".to_string(),
+                GraphoidError::IOError { .. } => "IOError".to_string(),
+                GraphoidError::CircularDependency { .. } => "CircularDependency".to_string(),
+                GraphoidError::IoError(_) => "IoError".to_string(),
+                GraphoidError::ConfigError { .. } => "ConfigError".to_string(),
+            };
+            actual_message = error_message.clone();
+        }
 
         // Search for a matching catch clause
         for catch_clause in catch_clauses {
             // Check if this catch clause matches the error type
             let matches = if let Some(ref expected_type) = catch_clause.error_type {
-                expected_type == error_type_name
+                expected_type == &error_type_name
             } else {
                 // Catch-all clause (no type specified)
                 true
@@ -2723,9 +2878,15 @@ impl Executor {
             if matches {
                 // Bind error to variable if specified (in current scope)
                 if let Some(ref var_name) = catch_clause.variable {
-                    // Convert error to a string value for binding
-                    let error_message = error.to_string();
-                    self.env.define(var_name.clone(), Value::String(error_message));
+                    // Create an Error object from the GraphoidError
+                    let error_obj = ErrorObject::new(
+                        error_type_name.clone(),
+                        actual_message.clone(),
+                        None, // TODO: Extract from GraphoidError position
+                        0,    // TODO: Extract from GraphoidError position
+                        0,    // TODO: Extract from GraphoidError position
+                    );
+                    self.env.define(var_name.clone(), Value::Error(error_obj));
                 }
 
                 // Execute catch body

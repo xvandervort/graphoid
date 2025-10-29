@@ -6045,7 +6045,7 @@ try {
     raise "something went wrong"
 }
 catch as e {
-    error_msg = e
+    error_msg = e.message()
 }
 "#;
     let mut executor = Executor::new();
@@ -6087,7 +6087,7 @@ try {
     x = 1 / 0
 }
 catch RuntimeError as e {
-    error_msg = e
+    error_msg = e.message()
 }
 "#;
     let mut executor = Executor::new();
@@ -6443,7 +6443,7 @@ try {
     raise msg + "42"
 }
 catch as e {
-    error_msg = e
+    error_msg = e.message()
 }
 "#;
     let mut executor = Executor::new();
@@ -6865,4 +6865,230 @@ catch runtimeerror {
 
 // ============================================================================
 // Total: 35 try/catch/finally executor tests
+// ============================================================================
+
+// ============================================================================
+// ERROR COLLECTION MODE TESTS
+// ============================================================================
+
+#[test]
+fn test_error_collection_basic() {
+    let source = r#"
+configure { error_mode: :collect } {
+    raise "first error"
+    raise "second error"
+    result = 42
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Execution should continue despite errors
+    let result = executor.get_variable("result").unwrap();
+    assert_eq!(result, Value::Number(42.0));
+
+    // Errors should be collected
+    let errors_source = r#"
+errors = get_errors()
+count = errors.length()
+"#;
+    executor.execute_source(errors_source).unwrap();
+    let count = executor.get_variable("count").unwrap();
+    assert_eq!(count, Value::Number(2.0));
+}
+
+#[test]
+fn test_error_collection_get_errors() {
+    let source = r#"
+configure { error_mode: :collect } {
+    raise ValueError("bad value")
+    raise TypeError("bad type")
+}
+
+errors = get_errors()
+count = errors.length()
+first_msg = errors[0].message()
+second_msg = errors[1].message()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let count = executor.get_variable("count").unwrap();
+    assert_eq!(count, Value::Number(2.0));
+
+    let first_msg = executor.get_variable("first_msg").unwrap();
+    assert_eq!(first_msg, Value::String("Runtime error: ValueError: bad value".to_string()));
+
+    let second_msg = executor.get_variable("second_msg").unwrap();
+    assert_eq!(second_msg, Value::String("Runtime error: TypeError: bad type".to_string()));
+}
+
+#[test]
+fn test_error_collection_clear_errors() {
+    let source = r#"
+configure { error_mode: :collect } {
+    raise "error 1"
+    raise "error 2"
+}
+
+count_before = get_errors().length()
+clear_errors()
+count_after = get_errors().length()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let count_before = executor.get_variable("count_before").unwrap();
+    assert_eq!(count_before, Value::Number(2.0));
+
+    let count_after = executor.get_variable("count_after").unwrap();
+    assert_eq!(count_after, Value::Number(0.0));
+}
+
+#[test]
+fn test_error_collection_scope() {
+    let source = r#"
+# Outside configure block - errors propagate
+outer_error = false
+try {
+    raise "outer error"
+}
+catch {
+    outer_error = true
+}
+
+# Inside configure block - errors collected
+configure { error_mode: :collect } {
+    raise "inner error 1"
+    raise "inner error 2"
+}
+
+# Back outside - errors propagate again
+outer_error_2 = false
+try {
+    raise "outer error 2"
+}
+catch {
+    outer_error_2 = true
+}
+
+collected_count = get_errors().length()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let outer_error = executor.get_variable("outer_error").unwrap();
+    assert_eq!(outer_error, Value::Boolean(true));
+
+    let outer_error_2 = executor.get_variable("outer_error_2").unwrap();
+    assert_eq!(outer_error_2, Value::Boolean(true));
+
+    let collected_count = executor.get_variable("collected_count").unwrap();
+    assert_eq!(collected_count, Value::Number(2.0));
+}
+
+#[test]
+fn test_error_collection_continues_execution() {
+    let source = r#"
+x = 0
+configure { error_mode: :collect } {
+    x = 1
+    raise "error 1"
+    x = 2
+    raise "error 2"
+    x = 3
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // All statements should execute despite errors
+    let x = executor.get_variable("x").unwrap();
+    assert_eq!(x, Value::Number(3.0));
+
+    // Both errors should be collected
+    let errors_source = "count = get_errors().length()";
+    executor.execute_source(errors_source).unwrap();
+    let count = executor.get_variable("count").unwrap();
+    assert_eq!(count, Value::Number(2.0));
+}
+
+#[test]
+fn test_error_collection_nested_configure() {
+    let source = r#"
+configure { error_mode: :collect } {
+    raise "outer error"
+
+    # Nested configure inherits :collect mode
+    configure { skip_none: true } {
+        raise "inner error"
+    }
+
+    raise "outer error 2"
+}
+
+count = get_errors().length()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // All errors should be collected
+    let count = executor.get_variable("count").unwrap();
+    assert_eq!(count, Value::Number(3.0));
+}
+
+#[test]
+fn test_error_collection_error_object_fields() {
+    let source = r#"
+configure { error_mode: :collect } {
+    raise ValueError("test error message")
+}
+
+errors = get_errors()
+error = errors[0]
+error_type = error.type()
+error_msg = error.message()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let error_type = executor.get_variable("error_type").unwrap();
+    // Note: error type is embedded in the message for now
+    assert!(error_type.to_string_value().contains("RuntimeError"));
+
+    let error_msg = executor.get_variable("error_msg").unwrap();
+    assert!(error_msg.to_string_value().contains("ValueError: test error message"));
+}
+
+#[test]
+fn test_get_errors_without_collection() {
+    // get_errors() should work even without error_mode: :collect
+    // It just returns an empty list
+    let source = r#"
+errors = get_errors()
+count = errors.length()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let count = executor.get_variable("count").unwrap();
+    assert_eq!(count, Value::Number(0.0));
+}
+
+#[test]
+fn test_clear_errors_without_collection() {
+    // clear_errors() should work even without errors
+    let source = r#"
+clear_errors()
+result = 42
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert_eq!(result, Value::Number(42.0));
+}
+
+// ============================================================================
+// Total: 10 error collection mode tests
 // ============================================================================

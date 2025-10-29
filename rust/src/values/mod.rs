@@ -15,6 +15,65 @@ pub use list::List;
 pub use hash::Hash;
 // Tree type removed - use graph{}.with_ruleset(:tree) instead
 
+/// An error object with type, message, and source location.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ErrorObject {
+    /// Error type name (e.g., "RuntimeError", "ValueError")
+    pub error_type: String,
+    /// Error message
+    pub message: String,
+    /// Source file where error occurred
+    pub file: Option<String>,
+    /// Line number where error occurred
+    pub line: usize,
+    /// Column number where error occurred
+    pub column: usize,
+}
+
+impl ErrorObject {
+    /// Create a new error object
+    pub fn new(
+        error_type: String,
+        message: String,
+        file: Option<String>,
+        line: usize,
+        column: usize,
+    ) -> Self {
+        Self {
+            error_type,
+            message,
+            file,
+            line,
+            column,
+        }
+    }
+
+    /// Create a RuntimeError
+    pub fn runtime(message: String) -> Self {
+        Self::new("RuntimeError".to_string(), message, None, 0, 0)
+    }
+
+    /// Create a TypeError
+    pub fn type_error(message: String) -> Self {
+        Self::new("TypeError".to_string(), message, None, 0, 0)
+    }
+
+    /// Create a ValueError
+    pub fn value_error(message: String) -> Self {
+        Self::new("ValueError".to_string(), message, None, 0, 0)
+    }
+
+    /// Create an IOError
+    pub fn io_error(message: String) -> Self {
+        Self::new("IOError".to_string(), message, None, 0, 0)
+    }
+
+    /// Get the full error message including type
+    pub fn full_message(&self) -> String {
+        format!("{}: {}", self.error_type, self.message)
+    }
+}
+
 /// A function value with its captured environment (closure).
 #[derive(Debug, Clone)]
 pub struct Function {
@@ -72,6 +131,8 @@ pub enum Value {
     Graph(Graph),
     /// Module value (Phase 8) - imported module namespace
     Module(Module),
+    /// Error object (Phase 9) - raised errors with type and location info
+    Error(ErrorObject),
 }
 
 impl Value {
@@ -89,6 +150,7 @@ impl Value {
             Value::Function(_) => true, // Functions are always truthy
             Value::Graph(g) => g.node_count() > 0,
             Value::Module(_) => true, // Modules are always truthy
+            Value::Error(_) => true, // Errors are always truthy
         }
     }
 
@@ -143,6 +205,7 @@ impl Value {
             Value::Module(m) => {
                 format!("<module {}>", m.name)
             }
+            Value::Error(e) => e.full_message(),
         }
     }
 
@@ -159,6 +222,7 @@ impl Value {
             Value::Function(_) => "function",
             Value::Graph(_) => "graph",
             Value::Module(_) => "module",
+            Value::Error(_) => "error",
         }
     }
 }
