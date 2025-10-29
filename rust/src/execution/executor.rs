@@ -3,6 +3,7 @@ use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::execution::Environment;
 use crate::execution::config::{ConfigStack, ErrorMode};
 use crate::execution::error_collector::ErrorCollector;
+use crate::execution::function_graph::FunctionGraph;
 use crate::execution::module_manager::{ModuleManager, Module};
 use crate::values::{Function, Value, List, Hash, ErrorObject};
 use crate::graph::{RuleSpec, RuleInstance};
@@ -10,6 +11,7 @@ use crate::lexer::Lexer;
 use crate::parser::Parser;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::cell::RefCell;
 use std::path::PathBuf;
 
 /// The executor evaluates AST nodes and produces values.
@@ -21,6 +23,10 @@ pub struct Executor {
     pub config_stack: ConfigStack,
     pub precision_stack: Vec<Option<usize>>,
     pub error_collector: ErrorCollector,
+    /// Global function graph tracking all function definitions and calls
+    pub function_graph: Rc<RefCell<FunctionGraph>>,
+    /// Global function table (for recursion support)
+    global_functions: HashMap<String, Function>,
 }
 
 impl Executor {
@@ -34,6 +40,8 @@ impl Executor {
             config_stack: ConfigStack::new(),
             precision_stack: Vec::new(),
             error_collector: ErrorCollector::new(),
+            function_graph: Rc::new(RefCell::new(FunctionGraph::new())),
+            global_functions: HashMap::new(),
         }
     }
 
@@ -47,6 +55,8 @@ impl Executor {
             config_stack: ConfigStack::new(),
             precision_stack: Vec::new(),
             error_collector: ErrorCollector::new(),
+            function_graph: Rc::new(RefCell::new(FunctionGraph::new())),
+            global_functions: HashMap::new(),
         }
     }
 
@@ -66,10 +76,25 @@ impl Executor {
         let mut parser = Parser::new(tokens);
         let program = parser.parse()?;
 
+        // Create a synthetic __toplevel__ function to represent the main program scope
+        // This ensures all top-level function calls have a caller and create edges in the graph
+        let toplevel_func = Function {
+            name: Some("__toplevel__".to_string()),
+            params: Vec::new(),
+            body: Vec::new(),
+            env: Rc::new(self.env.clone()),
+        };
+
+        let toplevel_id = self.function_graph.borrow_mut().register_function(toplevel_func);
+        self.function_graph.borrow_mut().push_call(toplevel_id.clone(), Vec::new());
+
         // Execute all statements
         for stmt in &program.statements {
             self.eval_stmt(stmt)?;
         }
+
+        // Pop the toplevel function from the call stack
+        self.function_graph.borrow_mut().pop_call(Value::None);
 
         Ok(())
     }
@@ -103,7 +128,20 @@ impl Executor {
     pub fn eval_expr(&mut self, expr: &Expr) -> Result<Value> {
         match expr {
             Expr::Literal { value, .. } => self.eval_literal(value),
-            Expr::Variable { name, .. } => self.env.get(name),
+            Expr::Variable { name, .. } => {
+                // Try environment first
+                match self.env.get(name) {
+                    Ok(value) => Ok(value),
+                    Err(_) => {
+                        // If not in environment, check global functions table
+                        if let Some(func) = self.global_functions.get(name) {
+                            Ok(Value::Function(func.clone()))
+                        } else {
+                            Err(GraphoidError::undefined_variable(name))
+                        }
+                    }
+                }
+            },
             Expr::Binary {
                 left,
                 op,
@@ -267,13 +305,19 @@ impl Executor {
                 // Extract parameter names (ignore default values for now)
                 let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
 
-                // Create function value with captured environment
+                // Create function value
                 let func = Function {
                     name: Some(name.clone()),
                     params: param_names,
                     body: body.clone(),
                     env: Rc::new(self.env.clone()),
                 };
+
+                // Store in global functions table (for recursion support)
+                self.global_functions.insert(name.clone(), func.clone());
+
+                // Register function in the function graph
+                self.function_graph.borrow_mut().register_function(func.clone());
 
                 // Store function in environment
                 self.env.define(name.clone(), Value::Function(func));
@@ -640,6 +684,9 @@ impl Executor {
             body: vec![return_stmt],
             env: Rc::new(self.env.clone()),
         };
+
+        // Register lambda in the function graph
+        self.function_graph.borrow_mut().register_function(func.clone());
 
         Ok(Value::Function(func))
     }
@@ -2130,59 +2177,8 @@ impl Executor {
             arg_values.push(self.eval_expr(arg)?);
         }
 
-        // Check argument count
-        if arg_values.len() != func.params.len() {
-            return Err(GraphoidError::runtime(format!(
-                "Function '{}' expects {} arguments, but got {}",
-                func.name.as_ref().unwrap_or(&"<anonymous>".to_string()),
-                func.params.len(),
-                arg_values.len()
-            )));
-        }
-
-        // Push function name onto call stack
-        let func_name = func.name.as_ref().unwrap_or(&"<anonymous>".to_string()).clone();
-        self.call_stack.push(func_name.clone());
-
-        // Create new environment as child of function's closure environment
-        let mut call_env = Environment::with_parent((*func.env).clone());
-
-        // Bind parameters to argument values
-        for (param_name, arg_value) in func.params.iter().zip(arg_values.iter()) {
-            call_env.define(param_name.clone(), arg_value.clone());
-        }
-
-        // Save current environment and switch to call environment
-        let saved_env = std::mem::replace(&mut self.env, call_env);
-
-        // Execute function body
-        let mut return_value = Value::None;
-        let execution_result: Result<()> = (|| {
-            for stmt in &func.body {
-                match self.eval_stmt(stmt)? {
-                    Some(val) => {
-                        // Return statement executed
-                        return_value = val;
-                        break;
-                    }
-                    None => {
-                        // Normal statement, continue
-                    }
-                }
-            }
-            Ok(())
-        })();
-
-        // Restore original environment
-        self.env = saved_env;
-
-        // Pop function from call stack
-        self.call_stack.pop();
-
-        // Propagate errors
-        execution_result?;
-
-        Ok(return_value)
+        // Delegate to call_function (which has graph tracking)
+        self.call_function(&func, &arg_values)
     }
 
     /// Helper method to call a function with given argument values.
@@ -2198,12 +2194,45 @@ impl Executor {
             )));
         }
 
-        // Push function name onto call stack
+        // Find or register function in the function graph
+        let func_id = if let Some(fname) = &func.name {
+            // Named function: look up existing node
+            let graph = self.function_graph.borrow();
+            if let Some(node) = graph.get_function_by_name(fname) {
+                node.node_id.clone()
+            } else {
+                // Not found, this shouldn't happen but handle it
+                drop(graph);
+                self.function_graph.borrow_mut().register_function(func.clone())
+            }
+        } else {
+            // Lambda: register at first call
+            self.function_graph.borrow_mut().register_function(func.clone())
+        };
+
+        // Push function onto call stack (traditional - for backward compatibility)
         let func_name = func.name.as_ref().unwrap_or(&"<anonymous>".to_string()).clone();
         self.call_stack.push(func_name.clone());
 
-        // Create new environment as child of function's closure environment
-        let mut call_env = Environment::with_parent((*func.env).clone());
+        // Push function call onto the graph (this is the graph path!)
+        self.function_graph.borrow_mut().push_call(func_id.clone(), arg_values.to_vec());
+
+        // Save current environment FIRST (before creating call_env)
+        // For named functions, we need to use the environment where functions are defined,
+        // not the current call environment (which might be inside another function)
+
+        // For named functions: walk up to find the root environment (no parent)
+        // This ensures they can always see globally defined functions
+        let parent_env = if func.name.is_some() {
+            // Named functions use the captured environment, which has access to global scope
+            // This allows recursion and mutual recursion
+            (*func.env).clone()
+        } else {
+            // Lambdas use captured environment (true closures)
+            (*func.env).clone()
+        };
+
+        let mut call_env = Environment::with_parent(parent_env);
 
         // Bind parameters to argument values
         for (param_name, arg_value) in func.params.iter().zip(arg_values.iter()) {
@@ -2234,8 +2263,11 @@ impl Executor {
         // Restore original environment
         self.env = saved_env;
 
-        // Pop function from call stack
+        // Pop function from call stack (traditional)
         self.call_stack.pop();
+
+        // Pop function from graph with return value
+        self.function_graph.borrow_mut().pop_call(return_value.clone());
 
         // Propagate errors
         execution_result?;
