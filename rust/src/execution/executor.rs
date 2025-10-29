@@ -1601,28 +1601,88 @@ impl Executor {
 
     /// Evaluates a method call on an error object.
     fn eval_error_method(&self, err: &ErrorObject, method: &str, args: &[Value]) -> Result<Value> {
-        // All error methods take no arguments
-        if !args.is_empty() {
-            return Err(GraphoidError::runtime(format!(
-                "Error method '{}' takes no arguments, but got {}",
-                method,
-                args.len()
-            )));
-        }
-
         match method {
-            "type" => Ok(Value::String(err.error_type.clone())),
-            "message" => Ok(Value::String(err.message.clone())),
-            "file" => Ok(err.file.as_ref().map(|f| Value::String(f.clone())).unwrap_or(Value::None)),
-            "line" => Ok(Value::Number(err.line as f64)),
-            "column" => Ok(Value::Number(err.column as f64)),
+            "type" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Error.type() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                Ok(Value::String(err.error_type.clone()))
+            }
+            "message" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Error.message() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                Ok(Value::String(err.message.clone()))
+            }
+            "file" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Error.file() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                Ok(err.file.as_ref().map(|f| Value::String(f.clone())).unwrap_or(Value::None))
+            }
+            "line" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Error.line() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                Ok(Value::Number(err.line as f64))
+            }
+            "column" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Error.column() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                Ok(Value::Number(err.column as f64))
+            }
             "stack_trace" => {
-                // TODO: Implement stack trace when we have call stack tracking
-                Ok(Value::String(format!("{}:{}:{}",
-                    err.file.as_ref().map(|f| f.as_str()).unwrap_or("<unknown>"),
-                    err.line,
-                    err.column
-                )))
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Error.stack_trace() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                Ok(Value::String(err.formatted_stack_trace()))
+            }
+            "full_chain" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Error.full_chain() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                Ok(Value::String(err.full_chain()))
+            }
+            "cause" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Error.cause() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                Ok(err.cause.as_ref().map(|c| Value::Error((**c).clone())).unwrap_or(Value::None))
+            }
+            "caused_by" => {
+                // caused_by(other_error) - chain errors
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Error.caused_by() expects 1 argument (error), got {}", args.len()
+                    )));
+                }
+                match &args[0] {
+                    Value::Error(cause) => {
+                        let mut new_err = err.clone();
+                        new_err.cause = Some(Box::new(cause.clone()));
+                        Ok(Value::Error(new_err))
+                    }
+                    other => Err(GraphoidError::runtime(format!(
+                        "Error.caused_by() expects an error argument, got {}", other.type_name()
+                    )))
+                }
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Error does not have method '{}'",
@@ -1952,13 +2012,14 @@ impl Executor {
                     let message_value = self.eval_expr(&args[0])?;
                     let message = message_value.to_string_value();
 
-                    // Create the error object
-                    let error_obj = ErrorObject::new(
+                    // Create the error object with current call stack
+                    let error_obj = ErrorObject::with_stack_trace(
                         name.clone(),
                         message,
-                        None, // file
-                        0,    // line
-                        0,    // column
+                        self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
+                        0,    // line (not available at call site)
+                        0,    // column (not available at call site)
+                        self.call_stack.clone(),
                     );
                     return Ok(Value::Error(error_obj));
                 }
@@ -2878,13 +2939,14 @@ impl Executor {
             if matches {
                 // Bind error to variable if specified (in current scope)
                 if let Some(ref var_name) = catch_clause.variable {
-                    // Create an Error object from the GraphoidError
-                    let error_obj = ErrorObject::new(
+                    // Create an Error object from the GraphoidError with call stack
+                    let error_obj = ErrorObject::with_stack_trace(
                         error_type_name.clone(),
                         actual_message.clone(),
-                        None, // TODO: Extract from GraphoidError position
+                        self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
                         0,    // TODO: Extract from GraphoidError position
                         0,    // TODO: Extract from GraphoidError position
+                        self.call_stack.clone(),
                     );
                     self.env.define(var_name.clone(), Value::Error(error_obj));
                 }

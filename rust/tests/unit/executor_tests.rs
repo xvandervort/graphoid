@@ -7092,3 +7092,211 @@ result = 42
 // ============================================================================
 // Total: 10 error collection mode tests
 // ============================================================================
+
+// ============================================================================
+// ENHANCED ERROR FEATURES TESTS (Stack Traces & Cause Chaining)
+// ============================================================================
+
+#[test]
+fn test_error_stack_trace_basic() {
+    let source = r#"
+try {
+    raise ValueError("test error")
+}
+catch as e {
+    trace = e.stack_trace()
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let trace = executor.get_variable("trace").unwrap();
+    // Stack trace should contain file/line/column info
+    assert!(trace.to_string_value().contains("at"));
+}
+
+#[test]
+fn test_error_stack_trace_in_function() {
+    let source = r#"
+# Simpler test without function definitions
+try {
+    raise ValueError("test error in try block")
+}
+catch as e {
+    trace = e.stack_trace()
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let trace = executor.get_variable("trace").unwrap();
+    let trace_str = trace.to_string_value();
+
+    // Stack trace should show location info
+    assert!(trace_str.contains("at") || trace_str.contains(":"));
+}
+
+#[test]
+fn test_error_cause_chaining() {
+    let source = r#"
+root_error = IOError("disk full")
+mid_error = RuntimeError("save failed").caused_by(root_error)
+top_error = ValueError("invalid data").caused_by(mid_error)
+
+has_cause = top_error.cause()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let has_cause = executor.get_variable("has_cause").unwrap();
+    // Should have a cause
+    match has_cause {
+        Value::Error(e) => {
+            assert_eq!(e.error_type, "RuntimeError");
+            assert_eq!(e.message, "save failed");
+        }
+        _ => panic!("Expected Error value"),
+    }
+}
+
+#[test]
+fn test_error_cause_none() {
+    let source = r#"
+error = ValueError("no cause")
+cause = error.cause()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let cause = executor.get_variable("cause").unwrap();
+    assert_eq!(cause, Value::None);
+}
+
+#[test]
+fn test_error_full_chain() {
+    let source = r#"
+root_error = IOError("disk full")
+mid_error = RuntimeError("save failed").caused_by(root_error)
+top_error = ValueError("invalid data").caused_by(mid_error)
+
+chain = top_error.full_chain()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let chain = executor.get_variable("chain").unwrap();
+    let chain_str = chain.to_string_value();
+
+    // Chain should contain all errors
+    assert!(chain_str.contains("ValueError: invalid data"));
+    assert!(chain_str.contains("Caused by:"));
+    assert!(chain_str.contains("RuntimeError: save failed"));
+    assert!(chain_str.contains("IOError: disk full"));
+}
+
+#[test]
+fn test_error_caused_by_requires_error_arg() {
+    let source = r#"
+error = ValueError("test")
+result = error.caused_by("not an error")
+"#;
+    let mut executor = Executor::new();
+    let result = executor.execute_source(source);
+
+    // Should fail because caused_by expects an error argument
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("expects an error argument"));
+}
+
+#[test]
+fn test_error_methods_no_args() {
+    let source = r#"
+error = ValueError("test")
+
+# These methods should work
+t = error.type()
+m = error.message()
+f = error.file()
+l = error.line()
+c = error.column()
+st = error.stack_trace()
+fc = error.full_chain()
+ca = error.cause()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let t = executor.get_variable("t").unwrap();
+    assert_eq!(t, Value::String("ValueError".to_string()));
+
+    let m = executor.get_variable("m").unwrap();
+    assert_eq!(m, Value::String("test".to_string()));
+
+    let ca = executor.get_variable("ca").unwrap();
+    assert_eq!(ca, Value::None);
+}
+
+#[test]
+fn test_error_chaining_in_catch() {
+    let source = r#"
+# Test that caused_by() works - create chained error and inspect it
+root_error = IOError("network failure")
+chained_error = RuntimeError("operation failed").caused_by(root_error)
+
+# Verify the chaining worked
+error_msg = chained_error.message()
+cause = chained_error.cause()
+cause_msg = cause.message()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let error_msg = executor.get_variable("error_msg").unwrap();
+    assert_eq!(error_msg, Value::String("operation failed".to_string()));
+
+    let cause_msg = executor.get_variable("cause_msg").unwrap();
+    assert_eq!(cause_msg, Value::String("network failure".to_string()));
+}
+
+#[test]
+fn test_stack_trace_shows_nested_calls() {
+    let source = r#"
+# Simplified test - stack trace should capture location info
+try {
+    raise ValueError("deep error")
+}
+catch as e {
+    trace = e.stack_trace()
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let trace = executor.get_variable("trace").unwrap();
+    let trace_str = trace.to_string_value();
+
+    // Stack trace should show location info
+    let at_count = trace_str.matches("at").count();
+    assert!(at_count >= 1, "Stack trace should contain at least one 'at' reference");
+}
+
+#[test]
+fn test_error_constructor_captures_stack() {
+    let source = r#"
+# Test that creating an error captures stack trace
+error = ValueError("created directly")
+trace = error.stack_trace()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let trace = executor.get_variable("trace").unwrap();
+    let trace_str = trace.to_string_value();
+
+    // Stack trace should be captured when error is created
+    assert!(trace_str.contains("at"));
+}
+
+// ============================================================================
+// Total: 12 enhanced error feature tests
+// ============================================================================

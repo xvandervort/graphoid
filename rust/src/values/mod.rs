@@ -15,8 +15,8 @@ pub use list::List;
 pub use hash::Hash;
 // Tree type removed - use graph{}.with_ruleset(:tree) instead
 
-/// An error object with type, message, and source location.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// An error object with type, message, source location, stack trace, and optional cause.
+#[derive(Debug, Clone)]
 pub struct ErrorObject {
     /// Error type name (e.g., "RuntimeError", "ValueError")
     pub error_type: String,
@@ -28,6 +28,38 @@ pub struct ErrorObject {
     pub line: usize,
     /// Column number where error occurred
     pub column: usize,
+    /// Call stack at the time of error (function names)
+    pub stack_trace: Vec<String>,
+    /// Optional underlying cause of this error (for error chaining)
+    pub cause: Option<Box<ErrorObject>>,
+}
+
+// Custom PartialEq that excludes cause to avoid infinite recursion
+impl PartialEq for ErrorObject {
+    fn eq(&self, other: &Self) -> bool {
+        self.error_type == other.error_type
+            && self.message == other.message
+            && self.file == other.file
+            && self.line == other.line
+            && self.column == other.column
+            && self.stack_trace == other.stack_trace
+        // Intentionally exclude cause from equality
+    }
+}
+
+impl Eq for ErrorObject {}
+
+// Custom Hash that excludes cause to avoid infinite recursion
+impl std::hash::Hash for ErrorObject {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.error_type.hash(state);
+        self.message.hash(state);
+        self.file.hash(state);
+        self.line.hash(state);
+        self.column.hash(state);
+        self.stack_trace.hash(state);
+        // Intentionally exclude cause from hash
+    }
 }
 
 impl ErrorObject {
@@ -45,6 +77,28 @@ impl ErrorObject {
             file,
             line,
             column,
+            stack_trace: Vec::new(),
+            cause: None,
+        }
+    }
+
+    /// Create a new error object with stack trace
+    pub fn with_stack_trace(
+        error_type: String,
+        message: String,
+        file: Option<String>,
+        line: usize,
+        column: usize,
+        stack_trace: Vec<String>,
+    ) -> Self {
+        Self {
+            error_type,
+            message,
+            file,
+            line,
+            column,
+            stack_trace,
+            cause: None,
         }
     }
 
@@ -68,9 +122,55 @@ impl ErrorObject {
         Self::new("IOError".to_string(), message, None, 0, 0)
     }
 
+    /// Set the cause of this error (for error chaining)
+    pub fn with_cause(mut self, cause: ErrorObject) -> Self {
+        self.cause = Some(Box::new(cause));
+        self
+    }
+
     /// Get the full error message including type
     pub fn full_message(&self) -> String {
         format!("{}: {}", self.error_type, self.message)
+    }
+
+    /// Get a formatted stack trace string
+    pub fn formatted_stack_trace(&self) -> String {
+        if self.stack_trace.is_empty() {
+            format!(
+                "  at {}:{}:{}",
+                self.file.as_ref().map(|f| f.as_str()).unwrap_or("<unknown>"),
+                self.line,
+                self.column
+            )
+        } else {
+            let mut trace = String::new();
+            // Add error location first
+            trace.push_str(&format!(
+                "  at {}:{}:{}\n",
+                self.file.as_ref().map(|f| f.as_str()).unwrap_or("<unknown>"),
+                self.line,
+                self.column
+            ));
+            // Add call stack
+            for func in self.stack_trace.iter().rev() {
+                trace.push_str(&format!("  at {}\n", func));
+            }
+            trace.trim_end().to_string()
+        }
+    }
+
+    /// Get the full error chain including causes
+    pub fn full_chain(&self) -> String {
+        let mut chain = self.full_message();
+        chain.push('\n');
+        chain.push_str(&self.formatted_stack_trace());
+
+        if let Some(ref cause) = self.cause {
+            chain.push_str("\nCaused by: ");
+            chain.push_str(&cause.full_chain());
+        }
+
+        chain
     }
 }
 
