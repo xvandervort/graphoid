@@ -947,9 +947,20 @@ impl Executor {
                 }
             };
 
-            // Apply method to the already-evaluated value, update variable
-            let new_value = self.apply_method_to_value(object_value, base_method, &arg_values, object)?;
-            self.env.set(&var_name, new_value)?;
+            // Special case for pop: it returns the popped value, not the mutated list
+            if base_method == "pop" {
+                // Clone the list for mutation
+                if let Value::List(list) = &object_value {
+                    let mut list_to_mutate = list.clone();
+                    let popped_value = list_to_mutate.pop()?; // Get popped value and mutate
+                    self.env.set(&var_name, Value::List(list_to_mutate))?;
+                    return Ok(popped_value); // Return the popped value
+                }
+            }
+
+            // For other mutating methods, apply method and update variable
+            let result = self.apply_method_to_value(object_value, base_method, &arg_values, object)?;
+            self.env.set(&var_name, result)?;
 
             // Mutating methods return none
             Ok(Value::None)
@@ -1562,6 +1573,126 @@ impl Executor {
                 // Append without re-applying behaviors (already done above)
                 new_list.append_raw(transformed_value)?;
                 Ok(Value::List(new_list))
+            }
+            "index_of" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'index_of' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+                let search_value = &args[0];
+                for (idx, element) in elements.iter().enumerate() {
+                    if element == search_value {
+                        return Ok(Value::Number(idx as f64));
+                    }
+                }
+                // Not found, return -1
+                Ok(Value::Number(-1.0))
+            }
+            "prepend" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'prepend' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+                let mut new_list = list.clone();
+                let transformed_value = self.apply_transformation_rules_with_context(args[0].clone(), &new_list.graph.rules)?;
+                new_list.prepend_raw(transformed_value)?;
+                Ok(Value::List(new_list))
+            }
+            "insert" => {
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'insert' expects 2 arguments (index, value), but got {}",
+                        args.len()
+                    )));
+                }
+                let index = match &args[0] {
+                    Value::Number(n) => *n as usize,
+                    other => {
+                        return Err(GraphoidError::type_error("number", other.type_name()));
+                    }
+                };
+                let mut new_list = list.clone();
+                let transformed_value = self.apply_transformation_rules_with_context(args[1].clone(), &new_list.graph.rules)?;
+                new_list.insert_at_raw(index, transformed_value)?;
+                Ok(Value::List(new_list))
+            }
+            "remove" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'remove' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+                let mut new_list = list.clone();
+                new_list.remove_value(&args[0])?;
+                Ok(Value::List(new_list))
+            }
+            "remove_at_index" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'remove_at_index' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+                let index = match &args[0] {
+                    Value::Number(n) => *n as usize,
+                    other => {
+                        return Err(GraphoidError::type_error("number", other.type_name()));
+                    }
+                };
+                let mut new_list = list.clone();
+                new_list.remove_at_index(index)?;
+                Ok(Value::List(new_list))
+            }
+            "pop" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'pop' expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                // pop() returns the last element (like last()) but is typically used with !
+                // for mutation. Without !, it just returns the value.
+                let elements = list.to_vec();
+                elements.last()
+                    .cloned()
+                    .ok_or_else(|| GraphoidError::runtime("Cannot pop from empty list".to_string()))
+            }
+            "clear" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'clear' expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                let mut new_list = list.clone();
+                new_list.clear();
+                Ok(Value::List(new_list))
+            }
+            "reduce" => {
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'reduce' expects 2 arguments (initial, function), but got {}",
+                        args.len()
+                    )));
+                }
+                let mut accumulator = args[0].clone();
+                let func = match &args[1] {
+                    Value::Function(f) => f,
+                    other => {
+                        return Err(GraphoidError::type_error("function", other.type_name()));
+                    }
+                };
+
+                for element in &elements {
+                    accumulator = self.call_function(func, &[accumulator, element.clone()])?;
+                }
+
+                Ok(accumulator)
             }
             _ => Err(GraphoidError::runtime(format!(
                 "List does not have method '{}'",

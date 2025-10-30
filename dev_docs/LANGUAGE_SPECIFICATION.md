@@ -177,11 +177,20 @@ This is as far as type constraints go. No exceptions.
 - Ordered, mutable collections
 - Internal representation: linked graph nodes
 - Type constraints: `list<num>`, `list<string>`, etc.
+- **Mutation Convention**: Methods ending with `!` mutate in place and return `none`. Methods without `!` return new lists.
 - Methods:
-  - **Always-Mutating** (add/remove elements): `append(value)`, `prepend(value)`, `insert(index, value)`, `remove(value)`, `remove_at_index(index)`, `pop()`, `clear()`
   - **Inspection** (read-only): `size()`, `first()`, `last()`, `contains(value)`, `index_of(value)`, `is_empty()`
   - **Freeze Queries**: `is_frozen()`, `has_frozen()`, `has_frozen(:verbose)`
   - **Transformation** (immutable): `slice(start, end)`, `slice(start, end, step)`, `join(delimiter)`
+  - **Mutation Methods** (two versions):
+    - `append(value)` / `append!(value)` - Add element (returns new list / mutates in place)
+    - `prepend(value)` / `prepend!(value)` - Add to beginning (returns new list / mutates in place)
+    - `insert(index, value)` / `insert!(index, value)` - Insert at position (returns new list / mutates in place)
+    - `remove(value)` / `remove!(value)` - Remove first occurrence (returns new list / mutates in place)
+    - `remove_at_index(index)` / `remove_at_index!(index)` - Remove at index (returns new list / mutates in place)
+    - `pop()` - Returns last element without mutation (use with `last()` for read-only access)
+    - `pop!()` - Mutates list, removes and returns last element
+    - `clear()` / `clear!()` - Remove all elements (returns new empty list / mutates in place)
   - **Functional** (two versions):
     - `map(transform)` / `map!(transform)` - Transform each element (new list / in place)
     - `filter(predicate)` / `filter!(predicate)` - Keep matching elements (new list / in place)
@@ -192,6 +201,7 @@ This is as far as type constraints go. No exceptions.
     - `uniq()` / `uniq!()` - Remove duplicates (new list / remove in place)
     - `compact()` / `compact!()` - Remove none values (new list / remove in place)
     - `each(fn)` - Execute function for each element (always iterates, no mutation)
+    - `reduce(initial, fn)` - Reduce to single value
   - **Generators**:
     - `generate(start, end, step)` - Range mode
     - `generate(start, end, fn)` - function mode

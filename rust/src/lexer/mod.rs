@@ -556,6 +556,11 @@ impl Lexer {
             lexeme.push(self.advance());
         }
 
+        // Allow trailing ! for mutating methods (Ruby convention)
+        if !self.is_at_end() && self.peek() == '!' {
+            lexeme.push(self.advance());
+        }
+
         let token_type = match lexeme.as_str() {
             // Keywords
             "fn" => TokenType::Func,

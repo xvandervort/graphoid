@@ -370,6 +370,80 @@ impl List {
         Ok(current)
     }
 
+    /// Prepend a value to the beginning of the list (raw, no rules applied)
+    pub fn prepend_raw(&mut self, value: Value) -> Result<(), GraphoidError> {
+        self.insert_at_raw(0, value)
+    }
+
+    /// Remove the first occurrence of a value from the list
+    pub fn remove_value(&mut self, value: &Value) -> Result<(), GraphoidError> {
+        let elements = self.to_vec();
+        for (idx, element) in elements.iter().enumerate() {
+            if element == value {
+                return self.remove_at_index(idx);
+            }
+        }
+        // Value not found - not an error, just no-op
+        Ok(())
+    }
+
+    /// Remove element at a specific index
+    pub fn remove_at_index(&mut self, index: usize) -> Result<(), GraphoidError> {
+        if index >= self.len() {
+            return Err(GraphoidError::runtime(format!(
+                "Index {} out of bounds for list of length {}",
+                index,
+                self.len()
+            )));
+        }
+
+        // Rebuild the list without the element at the given index
+        let mut new_elements = Vec::new();
+        let elements = self.to_vec();
+        for (idx, element) in elements.into_iter().enumerate() {
+            if idx != index {
+                new_elements.push(element);
+            }
+        }
+
+        // Preserve rules before rebuilding
+        let old_rules = self.graph.rules.clone();
+
+        // Rebuild the graph
+        self.graph = Graph::new(GraphType::Directed);
+        self.graph.rules = old_rules;
+        self.length = 0; // Reset length
+
+        for value in new_elements {
+            self.append_raw(value)?;
+        }
+
+        Ok(())
+    }
+
+    /// Remove and return the last element
+    pub fn pop(&mut self) -> Result<Value, GraphoidError> {
+        if self.is_empty() {
+            return Err(GraphoidError::runtime("Cannot pop from empty list".to_string()));
+        }
+
+        let last_index = self.len() - 1;
+        let last_value = self.get(last_index)
+            .cloned()
+            .ok_or_else(|| GraphoidError::runtime("Failed to get last element".to_string()))?;
+
+        self.remove_at_index(last_index)?;
+        Ok(last_value)
+    }
+
+    /// Clear all elements from the list
+    pub fn clear(&mut self) {
+        let old_rules = self.graph.rules.clone();
+        self.graph = Graph::new(GraphType::Directed);
+        self.graph.rules = old_rules;
+        self.length = 0; // Reset length
+    }
+
 }
 
 impl Default for List {

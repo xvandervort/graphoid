@@ -198,3 +198,294 @@ fn test_transformation_decrement() {
     let code = "[1, 2, 3].map(:decrement)";
     assert_eq!(eval(code), list_nums(vec![0.0, 1.0, 2.0]));
 }
+
+// ============================================================================
+// BASIC LIST METHODS - Phase 5
+// ============================================================================
+
+#[test]
+fn test_list_size() {
+    let code = "[1, 2, 3, 4, 5].size()";
+    assert_eq!(eval(code), Value::Number(5.0));
+}
+
+#[test]
+fn test_list_size_empty() {
+    let code = "[].size()";
+    assert_eq!(eval(code), Value::Number(0.0));
+}
+
+#[test]
+fn test_list_first() {
+    let code = "[10, 20, 30].first()";
+    assert_eq!(eval(code), Value::Number(10.0));
+}
+
+#[test]
+fn test_list_last() {
+    let code = "[10, 20, 30].last()";
+    assert_eq!(eval(code), Value::Number(30.0));
+}
+
+#[test]
+fn test_list_is_empty_false() {
+    let code = "[1, 2, 3].is_empty()";
+    assert_eq!(eval(code), Value::Boolean(false));
+}
+
+#[test]
+fn test_list_is_empty_true() {
+    let code = "[].is_empty()";
+    assert_eq!(eval(code), Value::Boolean(true));
+}
+
+#[test]
+fn test_list_contains_true() {
+    let code = "[1, 2, 3, 4, 5].contains(3)";
+    assert_eq!(eval(code), Value::Boolean(true));
+}
+
+#[test]
+fn test_list_contains_false() {
+    let code = "[1, 2, 3, 4, 5].contains(10)";
+    assert_eq!(eval(code), Value::Boolean(false));
+}
+
+#[test]
+fn test_list_index_of_found() {
+    let code = "[10, 20, 30, 40].index_of(30)";
+    assert_eq!(eval(code), Value::Number(2.0));
+}
+
+#[test]
+fn test_list_index_of_not_found() {
+    let code = "[10, 20, 30, 40].index_of(99)";
+    assert_eq!(eval(code), Value::Number(-1.0));
+}
+
+// ============================================================================
+// LIST FUNCTIONAL METHODS - each, reduce
+// ============================================================================
+
+#[test]
+fn test_list_each_returns_original() {
+    let code = r#"
+sum = 0
+result = [1, 2, 3].each(x => { sum = sum + x })
+result
+"#;
+    // each should return the original list
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 3.0]));
+}
+
+#[test]
+fn test_list_reduce_sum() {
+    let code = "[1, 2, 3, 4, 5].reduce(0, (acc, x) => acc + x)";
+    assert_eq!(eval(code), Value::Number(15.0));
+}
+
+#[test]
+fn test_list_reduce_product() {
+    let code = "[1, 2, 3, 4].reduce(1, (acc, x) => acc * x)";
+    assert_eq!(eval(code), Value::Number(24.0));
+}
+
+#[test]
+fn test_list_select_alias() {
+    let code = "[1, 2, 3, 4, 5].select(x => x > 3)";
+    assert_eq!(eval(code), list_nums(vec![4.0, 5.0]));
+}
+
+#[test]
+fn test_list_reject() {
+    let code = "[1, 2, 3, 4, 5].reject(x => x > 3)";
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 3.0]));
+}
+
+// ============================================================================
+// LIST MUTATION METHODS - append!, prepend!, insert!, remove!
+// ============================================================================
+
+#[test]
+fn test_list_append_immutable() {
+    let code = "[1, 2, 3].append(4)";
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 3.0, 4.0]));
+}
+
+#[test]
+fn test_list_append_mutable() {
+    let code = r#"
+items = [1, 2, 3]
+items.append!(4)
+items
+"#;
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 3.0, 4.0]));
+}
+
+#[test]
+fn test_list_prepend_immutable() {
+    let code = "[2, 3, 4].prepend(1)";
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 3.0, 4.0]));
+}
+
+#[test]
+fn test_list_prepend_mutable() {
+    let code = r#"
+items = [2, 3, 4]
+items.prepend!(1)
+items
+"#;
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 3.0, 4.0]));
+}
+
+#[test]
+fn test_list_insert_immutable() {
+    let code = "[1, 2, 4].insert(2, 3)";
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 3.0, 4.0]));
+}
+
+#[test]
+fn test_list_insert_mutable() {
+    let code = r#"
+items = [1, 2, 4]
+items.insert!(2, 3)
+items
+"#;
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 3.0, 4.0]));
+}
+
+#[test]
+fn test_list_remove_immutable() {
+    let code = "[1, 2, 3, 2, 4].remove(2)";
+    // Should remove first occurrence
+    assert_eq!(eval(code), list_nums(vec![1.0, 3.0, 2.0, 4.0]));
+}
+
+#[test]
+fn test_list_remove_mutable() {
+    let code = r#"
+items = [1, 2, 3, 2, 4]
+items.remove!(2)
+items
+"#;
+    // Should remove first occurrence
+    assert_eq!(eval(code), list_nums(vec![1.0, 3.0, 2.0, 4.0]));
+}
+
+#[test]
+fn test_list_remove_at_index_immutable() {
+    let code = "[1, 2, 3, 4].remove_at_index(2)";
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 4.0]));
+}
+
+#[test]
+fn test_list_remove_at_index_mutable() {
+    let code = r#"
+items = [1, 2, 3, 4]
+items.remove_at_index!(2)
+items
+"#;
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 4.0]));
+}
+
+#[test]
+fn test_list_pop_immutable() {
+    let code = "[1, 2, 3].pop()";
+    // pop() without ! returns the popped value
+    assert_eq!(eval(code), Value::Number(3.0));
+}
+
+#[test]
+fn test_list_pop_mutable() {
+    let code = r#"
+items = [1, 2, 3]
+popped = items.pop!()
+popped
+"#;
+    // pop!() returns the popped value
+    assert_eq!(eval(code), Value::Number(3.0));
+}
+
+#[test]
+fn test_list_clear_immutable() {
+    let code = "[1, 2, 3].clear()";
+    assert_eq!(eval(code), list_nums(vec![]));
+}
+
+#[test]
+fn test_list_clear_mutable() {
+    let code = r#"
+items = [1, 2, 3]
+items.clear!()
+items
+"#;
+    assert_eq!(eval(code), list_nums(vec![]));
+}
+
+// ============================================================================
+// LIST TRANSFORMATION METHODS - sort, reverse, uniq, compact
+// ============================================================================
+
+#[test]
+fn test_list_sort_immutable() {
+    let code = "[3, 1, 4, 1, 5].sort()";
+    assert_eq!(eval(code), list_nums(vec![1.0, 1.0, 3.0, 4.0, 5.0]));
+}
+
+#[test]
+fn test_list_sort_mutable() {
+    let code = r#"
+items = [3, 1, 4, 1, 5]
+items.sort!()
+items
+"#;
+    assert_eq!(eval(code), list_nums(vec![1.0, 1.0, 3.0, 4.0, 5.0]));
+}
+
+#[test]
+fn test_list_reverse_immutable() {
+    let code = "[1, 2, 3, 4].reverse()";
+    assert_eq!(eval(code), list_nums(vec![4.0, 3.0, 2.0, 1.0]));
+}
+
+#[test]
+fn test_list_reverse_mutable() {
+    let code = r#"
+items = [1, 2, 3, 4]
+items.reverse!()
+items
+"#;
+    assert_eq!(eval(code), list_nums(vec![4.0, 3.0, 2.0, 1.0]));
+}
+
+#[test]
+fn test_list_uniq_immutable() {
+    let code = "[1, 2, 2, 3, 3, 3, 4].uniq()";
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 3.0, 4.0]));
+}
+
+#[test]
+fn test_list_uniq_mutable() {
+    let code = r#"
+items = [1, 2, 2, 3, 3, 3, 4]
+items.uniq!()
+items
+"#;
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 3.0, 4.0]));
+}
+
+#[test]
+fn test_list_compact_immutable() {
+    let code = "[1, none, 2, none, 3].compact()";
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 3.0]));
+}
+
+#[test]
+fn test_list_compact_mutable() {
+    let code = r#"
+items = [1, none, 2, none, 3]
+items.compact!()
+items
+"#;
+    assert_eq!(eval(code), list_nums(vec![1.0, 2.0, 3.0]));
+}
