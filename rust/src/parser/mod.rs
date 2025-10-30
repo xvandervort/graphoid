@@ -928,6 +928,153 @@ impl Parser {
         Ok(statements)
     }
 
+    /// Parse a lambda block body: { statements }
+    /// Returns a Block expression
+    fn parse_lambda_block(&mut self) -> Result<Expr> {
+        let position = self.peek().position();
+
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' to start lambda block body".to_string(),
+                position,
+            });
+        }
+
+        let statements = self.block()?;
+
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' to close lambda block body".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        Ok(Expr::Block {
+            statements,
+            position,
+        })
+    }
+
+    /// Check if the next token is the start of a trailing block
+    /// Trailing blocks start with { followed by | or || (empty params)
+    fn is_trailing_block(&self) -> bool {
+        if !self.check(&TokenType::LeftBrace) {
+            return false;
+        }
+
+        // Look ahead to see if there's a pipe (parameter list) or double pipe (empty params)
+        if self.current + 1 < self.tokens.len() {
+            matches!(
+                self.tokens[self.current + 1].token_type,
+                TokenType::Pipe | TokenType::PipePipe
+            )
+        } else {
+            false
+        }
+    }
+
+    /// Parse a trailing block: { |params| body } or { body }
+    /// Returns a Lambda expression
+    fn parse_trailing_block(&mut self) -> Result<Expr> {
+        let position = self.peek().position();
+
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' to start trailing block".to_string(),
+                position,
+            });
+        }
+
+        // Check for parameter list: |params| or ||
+        let params = if self.check(&TokenType::PipePipe) {
+            // Empty parameter list: ||
+            self.advance(); // consume ||
+            vec![]
+        } else if self.check(&TokenType::Pipe) {
+            self.advance(); // consume |
+
+            let mut params = Vec::new();
+            if !self.check(&TokenType::Pipe) {
+                loop {
+                    // Allow identifiers and type keywords as parameter names
+                    let param_name = match &self.peek().token_type {
+                        TokenType::Identifier(name) => name.clone(),
+                        // Allow type keywords as parameter names in blocks
+                        TokenType::NumType => "num".to_string(),
+                        TokenType::StringType => "string".to_string(),
+                        TokenType::BoolType => "bool".to_string(),
+                        TokenType::ListType => "list".to_string(),
+                        TokenType::MapType => "map".to_string(),
+                        TokenType::GraphType => "graph".to_string(),
+                        TokenType::TreeType => "tree".to_string(),
+                        _ => {
+                            return Err(GraphoidError::SyntaxError {
+                                message: format!("Expected parameter name, got {:?}", self.peek().token_type),
+                                position: self.peek().position(),
+                            });
+                        }
+                    };
+
+                    params.push(param_name);
+                    self.advance();
+
+                    if !self.match_token(&TokenType::Comma) {
+                        break;
+                    }
+                }
+            }
+
+            if !self.match_token(&TokenType::Pipe) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '|' after block parameters".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            params
+        } else {
+            vec![] // No parameters
+        };
+
+        // Parse block body
+        let statements = self.block()?;
+
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' to close trailing block".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Create lambda body: if single expression statement, use expression directly
+        // Otherwise, use block
+        let body = if statements.len() == 1 {
+            // Check if it's a single expression statement
+            if let Stmt::Expression { expr, .. } = &statements[0] {
+                // Single expression: treat as expression lambda
+                Box::new(expr.clone())
+            } else {
+                // Other statement types: use block
+                Box::new(Expr::Block {
+                    statements,
+                    position: position.clone(),
+                })
+            }
+        } else {
+            // Multiple statements: use block
+            Box::new(Expr::Block {
+                statements,
+                position: position.clone(),
+            })
+        };
+
+        Ok(Expr::Lambda {
+            params,
+            body,
+            position,
+        })
+    }
+
     // Expression parsing with precedence climbing
     fn expression(&mut self) -> Result<Expr> {
         // TODO: Add lambda parsing
@@ -1205,13 +1352,20 @@ impl Parser {
             if self.match_token(&TokenType::LeftParen) {
                 // Function call
                 let position = expr.position().clone();
-                let args = self.arguments()?;
+                let mut args = self.arguments()?;
                 if !self.match_token(&TokenType::RightParen) {
                     return Err(GraphoidError::SyntaxError {
                         message: "Expected ')' after arguments".to_string(),
                         position: self.peek().position(),
                     });
                 }
+
+                // Check for trailing block: function(args) { |params| body }
+                if self.is_trailing_block() {
+                    let block_lambda = self.parse_trailing_block()?;
+                    args.push(Argument::Positional(block_lambda));
+                }
+
                 expr = Expr::Call {
                     callee: Box::new(expr),
                     args,
@@ -1274,13 +1428,20 @@ impl Parser {
 
                 // Check if it's a method call (with parentheses)
                 if self.match_token(&TokenType::LeftParen) {
-                    let args = self.arguments()?;
+                    let mut args = self.arguments()?;
                     if !self.match_token(&TokenType::RightParen) {
                         return Err(GraphoidError::SyntaxError {
                             message: "Expected ')' after method arguments".to_string(),
                             position: self.peek().position(),
                         });
                     }
+
+                    // Check for trailing block: method(args) { |params| body }
+                    if self.is_trailing_block() {
+                        let block_lambda = self.parse_trailing_block()?;
+                        args.push(Argument::Positional(block_lambda));
+                    }
+
                     expr = Expr::MethodCall {
                         object: Box::new(expr),
                         method,
@@ -1288,11 +1449,19 @@ impl Parser {
                         position,
                     };
                 } else {
-                    // Property access - treat as method call with no args for now
+                    // Property access or method call without parens - treat as method call with no args for now
+                    let mut args = vec![];
+
+                    // Check for trailing block even without parens: method { |params| body }
+                    if self.is_trailing_block() {
+                        let block_lambda = self.parse_trailing_block()?;
+                        args.push(Argument::Positional(block_lambda));
+                    }
+
                     expr = Expr::MethodCall {
                         object: Box::new(expr),
                         method,
-                        args: vec![],
+                        args,
                         position,
                     };
                 }
@@ -1358,7 +1527,15 @@ impl Parser {
                     self.advance(); // consume param
                     self.advance(); // consume =>
 
-                    let body = Box::new(self.or_expression()?);
+                    // Check if body is a block or single expression
+                    let body = if self.check(&TokenType::LeftBrace) {
+                        // Block body: x => { statements }
+                        Box::new(self.parse_lambda_block()?)
+                    } else {
+                        // Expression body: x => expr
+                        Box::new(self.or_expression()?)
+                    };
+
                     return Ok(Expr::Lambda {
                         params: vec![param],
                         body,
@@ -1397,7 +1574,16 @@ impl Parser {
             if could_be_lambda && self.match_token(&TokenType::RightParen) && self.check(&TokenType::Arrow) {
                 // This is a lambda!
                 self.advance(); // consume =>
-                let body = Box::new(self.or_expression()?);
+
+                // Check if body is a block or single expression
+                let body = if self.check(&TokenType::LeftBrace) {
+                    // Block body: (x, y) => { statements }
+                    Box::new(self.parse_lambda_block()?)
+                } else {
+                    // Expression body: (x, y) => expr
+                    Box::new(self.or_expression()?)
+                };
+
                 return Ok(Expr::Lambda {
                     params,
                     body,

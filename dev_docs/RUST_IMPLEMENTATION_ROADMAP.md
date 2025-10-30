@@ -2,7 +2,7 @@
 
 **Version**: 2.0
 **Last Updated**: January 2025
-**Status**: Phase 0 complete, Phase 1 partially complete (lexer updated with new tokens)
+**Status**: Phase 4 complete (521 tests passing) - Functions, lambdas, closures, block bodies, trailing blocks
 
 **⚠️ IMPORTANT**: This roadmap has been significantly updated based on new language features. See [archived updates document](archive/sessions/2025-01-roadmap-updates/ROADMAP_UPDATES_FOR_NEW_FEATURES.md) for complete details of changes.
 
@@ -1706,10 +1706,46 @@ fn test_execute_if() {
 
 ## Phase 4: Functions & Lambdas
 
-**Duration**: 4-6 days
+**Duration**: 4-6 days (completed)
+**Status**: ✅ COMPLETE - 521 tests passing
 **Goal**: Support user-defined functions and lambdas
 
-See detailed implementation in next section...
+### Implemented Features
+
+#### Core Function System
+- Regular function declarations with `fn` keyword
+- Function parameters with default values
+- Named argument passing
+- Variadic parameters (`*args`)
+- Function closures with environment capture
+- Recursive functions
+- Function call stack management
+
+#### Lambda Expressions
+- Single-expression lambdas: `x => x * 2`
+- Multi-parameter lambdas: `(x, y) => x + y`
+- **Lambda block bodies**: `x => { temp = x * 2; return temp + 1 }`
+- Closure capture in lambdas
+- Lambdas as first-class values
+
+#### Trailing Block Syntax
+- **Ruby/Smalltalk-style trailing blocks**: `list.map { |x| x * 2 }`
+- Multi-parameter blocks: `{ |x, y| x + y }`
+- Empty parameter list: `{ || print("Hello") }`
+- Method chaining with blocks: `.filter { |x| x > 0 }.map { |x| x * 2 }`
+- Trailing blocks on function calls: `apply(5) { |n| n * 2 }`
+- Complex block bodies with statements, conditionals, loops
+
+#### Test Coverage
+- 22 advanced function tests (default params, named args, variadics, closures, recursion)
+- 15 lambda block body tests (single/multi-param, conditionals, loops, closure capture)
+- 17 trailing block syntax tests (map/filter/each, chaining, mixed syntax)
+- 100% pass rate across all function-related features
+
+**Notes**:
+- Lambda block bodies and trailing block syntax were originally planned for Phase 11 but implemented in Phase 4 to support Phase 5 (Collections & Methods)
+- Trailing blocks are syntactic sugar - they desugar to regular lambda arguments
+- All features fully integrated with the execution engine and support proper closure semantics
 
 ---
 

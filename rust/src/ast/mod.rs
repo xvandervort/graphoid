@@ -152,6 +152,10 @@ pub enum Expr {
         body: Box<Expr>,
         position: SourcePosition,
     },
+    Block {
+        statements: Vec<Stmt>,
+        position: SourcePosition,
+    },
     List {
         elements: Vec<Expr>,
         position: SourcePosition,
@@ -189,6 +193,7 @@ impl Expr {
             Expr::MethodCall { position, .. } => position,
             Expr::Index { position, .. } => position,
             Expr::Lambda { position, .. } => position,
+            Expr::Block { position, .. } => position,
             Expr::List { position, .. } => position,
             Expr::Map { position, .. } => position,
             Expr::Graph { position, .. } => position,

@@ -153,6 +153,7 @@ impl Executor {
             Expr::Unary { op, operand, .. } => self.eval_unary(op, operand),
             Expr::Call { callee, args, .. } => self.eval_call(callee, args),
             Expr::Lambda { params, body, .. } => self.eval_lambda(params, body),
+            Expr::Block { statements, .. } => self.eval_block(statements),
             Expr::List { elements, .. } => self.eval_list(elements),
             Expr::Map { entries, .. } => self.eval_map(entries),
             Expr::Index { object, index, .. } => self.eval_index(object, index),
@@ -676,10 +677,15 @@ impl Executor {
     /// Evaluates a lambda expression.
     /// Creates an anonymous function that captures the current environment.
     fn eval_lambda(&self, params: &[String], body: &Expr) -> Result<Value> {
-        // Convert expression body to a return statement
-        let return_stmt = Stmt::Return {
-            value: Some((*body).clone()),
-            position: body.position().clone(),
+        // Convert body to function body statements
+        let body_stmts = match body {
+            // Block body: use statements directly
+            Expr::Block { statements, .. } => statements.clone(),
+            // Expression body: wrap in return statement
+            _ => vec![Stmt::Return {
+                value: Some((*body).clone()),
+                position: body.position().clone(),
+            }],
         };
 
         // Create anonymous function with captured environment
@@ -694,7 +700,7 @@ impl Executor {
             name: None, // Anonymous
             params: params.to_vec(),
             parameters,
-            body: vec![return_stmt],
+            body: body_stmts,
             env: Rc::new(RefCell::new(self.env.clone())),
             node_id: None,
         };
@@ -704,6 +710,21 @@ impl Executor {
         func.node_id = Some(node_id);
 
         Ok(Value::Function(func))
+    }
+
+    /// Evaluates a block expression (used in lambda bodies).
+    /// Returns the value of the last expression, or none if the block is empty or only has statements.
+    fn eval_block(&mut self, statements: &[Stmt]) -> Result<Value> {
+        // Execute all statements in the block
+        for stmt in statements {
+            // Execute the statement and check for returns
+            if let Some(return_value) = self.eval_stmt(stmt)? {
+                return Ok(return_value);
+            }
+        }
+
+        // No explicit return, return none
+        Ok(Value::None)
     }
 
     /// Evaluates an index expression (list[i] or map[key]).

@@ -281,38 +281,54 @@ Anonymous functions with arrow syntax:
 double = x => x * 2
 add = (x, y) => x + y
 
-# Multi-statement lambdas (future)
+# Multi-statement lambdas (block bodies)
 process = x => {
     temp = x * 2
     return temp + 1
 }
 ```
 
-> Proposed (Phase 11): Trailing-block sugar for lambdas
->
-> - Rationale: Provide Ruby/Smalltalk-like trailing block syntax as pure sugar for a function's last `lambda` parameter to improve ergonomics for iteration, transactions, and DSL-style APIs. This is syntactic sugar only; blocks are ordinary lambdas.
-> - Syntax (desugaring):
->   ```Graphoid
->   list.each { |x, i| print(i.to_string() + ": " + x) }
->   # == list.each((x, i) => { print(i.to_string() + ": " + x) })
->
->   numbers.map { |x| x * 2 }.filter { |x| x > 10 }
->   # == numbers.map((x) => x * 2).filter((x) => x > 10)
->   ```
-> - Function opt-in and `yield()` sugar:
->   ```Graphoid
->   fn times(n, block: lambda = () => {}) { i = 0; while i < n { block(i); i = i + 1 } }
->   5.times { |i| print(i) }
->
->   fn with_transaction(graph, block: lambda) {
->     begin_tx(graph)
->     try { yield(); commit_tx(graph) } catch Error { rollback_tx(graph); raise }
->   }
->   # yield() == block()
->   ```
-> - Semantics: no nonlocal returns; `return` inside the block returns from the block. Arity follows error modes (`:strict` errors on mismatch; `:lenient` ignores extras, fills missing with `none`).
-> - Parser note: trailing `{ ... }` after a call is parsed as a lambda argument; a leading `|params|` declares block parameters. Disambiguated from pattern matching (`|pattern| =>`) since that form does not appear as a call argument.
-> - Status: Deferred to Phase 11 (low priority) in the roadmap.
+#### Trailing-block syntax for lambdas
+
+Graphoid provides Ruby/Smalltalk-like trailing block syntax as syntactic sugar for a function's last lambda parameter. This improves ergonomics for iteration, transactions, and DSL-style APIs. Trailing blocks are ordinary lambdas.
+
+**Syntax (desugaring)**:
+```Graphoid
+list.each { |x, i| print(i.to_string() + ": " + x) }
+# == list.each((x, i) => { print(i.to_string() + ": " + x) })
+
+numbers.map { |x| x * 2 }.filter { |x| x > 10 }
+# == numbers.map((x) => x * 2).filter((x) => x > 10)
+
+# Empty parameter list
+5.times { || print("Hello") }
+# == 5.times(() => { print("Hello") })
+```
+
+**Function usage**:
+```Graphoid
+fn times(n, block: lambda = () => {}) {
+    i = 0
+    while i < n {
+        block(i)
+        i = i + 1
+    }
+}
+5.times { |i| print(i) }
+
+fn with_transaction(graph, block: lambda) {
+  begin_tx(graph)
+  try { yield(); commit_tx(graph) } catch Error { rollback_tx(graph); raise }
+}
+# yield() == block()
+```
+
+**Semantics**:
+- No nonlocal returns: `return` inside the block returns from the block only
+- Arity follows error modes: `:strict` errors on mismatch; `:lenient` ignores extras, fills missing with `none`
+- Parser: trailing `{ ... }` after a call is parsed as a lambda argument
+- Parameter list: `|params|` declares block parameters, `||` for empty parameter list
+- Disambiguation: not confused with pattern matching since that form doesn't appear as call argument
 
 #### Regex (`regex`)
 - Literals: `/pattern/flags`
