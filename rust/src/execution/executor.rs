@@ -1861,6 +1861,140 @@ impl Executor {
                 }
                 Ok(Value::Number(s.len() as f64))
             }
+            "upper" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'upper' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                Ok(Value::String(s.to_uppercase()))
+            }
+            "lower" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'lower' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                Ok(Value::String(s.to_lowercase()))
+            }
+            "trim" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'trim' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                Ok(Value::String(s.trim().to_string()))
+            }
+            "reverse" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'reverse' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                Ok(Value::String(s.chars().rev().collect()))
+            }
+            "substring" => {
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'substring' expects 2 arguments (start, end), but got {}",
+                        args.len()
+                    )));
+                }
+                let start = match &args[0] {
+                    Value::Number(n) => *n as usize,
+                    other => {
+                        return Err(GraphoidError::type_error("number", other.type_name()));
+                    }
+                };
+                let end = match &args[1] {
+                    Value::Number(n) => *n as usize,
+                    other => {
+                        return Err(GraphoidError::type_error("number", other.type_name()));
+                    }
+                };
+
+                let chars: Vec<char> = s.chars().collect();
+                let start = start.min(chars.len());
+                let end = end.min(chars.len());
+
+                if start > end {
+                    return Ok(Value::String(String::new()));
+                }
+
+                Ok(Value::String(chars[start..end].iter().collect()))
+            }
+            "split" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'split' expects 1 argument (delimiter), but got {}",
+                        args.len()
+                    )));
+                }
+                let delimiter = match &args[0] {
+                    Value::String(d) => d,
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                let parts: Vec<Value> = s.split(delimiter.as_str())
+                    .map(|part| Value::String(part.to_string()))
+                    .collect();
+
+                Ok(Value::List(crate::values::List::from_vec(parts)))
+            }
+            "starts_with" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'starts_with' expects 1 argument (prefix), but got {}",
+                        args.len()
+                    )));
+                }
+                let prefix = match &args[0] {
+                    Value::String(p) => p,
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                Ok(Value::Boolean(s.starts_with(prefix)))
+            }
+            "ends_with" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'ends_with' expects 1 argument (suffix), but got {}",
+                        args.len()
+                    )));
+                }
+                let suffix = match &args[0] {
+                    Value::String(suf) => suf,
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                Ok(Value::Boolean(s.ends_with(suffix)))
+            }
+            "contains" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'contains' expects 1 argument (substring), but got {}",
+                        args.len()
+                    )));
+                }
+                let substring = match &args[0] {
+                    Value::String(sub) => sub,
+                    other => {
+                        return Err(GraphoidError::type_error("string", other.type_name()));
+                    }
+                };
+
+                Ok(Value::Boolean(s.contains(substring.as_str())))
+            }
             _ => Err(GraphoidError::runtime(format!(
                 "String does not have method '{}'",
                 method

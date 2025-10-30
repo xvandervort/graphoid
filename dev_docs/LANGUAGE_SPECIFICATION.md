@@ -109,17 +109,32 @@ This is as far as type constraints go. No exceptions.
 #### Strings (`string`)
 - Internally represented as character node graphs
 - Unicode-aware grapheme cluster support
+- **Mutation Convention**: Methods ending with `!` mutate in place and return `none`. Methods without `!` return new strings.
 - Methods:
-  - Case: `upper()`, `lower()`
-  - Manipulation: `trim()`, `reverse()`, `substring(start, end)`
-  - Splitting: `split(delimiter)`, `split(regex)`
-  - Pattern matching: `starts_with(prefix)`, `ends_with(suffix)`
-  - Unified semantic methods:
+  - **Case Conversion** (two versions):
+    - `upper()` / `upper!()` - Convert to uppercase (returns new string / mutates in place)
+    - `lower()` / `lower!()` - Convert to lowercase (returns new string / mutates in place)
+  - **Whitespace** (two versions):
+    - `trim()` / `trim!()` - Remove leading/trailing whitespace (returns new string / mutates in place)
+  - **Transformation** (two versions):
+    - `reverse()` / `reverse!()` - Reverse character order (returns new string / mutates in place)
+  - **Extraction** (immutable):
+    - `substring(start, end)` - Extract substring by character indices
+  - **Splitting** (immutable):
+    - `split(delimiter)` - Split into list by delimiter
+    - `split(regex)` - Split into list by regex pattern
+  - **Pattern Matching** (immutable):
+    - `starts_with(prefix)` - Check if starts with prefix
+    - `ends_with(suffix)` - Check if ends with suffix
+    - `contains(substring)` - Check if contains substring
+  - **Unified Semantic Methods** (immutable):
     - `contains(mode, patterns...)` - Check for patterns
     - `extract(pattern)` - Extract matching content
     - `count(pattern)` - Count occurrences
     - `find(pattern)` - Find position of matches (optional second param limits how many matches)
-  - Regex support: `replace(regex, replacement)`, `find_all(regex)`
+  - **Regex Support** (immutable):
+    - `replace(regex, replacement)` - Replace matches with replacement
+    - `find_all(regex)` - Find all regex matches
 
 **Pattern Types**: `:digits`/`:numbers`, `:letters`, `:uppercase`, `:lowercase`, `:spaces`/`:whitespace`, `:punctuation`, `:symbols`, `:alphanumeric`, `:words`, `:emails`
 
@@ -217,13 +232,12 @@ This is as far as type constraints go. No exceptions.
 - Key-value collections stored as hash graphs
 - Type constraints: `hash<num>` (value type constraint)
 - Multi-line literals supported with trailing commas
+- **Mutation**: Hash mutation occurs through index assignment: `hash["key"] = value`
 - Methods:
-  - **Access**: `has_key(key)`, `keys()`, `values()`
-  - **Mutation**: `remove(key)`, `pop(key)`, `merge(other_hash)`
-  - **Inspection**: `size()`, `is_empty()`
+  - **Inspection**: `has_key(key)`, `keys()`, `values()`, `size()`, `is_empty()`
   - **Type Conversion**: `to_bool()`, `to_string()`
-- Index access: `hash["key"]` returns value
-- Index assignment: `hash["key"] = value`
+- Index access: `hash["key"]` returns value (returns `none` in lenient mode if key not found)
+- Index assignment: `hash["key"] = value` creates or updates key-value pair
 
 #### Graphs (`graph`)
 - Universal graph type representing nodes and edges
