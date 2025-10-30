@@ -4,7 +4,7 @@
 //! for expression parsing.
 
 use crate::ast::{
-    AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Program, Stmt, TypeAnnotation,
+    Argument, AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Program, Stmt, TypeAnnotation,
     UnaryOp,
 };
 use crate::error::{GraphoidError, Result, SourcePosition};
@@ -247,6 +247,21 @@ impl Parser {
         let mut params = Vec::new();
         if !self.check(&TokenType::RightParen) {
             loop {
+                // Check for variadic parameter (...)
+                let is_variadic = if self.check(&TokenType::Dot)
+                    && self.current + 1 < self.tokens.len()
+                    && matches!(self.tokens[self.current + 1].token_type, TokenType::Dot)
+                    && self.current + 2 < self.tokens.len()
+                    && matches!(self.tokens[self.current + 2].token_type, TokenType::Dot) {
+                    // Consume the three dots
+                    self.advance();
+                    self.advance();
+                    self.advance();
+                    true
+                } else {
+                    false
+                };
+
                 let param_name = if let TokenType::Identifier(id) = &self.peek().token_type {
                     let n = id.clone();
                     self.advance();
@@ -258,10 +273,25 @@ impl Parser {
                     });
                 };
 
-                // TODO: Parse default values
+                // Variadic parameters cannot have default values
+                let default_value = if is_variadic {
+                    if self.check(&TokenType::Equal) {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Variadic parameters cannot have default values".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+                    None
+                } else if self.match_token(&TokenType::Equal) {
+                    Some(self.expression()?)
+                } else {
+                    None
+                };
+
                 params.push(Parameter {
                     name: param_name,
-                    default_value: None,
+                    default_value,
+                    is_variadic,
                 });
 
                 if !self.match_token(&TokenType::Comma) {
@@ -1274,13 +1304,37 @@ impl Parser {
         Ok(expr)
     }
 
-    fn arguments(&mut self) -> Result<Vec<Expr>> {
+    fn arguments(&mut self) -> Result<Vec<Argument>> {
+        use crate::ast::Argument;
         let mut args = Vec::new();
 
         if !self.check(&TokenType::RightParen) {
             loop {
-                // Try to parse lambda or regular expression
-                args.push(self.lambda_or_expression()?);
+                // Check for named argument syntax: name: value
+                if let TokenType::Identifier(name) = &self.peek().token_type {
+                    // Look ahead to see if this is a named argument
+                    if self.current + 1 < self.tokens.len() {
+                        if let TokenType::Colon = self.tokens[self.current + 1].token_type {
+                            // Named argument
+                            let param_name = name.clone();
+                            self.advance(); // consume identifier
+                            self.advance(); // consume colon
+                            let value = self.lambda_or_expression()?;
+                            args.push(Argument::Named {
+                                name: param_name,
+                                value,
+                            });
+                            if !self.match_token(&TokenType::Comma) {
+                                break;
+                            }
+                            continue;
+                        }
+                    }
+                }
+
+                // Positional argument
+                let expr = self.lambda_or_expression()?;
+                args.push(Argument::Positional(expr));
                 if !self.match_token(&TokenType::Comma) {
                     break;
                 }
@@ -1574,7 +1628,7 @@ impl Parser {
             return Ok(Expr::MethodCall {
                 object: Box::new(graph_expr),
                 method: "with_ruleset".to_string(),
-                args: vec![symbol_expr],
+                args: vec![crate::ast::Argument::Positional(symbol_expr)],
                 position,
             });
         }

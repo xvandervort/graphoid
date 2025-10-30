@@ -1,7 +1,8 @@
 use std::fmt;
 use std::rc::Rc;
+use std::cell::RefCell;
 
-use crate::ast::Stmt;
+use crate::ast::{Stmt, Parameter};
 use crate::execution::Environment;
 use crate::execution::module_manager::Module;
 
@@ -179,12 +180,14 @@ impl ErrorObject {
 pub struct Function {
     /// Function name (None for anonymous lambdas)
     pub name: Option<String>,
-    /// Parameter names
+    /// Parameter names (for backward compatibility)
     pub params: Vec<String>,
+    /// Full parameter information including default values
+    pub parameters: Vec<Parameter>,
     /// Function body statements
     pub body: Vec<Stmt>,
-    /// Captured environment (for closures)
-    pub env: Rc<Environment>,
+    /// Captured environment (for closures) - shared mutable for closure state
+    pub env: Rc<RefCell<Environment>>,
     /// Node ID in the function graph (set when registered, prevents duplicate registration)
     pub node_id: Option<String>,
 }

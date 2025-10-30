@@ -98,6 +98,18 @@ pub struct CatchClause {
     pub position: SourcePosition,
 }
 
+/// Function call argument - can be positional or named
+#[derive(Debug, Clone, PartialEq)]
+pub enum Argument {
+    /// Positional argument: just the expression
+    Positional(Expr),
+    /// Named argument: name and expression (e.g., name: "Alice")
+    Named {
+        name: String,
+        value: Expr,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Literal {
@@ -121,13 +133,13 @@ pub enum Expr {
     },
     Call {
         callee: Box<Expr>,
-        args: Vec<Expr>,
+        args: Vec<Argument>,
         position: SourcePosition,
     },
     MethodCall {
         object: Box<Expr>,
         method: String,
-        args: Vec<Expr>,
+        args: Vec<Argument>,
         position: SourcePosition,
     },
     Index {
@@ -248,6 +260,7 @@ pub enum UnaryOp {
 pub struct Parameter {
     pub name: String,
     pub default_value: Option<Expr>,
+    pub is_variadic: bool,  // true if parameter is ...name
 }
 
 #[derive(Debug, Clone, PartialEq)]

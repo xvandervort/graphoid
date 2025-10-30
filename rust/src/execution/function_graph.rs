@@ -423,11 +423,14 @@ mod tests {
     use std::rc::Rc;
 
     fn make_test_function(name: &str) -> Function {
+        use std::cell::RefCell;
+        use crate::ast::Parameter;
         Function {
             name: Some(name.to_string()),
             params: vec!["x".to_string()],
+            parameters: vec![Parameter { name: "x".to_string(), default_value: None, is_variadic: false }],
             body: vec![],
-            env: Rc::new(Environment::new()),
+            env: Rc::new(RefCell::new(Environment::new())),
             node_id: None,
         }
     }

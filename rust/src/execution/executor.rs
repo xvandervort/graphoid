@@ -1,4 +1,4 @@
-use crate::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Stmt, UnaryOp};
+use crate::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Stmt, UnaryOp};
 use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::execution::Environment;
 use crate::execution::config::{ConfigStack, ErrorMode};
@@ -81,8 +81,9 @@ impl Executor {
         let toplevel_func = Function {
             name: Some("__toplevel__".to_string()),
             params: Vec::new(),
+            parameters: Vec::new(),
             body: Vec::new(),
-            env: Rc::new(self.env.clone()),
+            env: Rc::new(RefCell::new(self.env.clone())),
             node_id: None,
         };
 
@@ -303,15 +304,16 @@ impl Executor {
                 body,
                 ..
             } => {
-                // Extract parameter names (ignore default values for now)
+                // Extract parameter names
                 let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
 
                 // Create function value
                 let mut func = Function {
                     name: Some(name.clone()),
                     params: param_names,
+                    parameters: params.clone(),
                     body: body.clone(),
-                    env: Rc::new(self.env.clone()),
+                    env: Rc::new(RefCell::new(self.env.clone())),
                     node_id: None,
                 };
 
@@ -681,11 +683,19 @@ impl Executor {
         };
 
         // Create anonymous function with captured environment
+        // Convert param names to Parameter objects (lambdas don't have defaults or variadic)
+        let parameters: Vec<Parameter> = params.iter().map(|name| Parameter {
+            name: name.clone(),
+            default_value: None,
+            is_variadic: false,  // Lambdas don't support variadic parameters
+        }).collect();
+
         let mut func = Function {
             name: None, // Anonymous
             params: params.to_vec(),
+            parameters,
             body: vec![return_stmt],
-            env: Rc::new(self.env.clone()),
+            env: Rc::new(RefCell::new(self.env.clone())),
             node_id: None,
         };
 
@@ -834,16 +844,34 @@ impl Executor {
         }
     }
 
+    /// Helper to evaluate arguments (positional only for now).
+    /// Named arguments in method calls are not yet supported.
+    fn eval_arguments(&mut self, args: &[crate::ast::Argument]) -> Result<Vec<Value>> {
+        use crate::ast::Argument;
+        let mut arg_values = Vec::new();
+        for arg in args {
+            match arg {
+                Argument::Positional(expr) => {
+                    arg_values.push(self.eval_expr(expr)?);
+                }
+                Argument::Named { name, .. } => {
+                    return Err(GraphoidError::runtime(format!(
+                        "Named arguments are not supported in method calls (parameter '{}')",
+                        name
+                    )));
+                }
+            }
+        }
+        Ok(arg_values)
+    }
+
     /// Evaluates a method call expression (object.method(args)).
-    fn eval_method_call(&mut self, object: &Expr, method: &str, args: &[Expr]) -> Result<Value> {
+    fn eval_method_call(&mut self, object: &Expr, method: &str, args: &[crate::ast::Argument]) -> Result<Value> {
         // Check for static method calls on type identifiers (e.g., list.generate)
         if let Expr::Variable { name, .. } = object {
             if name == "list" {
                 // Evaluate argument expressions
-                let mut arg_values = Vec::new();
-                for arg in args {
-                    arg_values.push(self.eval_expr(arg)?);
-                }
+                let arg_values = self.eval_arguments(args)?;
                 return self.eval_list_static_method(method, &arg_values);
             }
         }
@@ -859,10 +887,7 @@ impl Executor {
             // If it's a function, call it with args
             if let Value::Function(func) = member {
                 // Evaluate argument expressions
-                let mut arg_values = Vec::new();
-                for arg in args {
-                    arg_values.push(self.eval_expr(arg)?);
-                }
+                let arg_values = self.eval_arguments(args)?;
                 return self.call_function(&func, &arg_values);
             } else {
                 // If it's a variable and no args, return it directly
@@ -887,10 +912,7 @@ impl Executor {
         };
 
         // Evaluate all argument expressions
-        let mut arg_values = Vec::new();
-        for arg in args {
-            arg_values.push(self.eval_expr(arg)?);
-        }
+        let arg_values = self.eval_arguments(args)?;
 
         if is_mutating {
             // Extract variable name from object expression
@@ -2092,7 +2114,9 @@ impl Executor {
     }
 
     /// Evaluates a function call expression.
-    fn eval_call(&mut self, callee: &Expr, args: &[Expr]) -> Result<Value> {
+    fn eval_call(&mut self, callee: &Expr, args: &[crate::ast::Argument]) -> Result<Value> {
+        use crate::ast::Argument;
+
         // Check if this is a builtin function call (special handling)
         if let Expr::Variable { name, .. } = callee {
             match name.as_str() {
@@ -2104,7 +2128,15 @@ impl Executor {
                             name, args.len()
                         )));
                     }
-                    let message_value = self.eval_expr(&args[0])?;
+                    let message_value = match &args[0] {
+                        Argument::Positional(expr) => self.eval_expr(expr)?,
+                        Argument::Named { .. } => {
+                            return Err(GraphoidError::runtime(format!(
+                                "{} constructor does not support named arguments",
+                                name
+                            )));
+                        }
+                    };
                     let message = message_value.to_string_value();
 
                     // Create the error object with current call stack
@@ -2176,26 +2208,134 @@ impl Executor {
             }
         };
 
-        // Evaluate all argument expressions
-        let mut arg_values = Vec::new();
-        for arg in args {
-            arg_values.push(self.eval_expr(arg)?);
-        }
+        // Process arguments (positional and named) and match to parameters
+        let arg_values = self.process_arguments(&func, args)?;
 
         // Delegate to call_function (which has graph tracking)
         self.call_function(&func, &arg_values)
     }
 
+    /// Process function arguments (positional and named) and match them to parameters.
+    /// Returns a Vec<Value> with values in parameter order.
+    /// Handles variadic parameters by collecting remaining args into a list.
+    fn process_arguments(&mut self, func: &Function, args: &[crate::ast::Argument]) -> Result<Vec<Value>> {
+        use crate::ast::Argument;
+        use std::collections::{HashMap, HashSet};
+
+        let param_count = func.parameters.len();
+
+        // Find variadic parameter index if any
+        let variadic_idx = func.parameters.iter().position(|p| p.is_variadic);
+
+        // Track which parameters have been assigned
+        let mut assigned: Vec<Option<Value>> = vec![None; param_count];
+        let mut assigned_names: HashSet<String> = HashSet::new();
+        let mut variadic_values: Vec<Value> = Vec::new();
+
+        // Build parameter name -> index mapping
+        let mut param_index: HashMap<String, usize> = HashMap::new();
+        for (i, param) in func.parameters.iter().enumerate() {
+            param_index.insert(param.name.clone(), i);
+        }
+
+        // Track the next positional parameter index
+        let mut next_positional_idx = 0;
+
+        // Process each argument
+        for arg in args {
+            match arg {
+                Argument::Named { name, value } => {
+                    // Find parameter by name
+                    let idx = param_index.get(name).ok_or_else(|| {
+                        GraphoidError::runtime(format!(
+                            "Unknown parameter '{}' in function '{}'",
+                            name,
+                            func.name.as_ref().unwrap_or(&"<anonymous>".to_string())
+                        ))
+                    })?;
+
+                    // Check if already assigned
+                    if assigned_names.contains(name) {
+                        return Err(GraphoidError::runtime(format!(
+                            "Parameter '{}' specified multiple times",
+                            name
+                        )));
+                    }
+
+                    // Evaluate and assign
+                    let val = self.eval_expr(value)?;
+                    assigned[*idx] = Some(val);
+                    assigned_names.insert(name.clone());
+                }
+                Argument::Positional(expr) => {
+                    // Find next unassigned positional parameter
+                    while next_positional_idx < param_count && assigned[next_positional_idx].is_some() {
+                        next_positional_idx += 1;
+                    }
+
+                    // If we've reached a variadic parameter, collect remaining args
+                    if let Some(var_idx) = variadic_idx {
+                        if next_positional_idx == var_idx {
+                            // Collect this and all remaining positional args for variadic
+                            let val = self.eval_expr(expr)?;
+                            variadic_values.push(val);
+                            continue;
+                        }
+                    }
+
+                    if next_positional_idx >= param_count {
+                        return Err(GraphoidError::runtime(format!(
+                            "Too many arguments for function '{}'",
+                            func.name.as_ref().unwrap_or(&"<anonymous>".to_string())
+                        )));
+                    }
+
+                    // Evaluate and assign
+                    let val = self.eval_expr(expr)?;
+                    assigned[next_positional_idx] = Some(val);
+                    assigned_names.insert(func.parameters[next_positional_idx].name.clone());
+                    next_positional_idx += 1;
+                }
+            }
+        }
+
+        // Fill in defaults and check for missing required parameters
+        let mut result: Vec<Value> = Vec::new();
+        for (i, param) in func.parameters.iter().enumerate() {
+            if param.is_variadic {
+                // Assign collected variadic values as a list
+                result.push(Value::List(List::from_vec(variadic_values.clone())));
+            } else if let Some(val) = assigned[i].take() {
+                result.push(val);
+            } else if let Some(default_expr) = &param.default_value {
+                // Evaluate default value
+                let default_val = self.eval_expr(default_expr)?;
+                result.push(default_val);
+            } else {
+                // Required parameter not provided
+                return Err(GraphoidError::runtime(format!(
+                    "Missing required parameter '{}' in function '{}'",
+                    param.name,
+                    func.name.as_ref().unwrap_or(&"<anonymous>".to_string())
+                )));
+            }
+        }
+
+        Ok(result)
+    }
+
     /// Helper method to call a function with given argument values.
     /// Used by map, filter, each, and other functional methods.
     fn call_function(&mut self, func: &Function, arg_values: &[Value]) -> Result<Value> {
-        // Check argument count
-        if arg_values.len() != func.params.len() {
+        // Note: Argument validation is done by process_arguments() in eval_call()
+        // For direct calls (e.g., from map/filter), we trust arg_values are correct
+
+        // Quick sanity check: arg_values should match parameter count
+        if arg_values.len() != func.parameters.len() {
             return Err(GraphoidError::runtime(format!(
-                "Function '{}' expects {} arguments, but got {}",
-                func.name.as_ref().unwrap_or(&"<anonymous>".to_string()),
-                func.params.len(),
-                arg_values.len()
+                "Internal error: arg_values length ({}) doesn't match parameter count ({})",
+                arg_values.len(),
+                func.parameters.len()
             )));
         }
 
@@ -2229,22 +2369,25 @@ impl Executor {
         // For named functions, we need to use the environment where functions are defined,
         // not the current call environment (which might be inside another function)
 
-        // For named functions: walk up to find the root environment (no parent)
-        // This ensures they can always see globally defined functions
-        let parent_env = if func.name.is_some() {
-            // Named functions use the captured environment, which has access to global scope
-            // This allows recursion and mutual recursion
-            (*func.env).clone()
-        } else {
-            // Lambdas use captured environment (true closures)
-            (*func.env).clone()
-        };
+        // Use the captured environment (shared mutable for closures)
+        // This enables closures to maintain state across calls
+        let parent_env = func.env.borrow().clone();
 
         let mut call_env = Environment::with_parent(parent_env);
 
         // Bind parameters to argument values
-        for (param_name, arg_value) in func.params.iter().zip(arg_values.iter()) {
-            call_env.define(param_name.clone(), arg_value.clone());
+        // Note: arg_values already has variadic parameters properly bundled as lists
+        // thanks to process_arguments(), so we just bind them directly
+        for (i, param) in func.parameters.iter().enumerate() {
+            if i < arg_values.len() {
+                call_env.define(param.name.clone(), arg_values[i].clone());
+            } else {
+                // This should not happen since process_arguments validates everything
+                return Err(GraphoidError::runtime(format!(
+                    "Internal error: missing value for parameter '{}'",
+                    param.name
+                )));
+            }
         }
 
         // Save current environment and switch to call environment
@@ -2267,6 +2410,13 @@ impl Executor {
             }
             Ok(())
         })();
+
+        // Save modifications back to the captured environment (for closure state)
+        // Extract the parent environment from call_env (which may have been modified)
+        if let Some(modified_parent) = self.env.take_parent() {
+            // Update the captured environment with modifications
+            *func.env.borrow_mut() = *modified_parent;
+        }
 
         // Restore original environment
         self.env = saved_env;
@@ -2690,12 +2840,13 @@ impl Executor {
 
     // Arithmetic helpers
     fn eval_add(&self, left: Value, right: Value) -> Result<Value> {
-        match (left, right) {
+        match (&left, &right) {
             (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
-            (Value::String(l), Value::String(r)) => {
-                let mut result = l.clone();
-                result.push_str(&r);
-                Ok(Value::String(result))
+            (Value::String(_), _) | (_, Value::String(_)) => {
+                // If either operand is a string, convert both to strings and concatenate
+                let left_str = left.to_string_value();
+                let right_str = right.to_string_value();
+                Ok(Value::String(format!("{}{}", left_str, right_str)))
             }
             (l, r) => Err(GraphoidError::type_error(
                 "number or string",

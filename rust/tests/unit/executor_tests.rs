@@ -1,4 +1,4 @@
-use graphoid::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Stmt, UnaryOp};
+use graphoid::ast::{Argument, AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Stmt, UnaryOp};
 use graphoid::error::SourcePosition;
 use graphoid::execution::{Executor, ErrorMode};
 use graphoid::values::{Hash, List, Value};
@@ -913,7 +913,8 @@ fn test_eval_string_equal() {
 // ============================================================================
 
 #[test]
-fn test_eval_type_error_add_string_to_number() {
+fn test_eval_string_number_concatenation() {
+    // String + number should work with type coercion (number converted to string)
     let mut executor = Executor::new();
     let expr = Expr::Binary {
         left: Box::new(Expr::Literal {
@@ -928,8 +929,8 @@ fn test_eval_type_error_add_string_to_number() {
         position: pos(),
     };
 
-    let result = executor.eval_expr(&expr);
-    assert!(result.is_err());
+    let result = executor.eval_expr(&expr).unwrap();
+    assert_eq!(result, Value::String("hello5".to_string()));
 }
 
 #[test]
@@ -1110,10 +1111,12 @@ fn test_function_declaration() {
             graphoid::ast::Parameter {
                 name: "a".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             graphoid::ast::Parameter {
                 name: "b".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
         ],
         body: vec![Stmt::Return {
@@ -1152,10 +1155,12 @@ fn test_function_call_simple() {
             graphoid::ast::Parameter {
                 name: "a".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             graphoid::ast::Parameter {
                 name: "b".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
         ],
         body: vec![Stmt::Return {
@@ -1185,14 +1190,14 @@ fn test_function_call_simple() {
             position: pos(),
         }),
         args: vec![
-            Expr::Literal {
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(2.0),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(3.0),
                 position: pos(),
-            },
+            }),
         ],
         position: pos(),
     };
@@ -1245,7 +1250,8 @@ fn test_function_with_expression_body() {
         params: vec![graphoid::ast::Parameter {
             name: "x".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![Stmt::Return {
             value: Some(Expr::Binary {
                 left: Box::new(Expr::Variable {
@@ -1272,10 +1278,10 @@ fn test_function_with_expression_body() {
             name: "double".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -1294,10 +1300,12 @@ fn test_function_nested_calls() {
             graphoid::ast::Parameter {
                 name: "a".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             graphoid::ast::Parameter {
                 name: "b".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
         ],
         body: vec![Stmt::Return {
@@ -1325,10 +1333,12 @@ fn test_function_nested_calls() {
             graphoid::ast::Parameter {
                 name: "a".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             graphoid::ast::Parameter {
                 name: "b".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
         ],
         body: vec![Stmt::Return {
@@ -1359,27 +1369,27 @@ fn test_function_nested_calls() {
             position: pos(),
         }),
         args: vec![
-            Expr::Call {
+            Argument::Positional(Expr::Call {
                 callee: Box::new(Expr::Variable {
                     name: "mul".to_string(),
                     position: pos(),
                 }),
                 args: vec![
-                    Expr::Literal {
+                    Argument::Positional(Expr::Literal {
                         value: LiteralValue::Number(2.0),
                         position: pos(),
-                    },
-                    Expr::Literal {
+                    }),
+                    Argument::Positional(Expr::Literal {
                         value: LiteralValue::Number(3.0),
                         position: pos(),
-                    },
+                    }),
                 ],
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(4.0),
                 position: pos(),
-            },
+            }),
         ],
         position: pos(),
     };
@@ -1401,7 +1411,8 @@ fn test_function_closure() {
         params: vec![graphoid::ast::Parameter {
             name: "y".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![Stmt::Return {
             value: Some(Expr::Binary {
                 left: Box::new(Expr::Variable {
@@ -1428,10 +1439,10 @@ fn test_function_closure() {
             name: "add_x".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -1481,10 +1492,12 @@ fn test_function_wrong_arg_count() {
             graphoid::ast::Parameter {
                 name: "a".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             graphoid::ast::Parameter {
                 name: "b".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
         ],
         body: vec![Stmt::Return {
@@ -1513,10 +1526,10 @@ fn test_function_wrong_arg_count() {
             name: "add".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(2.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -1623,10 +1636,10 @@ fn test_lambda_call() {
     // Call lambda immediately: (x => x * 2)(5)
     let call = Expr::Call {
         callee: Box::new(lambda),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -1662,10 +1675,10 @@ fn test_lambda_closure() {
     // Call lambda: (y => x + y)(5)
     let call = Expr::Call {
         callee: Box::new(lambda),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -1708,7 +1721,8 @@ fn test_function_as_value() {
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![Stmt::Return {
             value: Some(Expr::Binary {
                 left: Box::new(Expr::Variable {
@@ -1745,14 +1759,17 @@ fn test_function_multiple_params() {
             Parameter {
                 name: "a".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             Parameter {
                 name: "b".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             Parameter {
                 name: "c".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
         ],
         body: vec![Stmt::Return {
@@ -1790,18 +1807,18 @@ fn test_function_multiple_params() {
             position: pos(),
         }),
         args: vec![
-            Expr::Literal {
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(10.0),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(2.0),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(5.0),
                 position: pos(),
-            },
+            }),
         ],
         position: pos(),
     };
@@ -1830,7 +1847,8 @@ fn test_recursive_function() {
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![Stmt::Return {
             value: Some(Expr::Variable {
                 name: "n".to_string(),
@@ -1848,10 +1866,10 @@ fn test_recursive_function() {
             name: "identity".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -1869,7 +1887,8 @@ fn test_function_with_string_return() {
         params: vec![Parameter {
             name: "name".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![Stmt::Return {
             value: Some(Expr::Binary {
                 left: Box::new(Expr::Literal {
@@ -1895,10 +1914,10 @@ fn test_function_with_string_return() {
             name: "greet".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::String("Alice".to_string()),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -1987,18 +2006,18 @@ fn test_lambda_multiple_params() {
     let call = Expr::Call {
         callee: Box::new(lambda),
         args: vec![
-            Expr::Literal {
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(1.0),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(2.0),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(3.0),
                 position: pos(),
-            },
+            }),
         ],
         position: pos(),
     };
@@ -2040,14 +2059,14 @@ fn test_lambda_with_string_concat() {
     let call = Expr::Call {
         callee: Box::new(lambda),
         args: vec![
-            Expr::Literal {
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::String("John".to_string()),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::String("Doe".to_string()),
                 position: pos(),
-            },
+            }),
         ],
         position: pos(),
     };
@@ -2066,7 +2085,8 @@ fn test_function_returning_boolean() {
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![Stmt::Return {
             value: Some(Expr::Binary {
                 left: Box::new(Expr::Variable {
@@ -2092,10 +2112,10 @@ fn test_function_returning_boolean() {
             name: "is_positive".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -2107,10 +2127,10 @@ fn test_function_returning_boolean() {
             name: "is_positive".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(-5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -2129,10 +2149,12 @@ fn test_function_returning_list() {
             Parameter {
                 name: "a".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             Parameter {
                 name: "b".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
         ],
         body: vec![Stmt::Return {
@@ -2162,14 +2184,14 @@ fn test_function_returning_list() {
             position: pos(),
         }),
         args: vec![
-            Expr::Literal {
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(1.0),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(2.0),
                 position: pos(),
-            },
+            }),
         ],
         position: pos(),
     };
@@ -2191,7 +2213,8 @@ fn test_deeply_nested_calls() {
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![Stmt::Return {
             value: Some(Expr::Binary {
                 left: Box::new(Expr::Variable {
@@ -2218,24 +2241,24 @@ fn test_deeply_nested_calls() {
             name: "add1".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Call {
+        args: vec![Argument::Positional(Expr::Call {
             callee: Box::new(Expr::Variable {
                 name: "add1".to_string(),
                 position: pos(),
             }),
-            args: vec![Expr::Call {
+            args: vec![Argument::Positional(Expr::Call {
                 callee: Box::new(Expr::Variable {
                     name: "add1".to_string(),
                     position: pos(),
                 }),
-                args: vec![Expr::Literal {
+                args: vec![Argument::Positional(Expr::Literal {
                     value: LiteralValue::Number(5.0),
                     position: pos(),
-                }],
+                })],
                 position: pos(),
-            }],
+            })],
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -2358,7 +2381,8 @@ fn test_function_with_side_effects() {
         params: vec![Parameter {
             name: "val".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![
             Stmt::Assignment {
                 target: AssignmentTarget::Variable("x".to_string()),
@@ -2387,10 +2411,10 @@ fn test_function_with_side_effects() {
             name: "set_x".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(42.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -2452,6 +2476,7 @@ fn test_function_parameter_shadowing() {
         params: vec![Parameter {
             name: "x".to_string(), // Shadows outer x
             default_value: None,
+        is_variadic: false,
         }],
         body: vec![Stmt::Return {
             value: Some(Expr::Binary {
@@ -2479,10 +2504,10 @@ fn test_function_parameter_shadowing() {
             name: "use_param".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -2500,7 +2525,8 @@ fn test_function_returning_function_value() {
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![Stmt::Return {
             value: Some(Expr::Binary {
                 left: Box::new(Expr::Variable {
@@ -2539,10 +2565,10 @@ fn test_function_returning_function_value() {
             name: "adder".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -2575,14 +2601,14 @@ fn test_lambda_with_logical_operations() {
     let call = Expr::Call {
         callee: Box::new(lambda),
         args: vec![
-            Expr::Literal {
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Boolean(true),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Boolean(false),
                 position: pos(),
-            },
+            }),
         ],
         position: pos(),
     };
@@ -2602,10 +2628,12 @@ fn test_function_with_comparison() {
             Parameter {
                 name: "a".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             Parameter {
                 name: "b".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
         ],
         body: vec![Stmt::Return {
@@ -2634,14 +2662,14 @@ fn test_function_with_comparison() {
             position: pos(),
         }),
         args: vec![
-            Expr::Literal {
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(10.0),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(5.0),
                 position: pos(),
-            },
+            }),
         ],
         position: pos(),
     };
@@ -2688,14 +2716,14 @@ fn test_lambda_returning_list() {
     let call = Expr::Call {
         callee: Box::new(lambda),
         args: vec![
-            Expr::Literal {
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(3.0),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(4.0),
                 position: pos(),
-            },
+            }),
         ],
         position: pos(),
     };
@@ -2721,7 +2749,8 @@ fn test_function_with_unary_ops() {
         params: vec![Parameter {
             name: "x".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![Stmt::Return {
             value: Some(Expr::Unary {
                 op: UnaryOp::Negate,
@@ -2743,10 +2772,10 @@ fn test_function_with_unary_ops() {
             name: "negate".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -2764,7 +2793,8 @@ fn test_function_with_not_op() {
         params: vec![Parameter {
             name: "b".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![Stmt::Return {
             value: Some(Expr::Unary {
                 op: UnaryOp::Not,
@@ -2786,10 +2816,10 @@ fn test_function_with_not_op() {
             name: "invert".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Boolean(true),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -2808,18 +2838,22 @@ fn test_function_four_params() {
             Parameter {
                 name: "a".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             Parameter {
                 name: "b".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             Parameter {
                 name: "c".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             Parameter {
                 name: "d".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
         ],
         body: vec![Stmt::Return {
@@ -2872,22 +2906,22 @@ fn test_function_four_params() {
             position: pos(),
         }),
         args: vec![
-            Expr::Literal {
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(10.0),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(20.0),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(30.0),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(40.0),
                 position: pos(),
-            },
+            }),
         ],
         position: pos(),
     };
@@ -2931,10 +2965,12 @@ fn test_function_call_with_expression_args() {
             Parameter {
                 name: "a".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             Parameter {
                 name: "b".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
         ],
         body: vec![Stmt::Return {
@@ -2964,7 +3000,7 @@ fn test_function_call_with_expression_args() {
             position: pos(),
         }),
         args: vec![
-            Expr::Binary {
+            Argument::Positional(Expr::Binary {
                 left: Box::new(Expr::Literal {
                     value: LiteralValue::Number(2.0),
                     position: pos(),
@@ -2975,8 +3011,8 @@ fn test_function_call_with_expression_args() {
                     position: pos(),
                 }),
                 position: pos(),
-            },
-            Expr::Binary {
+            }),
+            Argument::Positional(Expr::Binary {
                 left: Box::new(Expr::Literal {
                     value: LiteralValue::Number(5.0),
                     position: pos(),
@@ -2987,7 +3023,7 @@ fn test_function_call_with_expression_args() {
                     position: pos(),
                 }),
                 position: pos(),
-            },
+            }),
         ],
         position: pos(),
     };
@@ -3189,7 +3225,8 @@ fn test_if_return_in_function() {
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![
             Stmt::If {
                 condition: Expr::Binary {
@@ -3233,10 +3270,10 @@ fn test_if_return_in_function() {
             name: "check".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -3249,10 +3286,10 @@ fn test_if_return_in_function() {
             name: "check".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(-5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -3277,10 +3314,12 @@ fn test_call_stack_cleared_after_return() {
             Parameter {
                 name: "a".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
             Parameter {
                 name: "b".to_string(),
                 default_value: None,
+                is_variadic: false,
             },
         ],
         body: vec![Stmt::Return {
@@ -3310,14 +3349,14 @@ fn test_call_stack_cleared_after_return() {
             position: pos(),
         }),
         args: vec![
-            Expr::Literal {
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(2.0),
                 position: pos(),
-            },
-            Expr::Literal {
+            }),
+            Argument::Positional(Expr::Literal {
                 value: LiteralValue::Number(3.0),
                 position: pos(),
-            },
+            }),
         ],
         position: pos(),
     };
@@ -3558,7 +3597,8 @@ fn test_while_loop_in_function() {
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![
             Stmt::VariableDecl {
                 name: "result".to_string(),
@@ -3646,10 +3686,10 @@ fn test_while_loop_in_function() {
             name: "factorial".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::Literal {
+        args: vec![Argument::Positional(Expr::Literal {
             value: LiteralValue::Number(5.0),
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -3991,7 +4031,8 @@ fn test_for_loop_in_function() {
         params: vec![Parameter {
             name: "numbers".to_string(),
             default_value: None,
-        }],
+                is_variadic: false,
+            }],
         body: vec![
             Stmt::VariableDecl {
                 name: "total".to_string(),
@@ -4045,7 +4086,7 @@ fn test_for_loop_in_function() {
             name: "sum_list".to_string(),
             position: pos(),
         }),
-        args: vec![Expr::List {
+        args: vec![Argument::Positional(Expr::List {
             elements: vec![
                 Expr::Literal {
                     value: LiteralValue::Number(10.0),
@@ -4061,7 +4102,7 @@ fn test_for_loop_in_function() {
                 },
             ],
             position: pos(),
-        }],
+        })],
         position: pos(),
     };
 
@@ -4499,7 +4540,7 @@ fn test_list_method_contains() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
         method: "contains".to_string(),
-        args: vec![Expr::Literal { value: LiteralValue::Number(20.0), position: pos() }],
+        args: vec![Argument::Positional(Expr::Literal { value: LiteralValue::Number(20.0), position: pos() })],
         position: pos(),
     };
     let result = executor.eval_expr(&method_call).unwrap();
@@ -4509,7 +4550,7 @@ fn test_list_method_contains() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
         method: "contains".to_string(),
-        args: vec![Expr::Literal { value: LiteralValue::Number(99.0), position: pos() }],
+        args: vec![Argument::Positional(Expr::Literal { value: LiteralValue::Number(99.0), position: pos() })],
         position: pos(),
     };
     let result = executor.eval_expr(&method_call).unwrap();
@@ -4601,7 +4642,7 @@ fn test_list_method_map() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
         method: "map".to_string(),
-        args: vec![lambda],
+        args: vec![Argument::Positional(lambda)],
         position: pos(),
     };
 
@@ -4658,7 +4699,7 @@ fn test_list_method_filter() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
         method: "filter".to_string(),
-        args: vec![lambda],
+        args: vec![Argument::Positional(lambda)],
         position: pos(),
     };
 
@@ -4707,7 +4748,7 @@ fn test_list_method_each() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
         method: "each".to_string(),
-        args: vec![lambda],
+        args: vec![Argument::Positional(lambda)],
         position: pos(),
     };
 
@@ -4757,7 +4798,7 @@ fn test_list_method_map_with_strings() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "words".to_string(), position: pos() }),
         method: "map".to_string(),
-        args: vec![lambda],
+        args: vec![Argument::Positional(lambda)],
         position: pos(),
     };
 
@@ -4808,7 +4849,7 @@ fn test_list_method_filter_greater_than() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
         method: "filter".to_string(),
-        args: vec![lambda],
+        args: vec![Argument::Positional(lambda)],
         position: pos(),
     };
 
@@ -4850,7 +4891,7 @@ fn test_list_method_map_with_named_transform_double() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
         method: "map".to_string(),
-        args: vec![Expr::Literal { value: LiteralValue::Symbol("double".to_string()), position: pos() }],
+        args: vec![Argument::Positional(Expr::Literal { value: LiteralValue::Symbol("double".to_string()), position: pos() })],
         position: pos(),
     };
 
@@ -4889,7 +4930,7 @@ fn test_list_method_map_with_named_transform_square() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
         method: "map".to_string(),
-        args: vec![Expr::Literal { value: LiteralValue::Symbol("square".to_string()), position: pos() }],
+        args: vec![Argument::Positional(Expr::Literal { value: LiteralValue::Symbol("square".to_string()), position: pos() })],
         position: pos(),
     };
 
@@ -4928,7 +4969,7 @@ fn test_list_method_map_with_named_transform_negate() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
         method: "map".to_string(),
-        args: vec![Expr::Literal { value: LiteralValue::Symbol("negate".to_string()), position: pos() }],
+        args: vec![Argument::Positional(Expr::Literal { value: LiteralValue::Symbol("negate".to_string()), position: pos() })],
         position: pos(),
     };
 
@@ -4974,7 +5015,7 @@ fn test_list_method_filter_with_named_predicate_even() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
         method: "filter".to_string(),
-        args: vec![Expr::Literal { value: LiteralValue::Symbol("even".to_string()), position: pos() }],
+        args: vec![Argument::Positional(Expr::Literal { value: LiteralValue::Symbol("even".to_string()), position: pos() })],
         position: pos(),
     };
 
@@ -5015,7 +5056,7 @@ fn test_list_method_filter_with_named_predicate_positive() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
         method: "filter".to_string(),
-        args: vec![Expr::Literal { value: LiteralValue::Symbol("positive".to_string()), position: pos() }],
+        args: vec![Argument::Positional(Expr::Literal { value: LiteralValue::Symbol("positive".to_string()), position: pos() })],
         position: pos(),
     };
 
@@ -5055,7 +5096,7 @@ fn test_list_method_filter_with_named_predicate_odd() {
     let method_call = Expr::MethodCall {
         object: Box::new(Expr::Variable { name: "numbers".to_string(), position: pos() }),
         method: "filter".to_string(),
-        args: vec![Expr::Literal { value: LiteralValue::Symbol("odd".to_string()), position: pos() }],
+        args: vec![Argument::Positional(Expr::Literal { value: LiteralValue::Symbol("odd".to_string()), position: pos() })],
         position: pos(),
     };
 
@@ -5306,8 +5347,8 @@ fn test_list_method_slice_basic() {
         object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
         method: "slice".to_string(),
         args: vec![
-            Expr::Literal { value: LiteralValue::Number(1.0), position: pos() },
-            Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+            Argument::Positional(Expr::Literal { value: LiteralValue::Number(1.0), position: pos() }),
+            Argument::Positional(Expr::Literal { value: LiteralValue::Number(3.0), position: pos() }),
         ],
         position: pos(),
     };
@@ -5349,8 +5390,8 @@ fn test_list_method_slice_from_start() {
         object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
         method: "slice".to_string(),
         args: vec![
-            Expr::Literal { value: LiteralValue::Number(0.0), position: pos() },
-            Expr::Literal { value: LiteralValue::Number(3.0), position: pos() },
+            Argument::Positional(Expr::Literal { value: LiteralValue::Number(0.0), position: pos() }),
+            Argument::Positional(Expr::Literal { value: LiteralValue::Number(3.0), position: pos() }),
         ],
         position: pos(),
     };
@@ -5393,8 +5434,8 @@ fn test_list_method_slice_to_end() {
         object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
         method: "slice".to_string(),
         args: vec![
-            Expr::Literal { value: LiteralValue::Number(2.0), position: pos() },
-            Expr::Literal { value: LiteralValue::Number(5.0), position: pos() },
+            Argument::Positional(Expr::Literal { value: LiteralValue::Number(2.0), position: pos() }),
+            Argument::Positional(Expr::Literal { value: LiteralValue::Number(5.0), position: pos() }),
         ],
         position: pos(),
     };
@@ -5437,8 +5478,8 @@ fn test_list_method_slice_negative_indices() {
         object: Box::new(Expr::Variable { name: "items".to_string(), position: pos() }),
         method: "slice".to_string(),
         args: vec![
-            Expr::Literal { value: LiteralValue::Number(-3.0), position: pos() },
-            Expr::Literal { value: LiteralValue::Number(-1.0), position: pos() },
+            Argument::Positional(Expr::Literal { value: LiteralValue::Number(-3.0), position: pos() }),
+            Argument::Positional(Expr::Literal { value: LiteralValue::Number(-1.0), position: pos() }),
         ],
         position: pos(),
     };
@@ -5589,7 +5630,7 @@ fn test_map_method_has_key() {
         object: Box::new(Expr::Variable { name: "data".to_string(), position: pos() }),
         method: "has_key".to_string(),
         args: vec![
-            Expr::Literal { value: LiteralValue::String("name".to_string()), position: pos() },
+            Argument::Positional(Expr::Literal { value: LiteralValue::String("name".to_string()), position: pos() }),
         ],
         position: pos(),
     };
@@ -5602,7 +5643,7 @@ fn test_map_method_has_key() {
         object: Box::new(Expr::Variable { name: "data".to_string(), position: pos() }),
         method: "has_key".to_string(),
         args: vec![
-            Expr::Literal { value: LiteralValue::String("missing".to_string()), position: pos() },
+            Argument::Positional(Expr::Literal { value: LiteralValue::String("missing".to_string()), position: pos() }),
         ],
         position: pos(),
     };

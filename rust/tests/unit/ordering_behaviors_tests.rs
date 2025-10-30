@@ -7,12 +7,13 @@
 //! - Stability and edge cases
 //! - Integration with other behaviors
 
-use graphoid::ast::{Stmt, Expr, BinaryOp};
+use graphoid::ast::{Stmt, Expr, BinaryOp, Parameter};
 use graphoid::execution::{Executor, Environment};
 use graphoid::values::{Value, List, Function};
 use graphoid::graph::{RuleInstance, RuleSpec};
 use graphoid::error::SourcePosition;
 use std::rc::Rc;
+use std::cell::RefCell;
 
 // Helper to create a dummy source position for testing
 fn pos() -> SourcePosition {
@@ -179,6 +180,10 @@ fn test_ordering_custom_function() {
     let compare_fn = Function {
         name: Some("compare_by_length".to_string()),
         params: vec!["a".to_string(), "b".to_string()],
+        parameters: vec![
+            Parameter { name: "a".to_string(), default_value: None, is_variadic: false },
+            Parameter { name: "b".to_string(), default_value: None, is_variadic: false },
+        ],
         body: vec![
             Stmt::Return {
                 value: Some(Expr::Binary {
@@ -200,8 +205,8 @@ fn test_ordering_custom_function() {
                 position: pos(),
             }
         ],
-        env: Rc::new(Environment::new()),
-            node_id: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
     };
 
     let mut list = List::new();
@@ -243,6 +248,10 @@ fn test_ordering_reverse() {
     let reverse_fn = Function {
         name: Some("reverse_compare".to_string()),
         params: vec!["a".to_string(), "b".to_string()],
+        parameters: vec![
+            Parameter { name: "a".to_string(), default_value: None, is_variadic: false },
+            Parameter { name: "b".to_string(), default_value: None, is_variadic: false },
+        ],
         body: vec![
             Stmt::Return {
                 value: Some(Expr::Binary {
@@ -254,8 +263,8 @@ fn test_ordering_reverse() {
                 position: pos(),
             }
         ],
-        env: Rc::new(Environment::new()),
-            node_id: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
     };
 
     let mut list = List::new();

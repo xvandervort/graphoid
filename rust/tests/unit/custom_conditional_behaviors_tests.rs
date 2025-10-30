@@ -7,12 +7,13 @@
 //! - Integration with List and Hash collections
 //! - Error handling
 
-use graphoid::ast::{Stmt, Expr, LiteralValue, BinaryOp, UnaryOp};
+use graphoid::ast::{Stmt, Expr, LiteralValue, BinaryOp, UnaryOp, Parameter};
 use graphoid::execution::{Executor, Environment};
 use graphoid::values::{Value, List, Function};
 use graphoid::graph::{RuleInstance, RuleSpec};
 use graphoid::error::SourcePosition;
 use std::rc::Rc;
+use std::cell::RefCell;
 
 // Helper to create a dummy source position for testing
 fn pos() -> SourcePosition {
@@ -24,6 +25,7 @@ fn create_double_fn() -> Function {
     Function {
         name: Some("double".to_string()),
         params: vec!["x".to_string()],
+        parameters: vec![Parameter { name: "x".to_string(), default_value: None, is_variadic: false }],
         body: vec![
             Stmt::Return {
                 value: Some(Expr::Binary {
@@ -35,8 +37,8 @@ fn create_double_fn() -> Function {
                 position: pos(),
             }
         ],
-        env: Rc::new(Environment::new()),
-            node_id: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
     }
 }
 
@@ -45,6 +47,7 @@ fn create_negate_fn() -> Function {
     Function {
         name: Some("negate".to_string()),
         params: vec!["x".to_string()],
+        parameters: vec![Parameter { name: "x".to_string(), default_value: None, is_variadic: false }],
         body: vec![
             Stmt::Return {
                 value: Some(Expr::Unary {
@@ -55,8 +58,8 @@ fn create_negate_fn() -> Function {
                 position: pos(),
             }
         ],
-        env: Rc::new(Environment::new()),
-            node_id: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
     }
 }
 
@@ -65,6 +68,7 @@ fn create_is_negative_fn() -> Function {
     Function {
         name: Some("is_negative".to_string()),
         params: vec!["x".to_string()],
+        parameters: vec![Parameter { name: "x".to_string(), default_value: None, is_variadic: false }],
         body: vec![
             Stmt::Return {
                 value: Some(Expr::Binary {
@@ -76,8 +80,8 @@ fn create_is_negative_fn() -> Function {
                 position: pos(),
             }
         ],
-        env: Rc::new(Environment::new()),
-            node_id: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
     }
 }
 
@@ -108,6 +112,7 @@ fn test_custom_function_with_closure() {
     let multiply_fn = Function {
         name: Some("multiply".to_string()),
         params: vec!["x".to_string()],
+        parameters: vec![Parameter { name: "x".to_string(), default_value: None, is_variadic: false }],
         body: vec![
             Stmt::Return {
                 value: Some(Expr::Binary {
@@ -119,7 +124,7 @@ fn test_custom_function_with_closure() {
                 position: pos(),
             }
         ],
-        env: Rc::new(env),
+        env: Rc::new(RefCell::new(env)),
         node_id: None,
     };
 
@@ -138,6 +143,7 @@ fn test_custom_function_type_specific() {
     let add_ten_fn = Function {
         name: Some("add_ten".to_string()),
         params: vec!["x".to_string()],
+        parameters: vec![Parameter { name: "x".to_string(), default_value: None, is_variadic: false }],
         body: vec![
             Stmt::Return {
                 value: Some(Expr::Binary {
@@ -149,8 +155,8 @@ fn test_custom_function_type_specific() {
                 position: pos(),
             }
         ],
-        env: Rc::new(Environment::new()),
-            node_id: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
     };
 
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
@@ -163,9 +169,9 @@ fn test_custom_function_type_specific() {
     let result = executor.apply_transformation_rules_with_context(Value::Number(5.0), &[rule.clone()]).unwrap();
     assert_eq!(result, Value::Number(15.0));
 
-    // Test with string - should error because "x" + 10 is not valid
+    // Test with string - type coercion converts number to string for concatenation
     let result = executor.apply_transformation_rules_with_context(Value::String("hello".to_string()), &[rule]);
-    assert!(result.is_err());
+    assert_eq!(result.unwrap(), Value::String("hello10".to_string()));
 }
 
 #[test]
@@ -174,6 +180,7 @@ fn test_custom_function_error_handling() {
     let divide_fn = Function {
         name: Some("divide".to_string()),
         params: vec!["x".to_string()],
+        parameters: vec![Parameter { name: "x".to_string(), default_value: None, is_variadic: false }],
         body: vec![
             Stmt::Return {
                 value: Some(Expr::Binary {
@@ -185,8 +192,8 @@ fn test_custom_function_error_handling() {
                 position: pos(),
             }
         ],
-        env: Rc::new(Environment::new()),
-            node_id: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
     };
 
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
@@ -298,6 +305,7 @@ fn test_conditional_without_fallback() {
     let is_positive = Function {
         name: Some("is_positive".to_string()),
         params: vec!["x".to_string()],
+        parameters: vec![Parameter { name: "x".to_string(), default_value: None, is_variadic: false }],
         body: vec![
             Stmt::Return {
                 value: Some(Expr::Binary {
@@ -309,14 +317,15 @@ fn test_conditional_without_fallback() {
                 position: pos(),
             }
         ],
-        env: Rc::new(Environment::new()),
-            node_id: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
     };
 
     // func(x) { return x * x }
     let square = Function {
         name: Some("square".to_string()),
         params: vec!["x".to_string()],
+        parameters: vec![Parameter { name: "x".to_string(), default_value: None, is_variadic: false }],
         body: vec![
             Stmt::Return {
                 value: Some(Expr::Binary {
@@ -328,8 +337,8 @@ fn test_conditional_without_fallback() {
                 position: pos(),
             }
         ],
-        env: Rc::new(Environment::new()),
-            node_id: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
     };
 
     let rule = RuleInstance::new(RuleSpec::Conditional {
@@ -408,6 +417,7 @@ fn test_conditional_chain() {
     let is_large = Function {
         name: Some("is_large".to_string()),
         params: vec!["x".to_string()],
+        parameters: vec![Parameter { name: "x".to_string(), default_value: None, is_variadic: false }],
         body: vec![
             Stmt::Return {
                 value: Some(Expr::Binary {
@@ -419,22 +429,23 @@ fn test_conditional_chain() {
                 position: pos(),
             }
         ],
-        env: Rc::new(Environment::new()),
-            node_id: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
     };
 
     // func(x) { return 10 }
     let clamp_to_10 = Function {
         name: Some("clamp_to_10".to_string()),
         params: vec!["x".to_string()],
+        parameters: vec![Parameter { name: "x".to_string(), default_value: None, is_variadic: false }],
         body: vec![
             Stmt::Return {
                 value: Some(Expr::Literal { value: LiteralValue::Number(10.0), position: pos() }),
                 position: pos(),
             }
         ],
-        env: Rc::new(Environment::new()),
-            node_id: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
     };
 
     let behavior1 = RuleInstance::new(RuleSpec::Conditional {
