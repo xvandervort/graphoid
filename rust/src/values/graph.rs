@@ -1174,6 +1174,80 @@ impl Graph {
         -1 // No path found
     }
 
+    /// Returns all nodes reachable within N hops from a starting node.
+    ///
+    /// Uses BFS to find all nodes that can be reached from `start` within `hops` edges.
+    /// Includes the starting node itself (at distance 0).
+    ///
+    /// # Arguments
+    /// * `start` - The starting node ID
+    /// * `hops` - Maximum number of edges to traverse
+    /// * `edge_type` - Optional edge type filter (only traverse edges of this type)
+    ///
+    /// # Returns
+    /// Vector of node IDs reachable within the specified hops
+    ///
+    /// # Example
+    /// ```
+    /// use graphoid::values::{Graph, GraphType, Value};
+    /// use std::collections::HashMap;
+    ///
+    /// let mut g = Graph::new(GraphType::Directed);
+    /// g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    /// g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    /// g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    /// g.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
+    /// g.add_edge("B", "C", "road".to_string(), None, HashMap::new()).unwrap();
+    ///
+    /// let nodes = g.nodes_within("A", 1, None);
+    /// assert!(nodes.contains(&"A".to_string()));
+    /// assert!(nodes.contains(&"B".to_string()));
+    /// assert!(!nodes.contains(&"C".to_string())); // C is 2 hops away
+    /// ```
+    pub fn nodes_within(&self, start: &str, hops: usize, edge_type: Option<&str>) -> Vec<String> {
+        // Handle special cases
+        if !self.has_node(start) {
+            return Vec::new();
+        }
+
+        // BFS with hop tracking
+        let mut result = Vec::new();
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        // Queue stores (node_id, current_hops)
+        queue.push_back((start.to_string(), 0));
+        visited.insert(start.to_string());
+        result.push(start.to_string());
+
+        while let Some((current, current_hops)) = queue.pop_front() {
+            // Don't explore beyond max hops
+            if current_hops >= hops {
+                continue;
+            }
+
+            // Explore neighbors
+            if let Some(node) = self.nodes.get(&current) {
+                for (neighbor_id, edge_info) in &node.neighbors {
+                    // Check edge type filter
+                    if let Some(filter_type) = edge_type {
+                        if edge_info.edge_type != filter_type {
+                            continue;
+                        }
+                    }
+
+                    if !visited.contains(neighbor_id) {
+                        visited.insert(neighbor_id.clone());
+                        result.push(neighbor_id.clone());
+                        queue.push_back((neighbor_id.clone(), current_hops + 1));
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
     /// Finds all paths from one node to another up to a maximum length.
     ///
     /// Returns a list of all paths (each path is a list of node IDs) from `from` to `to`
@@ -1775,524 +1849,3 @@ impl Graph {
     }
 }
 
-#[cfg(test)]
-mod edge_weight_tests {
-    use super::*;
-    use std::collections::HashMap;
-
-    // ========================================================================
-    // EdgeInfo Weight Methods Tests (10 tests)
-    // ========================================================================
-
-    #[test]
-    fn test_edgeinfo_new_creates_unweighted_edge() {
-        let edge = EdgeInfo::new("test".to_string(), HashMap::new());
-        assert_eq!(edge.weight(), None);
-        assert!(!edge.is_weighted());
-    }
-
-    #[test]
-    fn test_edgeinfo_new_weighted_creates_weighted_edge() {
-        let edge = EdgeInfo::new_weighted("test".to_string(), 5.0, HashMap::new());
-        assert_eq!(edge.weight(), Some(5.0));
-        assert!(edge.is_weighted());
-    }
-
-    #[test]
-    fn test_edgeinfo_set_weight_adds_weight() {
-        let mut edge = EdgeInfo::new("test".to_string(), HashMap::new());
-        assert!(!edge.is_weighted());
-
-        edge.set_weight(Some(3.5));
-        assert_eq!(edge.weight(), Some(3.5));
-        assert!(edge.is_weighted());
-    }
-
-    #[test]
-    fn test_edgeinfo_set_weight_updates_existing_weight() {
-        let mut edge = EdgeInfo::new_weighted("test".to_string(), 2.0, HashMap::new());
-        assert_eq!(edge.weight(), Some(2.0));
-
-        edge.set_weight(Some(10.0));
-        assert_eq!(edge.weight(), Some(10.0));
-    }
-
-    #[test]
-    fn test_edgeinfo_set_weight_removes_weight() {
-        let mut edge = EdgeInfo::new_weighted("test".to_string(), 7.5, HashMap::new());
-        assert!(edge.is_weighted());
-
-        edge.set_weight(None);
-        assert_eq!(edge.weight(), None);
-        assert!(!edge.is_weighted());
-    }
-
-    #[test]
-    fn test_edgeinfo_weight_returns_none_for_unweighted() {
-        let edge = EdgeInfo::new("test".to_string(), HashMap::new());
-        assert_eq!(edge.weight(), None);
-    }
-
-    #[test]
-    fn test_edgeinfo_weight_returns_some_for_weighted() {
-        let edge = EdgeInfo::new_weighted("test".to_string(), 42.0, HashMap::new());
-        assert_eq!(edge.weight(), Some(42.0));
-    }
-
-    #[test]
-    fn test_edgeinfo_is_weighted_false_for_unweighted() {
-        let edge = EdgeInfo::new("test".to_string(), HashMap::new());
-        assert!(!edge.is_weighted());
-    }
-
-    #[test]
-    fn test_edgeinfo_is_weighted_true_for_weighted() {
-        let edge = EdgeInfo::new_weighted("test".to_string(), 1.5, HashMap::new());
-        assert!(edge.is_weighted());
-    }
-
-    #[test]
-    fn test_edgeinfo_preserves_properties_with_weight() {
-        let mut props = HashMap::new();
-        props.insert("label".to_string(), Value::String("important".to_string()));
-
-        let edge = EdgeInfo::new_weighted("test".to_string(), 3.0, props.clone());
-        assert_eq!(edge.weight(), Some(3.0));
-        assert_eq!(edge.properties.get("label"), props.get("label"));
-    }
-
-    // ========================================================================
-    // Graph Weight Mutation Methods Tests (15 tests)
-    // ========================================================================
-
-    #[test]
-    fn test_graph_get_edge_weight_unweighted() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
-
-        assert_eq!(graph.get_edge_weight("A", "B"), None);
-    }
-
-    #[test]
-    fn test_graph_get_edge_weight_weighted() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "edge".to_string(), Some(5.5), HashMap::new()).unwrap();
-
-        assert_eq!(graph.get_edge_weight("A", "B"), Some(5.5));
-    }
-
-    #[test]
-    fn test_graph_get_edge_weight_nonexistent_edge() {
-        let graph = Graph::new(GraphType::Directed);
-        assert_eq!(graph.get_edge_weight("X", "Y"), None);
-    }
-
-    #[test]
-    fn test_graph_set_edge_weight_on_unweighted_edge() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
-
-        assert_eq!(graph.get_edge_weight("A", "B"), None);
-
-        graph.set_edge_weight("A", "B", 10.0).unwrap();
-        assert_eq!(graph.get_edge_weight("A", "B"), Some(10.0));
-    }
-
-    #[test]
-    fn test_graph_set_edge_weight_updates_existing_weight() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "edge".to_string(), Some(3.0), HashMap::new()).unwrap();
-
-        assert_eq!(graph.get_edge_weight("A", "B"), Some(3.0));
-
-        graph.set_edge_weight("A", "B", 99.9).unwrap();
-        assert_eq!(graph.get_edge_weight("A", "B"), Some(99.9));
-    }
-
-    #[test]
-    fn test_graph_set_edge_weight_nonexistent_edge_fails() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-
-        let result = graph.set_edge_weight("A", "B", 5.0);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_graph_set_edge_weight_undirected_updates_both() {
-        let mut graph = Graph::new(GraphType::Undirected);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
-
-        graph.set_edge_weight("A", "B", 7.5).unwrap();
-
-        // Both directions should have the weight
-        assert_eq!(graph.get_edge_weight("A", "B"), Some(7.5));
-        assert_eq!(graph.get_edge_weight("B", "A"), Some(7.5));
-    }
-
-    #[test]
-    fn test_graph_remove_edge_weight_from_weighted_edge() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "edge".to_string(), Some(12.0), HashMap::new()).unwrap();
-
-        assert_eq!(graph.get_edge_weight("A", "B"), Some(12.0));
-
-        graph.remove_edge_weight("A", "B").unwrap();
-        assert_eq!(graph.get_edge_weight("A", "B"), None);
-        assert!(!graph.is_edge_weighted("A", "B"));
-    }
-
-    #[test]
-    fn test_graph_remove_edge_weight_from_unweighted_edge() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
-
-        // Should succeed even though edge is already unweighted
-        graph.remove_edge_weight("A", "B").unwrap();
-        assert_eq!(graph.get_edge_weight("A", "B"), None);
-    }
-
-    #[test]
-    fn test_graph_remove_edge_weight_nonexistent_edge_fails() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-
-        let result = graph.remove_edge_weight("A", "B");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_graph_remove_edge_weight_undirected_updates_both() {
-        let mut graph = Graph::new(GraphType::Undirected);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "edge".to_string(), Some(15.0), HashMap::new()).unwrap();
-
-        graph.remove_edge_weight("A", "B").unwrap();
-
-        // Both directions should have weight removed
-        assert_eq!(graph.get_edge_weight("A", "B"), None);
-        assert_eq!(graph.get_edge_weight("B", "A"), None);
-    }
-
-    #[test]
-    fn test_graph_is_edge_weighted_true_for_weighted() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "edge".to_string(), Some(20.0), HashMap::new()).unwrap();
-
-        assert!(graph.is_edge_weighted("A", "B"));
-    }
-
-    #[test]
-    fn test_graph_is_edge_weighted_false_for_unweighted() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
-
-        assert!(!graph.is_edge_weighted("A", "B"));
-    }
-
-    #[test]
-    fn test_graph_is_edge_weighted_false_for_nonexistent() {
-        let graph = Graph::new(GraphType::Directed);
-        assert!(!graph.is_edge_weighted("X", "Y"));
-    }
-
-    #[test]
-    fn test_graph_weight_mutation_preserves_properties() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-
-        let mut props = HashMap::new();
-        props.insert("color".to_string(), Value::String("red".to_string()));
-
-        graph.add_edge("A", "B", "edge".to_string(), Some(1.0), props).unwrap();
-
-        // Set new weight
-        graph.set_edge_weight("A", "B", 2.0).unwrap();
-
-        // Properties should still be there
-        let node = graph.nodes.get("A").unwrap();
-        let edge = node.neighbors.get("B").unwrap();
-        assert_eq!(
-            edge.properties.get("color"),
-            Some(&Value::String("red".to_string()))
-        );
-    }
-
-    // ========================================================================
-    // Weighted Pathfinding Tests (15 tests) - TDD: Write tests first!
-    // ========================================================================
-
-    #[test]
-    fn test_dijkstra_simple_weighted_path() {
-        // A -5-> B -3-> C
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-        graph.add_edge("A", "B", "road".to_string(), Some(5.0), HashMap::new()).unwrap();
-        graph.add_edge("B", "C", "road".to_string(), Some(3.0), HashMap::new()).unwrap();
-
-        let path = graph.shortest_path_weighted("A", "C", None).unwrap();
-        assert_eq!(path, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
-    }
-
-    #[test]
-    fn test_dijkstra_chooses_lighter_path() {
-        // A -1-> B -1-> C (weight 2)
-        // A -10-> C (weight 10)
-        // Should choose A->B->C
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-        graph.add_edge("A", "B", "road".to_string(), Some(1.0), HashMap::new()).unwrap();
-        graph.add_edge("B", "C", "road".to_string(), Some(1.0), HashMap::new()).unwrap();
-        graph.add_edge("A", "C", "road".to_string(), Some(10.0), HashMap::new()).unwrap();
-
-        let path = graph.shortest_path_weighted("A", "C", None).unwrap();
-        assert_eq!(path, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
-    }
-
-    #[test]
-    fn test_dijkstra_complex_graph() {
-        // Diamond graph with different weights
-        //     A
-        //   /   \
-        //  1     5
-        // /       \
-        // B --2-- C
-        //  \     /
-        //   1   1
-        //    \ /
-        //     D
-        // A->B->D should be shortest (2), not A->C->D (6)
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-        graph.add_node("D".to_string(), Value::Number(4.0)).unwrap();
-
-        graph.add_edge("A", "B", "road".to_string(), Some(1.0), HashMap::new()).unwrap();
-        graph.add_edge("A", "C", "road".to_string(), Some(5.0), HashMap::new()).unwrap();
-        graph.add_edge("B", "C", "road".to_string(), Some(2.0), HashMap::new()).unwrap();
-        graph.add_edge("B", "D", "road".to_string(), Some(1.0), HashMap::new()).unwrap();
-        graph.add_edge("C", "D", "road".to_string(), Some(1.0), HashMap::new()).unwrap();
-
-        let path = graph.shortest_path_weighted("A", "D", None).unwrap();
-        assert_eq!(path, vec!["A".to_string(), "B".to_string(), "D".to_string()]);
-    }
-
-    #[test]
-    fn test_dijkstra_no_path_returns_none() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        // No edge between A and B
-
-        assert_eq!(graph.shortest_path_weighted("A", "B", None), None);
-    }
-
-    #[test]
-    fn test_dijkstra_with_edge_type_filter() {
-        // A -road(5)-> B -rail(3)-> C
-        // A -road(2)-> D -road(2)-> C
-        // With edge_type "road", should choose A->D->C (4), not A->B->C (rail blocked)
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-        graph.add_node("D".to_string(), Value::Number(4.0)).unwrap();
-
-        graph.add_edge("A", "B", "road".to_string(), Some(5.0), HashMap::new()).unwrap();
-        graph.add_edge("B", "C", "rail".to_string(), Some(3.0), HashMap::new()).unwrap();
-        graph.add_edge("A", "D", "road".to_string(), Some(2.0), HashMap::new()).unwrap();
-        graph.add_edge("D", "C", "road".to_string(), Some(2.0), HashMap::new()).unwrap();
-
-        let path = graph.shortest_path_weighted("A", "C", Some("road")).unwrap();
-        assert_eq!(path, vec!["A".to_string(), "D".to_string(), "C".to_string()]);
-    }
-
-    #[test]
-    fn test_dijkstra_rejects_unweighted_edges() {
-        // Graph has unweighted edge - should return error
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
-
-        // Should return None because unweighted edge can't be used in weighted pathfinding
-        assert_eq!(graph.shortest_path_weighted("A", "B", None), None);
-    }
-
-    #[test]
-    fn test_shortest_path_with_weighted_option() {
-        // Test the updated shortest_path() method with weighted parameter
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-
-        graph.add_edge("A", "B", "road".to_string(), Some(10.0), HashMap::new()).unwrap();
-        graph.add_edge("B", "C", "road".to_string(), Some(10.0), HashMap::new()).unwrap();
-        graph.add_edge("A", "C", "road".to_string(), Some(1.0), HashMap::new()).unwrap();
-
-        // With weighted=true, should use Dijkstra and choose A->C (weight 1)
-        let path = graph.shortest_path("A", "C", None, true).unwrap();
-        assert_eq!(path, vec!["A".to_string(), "C".to_string()]);
-    }
-
-    #[test]
-    fn test_shortest_path_unweighted_uses_bfs() {
-        // Test that weighted=false uses BFS (shortest by hops, not weight)
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-
-        graph.add_edge("A", "B", "road".to_string(), Some(10.0), HashMap::new()).unwrap();
-        graph.add_edge("B", "C", "road".to_string(), Some(10.0), HashMap::new()).unwrap();
-        graph.add_edge("A", "C", "road".to_string(), Some(1.0), HashMap::new()).unwrap();
-
-        // With weighted=false, should ignore weights and find shortest hop path
-        // Both paths are 1-2 hops, so either is valid for BFS
-        let path = graph.shortest_path("A", "C", None, false).unwrap();
-        assert!(path.len() >= 2); // At least 2 nodes (start and end)
-    }
-
-    #[test]
-    fn test_shortest_path_with_edge_type_filter() {
-        // Test edge_type parameter in shortest_path()
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-
-        graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
-        graph.add_edge("B", "C", "rail".to_string(), None, HashMap::new()).unwrap();
-        graph.add_edge("A", "C", "road".to_string(), None, HashMap::new()).unwrap();
-
-        // With edge_type "road", should choose A->C directly
-        let path = graph.shortest_path("A", "C", Some("road"), false).unwrap();
-        assert_eq!(path, vec!["A".to_string(), "C".to_string()]);
-    }
-
-    #[test]
-    fn test_dijkstra_self_path() {
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-
-        let path = graph.shortest_path_weighted("A", "A", None).unwrap();
-        assert_eq!(path, vec!["A".to_string()]);
-    }
-
-    #[test]
-    fn test_dijkstra_undirected_graph() {
-        // Undirected graph - both directions available
-        let mut graph = Graph::new(GraphType::Undirected);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "road".to_string(), Some(5.0), HashMap::new()).unwrap();
-
-        // Should work in both directions
-        let path_ab = graph.shortest_path_weighted("A", "B", None).unwrap();
-        assert_eq!(path_ab, vec!["A".to_string(), "B".to_string()]);
-
-        let path_ba = graph.shortest_path_weighted("B", "A", None).unwrap();
-        assert_eq!(path_ba, vec!["B".to_string(), "A".to_string()]);
-    }
-
-    #[test]
-    fn test_dijkstra_negative_weights_not_supported() {
-        // Dijkstra doesn't support negative weights - should still find a path
-        // but may not be optimal (this is a known limitation)
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "road".to_string(), Some(-5.0), HashMap::new()).unwrap();
-
-        // Should find the path (even with negative weight)
-        let path = graph.shortest_path_weighted("A", "B", None);
-        assert!(path.is_some());
-    }
-
-    #[test]
-    fn test_shortest_path_default_parameters() {
-        // Test that existing code still works (backward compatibility)
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
-
-        // Old signature should still work: shortest_path(from, to)
-        let path = graph.shortest_path("A", "B", None, false).unwrap();
-        assert_eq!(path, vec!["A".to_string(), "B".to_string()]);
-    }
-
-    #[test]
-    fn test_dijkstra_large_graph_performance() {
-        // Create a larger graph to test performance
-        let mut graph = Graph::new(GraphType::Directed);
-
-        // Create 10 nodes in a chain with varying weights
-        for i in 0..10 {
-            graph.add_node(format!("N{}", i), Value::Number(i as f64)).unwrap();
-        }
-
-        // Create edges with weights
-        for i in 0..9 {
-            graph.add_edge(
-                &format!("N{}", i),
-                &format!("N{}", i + 1),
-                "road".to_string(),
-                Some((i + 1) as f64),
-                HashMap::new()
-            ).unwrap();
-        }
-
-        let path = graph.shortest_path_weighted("N0", "N9", None).unwrap();
-        assert_eq!(path.len(), 10);
-        assert_eq!(path[0], "N0");
-        assert_eq!(path[9], "N9");
-    }
-
-    #[test]
-    fn test_dijkstra_mixed_weighted_unweighted_graph() {
-        // Graph with both weighted and unweighted edges
-        // Only weighted edges should be used in weighted pathfinding
-        let mut graph = Graph::new(GraphType::Directed);
-        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-
-        // Weighted path: A -5-> B -3-> C
-        graph.add_edge("A", "B", "road".to_string(), Some(5.0), HashMap::new()).unwrap();
-        graph.add_edge("B", "C", "road".to_string(), Some(3.0), HashMap::new()).unwrap();
-
-        // Unweighted shortcut: A -> C (should be ignored in weighted pathfinding)
-        graph.add_edge("A", "C", "road".to_string(), None, HashMap::new()).unwrap();
-
-        // Should use weighted path A->B->C, not the unweighted A->C
-        let path = graph.shortest_path_weighted("A", "C", None).unwrap();
-        assert_eq!(path, vec!["A".to_string(), "B".to_string(), "C".to_string()]);
-    }
-}

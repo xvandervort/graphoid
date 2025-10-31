@@ -17,4 +17,11 @@ mod unit {
     pub mod module_manager_tests;
     pub mod circular_dependency_tests;
     pub mod parser_module_tests;
+    pub mod weighted_graph_tests;
+    pub mod rulesets_tests;
+    pub mod values_tests;
+    pub mod function_graph_unit_tests;
+    pub mod error_collector_tests;
+    pub mod environment_tests;
+    pub mod config_tests;
 }
