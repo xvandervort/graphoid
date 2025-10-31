@@ -1,193 +1,176 @@
 # Start Here - Next Session
 
-## Quick Status: Variadic Functions Complete ✅
+## Quick Status: Ready for Phase 7 ✅
 
-**Current State**: Variadic functions fully implemented and all tests passing!
+**Current State**: All Phases 0-6.5 complete, detailed plans created for Phases 7-8
 
-**Test Status**: ✅ 521/521 tests passing (100% pass rate)
+**Test Status**: ✅ 1,397/1,397 tests passing (100% pass rate)
 
 **Branch**: `standard_stuff`
 
----
-
-## 🎉 COMPLETED THIS SESSION: Variadic Functions
-
-### What Was Completed
-
-Fully implemented variadic functions with comprehensive test coverage:
-
-1. ✅ **Variadic parameter syntax** - `func name(...param) { ... }`
-2. ✅ **Automatic list bundling** - Variadic args collected into lists
-3. ✅ **Works with required parameters** - `func name(required, ...variadic)`
-4. ✅ **Works with default parameters** - Proper interaction tested
-5. ✅ **Works with named arguments** - Mix and match tested
-6. ✅ **Fixed double-wrapping bug** - Simplified call_function logic
-7. ✅ **Fixed 100+ test compilation errors** - All Parameter/Argument updates
-8. ✅ **Aligned tests with language design** - String + number coercion is a feature
-
-### Test Results
-
-- **521 tests passing** (all tests!)
-- **22 advanced function tests** including 4 variadic-specific tests
-- **Zero warnings**
-- **Zero failures**
-- **100% pass rate**
-
-### Files Modified
-
-**Source Code**:
-- `src/ast/mod.rs` - Added `is_variadic` field to Parameter
-- `src/execution/executor.rs` - Fixed parameter binding, kept type coercion
-- `src/execution/function_graph.rs` - Added is_variadic to test helpers
-- `src/parser/mod.rs` - Parser changes (from previous work)
-- `src/values/mod.rs` - Value changes (from previous work)
-
-**Tests**:
-- `tests/advanced_functions_tests.rs` - NEW: 22 advanced function tests
-- `tests/unit/executor_tests.rs` - Fixed 446 test cases with Parameter/Argument updates
-- `tests/unit/parser_tests.rs` - Fixed Argument handling
-- `tests/unit/custom_conditional_behaviors_tests.rs` - Fixed Parameter usage & type coercion test
-- `tests/unit/ordering_behaviors_tests.rs` - Fixed Parameter usage
+**Build Status**: ✅ Zero warnings
 
 ---
 
-## 🎯 NEXT SESSION PLAN
+## 🎉 COMPLETED THIS SESSION: Phase Planning Documentation
 
-### Step 1: Audit Function Implementation ⏭️ **START HERE**
+### What Was Accomplished
 
-**Goal**: Compare current function implementation against `dev_docs/LANGUAGE_SPECIFICATION.md` for completeness and accuracy.
+Created comprehensive implementation plans for the next two major phases:
 
-**What to Check**:
+1. ✅ **Phase 7 Detailed Plan** (`dev_docs/PHASE_7_DETAILED_PLAN.md`)
+   - 7-day implementation plan for Behavior System
+   - 85+ new test specifications
+   - Copy-paste ready Rust code examples
+   - Complete coverage: standard/mapping/custom/conditional/ruleset/freeze behaviors
 
-#### Regular Functions
-- [x] Basic function syntax: `func name(params) { body }`
-- [x] Return statements
-- [x] Return value propagation
-- [ ] Implicit return (last expression)
-- [ ] Early returns
+2. ✅ **Phase 8 Detailed Plan** (`dev_docs/PHASE_8_DETAILED_PLAN.md`)
+   - 6-day implementation plan for Module System
+   - 91+ new test specifications
+   - 5 stdlib modules (JSON, IO, Math, String, List)
+   - Project structure and graphoid.toml specification
 
-#### Parameters
-- [x] Regular parameters
-- [x] Default parameters: `func name(x = default) { ... }`
-- [x] Named arguments: `name(x: 10, y: 20)`
-- [x] Variadic parameters: `func name(...args) { ... }`
-- [ ] Mixing positional and named arguments (verify spec compliance)
-- [ ] Parameter evaluation order
-- [ ] Default parameter evaluation timing (once? each call?)
+3. ✅ **Documentation Organization**
+   - All planning files moved to `dev_docs/`
+   - Roadmap updated with clear references (📋 markers)
+   - All paths corrected throughout documentation
 
-#### Lambdas
-- [ ] Lambda syntax: `x => x + 1`
-- [ ] Multi-parameter lambdas: `(x, y) => x + y`
-- [ ] Lambda with block body: `x => { return x + 1 }`
-- [ ] Lambdas as first-class values
-- [ ] Passing lambdas to functions
-
-#### Closures
-- [ ] Closure capture semantics
-- [ ] Capturing outer scope variables
-- [ ] Nested functions
-- [ ] Closure lifetime
-
-#### Method Calls
-- [ ] Method syntax: `object.method(args)`
-- [ ] Method dispatch
-- [ ] Built-in methods vs user methods
-- [ ] Chaining: `list.map(...).filter(...)`
-
-#### Function as Values
-- [ ] Storing functions in variables
-- [ ] Passing functions as arguments
-- [ ] Returning functions from functions
-- [ ] Higher-order functions
-
-**How to Audit**:
-
-1. **Read the spec** - Search for "func", "lambda", "closure" in LANGUAGE_SPECIFICATION.md
-2. **Check implementation** - Review `src/execution/executor.rs` and `src/parser/mod.rs`
-3. **Test coverage** - Verify we have tests for each feature
-4. **Document gaps** - Create a list of missing features
-5. **Create issue list** - Prioritize what needs to be implemented
-
-**Output**: Create `rust/FUNCTION_AUDIT_RESULTS.md` with:
-- ✅ Features that are complete and correct
-- ⚠️ Features that are partial or need refinement
-- ❌ Features that are missing
-- 📋 Prioritized list of next steps
-
-**Estimated Time**: 1-2 hours
-
-### Step 2: Fix Any Issues Found in Audit
-
-Address any bugs, inconsistencies, or missing functionality discovered during the audit.
-
-### Step 3: Phase 5 - Collections & Methods
-
-After functions are audited and any issues fixed, move to Phase 5 of the roadmap.
-
-**Phase 5 Goals**: (from `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md`)
-
-1. **List Methods**
-   - `map(func)` - Transform each element
-   - `filter(func)` - Keep elements matching predicate
-   - `reduce(func, initial)` - Fold list into single value
-   - `sort()` - Sort list
-   - `sort(comparator)` - Sort with custom function
-   - `reverse()` - Reverse order
-   - `unique()` - Remove duplicates
-   - `flatten()` - Flatten nested lists
-   - `zip(other)` - Combine two lists
-   - `each(func)` - Iterate with function
-
-2. **Map/Hash Methods**
-   - `keys()` - Get all keys
-   - `values()` - Get all values
-   - `has_key(key)` - Check if key exists
-   - `merge(other)` - Merge two maps
-   - `map(func)` - Transform values
-   - `filter(func)` - Filter entries
-
-3. **String Methods**
-   - `split(delimiter)` - Split into list
-   - `join(list)` - Join list elements
-   - `substring(start, end)` - Extract substring
-   - `replace(old, new)` - Replace occurrences
-   - `to_upper()` - Convert to uppercase
-   - `to_lower()` - Convert to lowercase
-   - `trim()` - Remove whitespace
-   - `starts_with(prefix)` - Check prefix
-   - `ends_with(suffix)` - Check suffix
-   - `contains(substring)` - Check containment
-
-4. **Method Dispatch System**
-   - Method lookup on values
-   - Built-in method registration
-   - Method call resolution
-   - Error handling for missing methods
-
-**Reference**: `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` Phase 5 section (search for "Phase 5")
+### Files Created/Relocated
+- `dev_docs/PHASE_6_5_VERIFICATION_REPORT.md` (6.6K)
+- `dev_docs/PHASE_7_DETAILED_PLAN.md` (15K)
+- `dev_docs/PHASE_8_DETAILED_PLAN.md` (18K)
 
 ---
 
-## 📋 Current Status Summary
+## 🎯 NEXT SESSION PLAN: Phase 7 - Behavior System
 
-| Component | Status | Tests |
-|-----------|--------|-------|
-| Lexer | ✅ Complete | 54 passing |
-| Parser | ✅ Complete | 31 passing |
-| AST | ✅ Complete | Integrated |
-| Values | ✅ Complete | Tested |
-| Executor | ✅ Complete | 446+ passing |
-| Error Handling | ✅ Complete | 64 passing |
-| **Functions** | ✅ **Mostly Complete** | **22+ passing** |
-| → Regular functions | ✅ Complete | Tested |
-| → Default parameters | ✅ Complete | Tested |
-| → Named arguments | ✅ Complete | Tested |
-| → Variadic parameters | ✅ **Complete** (this session) | **4 tests** |
-| → Lambdas | ⚠️ **Needs audit** | Unknown |
-| → Closures | ⚠️ **Needs audit** | Unknown |
-| → Methods | ⚠️ **Needs audit** | Unknown |
-| Collections | 🔲 Basic only | Some tests |
-| Standard Library | 🔲 Partial | - |
+### Overview
+
+**Phase 7 Status**:
+- ✅ Framework exists: `src/graph/behaviors.rs` (1,005 lines)
+- ✅ 75 behavior tests currently passing
+- 🎯 Target: 160+ total tests (need 85+ more)
+- 📋 Detailed plan: `dev_docs/PHASE_7_DETAILED_PLAN.md`
+
+**What Are Behaviors?**
+
+Behaviors allow data structures to automatically transform values during operations:
+
+```graphoid
+# Automatic nil handling
+temperatures = [98.6, none, 102.5]
+temperatures.add_rule(:none_to_zero)
+# temperatures is now [98.6, 0, 102.5]
+
+# Range validation
+temperatures.add_rule(:validate_range, 95, 105)
+temperatures.append(110)  # Automatically clamped to 105
+
+# Custom mappings
+colors = ["red", "blue", "purple"]
+color_map = {"red": 1, "green": 2, "blue": 3}
+colors.add_mapping_rule(color_map, 0)  # Default 0 for unmapped
+# colors is now [1, 3, 0]
+```
+
+### Step 1: Day 1-2 Tasks ⏭️ **START HERE**
+
+**Goal**: Complete standard transformation behaviors (14 tests)
+
+**Tasks** (from detailed plan):
+
+1. **Verify Existing Behaviors** (`src/graph/behaviors.rs`)
+   - Check: `none_to_zero`, `none_to_empty`, `positive`, `round_to_int`
+   - Check: `uppercase`, `lowercase`
+   - Current status: Some may already exist
+
+2. **Implement `validate_range`** (NEW)
+   ```rust
+   pub struct ValidateRange {
+       min: f64,
+       max: f64,
+   }
+
+   impl TransformationRule for ValidateRange {
+       fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+           match value {
+               Value::Number(n) => {
+                   let clamped = n.max(self.min).min(self.max);
+                   Ok(Value::Number(clamped))
+               }
+               other => Ok(other.clone()),
+           }
+       }
+   }
+   ```
+
+3. **Write Tests FIRST** (TDD approach)
+   - Test file: Create or add to behavior tests
+   - 14 tests total for Day 1-2
+   - One test per behavior (4 value + 2 string + 3 validate_range + 5 integration)
+
+4. **Executor Integration**
+   - Ensure `add_rule()` method works: `list.add_rule(:none_to_zero)`
+   - Ensure behaviors work retroactively (transform existing values)
+   - Ensure behaviors work proactively (transform new values)
+
+**Acceptance Criteria**:
+- ✅ All 9 standard behaviors implemented
+- ✅ Behaviors work retroactively AND proactively
+- ✅ 14+ tests passing
+- ✅ Executor routes `add_rule()` calls correctly
+
+**Command to Start**:
+```bash
+# Read the detailed plan
+cat dev_docs/PHASE_7_DETAILED_PLAN.md
+
+# Check existing behavior tests
+~/.cargo/bin/cargo test behavior
+
+# Check existing behavior code
+wc -l src/graph/behaviors.rs  # Should show ~1005 lines
+```
+
+---
+
+## 📋 Phase Completion Tracker
+
+### ✅ Completed Phases (0-6.5)
+
+1. **Phase 0**: Project Setup & Foundation
+2. **Phase 1**: Lexer (Tokenization)
+3. **Phase 2**: Parser & AST
+4. **Phase 3**: Value System & Basic Execution
+5. **Phase 4**: Functions & Lambdas
+   - Regular functions, defaults, named args, variadic params
+   - Lambdas with block bodies
+   - Trailing blocks: `list.map { |x| x * 2 }`
+   - Closures with environment capture
+6. **Phase 5**: Collections & Methods
+7. **Phase 6**: Graph Types, Rules & Auto-Performance
+8. **Phase 6.5**: Foundational Gaps & Verification
+
+### 🎯 Current: Phase 7 (Behavior System)
+
+**Duration**: 5-7 days
+**Current Tests**: 75 passing
+**Target Tests**: 160+ total
+
+**Daily Breakdown** (see detailed plan):
+- **Day 1-2**: Standard transformations (14 tests) ← **YOU ARE HERE**
+- **Day 3**: Mapping behaviors (8 tests)
+- **Day 4**: Custom function behaviors (10 tests)
+- **Day 5**: Conditional behaviors (12 tests)
+- **Day 6**: Rulesets (8 tests)
+- **Day 7**: Freeze control (10 tests)
+
+### 📅 Upcoming: Phase 8 (Module System)
+
+**Duration**: 4-6 days
+**Current Tests**: 31 passing
+**Target Tests**: 122+ total
+**Plan**: `dev_docs/PHASE_8_DETAILED_PLAN.md`
 
 ---
 
@@ -199,177 +182,134 @@ cd /home/irv/work/grang/rust
 # Run all tests
 ~/.cargo/bin/cargo test
 
-# Run specific test file
-~/.cargo/bin/cargo test --test advanced_functions_tests
+# Run behavior tests specifically
+~/.cargo/bin/cargo test behavior
 
-# Run variadic function tests
-~/.cargo/bin/cargo test test_variadic
+# Run a single test file
+~/.cargo/bin/cargo test --test <test_file_name>
 
 # Build
 ~/.cargo/bin/cargo build
 
-# Check git status
-git status
-
-# View function implementation
-grep -A 30 "fn call_function" src/execution/executor.rs
-grep -A 50 "fn process_arguments" src/execution/executor.rs
+# Check current test count
+~/.cargo/bin/cargo test 2>&1 | grep "test result"
 ```
 
 ---
 
-## 📊 Test Breakdown
+## 📊 Current Test Status
 
-**Total: 521 tests passing** (100% pass rate!)
+**Total: 1,397 tests passing** (100% pass rate!)
 
-**By Category**:
-- **Library unit tests**: 61 passing
-- **Advanced functions**: 22 passing (including 4 variadic tests)
-- **Collection methods**: 27 passing
-- **Element-wise operations**: 22 passing
-- **Function graph**: 18 passing
-- **Integration tests**: 29 passing
-- **Unit tests**: 521 passing
-- **Doc tests**: 8 passing
+**Current Behavior Tests**: ~75 passing
+**Target After Phase 7**: 160+ behavior tests
 
-**Variadic Function Tests** (all passing):
-- `test_variadic_basic` - Basic variadic function
-- `test_variadic_with_required_params` - Mix required and variadic
-- `test_variadic_with_defaults` - Variadic + default parameters
-- `test_variadic_with_named_args` - Named args + variadic
+**Breakdown** (approximate):
+- Lexer: 61 tests
+- Parser: 202 tests
+- Executor: 446 tests
+- Collections: 99 tests
+- Functions: 521 tests
+- Behaviors: 47 tests
+- Other: 21 tests
 
 ---
 
 ## 📁 Key Documentation
 
-### Created This Session
-- `SESSION_SUMMARY.md` - Complete record of variadic functions implementation
-- This file - Updated handoff documentation
+### Phase Planning (Created This Session)
+- **`dev_docs/PHASE_7_DETAILED_PLAN.md`** - Complete 7-day Phase 7 plan ← **READ THIS FIRST**
+- **`dev_docs/PHASE_8_DETAILED_PLAN.md`** - Complete 6-day Phase 8 plan
+- **`dev_docs/PHASE_6_5_VERIFICATION_REPORT.md`** - Architecture verification results
 
-### Reference Documentation (Project Root)
-- `dev_docs/LANGUAGE_SPECIFICATION.md` - **PRIMARY REFERENCE** for feature audit
-- `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` - 14-phase implementation plan
-- `dev_docs/ARCHITECTURE_DESIGN.md` - Design decisions
-- `dev_docs/NO_GENERICS_POLICY.md` - Type system constraints
+### Main References
+- **`dev_docs/LANGUAGE_SPECIFICATION.md`** - Canonical language spec
+  - Lines 758-900: Intrinsic Behavior System specification
+- **`dev_docs/RUST_IMPLEMENTATION_ROADMAP.md`** - 14-phase implementation plan
+  - Line 2925: Phase 7 reference
+- **`dev_docs/ARCHITECTURE_DESIGN.md`** - Design decisions
 
-### Where to Find Things
-
-**Function Specification**: Search LANGUAGE_SPECIFICATION.md for:
-- Line ~861: Control Flow section (includes function definitions)
-- Line ~1310: Functional Programming section (lambdas, closures, higher-order)
-- Search "func", "lambda", "closure" for all references
-
-**Phase 5 Specification**:
-- `RUST_IMPLEMENTATION_ROADMAP.md` - Search for "Phase 5"
-- Look for "Collections & Methods" section
-
----
-
-## 🔍 Technical Details of Current Implementation
-
-### Variadic Functions
-
-**Implementation**: executor.rs:~2250-2320
-
-**How It Works**:
-1. `process_arguments()` bundles variadic args into a `Value::List`
-2. `call_function()` binds the list to the parameter name
-3. Function body accesses variadic args as a regular list
-
-**Example**:
-```graphoid
-func sum(...numbers) {
-    total = 0
-    for n in numbers {
-        total = total + n
-    }
-    return total
-}
-
-result = sum(1, 2, 3, 4, 5)  # numbers = [1, 2, 3, 4, 5]
-```
-
-### Type Coercion
-
-**String + Number**: Supported (number converts to string)
-
-**Implementation**: executor.rs:~2840-2860
-```rust
-(Value::String(l), Value::Number(r)) => {
-    Ok(Value::String(format!("{}{}", l, r)))
-}
-```
-
-**Example**:
-```graphoid
-"hello" + 5      # "hello5"
-"count: " + 42   # "count: 42"
-```
+### Current Implementation
+- **`src/graph/behaviors.rs`** (1,005 lines) - Behavior framework
+- **`src/graph/rules.rs`** - Rule system (behaviors use rules)
+- **`src/values/list.rs`** - List behavior integration
+- **`src/execution/executor.rs`** - Behavior application
 
 ---
 
 ## 🎯 Recommended Workflow for Next Session
 
-### Option 1: Thorough Audit (Recommended)
+### Standard TDD Approach
 
 ```
-1. Read function sections of LANGUAGE_SPECIFICATION.md
-2. Create FUNCTION_AUDIT_RESULTS.md with findings
-3. Fix any critical issues found
-4. Move to Phase 5 Collections
+1. Read Phase 7 detailed plan (dev_docs/PHASE_7_DETAILED_PLAN.md)
+2. Review Day 1-2 tasks specifically
+3. Check existing behavior implementation (src/graph/behaviors.rs)
+4. Write tests FIRST for standard transformations
+5. Implement behaviors to make tests pass
+6. Verify 14+ new tests passing
+7. Move to Day 3 tasks (mapping behaviors)
 ```
 
-**Time**: 2-3 hours for audit, then start Phase 5
+**Estimated Time**:
+- Day 1-2 tasks: 4-6 hours
+- Full Phase 7: 5-7 days
 
-**Benefits**:
-- Ensures function implementation is complete
-- Documents what's working and what's missing
-- Creates clear roadmap for any needed fixes
+### Quick Start Option
 
-### Option 2: Quick Check + Move Forward
+Just ask: **"Start Phase 7 Day 1-2 using TDD"** and I'll:
+1. Read the existing behavior code
+2. Identify what's already implemented
+3. Write tests for missing behaviors
+4. Implement the missing pieces
+5. Verify all tests pass
 
-```
-1. Quick verification of lambda/closure support (30 min)
-2. Write 2-3 tests if needed
-3. Move to Phase 5 Collections immediately
-```
+---
 
-**Time**: 30 minutes, then Phase 5
+## 🔍 What Phase 7 Enables
 
-**Benefits**:
-- Faster progress to new features
-- Most function features are already working
+Completing Phase 7 unlocks:
+- **Smart collections** that validate and transform automatically
+- **Self-aware data structures** with intrinsic behaviors
+- **Automatic data cleaning** (none handling, range validation)
+- **Value mapping** (state codes, enumerations)
+- **Custom transformations** (user-defined business rules)
+- **Conditional transformations** (context-aware behaviors)
+- **Freeze control** (immutability system)
+
+This is a **foundational feature** that makes Graphoid collections truly intelligent.
 
 ---
 
 ## 🎉 Bottom Line
 
-**Variadic functions are COMPLETE and all tests are passing!**
+**All documentation is complete and ready for implementation!**
 
 ### What You Have
-- ✅ 521/521 tests passing
-- ✅ Variadic functions fully working
-- ✅ Default parameters working
-- ✅ Named arguments working
-- ✅ Type coercion working
+- ✅ 1,397/1,397 tests passing
+- ✅ Phases 0-6.5 complete
+- ✅ Detailed plans for Phases 7-8
+- ✅ Behavior framework exists (1,005 lines)
 - ✅ Zero compiler warnings
-- ✅ Clean, tested implementation
+- ✅ Clean, solid foundation
 
 ### What's Next
-1. **Audit function implementation** against spec
-2. **Fix any gaps** found in audit
-3. **Move to Phase 5** - Collections & Methods
+1. **Read** `dev_docs/PHASE_7_DETAILED_PLAN.md` (Day 1-2 section)
+2. **Write tests** for standard transformation behaviors
+3. **Implement** behaviors to make tests pass
+4. **Verify** 14+ new tests passing
+5. **Continue** with Day 3-7 tasks
 
-### Key Files to Check During Audit
-- `dev_docs/LANGUAGE_SPECIFICATION.md` - The source of truth
-- `src/execution/executor.rs` - Function execution
-- `src/parser/mod.rs` - Function parsing
-- `tests/advanced_functions_tests.rs` - Test coverage
+### Key Files for Phase 7
+- **Plan**: `dev_docs/PHASE_7_DETAILED_PLAN.md` ← **START HERE**
+- **Spec**: `dev_docs/LANGUAGE_SPECIFICATION.md` (lines 758-900)
+- **Code**: `src/graph/behaviors.rs`
+- **Tests**: Create/add behavior tests
 
 ---
 
-**Ready to start?**
+**Ready to start Phase 7?**
 
-Just say: **"Audit function implementation against the spec"** and I'll begin the comparison!
+Just say: **"Start Phase 7 Day 1-2"** and I'll begin with TDD!
 
-🚀 **Great work on completing variadic functions!** 🚀
+🚀 **Phase 7: Behavior System - Let's make collections smart!** 🚀
