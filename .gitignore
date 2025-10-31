@@ -62,3 +62,10 @@ bitcoin_prices.csv
 data/*
 dev_docs/archive/*
 dev_docs/scratch/*
+
+# Ephemeral development documentation
+rust/.notes/
+SESSION_*.md
+START_HERE_*.md
+*_TEMP.md
+*.backup

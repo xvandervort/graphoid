@@ -2342,7 +2342,7 @@ See `dev_docs/FUTURE_FEATURES.md` for complete v2.0+ roadmap.
 
 ## Phase 6.5: Foundational Gaps & Verification (5-7 days)
 
-**📋 Verification Report**: See [`dev_docs/PHASE_6_5_VERIFICATION_REPORT.md`](PHASE_6_5_VERIFICATION_REPORT.md) for detailed verification results of all architectural assumptions.
+**📋 Verification Report**: See [`dev_docs/archive/phase_reports/PHASE_6_5_VERIFICATION_REPORT.md`](archive/phase_reports/PHASE_6_5_VERIFICATION_REPORT.md) for detailed verification results of all architectural assumptions.
 
 **Duration**: 5-7 days
 **Goal**: Complete all missing foundational features from Phases 0-6 before proceeding to Phase 7
@@ -2961,7 +2961,7 @@ Minimum **30 tests**:
 
 ### Phase 9: Advanced Features (18-25 days)
 
-**📋 Detailed Implementation Plan**: See [`rust/dev_docs/PHASE_9_DETAILED_PLAN.md`](../rust/dev_docs/PHASE_9_DETAILED_PLAN.md) for:
+**📋 Detailed Implementation Plan**: See [`dev_docs/PHASE_9_DETAILED_PLAN.md`](PHASE_9_DETAILED_PLAN.md) for:
 - Complete architecture with copy-paste ready Rust structs
 - 5 milestones with detailed task breakdowns
 - 200+ test specifications
