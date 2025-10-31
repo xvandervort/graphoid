@@ -517,18 +517,65 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 14-phase plan:
 
 ### Code Quality Standards
 
+- **Test-Driven Development (TDD)** - Write tests FIRST, then implement (RED-GREEN-REFACTOR) - MANDATORY
 - **Idiomatic Rust** - Follow Rust best practices
 - **Zero warnings** - `cargo build` must be clean
-- **Test coverage** - 80%+ for core features
+- **Test coverage** - 80%+ for core features (achieved through TDD)
 - **Documentation** - All public APIs documented
 - **Error messages** - Rich, helpful, with source positions
 
 ### Testing Strategy
 
+**CRITICAL: Test-Driven Development (TDD) is MANDATORY**
+
+All development follows strict TDD methodology:
+
+1. 🔴 **RED**: Write failing tests FIRST (before any implementation)
+2. 🟢 **GREEN**: Write minimal code to make tests pass
+3. 🔵 **REFACTOR**: Clean up code while keeping tests passing
+
+**Example TDD Workflow**:
+```rust
+// Step 1 (RED): Write test first in tests/unit/weighted_graph_tests.rs
+#[test]
+fn test_dijkstra_simple_weighted_path() {
+    let mut g = Graph::new(GraphType::Directed);
+    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    g.add_edge("A", "B", "road".to_string(), Some(5.0), HashMap::new()).unwrap();
+
+    // This will fail - method doesn't exist yet
+    let path = g.shortest_path("A", "B", None, true).unwrap();
+    assert_eq!(path, vec!["A", "B"]);
+}
+
+// Step 2 (GREEN): Implement in src/values/graph.rs to make test pass
+pub fn shortest_path(&self, from: &str, to: &str, edge_type: Option<&str>, weighted: bool) -> Option<Vec<String>> {
+    // Implementation...
+}
+
+// Step 3 (REFACTOR): Clean up while keeping tests passing
+```
+
+**Test Organization**:
 - **Unit tests** - In `tests/unit/` for individual components
 - **Integration tests** - In `tests/integration/` for workflows
 - **Property-based tests** - For algorithmic correctness
 - **Regression tests** - For every bug fix
+
+**IMPORTANT: Test File Organization**
+
+- ❌ **NEVER** use `#[cfg(test)]` modules in `src/` files
+- ✅ **ALWAYS** place tests in separate files in `tests/unit/` or `tests/integration/`
+- ✅ **ALWAYS** write tests BEFORE implementation (TDD)
+- Tests in `tests/unit/` should import from the crate: `use graphoid::module::Type;`
+- Each source module can have a corresponding test file (e.g., `src/graph/rules.rs` → `tests/unit/graph_rules_tests.rs`)
+- Register new test files in `tests/unit_tests.rs`
+
+**Verification**: Run `find src -name "*.rs" -exec grep -l "#\[cfg(test)\]" {} \;` - should return no results
+
+**Why TDD**: Writing tests first ensures complete test coverage, better API design, prevents regressions, and validates requirements before implementation.
+
+**Why Separate Files**: Keeps source files clean, reduces compilation time for non-test builds, and follows Rust best practices for larger projects.
 
 ### Git Workflow
 
