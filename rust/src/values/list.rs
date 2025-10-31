@@ -56,7 +56,7 @@ impl List {
         // If not the first node, link from previous node
         if self.length > 0 {
             let prev_id = format!("node_{}", self.length - 1);
-            self.graph.add_edge(&prev_id, &new_id, "next".to_string(), HashMap::new())?;
+            self.graph.add_edge(&prev_id, &new_id, "next".to_string(), None, HashMap::new())?;
         }
 
         self.length += 1;
@@ -82,7 +82,7 @@ impl List {
         // If not the first node, link from previous node
         if self.length > 0 {
             let prev_id = format!("node_{}", self.length - 1);
-            self.graph.add_edge(&prev_id, &new_id, "next".to_string(), HashMap::new())?;
+            self.graph.add_edge(&prev_id, &new_id, "next".to_string(), None, HashMap::new())?;
         }
 
         self.length += 1;
@@ -130,11 +130,11 @@ impl List {
         // Restore edges
         if index > 0 {
             let prev_id = format!("node_{}", index - 1);
-            self.graph.add_edge(&prev_id, &node_id, "next".to_string(), HashMap::new())?;
+            self.graph.add_edge(&prev_id, &node_id, "next".to_string(), None, HashMap::new())?;
         }
         if index < self.length - 1 {
             let next_id = format!("node_{}", index + 1);
-            self.graph.add_edge(&node_id, &next_id, "next".to_string(), HashMap::new())?;
+            self.graph.add_edge(&node_id, &next_id, "next".to_string(), None, HashMap::new())?;
         }
 
         Ok(())
@@ -168,11 +168,11 @@ impl List {
         // Restore edges
         if index > 0 {
             let prev_id = format!("node_{}", index - 1);
-            self.graph.add_edge(&prev_id, &node_id, "next".to_string(), HashMap::new())?;
+            self.graph.add_edge(&prev_id, &node_id, "next".to_string(), None, HashMap::new())?;
         }
         if index < self.length - 1 {
             let next_id = format!("node_{}", index + 1);
-            self.graph.add_edge(&node_id, &next_id, "next".to_string(), HashMap::new())?;
+            self.graph.add_edge(&node_id, &next_id, "next".to_string(), None, HashMap::new())?;
         }
 
         Ok(())

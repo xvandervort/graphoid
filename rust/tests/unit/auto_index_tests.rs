@@ -136,7 +136,7 @@ fn test_stats_includes_edge_count() {
 
     graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
     graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_edge("A", "B", "link".to_string(), HashMap::new()).unwrap();
+    graph.add_edge("A", "B", "link".to_string(), None, HashMap::new()).unwrap();
 
     let stats = graph.stats();
 
@@ -155,11 +155,11 @@ fn test_stats_includes_degree_distribution() {
     graph.add_node("D".to_string(), Value::Number(4.0)).unwrap();
 
     // A has degree 2 (out to B and C)
-    graph.add_edge("A", "B", "link".to_string(), HashMap::new()).unwrap();
-    graph.add_edge("A", "C", "link".to_string(), HashMap::new()).unwrap();
+    graph.add_edge("A", "B", "link".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("A", "C", "link".to_string(), None, HashMap::new()).unwrap();
 
     // B has degree 1 (out to D)
-    graph.add_edge("B", "D", "link".to_string(), HashMap::new()).unwrap();
+    graph.add_edge("B", "D", "link".to_string(), None, HashMap::new()).unwrap();
 
     let stats = graph.stats();
 

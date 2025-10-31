@@ -36,11 +36,11 @@ fn test_tree_ruleset_prevents_cycles() {
     g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
     g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
 
-    g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("A", "C", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("A", "C", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Try to create a cycle (B -> A)
-    let result = g.add_edge("B", "A", "edge".to_string(), HashMap::new());
+    let result = g.add_edge("B", "A", "edge".to_string(), None, HashMap::new());
 
     // Should fail due to no_cycles rule
     assert!(result.is_err());
@@ -103,8 +103,8 @@ fn test_binary_tree_ruleset_allows_two_children() {
     g.add_node("right".to_string(), Value::Number(3.0)).unwrap();
 
     // Add two children - should succeed
-    g.add_edge("root", "left", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("root", "right", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("root", "left", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("root", "right", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Verify edges were added
     assert_eq!(g.edge_count(), 2);
@@ -121,11 +121,11 @@ fn test_binary_tree_ruleset_rejects_three_children() {
     g.add_node("child3".to_string(), Value::Number(4.0)).unwrap();
 
     // Add two children - should succeed
-    g.add_edge("root", "child1", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("root", "child2", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("root", "child1", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("root", "child2", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Try to add third child - should fail
-    let result = g.add_edge("root", "child3", "edge".to_string(), HashMap::new());
+    let result = g.add_edge("root", "child3", "edge".to_string(), None, HashMap::new());
     assert!(result.is_err());
     let err_msg = format!("{:?}", result.unwrap_err());
     assert!(err_msg.contains("degree") || err_msg.contains("MaxDegree"));
@@ -157,11 +157,11 @@ fn test_dag_ruleset_prevents_cycles() {
     g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
 
     // Create a path: A -> B -> C
-    g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("B", "C", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("B", "C", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Try to create a cycle: C -> A
-    let result = g.add_edge("C", "A", "edge".to_string(), HashMap::new());
+    let result = g.add_edge("C", "A", "edge".to_string(), None, HashMap::new());
     assert!(result.is_err());
     let err_msg = format!("{:?}", result.unwrap_err());
     assert!(err_msg.contains("cycle") || err_msg.contains("NoCycles"));
@@ -177,8 +177,8 @@ fn test_dag_ruleset_allows_multiple_roots() {
     g.add_node("child".to_string(), Value::Number(3.0)).unwrap();
 
     // Both roots point to the same child - should be allowed in DAG
-    g.add_edge("root1", "child", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("root2", "child", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("root1", "child", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("root2", "child", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Verify this is allowed
     assert_eq!(g.node_count(), 3);
@@ -201,10 +201,10 @@ fn test_dag_ruleset_allows_diamond_structure() {
     g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
     g.add_node("D".to_string(), Value::Number(4.0)).unwrap();
 
-    g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("A", "C", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("B", "D", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("C", "D", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("A", "C", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("B", "D", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("C", "D", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Verify diamond structure is allowed
     assert_eq!(g.node_count(), 4);

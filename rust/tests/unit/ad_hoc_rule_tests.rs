@@ -17,8 +17,8 @@ fn test_add_rule_enforces_constraint() {
     // Should be able to create a cycle without rules
     graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
     graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
-    assert!(graph.add_edge("B", "A", "edge".to_string(), HashMap::new()).is_ok());
+    graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
+    assert!(graph.add_edge("B", "A", "edge".to_string(), None, HashMap::new()).is_ok());
 
     // Now add no_cycles rule
     let mut graph2 = Graph::new(GraphType::Directed);
@@ -27,10 +27,10 @@ fn test_add_rule_enforces_constraint() {
     // Build same structure
     graph2.add_node("A".to_string(), Value::Number(1.0)).unwrap();
     graph2.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph2.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
+    graph2.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Now adding the reverse edge should fail
-    let result = graph2.add_edge("B", "A", "edge".to_string(), HashMap::new());
+    let result = graph2.add_edge("B", "A", "edge".to_string(), None, HashMap::new());
     assert!(result.is_err());
     match result {
         Err(GraphoidError::RuleViolation { rule, .. }) => {
@@ -52,11 +52,11 @@ fn test_add_rule_with_parameter() {
     graph.add_node("child3".to_string(), Value::Number(4.0)).unwrap();
 
     // First two edges should succeed
-    graph.add_edge("root", "child1", "edge".to_string(), HashMap::new()).unwrap();
-    graph.add_edge("root", "child2", "edge".to_string(), HashMap::new()).unwrap();
+    graph.add_edge("root", "child1", "edge".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("root", "child2", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Third edge should fail
-    let result = graph.add_edge("root", "child3", "edge".to_string(), HashMap::new());
+    let result = graph.add_edge("root", "child3", "edge".to_string(), None, HashMap::new());
     assert!(result.is_err());
     match result {
         Err(GraphoidError::RuleViolation { rule, message }) => {
@@ -75,16 +75,16 @@ fn test_remove_rule_disables_constraint() {
 
     graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
     graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
+    graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Cycle should fail
-    assert!(graph.add_edge("B", "A", "edge".to_string(), HashMap::new()).is_err());
+    assert!(graph.add_edge("B", "A", "edge".to_string(), None, HashMap::new()).is_err());
 
     // Remove the rule
     graph.remove_rule(&RuleSpec::NoCycles);
 
     // Now cycle should succeed
-    assert!(graph.add_edge("B", "A", "edge".to_string(), HashMap::new()).is_ok());
+    assert!(graph.add_edge("B", "A", "edge".to_string(), None, HashMap::new()).is_ok());
 }
 
 #[test]
@@ -149,11 +149,11 @@ fn test_ad_hoc_rules_combine_with_rulesets() {
     graph.add_node("right".to_string(), Value::Number(3.0)).unwrap();
     graph.add_node("extra".to_string(), Value::Number(4.0)).unwrap();
 
-    graph.add_edge("root", "left", "child".to_string(), HashMap::new()).unwrap();
-    graph.add_edge("root", "right", "child".to_string(), HashMap::new()).unwrap();
+    graph.add_edge("root", "left", "child".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("root", "right", "child".to_string(), None, HashMap::new()).unwrap();
 
     // Third child should fail due to max_degree
-    let result = graph.add_edge("root", "extra", "child".to_string(), HashMap::new());
+    let result = graph.add_edge("root", "extra", "child".to_string(), None, HashMap::new());
     assert!(result.is_err());
 }
 
@@ -206,10 +206,10 @@ fn test_ruleset_and_ad_hoc_deduplication() {
     // Build a structure
     graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
     graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
+    graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Cycle should still fail (rule should only be checked once, not twice)
-    let result = graph.add_edge("B", "A", "edge".to_string(), HashMap::new());
+    let result = graph.add_edge("B", "A", "edge".to_string(), None, HashMap::new());
     assert!(result.is_err());
 }
 

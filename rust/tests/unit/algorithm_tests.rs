@@ -20,11 +20,11 @@ fn test_shortest_path_simple_linear() {
     g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
     g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
 
-    g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("B", "C", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("B", "C", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Test shortest path
-    let path = g.shortest_path("A", "C");
+    let path = g.shortest_path("A", "C", None, false).unwrap();
     assert_eq!(path, vec!["A", "B", "C"]);
 }
 
@@ -44,13 +44,13 @@ fn test_shortest_path_with_multiple_routes() {
     g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
     g.add_node("D".to_string(), Value::Number(4.0)).unwrap();
 
-    g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("A", "C", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("B", "D", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("C", "D", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("A", "C", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("B", "D", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("C", "D", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Should find A -> B -> D or A -> C -> D (both are length 3)
-    let path = g.shortest_path("A", "D");
+    let path = g.shortest_path("A", "D", None, false).unwrap();
     assert_eq!(path.len(), 3);
     assert_eq!(path[0], "A");
     assert_eq!(path[2], "D");
@@ -65,9 +65,9 @@ fn test_shortest_path_direct_edge() {
     g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
     g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
 
-    g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
-    let path = g.shortest_path("A", "B");
+    let path = g.shortest_path("A", "B", None, false).unwrap();
     assert_eq!(path, vec!["A", "B"]);
 }
 
@@ -78,7 +78,7 @@ fn test_shortest_path_same_node() {
     g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
 
     // Path from A to A should be just [A]
-    let path = g.shortest_path("A", "A");
+    let path = g.shortest_path("A", "A", None, false).unwrap();
     assert_eq!(path, vec!["A"]);
 }
 
@@ -91,7 +91,7 @@ fn test_shortest_path_no_path_exists() {
     g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
 
     // No edge between them
-    let path = g.shortest_path("A", "B");
+    let path = g.shortest_path("A", "B", None, false).unwrap_or(vec![]);
     assert_eq!(path.len(), 0); // Empty path = no path exists
 }
 
@@ -101,7 +101,7 @@ fn test_shortest_path_nonexistent_start() {
 
     g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
 
-    let path = g.shortest_path("Z", "A");
+    let path = g.shortest_path("Z", "A", None, false).unwrap_or(vec![]);
     assert_eq!(path.len(), 0);
 }
 
@@ -111,7 +111,7 @@ fn test_shortest_path_nonexistent_end() {
 
     g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
 
-    let path = g.shortest_path("A", "Z");
+    let path = g.shortest_path("A", "Z", None, false).unwrap_or(vec![]);
     assert_eq!(path.len(), 0);
 }
 
@@ -128,8 +128,8 @@ fn test_topological_sort_simple_dag() {
     g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
     g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
 
-    g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("B", "C", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("B", "C", "edge".to_string(), None, HashMap::new()).unwrap();
 
     let sorted = g.topological_sort();
 
@@ -158,10 +158,10 @@ fn test_topological_sort_diamond_dag() {
     g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
     g.add_node("D".to_string(), Value::Number(4.0)).unwrap();
 
-    g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("A", "C", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("B", "D", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("C", "D", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("A", "C", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("B", "D", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("C", "D", "edge".to_string(), None, HashMap::new()).unwrap();
 
     let sorted = g.topological_sort();
 
@@ -206,9 +206,9 @@ fn test_topological_sort_with_cycle_returns_empty() {
 
     // Add edges that form a cycle
     // Note: This will only work if no_cycles rule is NOT active
-    let _ = g.add_edge("A", "B", "edge".to_string(), HashMap::new());
-    let _ = g.add_edge("B", "C", "edge".to_string(), HashMap::new());
-    let _ = g.add_edge("C", "A", "edge".to_string(), HashMap::new());
+    let _ = g.add_edge("A", "B", "edge".to_string(), None, HashMap::new());
+    let _ = g.add_edge("B", "C", "edge".to_string(), None, HashMap::new());
+    let _ = g.add_edge("C", "A", "edge".to_string(), None, HashMap::new());
 
     // Topological sort should detect cycle and return empty
     let sorted = g.topological_sort();
@@ -230,13 +230,13 @@ fn test_shortest_path_uses_topological_sort_with_no_cycles_rule() {
     g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
     g.add_node("D".to_string(), Value::Number(4.0)).unwrap();
 
-    g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("A", "C", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("B", "D", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("C", "D", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("A", "C", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("B", "D", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("C", "D", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Should use optimized topological-based algorithm
-    let path = g.shortest_path("A", "D");
+    let path = g.shortest_path("A", "D", None, false).unwrap();
 
     // Verify we get a valid shortest path
     assert_eq!(path.len(), 3);
@@ -253,10 +253,10 @@ fn test_shortest_path_without_rules_uses_bfs() {
     g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
     g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
 
-    g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("B", "C", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("B", "C", "edge".to_string(), None, HashMap::new()).unwrap();
 
-    let path = g.shortest_path("A", "C");
+    let path = g.shortest_path("A", "C", None, false).unwrap();
     assert_eq!(path, vec!["A", "B", "C"]);
 }
 
@@ -292,14 +292,14 @@ fn test_shortest_path_undirected() {
     g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
 
     // In undirected graph, edge goes both ways
-    g.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
-    g.add_edge("B", "C", "edge".to_string(), HashMap::new()).unwrap();
+    g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("B", "C", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Should be able to go A -> B -> C
-    let path = g.shortest_path("A", "C");
+    let path = g.shortest_path("A", "C", None, false).unwrap();
     assert_eq!(path, vec!["A", "B", "C"]);
 
     // Should also work in reverse (since undirected)
-    let path_reverse = g.shortest_path("C", "A");
+    let path_reverse = g.shortest_path("C", "A", None, false).unwrap();
     assert_eq!(path_reverse, vec!["C", "B", "A"]);
 }

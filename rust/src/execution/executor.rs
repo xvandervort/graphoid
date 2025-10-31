@@ -2164,10 +2164,10 @@ impl Executor {
                     "edge".to_string()
                 };
 
-                // Add the edge with empty properties
+                // Add the edge with empty properties and no weight
                 use std::collections::HashMap;
                 let properties = HashMap::new();
-                graph.add_edge(from, to, edge_type, properties)?;
+                graph.add_edge(from, to, edge_type, None, properties)?;
 
                 // Update graph in environment
                 if let Expr::Variable { name, .. } = object_expr {

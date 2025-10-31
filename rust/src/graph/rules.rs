@@ -101,6 +101,10 @@ pub enum RuleSpec {
     BinaryTree,
     /// No duplicate values allowed (for lists/sets)
     NoDuplicates,
+    /// All edges must have weights
+    WeightedEdges,
+    /// No edges may have weights (all unweighted)
+    UnweightedEdges,
 
     // ========================================================================
     // Transformation Rules (Value transformations)
@@ -154,6 +158,8 @@ impl RuleSpec {
             RuleSpec::MaxDegree(n) => Box::new(MaxDegreeRule::new(*n)),
             RuleSpec::BinaryTree => Box::new(BinaryTreeRule::new()),
             RuleSpec::NoDuplicates => Box::new(NoDuplicatesRule::new()),
+            RuleSpec::WeightedEdges => Box::new(WeightedEdgesRule::new()),
+            RuleSpec::UnweightedEdges => Box::new(UnweightedEdgesRule::new()),
 
             // Transformation rules (from behaviors.rs for now)
             RuleSpec::NoneToZero => Box::new(NoneToZeroBehavior),
@@ -184,6 +190,8 @@ impl RuleSpec {
             RuleSpec::MaxDegree(_) => "max_degree",
             RuleSpec::BinaryTree => "binary_tree",
             RuleSpec::NoDuplicates => "no_duplicates",
+            RuleSpec::WeightedEdges => "weighted_edges",
+            RuleSpec::UnweightedEdges => "unweighted_edges",
 
             // Transformation rules
             RuleSpec::NoneToZero => "none_to_zero",
@@ -255,6 +263,7 @@ pub enum GraphOperation {
         from: String,
         to: String,
         edge_type: String,
+        weight: Option<f64>,
         properties: HashMap<String, Value>,
     },
     /// Removing a node from the graph
@@ -790,6 +799,157 @@ impl Rule for NoDuplicatesRule {
     }
 }
 
+/// Rule that enforces all edges must have weights
+pub struct WeightedEdgesRule;
+
+impl WeightedEdgesRule {
+    /// Create a new weighted edges rule
+    pub fn new() -> Self {
+        WeightedEdgesRule
+    }
+
+    /// Check if all edges in the graph have weights
+    fn all_edges_weighted(graph: &Graph) -> bool {
+        for node in graph.nodes.values() {
+            for edge_info in node.neighbors.values() {
+                if !edge_info.is_weighted() {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+}
+
+impl Rule for WeightedEdgesRule {
+    fn name(&self) -> &str {
+        "weighted_edges"
+    }
+
+    fn validate(&self, graph: &Graph, context: &RuleContext) -> Result<(), GraphoidError> {
+        match &context.operation {
+            GraphOperation::AddEdge { from, to, weight, .. } => {
+                // Check if the new edge has a weight
+                if weight.is_none() {
+                    return Err(GraphoidError::RuleViolation {
+                        rule: self.name().to_string(),
+                        message: format!(
+                            "Edge from '{}' to '{}' must have a weight (weighted_edges rule active)",
+                            from, to
+                        ),
+                    });
+                }
+            }
+            _ => {
+                // For other operations, check if all existing edges are weighted
+                if !Self::all_edges_weighted(graph) {
+                    return Err(GraphoidError::RuleViolation {
+                        rule: self.name().to_string(),
+                        message: "All edges must have weights (weighted_edges rule active)".to_string(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn should_run_on(&self, operation: &GraphOperation) -> bool {
+        matches!(operation, GraphOperation::AddEdge { .. })
+    }
+
+    fn clean(&self, graph: &mut Graph) -> Result<(), GraphoidError> {
+        // Remove all edges that don't have weights
+        let mut edges_to_remove: Vec<(String, String)> = Vec::new();
+
+        for (from_id, node) in &graph.nodes {
+            for (to_id, edge_info) in &node.neighbors {
+                if !edge_info.is_weighted() {
+                    edges_to_remove.push((from_id.clone(), to_id.clone()));
+                }
+            }
+        }
+
+        // Remove unweighted edges
+        for (from, to) in edges_to_remove {
+            if let Some(node) = graph.nodes.get_mut(&from) {
+                node.neighbors.remove(&to);
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Rule that enforces no edges may have weights (all unweighted)
+pub struct UnweightedEdgesRule;
+
+impl UnweightedEdgesRule {
+    /// Create a new unweighted edges rule
+    pub fn new() -> Self {
+        UnweightedEdgesRule
+    }
+
+    /// Check if all edges in the graph are unweighted
+    fn all_edges_unweighted(graph: &Graph) -> bool {
+        for node in graph.nodes.values() {
+            for edge_info in node.neighbors.values() {
+                if edge_info.is_weighted() {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+}
+
+impl Rule for UnweightedEdgesRule {
+    fn name(&self) -> &str {
+        "unweighted_edges"
+    }
+
+    fn validate(&self, graph: &Graph, context: &RuleContext) -> Result<(), GraphoidError> {
+        match &context.operation {
+            GraphOperation::AddEdge { from, to, weight, .. } => {
+                // Check if the new edge has a weight
+                if weight.is_some() {
+                    return Err(GraphoidError::RuleViolation {
+                        rule: self.name().to_string(),
+                        message: format!(
+                            "Edge from '{}' to '{}' must not have a weight (unweighted_edges rule active)",
+                            from, to
+                        ),
+                    });
+                }
+            }
+            _ => {
+                // For other operations, check if all existing edges are unweighted
+                if !Self::all_edges_unweighted(graph) {
+                    return Err(GraphoidError::RuleViolation {
+                        rule: self.name().to_string(),
+                        message: "No edges may have weights (unweighted_edges rule active)".to_string(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn should_run_on(&self, operation: &GraphOperation) -> bool {
+        matches!(operation, GraphOperation::AddEdge { .. })
+    }
+
+    fn clean(&self, graph: &mut Graph) -> Result<(), GraphoidError> {
+        // Remove weights from all edges
+        for node in graph.nodes.values_mut() {
+            for edge_info in node.neighbors.values_mut() {
+                edge_info.set_weight(None);
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -807,6 +967,7 @@ mod tests {
             from: "A".to_string(),
             to: "B".to_string(),
             edge_type: "edge".to_string(),
+            weight: None,
             properties: HashMap::new(),
         });
 
@@ -818,13 +979,14 @@ mod tests {
         let mut graph = Graph::new(GraphType::Directed);
         graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
         graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
+        graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
         let rule = NoCyclesRule::new();
         let context = RuleContext::new(GraphOperation::AddEdge {
             from: "B".to_string(),
             to: "A".to_string(),
             edge_type: "edge".to_string(),
+            weight: None,
             properties: HashMap::new(),
         });
 
@@ -843,7 +1005,7 @@ mod tests {
         let mut graph = Graph::new(GraphType::Directed);
         graph.add_node("root".to_string(), Value::Number(1.0)).unwrap();
         graph.add_node("child".to_string(), Value::Number(2.0)).unwrap();
-        graph.add_edge("root", "child", "edge".to_string(), HashMap::new()).unwrap();
+        graph.add_edge("root", "child", "edge".to_string(), None, HashMap::new()).unwrap();
 
         let rule = SingleRootRule::new();
         let context = RuleContext::new(GraphOperation::AddNode {
@@ -881,13 +1043,14 @@ mod tests {
         graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
         graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
         graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-        graph.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
+        graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
         let rule = MaxDegreeRule::new(1);
         let context = RuleContext::new(GraphOperation::AddEdge {
             from: "A".to_string(),
             to: "C".to_string(),
             edge_type: "edge".to_string(),
+            weight: None,
             properties: HashMap::new(),
         });
 
@@ -905,13 +1068,14 @@ mod tests {
         graph.add_node("root".to_string(), Value::Number(1.0)).unwrap();
         graph.add_node("left".to_string(), Value::Number(2.0)).unwrap();
         graph.add_node("right".to_string(), Value::Number(3.0)).unwrap();
-        graph.add_edge("root", "left", "edge".to_string(), HashMap::new()).unwrap();
+        graph.add_edge("root", "left", "edge".to_string(), None, HashMap::new()).unwrap();
 
         let rule = BinaryTreeRule::new();
         let context = RuleContext::new(GraphOperation::AddEdge {
             from: "root".to_string(),
             to: "right".to_string(),
             edge_type: "edge".to_string(),
+            weight: None,
             properties: HashMap::new(),
         });
 
@@ -925,18 +1089,173 @@ mod tests {
         graph.add_node("child1".to_string(), Value::Number(2.0)).unwrap();
         graph.add_node("child2".to_string(), Value::Number(3.0)).unwrap();
         graph.add_node("child3".to_string(), Value::Number(4.0)).unwrap();
-        graph.add_edge("root", "child1", "edge".to_string(), HashMap::new()).unwrap();
-        graph.add_edge("root", "child2", "edge".to_string(), HashMap::new()).unwrap();
+        graph.add_edge("root", "child1", "edge".to_string(), None, HashMap::new()).unwrap();
+        graph.add_edge("root", "child2", "edge".to_string(), None, HashMap::new()).unwrap();
 
         let rule = BinaryTreeRule::new();
         let context = RuleContext::new(GraphOperation::AddEdge {
             from: "root".to_string(),
             to: "child3".to_string(),
             edge_type: "edge".to_string(),
+            weight: None,
             properties: HashMap::new(),
         });
 
         let result = rule.validate(&graph, &context);
         assert!(result.is_err());
+    }
+
+    // ========================================================================
+    // Weight Validation Rules Tests (10 tests)
+    // ========================================================================
+
+    #[test]
+    fn test_weighted_edges_rule_allows_weighted_edge() {
+        let mut graph = Graph::new(GraphType::Directed);
+        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+
+        let rule = WeightedEdgesRule::new();
+        let context = RuleContext::new(GraphOperation::AddEdge {
+            from: "A".to_string(),
+            to: "B".to_string(),
+            edge_type: "edge".to_string(),
+            weight: Some(5.0),
+            properties: HashMap::new(),
+        });
+
+        assert!(rule.validate(&graph, &context).is_ok());
+    }
+
+    #[test]
+    fn test_weighted_edges_rule_rejects_unweighted_edge() {
+        let mut graph = Graph::new(GraphType::Directed);
+        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+
+        let rule = WeightedEdgesRule::new();
+        let context = RuleContext::new(GraphOperation::AddEdge {
+            from: "A".to_string(),
+            to: "B".to_string(),
+            edge_type: "edge".to_string(),
+            weight: None,
+            properties: HashMap::new(),
+        });
+
+        let result = rule.validate(&graph, &context);
+        assert!(result.is_err());
+        if let Err(GraphoidError::RuleViolation { rule: rule_name, message }) = result {
+            assert_eq!(rule_name, "weighted_edges");
+            assert!(message.contains("must have a weight"));
+        }
+    }
+
+    #[test]
+    fn test_weighted_edges_rule_clean_removes_unweighted() {
+        let mut graph = Graph::new(GraphType::Directed);
+        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+        graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+
+        // Add one weighted and one unweighted edge
+        graph.add_edge("A", "B", "edge".to_string(), Some(5.0), HashMap::new()).unwrap();
+        graph.add_edge("B", "C", "edge".to_string(), None, HashMap::new()).unwrap();
+
+        assert_eq!(graph.edge_count(), 2);
+
+        let rule = WeightedEdgesRule::new();
+        rule.clean(&mut graph).unwrap();
+
+        // Only the weighted edge should remain
+        assert_eq!(graph.edge_count(), 1);
+        assert!(graph.has_edge("A", "B"));
+        assert!(!graph.has_edge("B", "C"));
+    }
+
+    #[test]
+    fn test_unweighted_edges_rule_allows_unweighted_edge() {
+        let mut graph = Graph::new(GraphType::Directed);
+        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+
+        let rule = UnweightedEdgesRule::new();
+        let context = RuleContext::new(GraphOperation::AddEdge {
+            from: "A".to_string(),
+            to: "B".to_string(),
+            edge_type: "edge".to_string(),
+            weight: None,
+            properties: HashMap::new(),
+        });
+
+        assert!(rule.validate(&graph, &context).is_ok());
+    }
+
+    #[test]
+    fn test_unweighted_edges_rule_rejects_weighted_edge() {
+        let mut graph = Graph::new(GraphType::Directed);
+        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+
+        let rule = UnweightedEdgesRule::new();
+        let context = RuleContext::new(GraphOperation::AddEdge {
+            from: "A".to_string(),
+            to: "B".to_string(),
+            edge_type: "edge".to_string(),
+            weight: Some(3.0),
+            properties: HashMap::new(),
+        });
+
+        let result = rule.validate(&graph, &context);
+        assert!(result.is_err());
+        if let Err(GraphoidError::RuleViolation { rule: rule_name, message }) = result {
+            assert_eq!(rule_name, "unweighted_edges");
+            assert!(message.contains("must not have a weight"));
+        }
+    }
+
+    #[test]
+    fn test_unweighted_edges_rule_clean_removes_weights() {
+        let mut graph = Graph::new(GraphType::Directed);
+        graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+        graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+        graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+
+        // Add weighted edges
+        graph.add_edge("A", "B", "edge".to_string(), Some(5.0), HashMap::new()).unwrap();
+        graph.add_edge("B", "C", "edge".to_string(), Some(10.0), HashMap::new()).unwrap();
+
+        assert!(graph.is_edge_weighted("A", "B"));
+        assert!(graph.is_edge_weighted("B", "C"));
+
+        let rule = UnweightedEdgesRule::new();
+        rule.clean(&mut graph).unwrap();
+
+        // Edges should still exist but without weights
+        assert!(graph.has_edge("A", "B"));
+        assert!(graph.has_edge("B", "C"));
+        assert!(!graph.is_edge_weighted("A", "B"));
+        assert!(!graph.is_edge_weighted("B", "C"));
+    }
+
+    #[test]
+    fn test_weighted_edges_rule_spec_name() {
+        assert_eq!(RuleSpec::WeightedEdges.name(), "weighted_edges");
+    }
+
+    #[test]
+    fn test_unweighted_edges_rule_spec_name() {
+        assert_eq!(RuleSpec::UnweightedEdges.name(), "unweighted_edges");
+    }
+
+    #[test]
+    fn test_weighted_edges_rule_instantiation() {
+        let rule = RuleSpec::WeightedEdges.instantiate();
+        assert_eq!(rule.name(), "weighted_edges");
+    }
+
+    #[test]
+    fn test_unweighted_edges_rule_instantiation() {
+        let rule = RuleSpec::UnweightedEdges.instantiate();
+        assert_eq!(rule.name(), "unweighted_edges");
     }
 }

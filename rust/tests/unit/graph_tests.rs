@@ -32,7 +32,7 @@ fn test_graph_add_edge() {
     let mut g = Graph::new(GraphType::Directed);
     g.add_node("alice".to_string(), Value::Number(1.0)).unwrap();
     g.add_node("bob".to_string(), Value::Number(2.0)).unwrap();
-    g.add_edge("alice", "bob", "follows".to_string(), HashMap::new()).unwrap();
+    g.add_edge("alice", "bob", "follows".to_string(), None, HashMap::new()).unwrap();
 
     assert_eq!(g.edge_count(), 1);
     assert!(g.has_edge("alice", "bob"));
@@ -44,7 +44,7 @@ fn test_graph_undirected_edge() {
     let mut g = Graph::new(GraphType::Undirected);
     g.add_node("alice".to_string(), Value::Number(1.0)).unwrap();
     g.add_node("bob".to_string(), Value::Number(2.0)).unwrap();
-    g.add_edge("alice", "bob", "friend".to_string(), HashMap::new()).unwrap();
+    g.add_edge("alice", "bob", "friend".to_string(), None, HashMap::new()).unwrap();
 
     // Undirected graphs have edges in both directions
     assert!(g.has_edge("alice", "bob"));
@@ -60,8 +60,8 @@ fn test_graph_neighbors() {
     g.add_node("bob".to_string(), Value::Number(2.0)).unwrap();
     g.add_node("charlie".to_string(), Value::Number(3.0)).unwrap();
 
-    g.add_edge("alice", "bob", "follows".to_string(), HashMap::new()).unwrap();
-    g.add_edge("alice", "charlie", "follows".to_string(), HashMap::new()).unwrap();
+    g.add_edge("alice", "bob", "follows".to_string(), None, HashMap::new()).unwrap();
+    g.add_edge("alice", "charlie", "follows".to_string(), None, HashMap::new()).unwrap();
 
     let neighbors = g.neighbors("alice");
     assert_eq!(neighbors.len(), 2);
@@ -77,7 +77,7 @@ fn test_graph_remove_node() {
     let mut g = Graph::new(GraphType::Directed);
     g.add_node("alice".to_string(), Value::Number(1.0)).unwrap();
     g.add_node("bob".to_string(), Value::Number(2.0)).unwrap();
-    g.add_edge("alice", "bob", "follows".to_string(), HashMap::new()).unwrap();
+    g.add_edge("alice", "bob", "follows".to_string(), None, HashMap::new()).unwrap();
 
     assert_eq!(g.node_count(), 2);
     assert_eq!(g.edge_count(), 1);
@@ -93,7 +93,7 @@ fn test_graph_remove_edge() {
     let mut g = Graph::new(GraphType::Directed);
     g.add_node("alice".to_string(), Value::Number(1.0)).unwrap();
     g.add_node("bob".to_string(), Value::Number(2.0)).unwrap();
-    g.add_edge("alice", "bob", "follows".to_string(), HashMap::new()).unwrap();
+    g.add_edge("alice", "bob", "follows".to_string(), None, HashMap::new()).unwrap();
 
     assert!(g.has_edge("alice", "bob"));
 

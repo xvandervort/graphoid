@@ -18,11 +18,11 @@ fn test_tree_ruleset_prevents_cycles() {
     tree.add_node("child2".to_string(), Value::Number(3.0)).unwrap();
 
     // Add edges to form tree
-    tree.add_edge("root", "child1", "child".to_string(), HashMap::new()).unwrap();
-    tree.add_edge("root", "child2", "child".to_string(), HashMap::new()).unwrap();
+    tree.add_edge("root", "child1", "child".to_string(), None, HashMap::new()).unwrap();
+    tree.add_edge("root", "child2", "child".to_string(), None, HashMap::new()).unwrap();
 
     // Try to create a cycle: child1 -> root (should fail due to no_cycles rule)
-    let result = tree.add_edge("child1", "root", "back".to_string(), HashMap::new());
+    let result = tree.add_edge("child1", "root", "back".to_string(), None, HashMap::new());
 
     assert!(result.is_err());
     match result {
@@ -44,8 +44,8 @@ fn test_tree_ruleset_prevents_multiple_roots_on_removal() {
     tree.add_node("left".to_string(), Value::Number(2.0)).unwrap();
     tree.add_node("right".to_string(), Value::Number(3.0)).unwrap();
 
-    tree.add_edge("root", "left", "child".to_string(), HashMap::new()).unwrap();
-    tree.add_edge("root", "right", "child".to_string(), HashMap::new()).unwrap();
+    tree.add_edge("root", "left", "child".to_string(), None, HashMap::new()).unwrap();
+    tree.add_edge("root", "right", "child".to_string(), None, HashMap::new()).unwrap();
 
     // Now try to remove the root's edge to one child
     // This would leave two disconnected subtrees (multiple roots)
@@ -72,10 +72,10 @@ fn test_tree_ruleset_allows_valid_tree_structure() {
     tree.add_node("left_right".to_string(), Value::Number(5.0)).unwrap();
 
     // Add edges to form valid tree
-    assert!(tree.add_edge("root", "left", "child".to_string(), HashMap::new()).is_ok());
-    assert!(tree.add_edge("root", "right", "child".to_string(), HashMap::new()).is_ok());
-    assert!(tree.add_edge("left", "left_left", "child".to_string(), HashMap::new()).is_ok());
-    assert!(tree.add_edge("left", "left_right", "child".to_string(), HashMap::new()).is_ok());
+    assert!(tree.add_edge("root", "left", "child".to_string(), None, HashMap::new()).is_ok());
+    assert!(tree.add_edge("root", "right", "child".to_string(), None, HashMap::new()).is_ok());
+    assert!(tree.add_edge("left", "left_left", "child".to_string(), None, HashMap::new()).is_ok());
+    assert!(tree.add_edge("left", "left_right", "child".to_string(), None, HashMap::new()).is_ok());
 
     // Verify structure
     assert_eq!(tree.node_count(), 5);
@@ -94,11 +94,11 @@ fn test_binary_tree_ruleset_limits_children() {
     btree.add_node("right".to_string(), Value::Number(3.0)).unwrap();
     btree.add_node("third".to_string(), Value::Number(4.0)).unwrap();
 
-    btree.add_edge("root", "left", "child".to_string(), HashMap::new()).unwrap();
-    btree.add_edge("root", "right", "child".to_string(), HashMap::new()).unwrap();
+    btree.add_edge("root", "left", "child".to_string(), None, HashMap::new()).unwrap();
+    btree.add_edge("root", "right", "child".to_string(), None, HashMap::new()).unwrap();
 
     // Try to add a third child (should fail)
-    let result = btree.add_edge("root", "third", "child".to_string(), HashMap::new());
+    let result = btree.add_edge("root", "third", "child".to_string(), None, HashMap::new());
 
     assert!(result.is_err());
     match result {
@@ -121,15 +121,15 @@ fn test_binary_tree_allows_two_children() {
     btree.add_node("right".to_string(), Value::Number(3.0)).unwrap();
 
     // Should succeed - exactly 2 children is allowed
-    assert!(btree.add_edge("root", "left", "child".to_string(), HashMap::new()).is_ok());
-    assert!(btree.add_edge("root", "right", "child".to_string(), HashMap::new()).is_ok());
+    assert!(btree.add_edge("root", "left", "child".to_string(), None, HashMap::new()).is_ok());
+    assert!(btree.add_edge("root", "right", "child".to_string(), None, HashMap::new()).is_ok());
 
     // Add children to left node
     btree.add_node("left_left".to_string(), Value::Number(4.0)).unwrap();
     btree.add_node("left_right".to_string(), Value::Number(5.0)).unwrap();
 
-    assert!(btree.add_edge("left", "left_left", "child".to_string(), HashMap::new()).is_ok());
-    assert!(btree.add_edge("left", "left_right", "child".to_string(), HashMap::new()).is_ok());
+    assert!(btree.add_edge("left", "left_left", "child".to_string(), None, HashMap::new()).is_ok());
+    assert!(btree.add_edge("left", "left_right", "child".to_string(), None, HashMap::new()).is_ok());
 
     assert_eq!(btree.node_count(), 5);
 }
@@ -146,13 +146,13 @@ fn test_dag_ruleset_prevents_cycles() {
     dag.add_node("D".to_string(), Value::Number(4.0)).unwrap();
 
     // Create valid DAG structure: A -> B -> D, A -> C -> D
-    dag.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
-    dag.add_edge("A", "C", "edge".to_string(), HashMap::new()).unwrap();
-    dag.add_edge("B", "D", "edge".to_string(), HashMap::new()).unwrap();
-    dag.add_edge("C", "D", "edge".to_string(), HashMap::new()).unwrap();
+    dag.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
+    dag.add_edge("A", "C", "edge".to_string(), None, HashMap::new()).unwrap();
+    dag.add_edge("B", "D", "edge".to_string(), None, HashMap::new()).unwrap();
+    dag.add_edge("C", "D", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Try to create a cycle: D -> A (should fail)
-    let result = dag.add_edge("D", "A", "back".to_string(), HashMap::new());
+    let result = dag.add_edge("D", "A", "back".to_string(), None, HashMap::new());
 
     assert!(result.is_err());
     match result {
@@ -175,8 +175,8 @@ fn test_dag_allows_multiple_roots() {
     dag.add_node("child".to_string(), Value::Number(3.0)).unwrap();
 
     // Both roots can point to same child - this is valid in a DAG
-    assert!(dag.add_edge("root1", "child", "edge".to_string(), HashMap::new()).is_ok());
-    assert!(dag.add_edge("root2", "child", "edge".to_string(), HashMap::new()).is_ok());
+    assert!(dag.add_edge("root1", "child", "edge".to_string(), None, HashMap::new()).is_ok());
+    assert!(dag.add_edge("root2", "child", "edge".to_string(), None, HashMap::new()).is_ok());
 
     assert_eq!(dag.node_count(), 3);
 }
@@ -190,8 +190,8 @@ fn test_graph_without_ruleset_allows_cycles() {
     graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
 
     // Should be able to create a cycle
-    assert!(graph.add_edge("A", "B", "edge".to_string(), HashMap::new()).is_ok());
-    assert!(graph.add_edge("B", "A", "edge".to_string(), HashMap::new()).is_ok());
+    assert!(graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).is_ok());
+    assert!(graph.add_edge("B", "A", "edge".to_string(), None, HashMap::new()).is_ok());
 
     // Cycle created successfully
     assert!(graph.has_edge("A", "B"));
@@ -234,10 +234,10 @@ fn test_ruleset_chaining() {
     // Add nodes and verify DAG rules apply
     graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
     graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_edge("A", "B", "edge".to_string(), HashMap::new()).unwrap();
+    graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Cycle should fail
-    let result = graph.add_edge("B", "A", "edge".to_string(), HashMap::new());
+    let result = graph.add_edge("B", "A", "edge".to_string(), None, HashMap::new());
     assert!(result.is_err());
 }
 
