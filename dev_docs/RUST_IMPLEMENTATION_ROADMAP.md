@@ -2342,6 +2342,8 @@ See `dev_docs/FUTURE_FEATURES.md` for complete v2.0+ roadmap.
 
 ## Phase 6.5: Foundational Gaps & Verification (5-7 days)
 
+**📋 Verification Report**: See [`dev_docs/PHASE_6_5_VERIFICATION_REPORT.md`](PHASE_6_5_VERIFICATION_REPORT.md) for detailed verification results of all architectural assumptions.
+
 **Duration**: 5-7 days
 **Goal**: Complete all missing foundational features from Phases 0-6 before proceeding to Phase 7
 **Philosophy**: "Solid foundations enable rapid progress" - Fix gaps now to avoid technical debt
@@ -2393,7 +2395,7 @@ This phase systematically addresses all gaps to create a solid foundation for Ph
    - Test parser accepts `list<num>`, `hash<string>` (single param)
    - Verify error messages reference NO_GENERICS_POLICY.md
 
-5. **Document Verification Results** (`rust/PHASE_6_5_VERIFICATION_REPORT.md`)
+5. **Document Verification Results** (`dev_docs/PHASE_6_5_VERIFICATION_REPORT.md`)
    - Create report of all verification findings
    - List confirmed behaviors
    - List discrepancies found
@@ -2773,7 +2775,7 @@ Minimum **30 tests**:
 
 **New files**:
 - `tests/integration/architecture_verification.rs` - Verify graph-backed collections
-- `rust/PHASE_6_5_VERIFICATION_REPORT.md` - Document verification findings
+- `dev_docs/PHASE_6_5_VERIFICATION_REPORT.md` - Document verification findings
 - `rust/MUTATION_OPERATOR_CONVENTION.md` - Document dual-version pattern
 
 **Modified files**:
@@ -2856,7 +2858,7 @@ Minimum **30 tests**:
 
 #### Tasks
 
-1. **Re-Analyze Language Specification** (`PHASE_6_5_CONFORMANCE_REPORT.md`)
+1. **Re-Analyze Language Specification** (`dev_docs/PHASE_6_5_CONFORMANCE_REPORT.md`)
    - Re-read LANGUAGE_SPECIFICATION.md thoroughly
    - Cross-reference against Phase 6.5 implementation
    - Identify any remaining gaps in Phases 0-6.5
@@ -2898,7 +2900,7 @@ Minimum **30 tests**:
 #### Deliverables
 
 **Required before Phase 7**:
-1. `rust/PHASE_6_5_CONFORMANCE_REPORT.md` - Comprehensive spec analysis
+1. `dev_docs/PHASE_6_5_CONFORMANCE_REPORT.md` - Comprehensive spec analysis
 2. Updated roadmap sections for Phases 7+ (if needed)
 3. Phase 7 detailed specification (if currently inadequate)
 4. Go/No-Go decision documented in START_HERE_NEXT_SESSION.md
@@ -2919,15 +2921,43 @@ Minimum **30 tests**:
 ---
 
 ## Phase 7: Behavior System (5-7 days)
-- Standard behaviors
-- Custom function behaviors
-- Conditional behaviors
-- Rulesets
+
+**📋 Detailed Implementation Plan**: See [`dev_docs/PHASE_7_DETAILED_PLAN.md`](PHASE_7_DETAILED_PLAN.md) for:
+- 7-day implementation plan with daily deliverables
+- 85+ new test specifications (target: 160+ total behavior tests)
+- Complete behavior types: standard transformations, mapping behaviors, custom functions, conditional behaviors, rulesets, freeze control
+- Copy-paste ready Rust code examples
+- Integration tests and acceptance criteria
+
+**Overview**:
+- Standard behaviors (none_to_zero, positive, uppercase, validate_range, etc.)
+- Mapping behaviors (hash-based value transformations)
+- Custom function behaviors (user-defined transformation functions)
+- Conditional behaviors (context-aware with predicates and fallbacks)
+- Rulesets (bundled behavior collections for reusability)
+- Freeze control (immutability behaviors)
+
+**Current Status**: 75 behavior tests passing, framework exists in `src/graph/behaviors.rs` (1,005 lines)
 
 ### Phase 8: Module System (4-6 days)
-- Module loading
-- Import/export
-- Stdlib structure
+
+**📋 Detailed Implementation Plan**: See [`dev_docs/PHASE_8_DETAILED_PLAN.md`](PHASE_8_DETAILED_PLAN.md) for:
+- 6-day implementation plan with daily deliverables
+- 91+ new test specifications (target: 122+ total module tests)
+- Complete module system: declaration syntax, imports, standard library modules, project structure
+- 5 standard library modules (JSON, IO, Math, String, List)
+- Copy-paste ready Rust code examples
+- graphoid.toml specification
+
+**Overview**:
+- Module declaration (`module name`, `alias`)
+- Import variations (relative, project-root, stdlib)
+- Standard library modules (JSON, IO, Math, String, List)
+- Load vs Import semantics (executable vs library)
+- Project structure (src/, lib/, graphoid.toml)
+- Module search paths and resolution
+
+**Current Status**: 31 module tests passing, module manager exists in `src/execution/module_manager.rs` (250 lines)
 
 ### Phase 9: Advanced Features (18-25 days)
 
