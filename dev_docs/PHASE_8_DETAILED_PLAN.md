@@ -1,774 +1,587 @@
-# Phase 8: Module System - Detailed Implementation Plan
+# Phase 8: Complete Behavior System - Detailed Implementation Plan
 
-**Duration**: 4-6 days
-**Status**: Partially implemented (31 tests passing)
-**Goal**: Complete multi-file project support with robust module system
+**Duration**: 2-3 days (reduced from 5-7 days - already 75% complete)
+**Status**: Partially implemented (75 tests passing, ~75% complete)
+**Goal**: Complete the intrinsic behavior system for automatic value transformation
 
 ---
 
 ## Overview
 
-The Module System enables code organization across multiple files, reusable libraries, and clean namespace management. It's essential for building real-world Graphoid applications.
+The Behavior System allows data structures (lists, hashes, graphs) to automatically transform values during operations like `append`, `insert`, and `set`. This is a core feature that makes Graphoid's collections "self-aware" and intelligent.
+
+**Architectural Note**: As correctly identified, the behavior system is "really just a subset of rules" - behaviors transform values while rules validate structure. Both use the same `RetroactivePolicy` and application system, providing architectural consistency.
 
 **Current Status**:
-- ✅ Module manager exists (`src/execution/module_manager.rs`, 250 lines)
-- ✅ 31 module tests passing
-- ✅ Basic import/load functionality works
-- ⏳ Missing: Module declaration syntax (`module name`)
-- ⏳ Missing: Module aliases
-- ⏳ Missing: Standard library modules
-- ⏳ Missing: Project structure support (graphoid.toml)
+- ✅ Behavior framework exists (`src/graph/behaviors.rs`, 1005 lines)
+- ✅ 75 behavior tests passing (~75% complete)
+- ⏳ Missing: Complete integration with all collection types
+- ⏳ Missing: Full executor support for all behavior types
+- ⏳ Missing: Some standard behaviors
+- ⏳ Missing: Behavior rulesets completion
+
+**Dependencies**: None - can start immediately after Phase 7 (Function Pattern Matching)
 
 ---
 
 ## Architecture Summary
 
 **Files Involved**:
-- `src/execution/module_manager.rs` - Module loading and resolution
-- `src/ast/mod.rs` - AST nodes for module/import statements
-- `src/parser/mod.rs` - Parsing module/import syntax
-- `src/execution/executor.rs` - Module execution context
-- `src/values/mod.rs` - Module value type
+- `src/graph/behaviors.rs` - Behavior definitions and implementations
+- `src/graph/rules.rs` - Rule system (behaviors use rules)
+- `src/values/list.rs` - List behavior integration
+- `src/values/hash.rs` - Hash behavior integration
+- `src/values/graph.rs` - Graph behavior integration
+- `src/execution/executor.rs` - Behavior application in execution
 
-**Module Types**:
-1. **File Modules** - Individual .gr files
-2. **Standard Library** - Built-in modules (json, http, etc.)
-3. **External Packages** - Dependencies (future - Phase 14)
-
-**Resolution Order**:
-1. Relative paths (`./`, `../`)
-2. Project modules (`src/`, `lib/`)
-3. Standard library
-4. External packages
+**Behavior Types** (from spec):
+1. **Standard Transformations** - Built-in named transformations
+2. **Mapping Behaviors** - Hash-based value mappings
+3. **Custom Function Behaviors** - User-defined transformation functions
+4. **Conditional Behaviors** - Context-aware transformations
+5. **Rulesets** - Bundled behavior collections
+6. **Freeze Control** - Immutability behaviors
 
 ---
 
-## Day 1: Module Declaration Syntax
+## Day 1-2: Standard Transformation Behaviors
 
 ### Goal
-Support `module name` and `alias` declarations in .gr files.
+Complete all standard built-in behaviors from the spec.
 
 ### Tasks
 
-#### 1.1 AST Nodes
-**File**: `src/ast/mod.rs`
+#### 1.1 Value Transformation Behaviors
+**File**: `src/graph/behaviors.rs`
 
-Add module declaration statement:
-```rust
-pub enum Stmt {
-    // ... existing ...
-    ModuleDeclaration {
-        name: String,
-        alias: Option<String>,
-        position: SourcePosition,
-    },
-    // ... existing ...
-}
-```
+Ensure these are implemented and tested:
+- ✅ `none_to_zero` - Convert none to 0 (verify exists)
+- ✅ `none_to_empty` - Convert none to "" (verify exists)
+- ✅ `positive` - Absolute value (verify exists)
+- ✅ `round_to_int` - Round decimals (verify exists)
 
-#### 1.2 Parser Support
-**File**: `src/parser/mod.rs`
-
-Parse this syntax:
+**Tests**: 4 tests (one per behavior)
 ```graphoid
-module my_utilities
-alias utils
-
-# Module contents below
-helper_value = 42
-fn process(data) { return data * 2 }
+# Example test
+temps = [98.6, none, 102.5]
+temps.add_rule(:none_to_zero)
+# Expected: [98.6, 0, 102.5]
 ```
+
+#### 1.2 String Transformation Behaviors
+**File**: `src/graph/behaviors.rs`
+
+- ✅ `uppercase` - Convert to uppercase (verify exists)
+- ✅ `lowercase` - Convert to lowercase (verify exists)
+
+**Tests**: 2 tests
+
+#### 1.3 Validation Behaviors
+**File**: `src/graph/behaviors.rs`
+
+- ⏳ `validate_range(min, max)` - Clamp numbers to range
 
 **Implementation**:
 ```rust
-fn parse_module_declaration(&mut self) -> Result<Stmt> {
-    // Expect: module <name>
-    let name = self.expect_identifier()?;
-
-    // Check for optional alias
-    let alias = if self.check_keyword("alias") {
-        self.advance();
-        Some(self.expect_identifier()?)
-    } else {
-        None
-    };
-
-    Ok(Stmt::ModuleDeclaration { name, alias, position })
-}
-```
-
-#### 1.3 Executor Integration
-**File**: `src/execution/executor.rs`
-
-When executing a module file:
-1. Create module namespace
-2. Register alias if provided
-3. Execute module contents in module scope
-4. Return Module value
-
-**Tests**: 8 tests
-- Basic module declaration
-- Module with alias
-- Module without alias
-- Multiple modules (error - only one allowed)
-- Module in wrong location (must be at top)
-- Invalid module names
-- Duplicate aliases
-- Module exports
-
-**Acceptance Criteria**:
-- ✅ `module name` syntax works
-- ✅ `alias name` syntax works
-- ✅ Module creates proper namespace
-- ✅ 8+ tests passing
-
----
-
-## Day 2: Import Syntax Enhancements
-
-### Goal
-Complete import syntax with all variations from spec.
-
-### Tasks
-
-#### 2.1 Import Variations
-**Current**: Basic `import "module"` works
-
-**Add Support For**:
-```graphoid
-# Import from stdlib
-import "json"
-import "http"
-
-# Import .gr file
-import "path/to/file.gr"
-
-# Import with custom alias (discouraged for stdlib)
-import "module" as custom_name
-
-# Relative imports
-import "./helpers.gr"
-import "../config.gr"
-
-# Project modules
-import "models/user"
-import "app/server"
-```
-
-#### 2.2 Module Resolution Enhanced
-**File**: `src/execution/module_manager.rs`
-
-Implement resolution priority:
-1. **Relative paths**: Start with `./` or `../`
-2. **Project modules**: Check `src/`, then `lib/`
-3. **Standard library**: Built-in modules
-4. **External packages**: From dependencies (Phase 14)
-
-**Implementation**:
-```rust
-impl ModuleManager {
-    pub fn resolve_module(&mut self, path: &str, current_file: Option<&Path>)
-        -> Result<PathBuf, GraphoidError> {
-
-        // 1. Check if relative path
-        if path.starts_with("./") || path.starts_with("../") {
-            return self.resolve_relative(path, current_file);
-        }
-
-        // 2. Check project directories
-        if let Some(project_path) = self.find_in_project(path) {
-            return Ok(project_path);
-        }
-
-        // 3. Check standard library
-        if let Some(stdlib_path) = self.find_in_stdlib(path) {
-            return Ok(stdlib_path);
-        }
-
-        // 4. Not found
-        Err(GraphoidError::runtime(format!("Module not found: {}", path)))
-    }
-}
-```
-
-#### 2.3 Module Caching
-Prevent duplicate loading:
-```rust
-pub struct ModuleManager {
-    // Cache: canonical_path -> Module value
-    loaded_modules: HashMap<PathBuf, Value>,
-}
-```
-
-**Tests**: 12 tests
-- Relative import (./)
-- Relative import (../)
-- Project module import
-- Stdlib import
-- Custom alias
-- Module caching (same module twice)
-- Circular import detection
-- Import non-existent module (error)
-- Import syntax errors
-- Case sensitivity
-- Path traversal security
-- Module re-exports
-
-**Acceptance Criteria**:
-- ✅ All import variations work
-- ✅ Resolution priority correct
-- ✅ Caching prevents duplicates
-- ✅ 12+ tests passing
-
----
-
-## Day 3: Standard Library Modules
-
-### Goal
-Implement core standard library modules.
-
-### Tasks
-
-#### 3.1 Module Registry
-**File**: `src/execution/stdlib_registry.rs` (new file)
-
-```rust
-pub struct StdlibRegistry {
-    modules: HashMap<String, Box<dyn StdlibModule>>,
+pub struct ValidateRange {
+    min: f64,
+    max: f64,
 }
 
-pub trait StdlibModule {
-    fn name(&self) -> &str;
-    fn aliases(&self) -> Vec<&str>;
-    fn initialize(&self) -> Environment;
-}
-```
-
-#### 3.2 Core Modules
-Implement these standard library modules:
-
-**1. JSON Module** (`stdlib/json`)
-```graphoid
-import "json"
-
-data = {"name": "Alice", "age": 30}
-json_string = json.encode(data)
-parsed = json.decode(json_string)
-```
-
-Functions:
-- `encode(value)` -> string
-- `decode(string)` -> value
-- `pretty(value)` -> string (formatted JSON)
-
-**2. IO Module** (`stdlib/io`)
-```graphoid
-import "io"
-
-content = io.read_file("data.txt")
-io.write_file("output.txt", content)
-io.print("message")
-```
-
-Functions:
-- `read_file(path)` -> string
-- `write_file(path, content)` -> none
-- `print(value)` -> none
-- `println(value)` -> none
-- `read_line()` -> string
-
-**3. Math Module** (`stdlib/math`)
-```graphoid
-import "math"
-
-value = math.sqrt(16)  # 4
-angle = math.sin(math.PI / 2)  # 1
-```
-
-Functions:
-- `sqrt(x)`, `pow(x, y)`, `abs(x)`
-- `sin(x)`, `cos(x)`, `tan(x)`
-- `floor(x)`, `ceil(x)`, `round(x)`
-- Constants: `PI`, `E`
-
-**4. String Module** (`stdlib/string`)
-```graphoid
-import "string"
-
-padded = string.pad_left("hello", 10)
-repeated = string.repeat("x", 5)
-```
-
-Functions:
-- `pad_left(str, width)`, `pad_right(str, width)`
-- `repeat(str, count)`
-- `join(list, delimiter)`
-- `lines(str)` - split by newlines
-
-**5. List Module** (`stdlib/list`)
-```graphoid
-import "list"
-
-flattened = list.flatten([[1, 2], [3, 4]])
-zipped = list.zip([1, 2], [3, 4])
-```
-
-Functions:
-- `flatten(nested_list)`
-- `zip(list1, list2, ...)`
-- `range(start, end, step?)`
-- `repeat(value, count)`
-
-#### 3.3 Module Aliases
-**File**: `src/execution/stdlib_registry.rs`
-
-Register built-in aliases:
-- `statistics` → `stats`
-- `random` → `rand`
-- `regex` → `re`
-- `constants` → `const`
-
-**Implementation**:
-Both names automatically available:
-```graphoid
-import "statistics"
-# Both work:
-stats.mean([1, 2, 3])
-statistics.mean([1, 2, 3])
-```
-
-**Tests**: 25 tests (5 per module × 5 modules)
-- JSON encode/decode
-- IO read/write
-- Math functions
-- String utilities
-- List operations
-- Module aliases work
-- Import names correct
-- Error handling
-
-**Acceptance Criteria**:
-- ✅ 5 core stdlib modules implemented
-- ✅ All functions work correctly
-- ✅ Aliases automatically available
-- ✅ 25+ tests passing
-
----
-
-## Day 4: Load vs Import
-
-### Goal
-Clarify and complete `load` vs `import` semantics.
-
-### Tasks
-
-#### 4.1 Load Implementation
-**File**: `src/execution/executor.rs`
-
-```graphoid
-# load merges into current namespace
-load "config.gr"
-
-# Variables from config.gr now available directly
-if debug {
-    print("Debug mode")
-}
-```
-
-**vs**
-
-```graphoid
-# import creates module namespace
-import "config"
-
-# Access via module name
-if config.debug {
-    print("Debug mode")
-}
-```
-
-#### 4.2 Load Execution
-**Implementation**:
-```rust
-fn eval_load_stmt(&mut self, path: &str) -> Result<()> {
-    // 1. Resolve path
-    let file_path = self.module_manager.resolve_module(path, self.current_file.as_deref())?;
-
-    // 2. Parse and execute in CURRENT environment
-    let content = fs::read_to_string(&file_path)?;
-    let program = self.parse(content)?;
-
-    // 3. Execute statements (modifies current env)
-    for stmt in program.statements {
-        self.eval_stmt(&stmt)?;
-    }
-
-    Ok(())
-}
-```
-
-**Tests**: 8 tests
-- Load merges variables
-- Load can access current scope
-- Load can modify current scope
-- Import does NOT merge
-- Load relative path
-- Load absolute path
-- Load non-existent (error)
-- Load cyclic (error)
-
-**Acceptance Criteria**:
-- ✅ `load` merges into current namespace
-- ✅ `import` creates separate namespace
-- ✅ Semantics clear and documented
-- ✅ 8+ tests passing
-
----
-
-## Day 5: Project Structure Support
-
-### Goal
-Support multi-file projects with proper structure.
-
-### Tasks
-
-#### 5.1 Project Detection
-**File**: `src/execution/module_manager.rs`
-
-```rust
-impl ModuleManager {
-    pub fn detect_project_root(&self, current_file: &Path) -> Option<PathBuf> {
-        // Walk up directory tree looking for graphoid.toml
-        let mut path = current_file.to_path_buf();
-        while path.pop() {
-            let toml_path = path.join("graphoid.toml");
-            if toml_path.exists() {
-                return Some(path);
+impl TransformationRule for ValidateRange {
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        match value {
+            Value::Number(n) => {
+                let clamped = n.max(self.min).min(self.max);
+                Ok(Value::Number(clamped))
             }
+            other => Ok(other.clone()),
         }
-        None
     }
 }
 ```
 
-#### 5.2 Project Module Resolution
-When project root detected:
-```
-my_project/
-├── graphoid.toml
-├── src/
-│   ├── main.gr
-│   ├── app/
-│   │   └── server.gr
-│   └── models/
-│       └── user.gr
-└── lib/
-    └── utils/
-        └── helpers.gr
-```
+**Tests**: 3 tests (min clamp, max clamp, in-range)
 
-Resolution for `import "app/server"`:
-1. Check `src/app/server.gr` ✓
-2. Check `src/app/server/mod.gr`
-3. Check `lib/app/server.gr`
-4. Not found → error
+#### 1.4 Executor Integration
+**File**: `src/execution/executor.rs`
 
-#### 5.3 Module Index Files
-Support `mod.gr` for directory modules:
-```
-models/
-├── mod.gr          # Module entry point
-├── user.gr
-└── product.gr
-```
-
-In `models/mod.gr`:
+Ensure `add_rule()` method calls work:
 ```graphoid
-module models
-
-# Re-export submodules
-import "./user"
-import "./product"
+list.add_rule(:none_to_zero)
+list.add_rule(:validate_range, 0, 100)
 ```
+
+**Implementation**: Check `eval_method_call()` handles behavior symbols
+
+**Tests**: 5 integration tests
+
+**Acceptance Criteria**:
+- ✅ All 9 standard behaviors implemented
+- ✅ Behaviors work retroactively (transform existing values)
+- ✅ Behaviors work proactively (transform new values)
+- ✅ 14+ tests passing
+- ✅ Executor correctly routes `add_rule()` calls
+
+---
+
+## Day 3: Mapping Behaviors
+
+### Goal
+Complete hash-based value mapping behaviors.
+
+### Tasks
+
+#### 3.1 Mapping Rule Implementation
+**File**: `src/graph/behaviors.rs`
+
+```rust
+pub struct MappingBehavior {
+    mapping: HashMap<String, Value>,
+    default_value: Option<Value>,
+}
+
+impl TransformationRule for MappingBehavior {
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        let key = value.to_string();
+        if let Some(mapped) = self.mapping.get(&key) {
+            Ok(mapped.clone())
+        } else if let Some(default) = &self.default_value {
+            Ok(default.clone())
+        } else {
+            Ok(value.clone())
+        }
+    }
+}
+```
+
+#### 3.2 Syntax Support
+**File**: `src/execution/executor.rs`
+
+Support this syntax:
+```graphoid
+status_map = {"active": 1, "inactive": 0}
+statuses.add_mapping_rule(status_map, -1)
+```
+
+**Implementation**: New method `add_mapping_rule()` in executor
+
+#### 3.3 Chained Mappings
+Support multiple mapping stages:
+```graphoid
+codes.add_mapping_rule(first_map)
+codes.add_mapping_rule(second_map)
+```
+
+**Tests**: 8 tests
+- Basic mapping
+- Mapping with default
+- Unmapped values
+- Chained mappings
+- Type conversions
+- Empty mapping
+- Mapping to none
+- Complex values
+
+**Acceptance Criteria**:
+- ✅ Mapping behaviors work on lists, hashes
+- ✅ Default values supported
+- ✅ Chain mappings work correctly
+- ✅ 8+ tests passing
+
+---
+
+## Day 4: Custom Function Behaviors
+
+### Goal
+Support user-defined transformation functions as behaviors.
+
+### Tasks
+
+#### 4.1 Function-Based Behaviors
+**File**: `src/graph/behaviors.rs`
+
+```rust
+pub struct CustomFunctionBehavior {
+    function: Rc<Function>,
+}
+
+impl TransformationRule for CustomFunctionBehavior {
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        // Call function with value, return result
+        // Requires executor context for function calls!
+    }
+}
+```
+
+**Challenge**: Behaviors need executor context to call functions.
+
+**Solution**: Behaviors store function reference, executor applies them with context.
+
+#### 4.2 Syntax Support
+```graphoid
+fn normalize_temp(value) {
+    if value < 95 { return 95 }
+    if value > 105 { return 105 }
+    return value
+}
+
+temperatures.add_custom_rule(normalize_temp)
+```
+
+**Implementation**:
+- Parse `add_custom_rule(function_name)`
+- Store function in behavior
+- Apply during append/insert with executor context
+
+#### 4.3 Executor Changes
+**File**: `src/execution/executor.rs`
+
+- Modify behavior application to pass executor context
+- Handle function calls within behaviors
+- Ensure proper scoping and closure support
 
 **Tests**: 10 tests
-- Project root detection
-- Import from src/
-- Import from lib/
-- Directory module with mod.gr
-- Multi-level imports
-- Relative imports in project
-- No project root (fallback)
-- Invalid project structure
-- Module not in project
-- Cross-directory imports
+- Basic custom function
+- Function with conditionals
+- Function with multiple params (closure)
+- Function returning different types
+- Function that errors
+- Multiple custom functions
+- Custom + standard mix
+- Recursive function (edge case)
+- Function with side effects
+- Function accessing closure variables
 
 **Acceptance Criteria**:
-- ✅ Project root detection works
-- ✅ src/ and lib/ directories searched
-- ✅ mod.gr files work
+- ✅ Functions can be used as behaviors
+- ✅ Functions have access to executor context
+- ✅ Error handling works correctly
 - ✅ 10+ tests passing
 
 ---
 
-## Day 6: graphoid.toml Support
+## Day 5: Conditional Behaviors
 
 ### Goal
-Basic manifest file support for project metadata.
+Context-aware behaviors that only apply when conditions are met.
 
 ### Tasks
 
-#### 6.1 TOML Parsing
-**Dependencies**: Add `toml` crate to `Cargo.toml`
-
-```toml
-[dependencies]
-toml = "0.8"
-serde = { version = "1.0", features = ["derive"] }
-```
-
-#### 6.2 Manifest Structure
-**File**: `src/project/manifest.rs` (new file)
+#### 5.1 Conditional Behavior Implementation
+**File**: `src/graph/behaviors.rs`
 
 ```rust
-use serde::Deserialize;
-
-#[derive(Debug, Deserialize)]
-pub struct GraphoidManifest {
-    pub project: ProjectInfo,
-    #[serde(default)]
-    pub dependencies: HashMap<String, String>,
-    #[serde(default)]
-    pub dev_dependencies: HashMap<String, String>,
-    #[serde(default)]
-    pub build: BuildConfig,
-    #[serde(default)]
-    pub test: TestConfig,
+pub struct ConditionalBehavior {
+    condition_fn: Rc<Function>,
+    transform_fn: Rc<Function>,
+    fallback_fn: Option<Rc<Function>>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ProjectInfo {
-    pub name: String,
-    pub version: String,
-    pub authors: Vec<String>,
-    pub description: Option<String>,
-    pub license: Option<String>,
-    pub graphoid_version: String,
-}
-
-#[derive(Debug, Deserialize, Default)]
-pub struct BuildConfig {
-    pub entry_point: Option<String>,
-    pub output_dir: Option<String>,
-    pub include: Vec<String>,
-    pub exclude: Vec<String>,
-}
-
-#[derive(Debug, Deserialize, Default)]
-pub struct TestConfig {
-    pub test_pattern: Option<String>,
-    pub coverage_threshold: Option<u8>,
-}
-```
-
-#### 6.3 Manifest Loading
-**File**: `src/execution/module_manager.rs`
-
-```rust
-impl ModuleManager {
-    pub fn load_manifest(&mut self, project_root: &Path) -> Result<GraphoidManifest> {
-        let toml_path = project_root.join("graphoid.toml");
-        let content = fs::read_to_string(toml_path)?;
-        let manifest: GraphoidManifest = toml::from_str(&content)?;
-        Ok(manifest)
+impl TransformationRule for ConditionalBehavior {
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        // 1. Call condition function
+        // 2. If true, apply transform
+        // 3. If false and fallback exists, apply fallback
+        // 4. Otherwise return original
     }
 }
 ```
 
-#### 6.4 Manifest Usage
-- Project name/version in error messages
-- Entry point for `graphoid run`
-- Test pattern for `graphoid test`
-- Include/exclude for module resolution
+#### 5.2 Syntax Support
+```graphoid
+# With functions
+mixed_data.add_rule(is_string, to_upper)
 
-**Tests**: 8 tests
-- Parse valid manifest
-- Parse minimal manifest
-- Invalid TOML (error)
-- Missing required fields (error)
-- Use entry_point
-- Use test_pattern
-- Include/exclude patterns
-- Manifest in subdirectory
+# With fallback
+numbers.add_rule(:is_negative, :make_positive, :leave_unchanged)
+
+# Symbol predicates
+data.add_rule(:is_string, :uppercase)
+```
+
+#### 5.3 Symbol Support
+Support built-in symbol predicates and transforms:
+- Predicates: `:is_string`, `:is_number`, `:is_negative`, `:is_positive`
+- Transforms: `:uppercase`, `:lowercase`, `:double`, `:negate`
+
+**Tests**: 12 tests
+- Basic conditional
+- Conditional with fallback
+- Symbol-based conditional
+- Multiple conditions
+- Chained conditionals
+- Condition returns none
+- Transform returns none
+- Type mismatches
+- Error in condition
+- Error in transform
+- Mixed types in collection
+- Conditional on graph
 
 **Acceptance Criteria**:
-- ✅ graphoid.toml parsing works
-- ✅ Manifest data accessible
-- ✅ Used in module resolution
+- ✅ Conditional behaviors work
+- ✅ Fallback functions supported
+- ✅ Symbol predicates work
+- ✅ 12+ tests passing
+
+---
+
+## Day 6: Rulesets
+
+### Goal
+Bundled behavior collections for reusability.
+
+### Tasks
+
+#### 6.1 Ruleset Definition
+**File**: `src/graph/behaviors.rs` or new file `src/graph/behavior_rulesets.rs`
+
+```rust
+pub struct BehaviorRuleset {
+    name: String,
+    rules: Vec<RuleInstance>,
+}
+
+// Predefined rulesets
+pub fn get_behavior_ruleset(name: &str) -> Option<BehaviorRuleset> {
+    match name {
+        "data_cleaning" => Some(data_cleaning_ruleset()),
+        "string_normalization" => Some(string_normalization_ruleset()),
+        _ => None,
+    }
+}
+
+fn data_cleaning_ruleset() -> BehaviorRuleset {
+    BehaviorRuleset {
+        name: "data_cleaning".to_string(),
+        rules: vec![
+            RuleInstance::new(RuleSpec::NoneToZero),
+            RuleInstance::new(RuleSpec::Positive),
+            RuleInstance::new(RuleSpec::RoundToInt),
+        ],
+    }
+}
+```
+
+#### 6.2 Syntax Support
+```graphoid
+# Define ruleset (or use predefined)
+data_cleaning = [:none_to_zero, :positive, :round_to_int]
+
+# Apply to collections
+temperatures.add_rules(data_cleaning)
+blood_pressure.add_rules(data_cleaning)
+```
+
+#### 6.3 Predefined Rulesets
+Create these standard rulesets:
+- `data_cleaning` - none_to_zero, positive, round_to_int
+- `string_normalization` - lowercase, trim
+- `strict_validation` - validate types, reject none
+
+**Tests**: 8 tests
+- Apply ruleset to list
+- Apply ruleset to hash
+- Custom ruleset definition
+- Multiple rulesets on same collection
+- Ruleset order matters
+- Empty ruleset
+- Ruleset with invalid rule
+- Predefined rulesets work
+
+**Acceptance Criteria**:
+- ✅ Rulesets can be defined
+- ✅ `add_rules()` method works
+- ✅ Predefined rulesets available
 - ✅ 8+ tests passing
 
-**Note**: Full dependency resolution deferred to Phase 14 (Package Manager)
-
 ---
 
-## Module Value Type
+## Day 7: Freeze Control Behaviors
 
-### Module Representation
+### Goal
+Implement immutability behaviors (freeze system).
+
+### Tasks
+
+#### 7.1 Freeze Behavior Implementation
+**File**: `src/graph/behaviors.rs`
+
+```rust
+pub struct NoFrozenBehavior;
+
+impl TransformationRule for NoFrozenBehavior {
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        if value.is_frozen() {
+            Err(GraphoidError::runtime("Cannot add frozen elements"))
+        } else {
+            Ok(value.clone())
+        }
+    }
+}
+
+pub struct CopyElementsBehavior;
+
+impl TransformationRule for CopyElementsBehavior {
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        // Deep copy value (copies are unfrozen)
+        Ok(value.deep_copy_unfrozen())
+    }
+}
+```
+
+#### 7.2 Freeze System Support
 **File**: `src/values/mod.rs`
 
+Add freeze support to `Value` enum:
 ```rust
-#[derive(Debug, Clone)]
-pub struct Module {
-    pub name: String,
-    pub namespace: Environment,
-    pub file_path: PathBuf,
-    pub aliases: Vec<String>,
-}
-
-pub enum Value {
-    // ... existing ...
-    Module(Rc<Module>),
-    // ... existing ...
+impl Value {
+    pub fn freeze(&mut self) { /* mark as frozen */ }
+    pub fn is_frozen(&self) -> bool { /* check frozen state */ }
+    pub fn deep_copy_unfrozen(&self) -> Value { /* copy without freeze */ }
 }
 ```
 
-### Module Methods
+#### 7.3 Behaviors
+Implement:
+- `no_frozen` - Reject frozen elements
+- `copy_elements` - Copy all elements (unfrozen)
+- `shallow_freeze_only` - Only freeze collection, not contents
+
+**Tests**: 10 tests
+- no_frozen rejects frozen values
+- copy_elements creates unfrozen copies
+- shallow_freeze_only behavior
+- Freeze list doesn't freeze elements
+- Freeze nested structures
+- Mix frozen and unfrozen
+- Error messages clear
+- Freeze predicates (:frozen, :unfrozen)
+- Freeze on graphs
+- Freeze on hashes
+
+**Acceptance Criteria**:
+- ✅ Freeze system implemented
+- ✅ Freeze behaviors work
+- ✅ Predicates support freeze
+- ✅ 10+ tests passing
+
+---
+
+## Behavior Management Methods
+
+### Required Methods (all collections)
+
 ```graphoid
-# Get module info
-name = my_module.name()
-path = my_module.path()
-exports = my_module.exports()  # List of exported names
+# Check if behavior exists
+has_rule = list.has_rule(:positive)
+
+# Get all active behaviors
+behaviors = list.rules()
+
+# Remove specific behavior
+list.remove_rule(:positive)
+
+# Clear all behaviors
+list.clear_rules()
 ```
 
-**Tests**: 5 tests
+**Implementation**:
+- `has_rule(symbol)` -> bool
+- `rules()` -> list of symbols
+- `remove_rule(symbol)` -> none
+- `clear_rules()` -> none
 
----
-
-## Error Messages
-
-### Improved Module Errors
-**File**: `src/error.rs`
-
-```rust
-pub enum GraphoidError {
-    // ... existing ...
-    ModuleNotFound {
-        module: String,
-        searched_paths: Vec<PathBuf>,
-    },
-    CircularImport {
-        chain: Vec<String>,
-    },
-    ModuleParseError {
-        module: String,
-        error: Box<GraphoidError>,
-    },
-}
-```
-
-**Implementation**: Clear error messages
-```
-Error: Module not found: 'app/server'
-
-Searched paths:
-  1. src/app/server.gr
-  2. src/app/server/mod.gr
-  3. lib/app/server.gr
-  4. Standard library
-
-Suggestion: Check the module name and ensure the file exists.
-```
-
-**Tests**: 6 tests for error messages
-
----
-
-## Documentation
-
-### Files to Update
-
-1. **Language Specification** (`dev_docs/LANGUAGE_SPECIFICATION.md`)
-   - Verify module examples
-   - Add graphoid.toml spec
-   - Document resolution order
-
-2. **Project Guide** (new: `docs/MULTI_FILE_PROJECTS.md`)
-   - Standard project layout
-   - Best practices
-   - Module organization patterns
-   - graphoid.toml reference
-
-3. **Module Tutorial** (new: `docs/MODULE_SYSTEM.md`)
-   - Step-by-step guide
-   - Common patterns
-   - Import vs load
-   - Stdlib reference
+**Tests**: 8 tests (2 per method × 4 methods)
 
 ---
 
 ## Integration Tests
 
-**File**: `tests/module_integration_tests.rs`
+**File**: `tests/behavior_integration_tests.rs`
 
-Comprehensive scenarios:
-1. Multi-file application
-2. Standard library usage
-3. Nested module imports
-4. Circular import detection
-5. Module re-exports
-6. load vs import
-7. Relative imports in subdirectories
-8. Project structure with src/ and lib/
-9. graphoid.toml integration
-10. Error handling and recovery
+Create comprehensive integration tests:
+1. Behaviors + type constraints
+2. Behaviors + graph rules
+3. Behaviors on nested structures
+4. Behaviors + method chaining
+5. Behaviors + freezing
+6. Retroactive + proactive application
+7. Order dependence
+8. Error propagation
+9. Performance with many behaviors
+10. Behaviors across module boundaries
 
-**Tests**: 20+ integration tests
+**Tests**: 15+ integration tests
 
 ---
 
-## Complete Phase 8 Acceptance Criteria
+## Documentation Updates
 
-**Module Declaration**:
-- ✅ `module name` syntax works
-- ✅ `alias` declaration works
+### Files to Update
+
+1. **Language Specification** (`dev_docs/LANGUAGE_SPECIFICATION.md`)
+   - Verify all examples work
+   - Add any missing behaviors
+   - Document behavior order
+   - Document freeze system
+
+2. **Architecture** (`dev_docs/ARCHITECTURE_DESIGN.md`)
+   - Explain behavior application
+   - Document executor integration
+   - Performance considerations
+
+3. **README** (`rust/README.md`)
+   - Add behavior system examples
+   - Link to spec
+
+---
+
+## Complete Phase 7 Acceptance Criteria
+
+**Standard Behaviors**:
+- ✅ All 9 standard transformations implemented
+- ✅ Retroactive + proactive application works
+- ✅ 14+ tests passing
+
+**Mapping Behaviors**:
+- ✅ Hash-based mappings work
+- ✅ Chained mappings supported
 - ✅ 8+ tests passing
 
-**Import System**:
-- ✅ All import variations work
-- ✅ Resolution priority correct
-- ✅ Module caching works
-- ✅ 12+ tests passing
-
-**Standard Library**:
-- ✅ 5 core modules implemented
-- ✅ JSON, IO, Math, String, List modules work
-- ✅ Aliases automatically available
-- ✅ 25+ tests passing
-
-**Load vs Import**:
-- ✅ Distinct semantics clear
-- ✅ Both work correctly
-- ✅ 8+ tests passing
-
-**Project Structure**:
-- ✅ Project root detection works
-- ✅ src/ and lib/ supported
-- ✅ mod.gr files work
+**Custom Functions**:
+- ✅ Functions as behaviors work
+- ✅ Executor context available
 - ✅ 10+ tests passing
 
-**Manifest**:
-- ✅ graphoid.toml parsing works
-- ✅ Metadata available
+**Conditional Behaviors**:
+- ✅ Condition + transform + fallback works
+- ✅ Symbol predicates supported
+- ✅ 12+ tests passing
+
+**Rulesets**:
+- ✅ Ruleset definition and application works
+- ✅ Predefined rulesets available
+- ✅ 8+ tests passing
+
+**Freeze Control**:
+- ✅ Freeze system implemented
+- ✅ Freeze behaviors work
+- ✅ 10+ tests passing
+
+**Management**:
+- ✅ has_rule, rules, remove_rule, clear_rules all work
 - ✅ 8+ tests passing
 
 **Integration**:
-- ✅ 20+ integration tests passing
-- ✅ Real-world scenarios work
+- ✅ 15+ integration tests passing
+- ✅ All collection types support behaviors
+- ✅ Documentation complete
 
 **Totals**:
-- ✅ **91+ new tests** (current: 31, target: 122+)
+- ✅ **85+ new tests** (current: 75, target: 160+)
 - ✅ Zero compiler warnings
-- ✅ Documentation complete
 - ✅ All spec examples work
 
 ---
@@ -776,58 +589,39 @@ Comprehensive scenarios:
 ## Risk Assessment
 
 **Low Risk**:
-- Module declaration (straightforward)
-- Load vs import (already partially working)
+- Standard behaviors (already mostly implemented)
+- Mapping behaviors (straightforward)
 
 **Medium Risk**:
-- Standard library modules (implementation work)
-- Project structure (file system complexity)
+- Custom functions (need executor context)
+- Conditional behaviors (complex logic)
 
 **High Risk**:
-- Module resolution edge cases
-- Circular import detection
-- Cross-platform path handling
+- Freeze system (new feature, affects all types)
+- Integration with existing code (may need refactoring)
 
 **Mitigation**:
-- Comprehensive path testing on all platforms
-- Clear error messages for debugging
-- Extensive integration tests
+- TDD approach (write tests first)
+- Incremental integration
+- Extensive testing at each stage
 
 ---
 
 ## Success Metrics
 
-1. **Test Coverage**: 122+ module tests passing
-2. **Stdlib Completeness**: 5 core modules working
-3. **Real Projects**: Multi-file examples work
-4. **Documentation**: Complete guides available
+1. **Test Coverage**: 160+ behavior tests passing
+2. **All Spec Examples**: Every code example in spec works
+3. **Performance**: Behaviors add < 10% overhead
+4. **Documentation**: Complete and accurate
 5. **Zero Warnings**: Clean compilation
 
 ---
 
 ## Next Phase Preview
 
-**Phase 9** (Advanced Features) will build on modules by:
-- Adding more stdlib modules
-- Module-level configuration
-- Advanced import patterns
-- Performance optimizations
+**Phase 8** will build on the behavior system by:
+- Using behaviors in stdlib modules
+- Module-level behavior definitions
+- Cross-module behavior sharing
 
-The module system enables real-world Graphoid applications with clean code organization!
-
----
-
-## Quick Start for Next Session
-
-```bash
-# Run existing module tests
-cargo test module
-
-# Check what's already implemented
-grep -r "module " src/
-ls -la src/execution/module_manager.rs
-
-# Start with Day 1: Module declaration
-# File: src/ast/mod.rs
-# Add: ModuleDeclaration statement
-```
+The behavior system is foundational for making Graphoid collections truly "smart" and self-managing!

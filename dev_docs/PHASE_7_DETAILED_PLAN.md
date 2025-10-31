@@ -1,622 +1,858 @@
-# Phase 7: Behavior System - Detailed Implementation Plan
+# Phase 7: Function Pattern Matching - Detailed Implementation Plan
 
 **Duration**: 5-7 days
-**Status**: Partially implemented (75 tests passing)
-**Goal**: Complete the intrinsic behavior system for automatic value transformation
+**Status**: Not started - NEW phase
+**Goal**: Implement pipe syntax pattern matching for elegant function definitions
 
 ---
 
 ## Overview
 
-The Behavior System allows data structures (lists, hashes, graphs) to automatically transform values during operations like `append`, `insert`, and `set`. This is a core feature that makes Graphoid's collections "self-aware" and intelligent.
+Pattern matching with pipe syntax allows functions to handle different cases elegantly without verbose if/else chains. This is a foundational feature that:
+- Provides elegant syntax for recursive functions
+- Enables clean case handling
+- Serves as the foundation for graph pattern matching (Phase 9)
+- Has **zero dependencies** - can start immediately
 
-**Current Status**:
-- ✅ Behavior framework exists (`src/graph/behaviors.rs`, 1005 lines)
-- ✅ 75 behavior tests passing
-- ⏳ Missing: Complete integration with all collection types
-- ⏳ Missing: Full executor support for all behavior types
-- ⏳ Missing: Freeze control behaviors
+**Key Syntax**: `|pattern| => result`
 
----
-
-## Architecture Summary
-
-**Files Involved**:
-- `src/graph/behaviors.rs` - Behavior definitions and implementations
-- `src/graph/rules.rs` - Rule system (behaviors use rules)
-- `src/values/list.rs` - List behavior integration
-- `src/values/hash.rs` - Hash behavior integration
-- `src/values/graph.rs` - Graph behavior integration
-- `src/execution/executor.rs` - Behavior application in execution
-
-**Behavior Types** (from spec):
-1. **Standard Transformations** - Built-in named transformations
-2. **Mapping Behaviors** - Hash-based value mappings
-3. **Custom Function Behaviors** - User-defined transformation functions
-4. **Conditional Behaviors** - Context-aware transformations
-5. **Rulesets** - Bundled behavior collections
-6. **Freeze Control** - Immutability behaviors
+**From Language Specification §2365**:
+- Pipe syntax clearly distinguishes pattern matching from lambdas
+- Automatic fallthrough to `none` if no pattern matches
+- Perfect for recursive functions
+- Functional elegance with imperative practicality
 
 ---
 
-## Day 1-2: Standard Transformation Behaviors
+## Architecture
 
-### Goal
-Complete all standard built-in behaviors from the spec.
+### AST Nodes Needed
 
-### Tasks
+**File**: `src/ast/mod.rs`
 
-#### 1.1 Value Transformation Behaviors
-**File**: `src/graph/behaviors.rs`
-
-Ensure these are implemented and tested:
-- ✅ `none_to_zero` - Convert none to 0 (verify exists)
-- ✅ `none_to_empty` - Convert none to "" (verify exists)
-- ✅ `positive` - Absolute value (verify exists)
-- ✅ `round_to_int` - Round decimals (verify exists)
-
-**Tests**: 4 tests (one per behavior)
-```graphoid
-# Example test
-temps = [98.6, none, 102.5]
-temps.add_rule(:none_to_zero)
-# Expected: [98.6, 0, 102.5]
-```
-
-#### 1.2 String Transformation Behaviors
-**File**: `src/graph/behaviors.rs`
-
-- ✅ `uppercase` - Convert to uppercase (verify exists)
-- ✅ `lowercase` - Convert to lowercase (verify exists)
-
-**Tests**: 2 tests
-
-#### 1.3 Validation Behaviors
-**File**: `src/graph/behaviors.rs`
-
-- ⏳ `validate_range(min, max)` - Clamp numbers to range
-
-**Implementation**:
 ```rust
-pub struct ValidateRange {
-    min: f64,
-    max: f64,
+/// Pattern matching clause
+#[derive(Debug, Clone, PartialEq)]
+pub struct PatternClause {
+    pub pattern: Pattern,
+    pub guard: Option<Expr>,  // Future: if conditions
+    pub body: Expr,
+    pub position: SourcePosition,
 }
 
-impl TransformationRule for ValidateRange {
-    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        match value {
-            Value::Number(n) => {
-                let clamped = n.max(self.min).min(self.max);
-                Ok(Value::Number(clamped))
+/// Pattern types
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pattern {
+    Literal {
+        value: LiteralValue,
+        position: SourcePosition,
+    },
+    Variable {
+        name: String,
+        position: SourcePosition,
+    },
+    Wildcard {
+        position: SourcePosition,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum LiteralValue {
+    Number(f64),
+    String(String),
+    Boolean(bool),
+    None,
+}
+
+/// Update FunctionDecl to include pattern clauses
+pub struct FunctionDecl {
+    pub name: String,
+    pub params: Vec<Parameter>,
+    pub body: Vec<Stmt>,
+    pub pattern_clauses: Option<Vec<PatternClause>>,  // NEW
+    pub position: SourcePosition,
+}
+```
+
+### Execution Engine
+
+**File**: `src/execution/pattern_matcher.rs` (NEW)
+
+```rust
+pub struct PatternMatcher {
+    // Pattern matching logic
+}
+
+impl PatternMatcher {
+    pub fn new() -> Self { ... }
+
+    /// Match a value against a pattern
+    pub fn matches(&self, pattern: &Pattern, value: &Value) -> bool { ... }
+
+    /// Extract bindings from a pattern match
+    pub fn extract_bindings(&self, pattern: &Pattern, value: &Value)
+        -> Result<HashMap<String, Value>, GraphoidError> { ... }
+
+    /// Match value against all clauses, return first match
+    pub fn match_clauses(&self, clauses: &[PatternClause], args: &[Value])
+        -> Result<Option<&PatternClause>, GraphoidError> { ... }
+}
+```
+
+---
+
+## Implementation Plan
+
+### Day 1: Parser Extension for Pipe Syntax
+
+**Goal**: Parse `|pattern| => result` syntax
+
+#### 1.1 Lexer Updates
+
+**File**: `src/lexer/mod.rs`
+
+Ensure these tokens exist (already added in Phase 1):
+- `Token::Pipe` (`|`)
+- `Token::Arrow` (`=>`)
+
+#### 1.2 Parser Updates
+
+**File**: `src/parser/mod.rs`
+
+**Add pattern parsing**:
+```rust
+impl Parser {
+    /// Parse a pattern: |pattern|
+    fn parse_pattern(&mut self) -> Result<Pattern, GraphoidError> {
+        self.expect(Token::Pipe)?;
+
+        let pattern = match self.current_token() {
+            Token::Number(n) => Pattern::Literal {
+                value: LiteralValue::Number(*n),
+                position: self.position(),
+            },
+            Token::String(s) => Pattern::Literal {
+                value: LiteralValue::String(s.clone()),
+                position: self.position(),
+            },
+            Token::Symbol(sym) if sym == "none" => Pattern::Literal {
+                value: LiteralValue::None,
+                position: self.position(),
+            },
+            Token::Symbol(sym) if sym == "true" || sym == "false" => Pattern::Literal {
+                value: LiteralValue::Boolean(sym == "true"),
+                position: self.position(),
+            },
+            Token::Symbol(sym) if sym == "_" => Pattern::Wildcard {
+                position: self.position(),
+            },
+            Token::Symbol(name) => Pattern::Variable {
+                name: name.clone(),
+                position: self.position(),
+            },
+            _ => return Err(GraphoidError::parse_error(
+                format!("Expected pattern, got {:?}", self.current_token()),
+                self.position()
+            )),
+        };
+
+        self.advance();
+        self.expect(Token::Pipe)?;
+
+        Ok(pattern)
+    }
+
+    /// Parse pattern clause: |pattern| => result
+    fn parse_pattern_clause(&mut self) -> Result<PatternClause, GraphoidError> {
+        let pattern = self.parse_pattern()?;
+        self.expect(Token::Arrow)?;
+        let body = self.parse_expression()?;
+
+        Ok(PatternClause {
+            pattern,
+            guard: None,  // Future: guards
+            body,
+            position: self.position(),
+        })
+    }
+
+    /// Update parse_function_decl to handle pattern clauses
+    fn parse_function_decl(&mut self) -> Result<Stmt, GraphoidError> {
+        // ... existing parsing ...
+
+        // Check if function body starts with pattern clauses
+        let pattern_clauses = if self.check(Token::Pipe) {
+            let mut clauses = vec![];
+            while self.check(Token::Pipe) {
+                clauses.push(self.parse_pattern_clause()?);
             }
-            other => Ok(other.clone()),
-        }
-    }
-}
-```
-
-**Tests**: 3 tests (min clamp, max clamp, in-range)
-
-#### 1.4 Executor Integration
-**File**: `src/execution/executor.rs`
-
-Ensure `add_rule()` method calls work:
-```graphoid
-list.add_rule(:none_to_zero)
-list.add_rule(:validate_range, 0, 100)
-```
-
-**Implementation**: Check `eval_method_call()` handles behavior symbols
-
-**Tests**: 5 integration tests
-
-**Acceptance Criteria**:
-- ✅ All 9 standard behaviors implemented
-- ✅ Behaviors work retroactively (transform existing values)
-- ✅ Behaviors work proactively (transform new values)
-- ✅ 14+ tests passing
-- ✅ Executor correctly routes `add_rule()` calls
-
----
-
-## Day 3: Mapping Behaviors
-
-### Goal
-Complete hash-based value mapping behaviors.
-
-### Tasks
-
-#### 3.1 Mapping Rule Implementation
-**File**: `src/graph/behaviors.rs`
-
-```rust
-pub struct MappingBehavior {
-    mapping: HashMap<String, Value>,
-    default_value: Option<Value>,
-}
-
-impl TransformationRule for MappingBehavior {
-    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        let key = value.to_string();
-        if let Some(mapped) = self.mapping.get(&key) {
-            Ok(mapped.clone())
-        } else if let Some(default) = &self.default_value {
-            Ok(default.clone())
+            Some(clauses)
         } else {
-            Ok(value.clone())
+            None
+        };
+
+        Ok(Stmt::FunctionDecl {
+            name,
+            params,
+            body: if pattern_clauses.is_some() { vec![] } else { body },
+            pattern_clauses,
+            position,
+        })
+    }
+}
+```
+
+**Tests**: `tests/unit/parser_tests.rs`
+```rust
+#[test]
+fn test_parse_literal_pattern() {
+    let code = "fn factorial(n) { |0| => 1 }";
+    // Assert pattern clause parsed correctly
+}
+
+#[test]
+fn test_parse_variable_pattern() {
+    let code = "fn double(x) { |n| => n * 2 }";
+    // Assert variable binding
+}
+
+#[test]
+fn test_parse_multiple_patterns() {
+    let code = r#"
+        fn factorial(n) {
+            |0| => 1
+            |1| => 1
+            |x| => x * factorial(x - 1)
+        }
+    "#;
+    // Assert multiple clauses
+}
+
+#[test]
+fn test_parse_string_patterns() {
+    let code = r#"
+        fn get_sound(animal) {
+            |"dog"| => "woof"
+            |"cat"| => "meow"
+        }
+    "#;
+    // Assert string literal patterns
+}
+```
+
+---
+
+### Day 2: Pattern Matching Engine
+
+**Goal**: Core pattern matching logic
+
+#### 2.1 Create Pattern Matcher Module
+
+**File**: `src/execution/pattern_matcher.rs` (NEW)
+
+```rust
+use crate::ast::{Pattern, LiteralValue, PatternClause};
+use crate::values::Value;
+use crate::error::{GraphoidError, Result};
+use std::collections::HashMap;
+
+pub struct PatternMatcher;
+
+impl PatternMatcher {
+    pub fn new() -> Self {
+        PatternMatcher
+    }
+
+    /// Check if a value matches a pattern
+    pub fn matches(&self, pattern: &Pattern, value: &Value) -> bool {
+        match pattern {
+            Pattern::Wildcard { .. } => true,  // _ matches anything
+
+            Pattern::Variable { .. } => true,  // Variables match anything
+
+            Pattern::Literal { value: lit, .. } => {
+                self.literal_matches(lit, value)
+            }
+        }
+    }
+
+    /// Check if a literal pattern matches a value
+    fn literal_matches(&self, literal: &LiteralValue, value: &Value) -> bool {
+        match (literal, value) {
+            (LiteralValue::Number(n1), Value::Number(n2)) => (n1 - n2).abs() < f64::EPSILON,
+            (LiteralValue::String(s1), Value::String(s2)) => s1 == s2,
+            (LiteralValue::Boolean(b1), Value::Boolean(b2)) => b1 == b2,
+            (LiteralValue::None, Value::None) => true,
+            _ => false,
+        }
+    }
+
+    /// Extract variable bindings from a successful match
+    pub fn extract_bindings(&self, pattern: &Pattern, value: &Value)
+        -> Result<HashMap<String, Value>>
+    {
+        let mut bindings = HashMap::new();
+
+        match pattern {
+            Pattern::Variable { name, .. } => {
+                bindings.insert(name.clone(), value.clone());
+            }
+            Pattern::Wildcard { .. } | Pattern::Literal { .. } => {
+                // No bindings for wildcards or literals
+            }
+        }
+
+        Ok(bindings)
+    }
+
+    /// Find the first matching pattern clause
+    pub fn find_match<'a>(
+        &self,
+        clauses: &'a [PatternClause],
+        args: &[Value]
+    ) -> Result<Option<(&'a PatternClause, HashMap<String, Value>)>> {
+        // For now, assume single-parameter functions
+        if args.len() != 1 {
+            return Err(GraphoidError::runtime_error(
+                format!("Pattern matching requires exactly 1 argument, got {}", args.len()),
+                None
+            ));
+        }
+
+        let arg = &args[0];
+
+        for clause in clauses {
+            if self.matches(&clause.pattern, arg) {
+                let bindings = self.extract_bindings(&clause.pattern, arg)?;
+                return Ok(Some((clause, bindings)));
+            }
+        }
+
+        // No match found - return none
+        Ok(None)
+    }
+}
+```
+
+**Tests**: `tests/unit/pattern_matcher_tests.rs` (NEW)
+```rust
+use graphoid::execution::pattern_matcher::PatternMatcher;
+use graphoid::ast::{Pattern, LiteralValue};
+use graphoid::values::Value;
+
+#[test]
+fn test_literal_number_match() {
+    let matcher = PatternMatcher::new();
+    let pattern = Pattern::Literal {
+        value: LiteralValue::Number(0.0),
+        position: Default::default(),
+    };
+    assert!(matcher.matches(&pattern, &Value::Number(0.0)));
+    assert!(!matcher.matches(&pattern, &Value::Number(1.0)));
+}
+
+#[test]
+fn test_variable_match() {
+    let matcher = PatternMatcher::new();
+    let pattern = Pattern::Variable {
+        name: "x".to_string(),
+        position: Default::default(),
+    };
+    assert!(matcher.matches(&pattern, &Value::Number(42.0)));
+}
+
+#[test]
+fn test_extract_variable_binding() {
+    let matcher = PatternMatcher::new();
+    let pattern = Pattern::Variable {
+        name: "x".to_string(),
+        position: Default::default(),
+    };
+    let bindings = matcher.extract_bindings(&pattern, &Value::Number(42.0)).unwrap();
+    assert_eq!(bindings.get("x"), Some(&Value::Number(42.0)));
+}
+```
+
+---
+
+### Day 3: Executor Integration
+
+**Goal**: Execute functions with pattern matching
+
+#### 3.1 Update Executor
+
+**File**: `src/execution/executor.rs`
+
+```rust
+use crate::execution::pattern_matcher::PatternMatcher;
+
+impl Executor {
+    pub fn eval_stmt(&mut self, stmt: &Stmt) -> Result<Option<Value>> {
+        match stmt {
+            Stmt::FunctionDecl { name, params, body, pattern_clauses, .. } => {
+                let func = if let Some(clauses) = pattern_clauses {
+                    // Pattern matching function
+                    Function::PatternMatching {
+                        name: name.clone(),
+                        params: params.clone(),
+                        clauses: clauses.clone(),
+                    }
+                } else {
+                    // Regular function
+                    Function::UserDefined {
+                        name: name.clone(),
+                        params: params.clone(),
+                        body: body.clone(),
+                    }
+                };
+
+                self.env.define(name.clone(), Value::Function(func));
+                Ok(None)
+            }
+            // ... other statements ...
+        }
+    }
+
+    fn call_function(&mut self, func: &Function, args: Vec<Value>)
+        -> Result<Value>
+    {
+        match func {
+            Function::PatternMatching { name, params, clauses } => {
+                let matcher = PatternMatcher::new();
+
+                match matcher.find_match(clauses, &args)? {
+                    Some((clause, bindings)) => {
+                        // Create new scope with bindings
+                        self.env.push_scope();
+                        for (name, value) in bindings {
+                            self.env.define(name, value);
+                        }
+
+                        // Evaluate the clause body
+                        let result = self.eval_expr(&clause.body)?;
+
+                        self.env.pop_scope();
+                        Ok(result)
+                    }
+                    None => {
+                        // No match - return none
+                        Ok(Value::None)
+                    }
+                }
+            }
+            Function::UserDefined { .. } => {
+                // ... existing logic ...
+            }
+            // ... other function types ...
         }
     }
 }
 ```
 
-#### 3.2 Syntax Support
-**File**: `src/execution/executor.rs`
+#### 3.2 Update Function Value Type
 
-Support this syntax:
-```graphoid
-status_map = {"active": 1, "inactive": 0}
-statuses.add_mapping_rule(status_map, -1)
-```
-
-**Implementation**: New method `add_mapping_rule()` in executor
-
-#### 3.3 Chained Mappings
-Support multiple mapping stages:
-```graphoid
-codes.add_mapping_rule(first_map)
-codes.add_mapping_rule(second_map)
-```
-
-**Tests**: 8 tests
-- Basic mapping
-- Mapping with default
-- Unmapped values
-- Chained mappings
-- Type conversions
-- Empty mapping
-- Mapping to none
-- Complex values
-
-**Acceptance Criteria**:
-- ✅ Mapping behaviors work on lists, hashes
-- ✅ Default values supported
-- ✅ Chain mappings work correctly
-- ✅ 8+ tests passing
-
----
-
-## Day 4: Custom Function Behaviors
-
-### Goal
-Support user-defined transformation functions as behaviors.
-
-### Tasks
-
-#### 4.1 Function-Based Behaviors
-**File**: `src/graph/behaviors.rs`
-
-```rust
-pub struct CustomFunctionBehavior {
-    function: Rc<Function>,
-}
-
-impl TransformationRule for CustomFunctionBehavior {
-    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        // Call function with value, return result
-        // Requires executor context for function calls!
-    }
-}
-```
-
-**Challenge**: Behaviors need executor context to call functions.
-
-**Solution**: Behaviors store function reference, executor applies them with context.
-
-#### 4.2 Syntax Support
-```graphoid
-fn normalize_temp(value) {
-    if value < 95 { return 95 }
-    if value > 105 { return 105 }
-    return value
-}
-
-temperatures.add_custom_rule(normalize_temp)
-```
-
-**Implementation**:
-- Parse `add_custom_rule(function_name)`
-- Store function in behavior
-- Apply during append/insert with executor context
-
-#### 4.3 Executor Changes
-**File**: `src/execution/executor.rs`
-
-- Modify behavior application to pass executor context
-- Handle function calls within behaviors
-- Ensure proper scoping and closure support
-
-**Tests**: 10 tests
-- Basic custom function
-- Function with conditionals
-- Function with multiple params (closure)
-- Function returning different types
-- Function that errors
-- Multiple custom functions
-- Custom + standard mix
-- Recursive function (edge case)
-- Function with side effects
-- Function accessing closure variables
-
-**Acceptance Criteria**:
-- ✅ Functions can be used as behaviors
-- ✅ Functions have access to executor context
-- ✅ Error handling works correctly
-- ✅ 10+ tests passing
-
----
-
-## Day 5: Conditional Behaviors
-
-### Goal
-Context-aware behaviors that only apply when conditions are met.
-
-### Tasks
-
-#### 5.1 Conditional Behavior Implementation
-**File**: `src/graph/behaviors.rs`
-
-```rust
-pub struct ConditionalBehavior {
-    condition_fn: Rc<Function>,
-    transform_fn: Rc<Function>,
-    fallback_fn: Option<Rc<Function>>,
-}
-
-impl TransformationRule for ConditionalBehavior {
-    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        // 1. Call condition function
-        // 2. If true, apply transform
-        // 3. If false and fallback exists, apply fallback
-        // 4. Otherwise return original
-    }
-}
-```
-
-#### 5.2 Syntax Support
-```graphoid
-# With functions
-mixed_data.add_rule(is_string, to_upper)
-
-# With fallback
-numbers.add_rule(:is_negative, :make_positive, :leave_unchanged)
-
-# Symbol predicates
-data.add_rule(:is_string, :uppercase)
-```
-
-#### 5.3 Symbol Support
-Support built-in symbol predicates and transforms:
-- Predicates: `:is_string`, `:is_number`, `:is_negative`, `:is_positive`
-- Transforms: `:uppercase`, `:lowercase`, `:double`, `:negate`
-
-**Tests**: 12 tests
-- Basic conditional
-- Conditional with fallback
-- Symbol-based conditional
-- Multiple conditions
-- Chained conditionals
-- Condition returns none
-- Transform returns none
-- Type mismatches
-- Error in condition
-- Error in transform
-- Mixed types in collection
-- Conditional on graph
-
-**Acceptance Criteria**:
-- ✅ Conditional behaviors work
-- ✅ Fallback functions supported
-- ✅ Symbol predicates work
-- ✅ 12+ tests passing
-
----
-
-## Day 6: Rulesets
-
-### Goal
-Bundled behavior collections for reusability.
-
-### Tasks
-
-#### 6.1 Ruleset Definition
-**File**: `src/graph/behaviors.rs` or new file `src/graph/behavior_rulesets.rs`
-
-```rust
-pub struct BehaviorRuleset {
-    name: String,
-    rules: Vec<RuleInstance>,
-}
-
-// Predefined rulesets
-pub fn get_behavior_ruleset(name: &str) -> Option<BehaviorRuleset> {
-    match name {
-        "data_cleaning" => Some(data_cleaning_ruleset()),
-        "string_normalization" => Some(string_normalization_ruleset()),
-        _ => None,
-    }
-}
-
-fn data_cleaning_ruleset() -> BehaviorRuleset {
-    BehaviorRuleset {
-        name: "data_cleaning".to_string(),
-        rules: vec![
-            RuleInstance::new(RuleSpec::NoneToZero),
-            RuleInstance::new(RuleSpec::Positive),
-            RuleInstance::new(RuleSpec::RoundToInt),
-        ],
-    }
-}
-```
-
-#### 6.2 Syntax Support
-```graphoid
-# Define ruleset (or use predefined)
-data_cleaning = [:none_to_zero, :positive, :round_to_int]
-
-# Apply to collections
-temperatures.add_rules(data_cleaning)
-blood_pressure.add_rules(data_cleaning)
-```
-
-#### 6.3 Predefined Rulesets
-Create these standard rulesets:
-- `data_cleaning` - none_to_zero, positive, round_to_int
-- `string_normalization` - lowercase, trim
-- `strict_validation` - validate types, reject none
-
-**Tests**: 8 tests
-- Apply ruleset to list
-- Apply ruleset to hash
-- Custom ruleset definition
-- Multiple rulesets on same collection
-- Ruleset order matters
-- Empty ruleset
-- Ruleset with invalid rule
-- Predefined rulesets work
-
-**Acceptance Criteria**:
-- ✅ Rulesets can be defined
-- ✅ `add_rules()` method works
-- ✅ Predefined rulesets available
-- ✅ 8+ tests passing
-
----
-
-## Day 7: Freeze Control Behaviors
-
-### Goal
-Implement immutability behaviors (freeze system).
-
-### Tasks
-
-#### 7.1 Freeze Behavior Implementation
-**File**: `src/graph/behaviors.rs`
-
-```rust
-pub struct NoFrozenBehavior;
-
-impl TransformationRule for NoFrozenBehavior {
-    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        if value.is_frozen() {
-            Err(GraphoidError::runtime("Cannot add frozen elements"))
-        } else {
-            Ok(value.clone())
-        }
-    }
-}
-
-pub struct CopyElementsBehavior;
-
-impl TransformationRule for CopyElementsBehavior {
-    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        // Deep copy value (copies are unfrozen)
-        Ok(value.deep_copy_unfrozen())
-    }
-}
-```
-
-#### 7.2 Freeze System Support
 **File**: `src/values/mod.rs`
 
-Add freeze support to `Value` enum:
 ```rust
-impl Value {
-    pub fn freeze(&mut self) { /* mark as frozen */ }
-    pub fn is_frozen(&self) -> bool { /* check frozen state */ }
-    pub fn deep_copy_unfrozen(&self) -> Value { /* copy without freeze */ }
+#[derive(Debug, Clone, PartialEq)]
+pub enum Function {
+    UserDefined {
+        name: String,
+        params: Vec<Parameter>,
+        body: Vec<Stmt>,
+    },
+    PatternMatching {
+        name: String,
+        params: Vec<Parameter>,
+        clauses: Vec<PatternClause>,
+    },
+    // ... other variants ...
 }
 ```
 
-#### 7.3 Behaviors
-Implement:
-- `no_frozen` - Reject frozen elements
-- `copy_elements` - Copy all elements (unfrozen)
-- `shallow_freeze_only` - Only freeze collection, not contents
+**Tests**: `tests/unit/executor_tests.rs`
+```rust
+#[test]
+fn test_pattern_matching_literal() {
+    let code = r#"
+        fn is_zero(n) {
+            |0| => true
+            |x| => false
+        }
+        is_zero(0)
+    "#;
+    assert_eq!(eval(code), Value::Boolean(true));
+}
 
-**Tests**: 10 tests
-- no_frozen rejects frozen values
-- copy_elements creates unfrozen copies
-- shallow_freeze_only behavior
-- Freeze list doesn't freeze elements
-- Freeze nested structures
-- Mix frozen and unfrozen
-- Error messages clear
-- Freeze predicates (:frozen, :unfrozen)
-- Freeze on graphs
-- Freeze on hashes
+#[test]
+fn test_pattern_matching_factorial() {
+    let code = r#"
+        fn factorial(n) {
+            |0| => 1
+            |1| => 1
+            |x| => x * factorial(x - 1)
+        }
+        factorial(5)
+    "#;
+    assert_eq!(eval(code), Value::Number(120.0));
+}
 
-**Acceptance Criteria**:
-- ✅ Freeze system implemented
-- ✅ Freeze behaviors work
-- ✅ Predicates support freeze
-- ✅ 10+ tests passing
-
----
-
-## Behavior Management Methods
-
-### Required Methods (all collections)
-
-```graphoid
-# Check if behavior exists
-has_rule = list.has_rule(:positive)
-
-# Get all active behaviors
-behaviors = list.rules()
-
-# Remove specific behavior
-list.remove_rule(:positive)
-
-# Clear all behaviors
-list.clear_rules()
+#[test]
+fn test_pattern_matching_no_match() {
+    let code = r#"
+        fn get_sound(animal) {
+            |"dog"| => "woof"
+            |"cat"| => "meow"
+        }
+        get_sound("bird")
+    "#;
+    assert_eq!(eval(code), Value::None);
+}
 ```
 
-**Implementation**:
-- `has_rule(symbol)` -> bool
-- `rules()` -> list of symbols
-- `remove_rule(symbol)` -> none
-- `clear_rules()` -> none
+---
 
-**Tests**: 8 tests (2 per method × 4 methods)
+### Day 4: Comprehensive Testing
+
+**Goal**: Test all pattern matching scenarios
+
+**File**: `tests/pattern_matching_tests.rs` (NEW)
+
+```rust
+use graphoid::values::Value;
+// ... test helpers ...
+
+#[test]
+fn test_fibonacci_pattern_matching() {
+    let code = r#"
+        fn fib(n) {
+            |0| => 0
+            |1| => 1
+            |x| => fib(x - 1) + fib(x - 2)
+        }
+        fib(10)
+    "#;
+    assert_eq!(eval(code), Value::Number(55.0));
+}
+
+#[test]
+fn test_string_pattern_matching() {
+    let code = r#"
+        fn greet(lang) {
+            |"english"| => "Hello"
+            |"spanish"| => "Hola"
+            |"french"| => "Bonjour"
+            |x| => "Unknown language"
+        }
+        greet("spanish")
+    "#;
+    assert_eq!(eval(code), Value::String("Hola".to_string()));
+}
+
+#[test]
+fn test_boolean_patterns() {
+    let code = r#"
+        fn describe(b) {
+            |true| => "yes"
+            |false| => "no"
+        }
+        describe(true)
+    "#;
+    assert_eq!(eval(code), Value::String("yes".to_string()));
+}
+
+#[test]
+fn test_none_pattern() {
+    let code = r#"
+        fn handle_optional(val) {
+            |none| => "nothing"
+            |x| => "something"
+        }
+        handle_optional(none)
+    "#;
+    assert_eq!(eval(code), Value::String("nothing".to_string()));
+}
+
+#[test]
+fn test_wildcard_pattern() {
+    let code = r#"
+        fn always_match(x) {
+            |_| => "matched"
+        }
+        always_match(42)
+    "#;
+    assert_eq!(eval(code), Value::String("matched".to_string()));
+}
+
+#[test]
+fn test_variable_shadowing_in_patterns() {
+    let code = r#"
+        x = 100
+        fn use_x(n) {
+            |0| => x
+            |x| => x * 2
+        }
+        [use_x(0), use_x(5)]
+    "#;
+    // use_x(0) returns outer x=100, use_x(5) returns 5*2=10
+    let expected = Value::List(List::from_vec(vec![
+        Value::Number(100.0),
+        Value::Number(10.0),
+    ]));
+    assert_eq!(eval(code), expected);
+}
+
+#[test]
+fn test_pattern_order_matters() {
+    let code = r#"
+        fn classify(n) {
+            |x| => "any"
+            |0| => "zero"
+        }
+        classify(0)
+    "#;
+    // First pattern matches, so returns "any"
+    assert_eq!(eval(code), Value::String("any".to_string()));
+}
+
+#[test]
+fn test_nested_function_calls_with_patterns() {
+    let code = r#"
+        fn double(x) { |n| => n * 2 }
+        fn triple(x) { |n| => n * 3 }
+        fn apply(f, x) { f(x) }
+
+        apply(double, 5)
+    "#;
+    assert_eq!(eval(code), Value::Number(10.0));
+}
+```
 
 ---
 
-## Integration Tests
+### Day 5: Error Handling & Edge Cases
 
-**File**: `tests/behavior_integration_tests.rs`
+**Goal**: Robust error handling and edge cases
 
-Create comprehensive integration tests:
-1. Behaviors + type constraints
-2. Behaviors + graph rules
-3. Behaviors on nested structures
-4. Behaviors + method chaining
-5. Behaviors + freezing
-6. Retroactive + proactive application
-7. Order dependence
-8. Error propagation
-9. Performance with many behaviors
-10. Behaviors across module boundaries
+#### 5.1 Error Cases
 
-**Tests**: 15+ integration tests
+**Tests**: `tests/pattern_matching_tests.rs`
 
----
+```rust
+#[test]
+fn test_pattern_matching_type_error() {
+    let code = r#"
+        fn process(x, y) {  # Two parameters
+            |5| => "five"
+        }
+        process(5, 10)
+    "#;
+    // Should error: pattern matching requires exactly 1 argument
+    let result = try_eval(code);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().message().contains("exactly 1 argument"));
+}
 
-## Documentation Updates
+#[test]
+fn test_empty_pattern_clauses() {
+    let code = r#"
+        fn bad_func(x) {
+            # No pattern clauses
+        }
+        bad_func(5)
+    "#;
+    // Should error during parsing or execution
+    let result = try_eval(code);
+    assert!(result.is_err());
+}
 
-### Files to Update
+#[test]
+fn test_pattern_with_complex_expression() {
+    let code = r#"
+        fn calc(x) {
+            |5| => x * 2 + 10  # x should be 5 from binding
+        }
+        calc(5)
+    "#;
+    assert_eq!(eval(code), Value::Number(20.0));
+}
+```
 
-1. **Language Specification** (`dev_docs/LANGUAGE_SPECIFICATION.md`)
-   - Verify all examples work
-   - Add any missing behaviors
-   - Document behavior order
-   - Document freeze system
+#### 5.2 Performance Considerations
 
-2. **Architecture** (`dev_docs/ARCHITECTURE_DESIGN.md`)
-   - Explain behavior application
-   - Document executor integration
-   - Performance considerations
-
-3. **README** (`rust/README.md`)
-   - Add behavior system examples
-   - Link to spec
-
----
-
-## Complete Phase 7 Acceptance Criteria
-
-**Standard Behaviors**:
-- ✅ All 9 standard transformations implemented
-- ✅ Retroactive + proactive application works
-- ✅ 14+ tests passing
-
-**Mapping Behaviors**:
-- ✅ Hash-based mappings work
-- ✅ Chained mappings supported
-- ✅ 8+ tests passing
-
-**Custom Functions**:
-- ✅ Functions as behaviors work
-- ✅ Executor context available
-- ✅ 10+ tests passing
-
-**Conditional Behaviors**:
-- ✅ Condition + transform + fallback works
-- ✅ Symbol predicates supported
-- ✅ 12+ tests passing
-
-**Rulesets**:
-- ✅ Ruleset definition and application works
-- ✅ Predefined rulesets available
-- ✅ 8+ tests passing
-
-**Freeze Control**:
-- ✅ Freeze system implemented
-- ✅ Freeze behaviors work
-- ✅ 10+ tests passing
-
-**Management**:
-- ✅ has_rule, rules, remove_rule, clear_rules all work
-- ✅ 8+ tests passing
-
-**Integration**:
-- ✅ 15+ integration tests passing
-- ✅ All collection types support behaviors
-- ✅ Documentation complete
-
-**Totals**:
-- ✅ **85+ new tests** (current: 75, target: 160+)
-- ✅ Zero compiler warnings
-- ✅ All spec examples work
+Add documentation about pattern matching performance:
+- Linear search through patterns (first match wins)
+- Recommend putting common cases first
+- Future optimization: pattern compilation
 
 ---
 
-## Risk Assessment
+### Day 6-7: Documentation & Integration
 
-**Low Risk**:
-- Standard behaviors (already mostly implemented)
-- Mapping behaviors (straightforward)
+**Goal**: Complete documentation and integration
 
-**Medium Risk**:
-- Custom functions (need executor context)
-- Conditional behaviors (complex logic)
+#### 6.1 API Documentation
 
-**High Risk**:
-- Freeze system (new feature, affects all types)
-- Integration with existing code (may need refactoring)
+**File**: `src/execution/pattern_matcher.rs`
 
-**Mitigation**:
-- TDD approach (write tests first)
-- Incremental integration
-- Extensive testing at each stage
+Add comprehensive rustdoc comments:
+```rust
+/// Pattern matching engine for Graphoid functions
+///
+/// Implements the pipe syntax pattern matching described in the language
+/// specification §2365.
+///
+/// # Pattern Types
+///
+/// - **Literal**: Matches exact values (`|0|`, `|"hello"|`)
+/// - **Variable**: Binds to any value (`|x|`)
+/// - **Wildcard**: Matches anything without binding (`|_|`)
+///
+/// # Matching Semantics
+///
+/// - Patterns are tried in order (first match wins)
+/// - Variable patterns bind the matched value to the variable name
+/// - If no pattern matches, the function returns `none`
+///
+/// # Examples
+///
+/// ```graphoid
+/// fn factorial(n) {
+///     |0| => 1
+///     |1| => 1
+///     |x| => x * factorial(x - 1)
+/// }
+/// ```
+```
+
+#### 6.2 Integration Testing
+
+**Tests**: `tests/integration/pattern_matching_integration.rs` (NEW)
+
+```rust
+// Test pattern matching with other language features
+
+#[test]
+fn test_pattern_matching_with_lists() {
+    let code = r#"
+        fn process(x) {
+            |0| => []
+            |n| => [n, n * 2, n * 3]
+        }
+
+        result = process(5)
+        result.size()
+    "#;
+    assert_eq!(eval(code), Value::Number(3.0));
+}
+
+#[test]
+fn test_pattern_matching_with_configure_blocks() {
+    let code = r#"
+        fn safe_divide(x) {
+            |0| => none
+            |n| => 100 / n
+        }
+
+        configure { error_mode: :lenient } {
+            safe_divide(0)
+        }
+    "#;
+    assert_eq!(eval(code), Value::None);
+}
+
+#[test]
+fn test_higher_order_functions_with_patterns() {
+    let code = r#"
+        fn apply_twice(f, x) {
+            f(f(x))
+        }
+
+        fn inc(n) {
+            |x| => x + 1
+        }
+
+        apply_twice(inc, 5)
+    "#;
+    assert_eq!(eval(code), Value::Number(7.0));
+}
+```
+
+#### 6.3 REPL Support
+
+**File**: `src/main.rs`
+
+Ensure pattern matching works in REPL:
+```rust
+// Test in REPL:
+// > fn is_even(n) { |x| => x % 2 == 0 }
+// > is_even(4)
+// true
+```
 
 ---
 
-## Success Metrics
+## Success Criteria
 
-1. **Test Coverage**: 160+ behavior tests passing
-2. **All Spec Examples**: Every code example in spec works
-3. **Performance**: Behaviors add < 10% overhead
-4. **Documentation**: Complete and accurate
-5. **Zero Warnings**: Clean compilation
+- [ ] ✅ Parser handles `|pattern| => result` syntax
+- [ ] ✅ Literal patterns work (numbers, strings, booleans, none)
+- [ ] ✅ Variable patterns bind correctly
+- [ ] ✅ Wildcard patterns (`|_|`) match everything
+- [ ] ✅ First-match semantics enforced (order matters)
+- [ ] ✅ Fallthrough to `none` when no pattern matches
+- [ ] ✅ Recursive functions work (factorial, fibonacci)
+- [ ] ✅ String pattern matching works
+- [ ] ✅ Variable shadowing handled correctly
+- [ ] ✅ Error messages helpful and clear
+- [ ] ✅ 40+ tests passing
+- [ ] ✅ Zero compiler warnings
+- [ ] ✅ REPL support working
+- [ ] ✅ Documentation complete
 
 ---
 
-## Next Phase Preview
+## Future Enhancements (Not in This Phase)
 
-**Phase 8** will build on the behavior system by:
-- Using behaviors in stdlib modules
-- Module-level behavior definitions
-- Cross-module behavior sharing
+### Guards (Conditional Patterns)
 
-The behavior system is foundational for making Graphoid collections truly "smart" and self-managing!
+From spec §2385 - marked as "future":
+```graphoid
+fn classify(n) {
+    |x| if x < 0 => "negative"
+    |0| => "zero"
+    |x| if x > 0 => "positive"
+}
+```
+
+**Deferred to**: Post-Phase 10 (after core language complete)
+
+**Why deferred**: Guards add complexity, and simple patterns cover 90% of use cases
+
+---
+
+## Dependencies
+
+**None** - This phase can start immediately after Phase 6.
+
+---
+
+## Notes for Implementation
+
+1. **Disambiguation from Lambdas**: The `|pattern| =>` syntax is unambiguous because:
+   - Lambdas use `x => body` (no pipes)
+   - Patterns use `|x| => body` (with pipes)
+   - Parser can distinguish at parse time
+
+2. **Single Parameter Only**: Initial implementation supports only single-parameter pattern matching. Multi-parameter patterns are future work.
+
+3. **Pattern Compilation**: Current implementation uses linear search. Future optimization could compile patterns into decision trees.
+
+4. **Guards Future-Proofing**: AST includes `guard: Option<Expr>` field for future guard support, but parser/executor ignore it for now.
+
+---
+
+## References
+
+- **Language Specification**: §2365 "Pattern Matching"
+- **Related**: Phase 9 will use this foundation for graph pattern matching
+- **Disambiguation**: §2399 explains syntax disambiguation from lambdas

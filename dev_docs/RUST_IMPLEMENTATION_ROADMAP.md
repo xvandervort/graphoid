@@ -59,21 +59,24 @@ This roadmap has been significantly expanded based on 10 new language features a
   - Dogfooding the language to build language features
   - Used for testing the graph query system
 
-**Documentation Milestones**:
+**Documentation Milestones (Updated for Revised Phase Ordering)**:
 - After Phase 5: Basic syntax and collections samples (2-3 days)
 - After Phase 6: Graph programming guide (3-4 days)
-- After Phase 8: Multi-file project guide (2-3 days)
-- After Phase 11: Complete reference (4-5 days)
+- After Phase 9: Advanced pattern matching guide (2-3 days)
+- After Phase 10: Multi-file project guide (2-3 days)
+- After Phase 12: Complete reference (4-5 days)
 
-**Timeline Increases**:
+**Timeline Increases (Updated for Revised Phase Ordering)**:
 - Phase 1: +1 day (new tokens: `then`, `unless`, `//`, `!`, element-wise operators)
 - Phase 2: +2 days (inline conditionals, try/catch, configure blocks)
-- Phase 3: +2 days (configuration stack, error modes)
+- Phase 3: +2 days (configuration stack, error modes - ✅ already done)
 - Phase 5: +3 days (mutation operator convention doubles method surface area)
 - Phase 6: +7 days (5-level graph querying is the "make or break" feature)
-- Phase 7: +1 day (freeze control rules)
-- Phase 8: +2 days (graphoid.toml support)
-- Phase 11: +7 days (freeze system: collection freezing, freeze behaviors, ruleset freezing; sophisticated configuration system)
+- Phase 7: +5 days (NEW - Function pattern matching)
+- Phase 8: +2 days (Behavior system completion - was old Phase 7)
+- Phase 9: +7 days (NEW - Graph pattern matching & Level 3-5 querying)
+- Phase 10: +3 days (Module system completion - was old Phase 8)
+- **Note**: Old "Phase 9 Advanced Features" (config/error/precision) are ✅ already implemented
 
 **See**: [ROADMAP_UPDATES_FOR_NEW_FEATURES.md](archive/sessions/2025-01-roadmap-updates/ROADMAP_UPDATES_FOR_NEW_FEATURES.md) for complete details.
 
@@ -2842,11 +2845,17 @@ Minimum **30 tests**:
 - ✅ Spec compliance for Phases 0-6
 - ✅ Confidence in architecture
 
-**Phase 7 (Behavior System) depends on**:
+**Phase 7 (Function Pattern Matching) dependencies**: None - can start immediately
+
+**Phase 8 (Behavior System) depends on**:
 - Mutation convention (behaviors may trigger transforms)
 - Complete collection methods (behaviors attach to methods)
 - Parser completeness (behavior syntax)
 - Verified architecture (behaviors integrate with graphs)
+
+**Phase 9 (Graph Pattern Matching) depends on**:
+- Function pattern matching (Phase 7) - shares parser/engine
+- Behavior system (Phase 8) - for result transformation
 
 **Timeline Impact**: 5-7 days investment now saves weeks of refactoring later.
 
@@ -2920,132 +2929,229 @@ Minimum **30 tests**:
 
 ---
 
-## Phase 7: Behavior System (5-7 days)
+## Phase 7: Function Pattern Matching (5-7 days)
 
 **📋 Detailed Implementation Plan**: See [`dev_docs/PHASE_7_DETAILED_PLAN.md`](PHASE_7_DETAILED_PLAN.md) for:
 - 7-day implementation plan with daily deliverables
-- 85+ new test specifications (target: 160+ total behavior tests)
-- Complete behavior types: standard transformations, mapping behaviors, custom functions, conditional behaviors, rulesets, freeze control
+- 40+ test specifications covering all pattern types
+- Parser extension for pipe syntax `|pattern| => result`
+- Pattern matching engine (literals, variables, guards)
+- Function dispatch with pattern matching
 - Copy-paste ready Rust code examples
 - Integration tests and acceptance criteria
 
+**Duration**: 5-7 days
+**Goal**: Implement pipe syntax pattern matching for elegant function definitions
+
 **Overview**:
-- Standard behaviors (none_to_zero, positive, uppercase, validate_range, etc.)
-- Mapping behaviors (hash-based value transformations)
-- Custom function behaviors (user-defined transformation functions)
-- Conditional behaviors (context-aware with predicates and fallbacks)
-- Rulesets (bundled behavior collections for reusability)
-- Freeze control (immutability behaviors)
+- **Pipe Syntax**: `|pattern| => result` for function pattern matching
+- **Literal Patterns**: `|0| => 1`, `|"dog"| => "woof"`
+- **Variable Patterns**: `|x| => x * 2`
+- **Guards** (future enhancement): `|x| if x > 0 => "positive"`
+- **Fallthrough**: Returns `none` if no pattern matches
+- **Disambiguation**: Clear separation from lambda syntax `x => x * 2`
 
-**Current Status**: 75 behavior tests passing, framework exists in `src/graph/behaviors.rs` (1,005 lines)
+**Why This Phase Comes First**:
+- Zero dependencies - can start immediately
+- Foundation for graph pattern matching (Phase 9)
+- Provides immediate value for recursive functions
+- Elegant syntax for case handling
 
-### Phase 8: Module System (4-6 days)
+**Key Use Cases**:
+```graphoid
+# Recursive functions with pattern matching
+fn factorial(n) {
+    |0| => 1
+    |1| => 1
+    |x| => x * factorial(x - 1)
+}
+
+# String case handling
+fn get_sound(animal) {
+    |"dog"| => "woof"
+    |"cat"| => "meow"
+    |"cow"| => "moo"
+    # Automatic fallthrough returns none
+}
+```
+
+**Current Status**: Not started - new phase
+
+---
+
+## Phase 8: Complete Behavior System (2-3 days)
 
 **📋 Detailed Implementation Plan**: See [`dev_docs/PHASE_8_DETAILED_PLAN.md`](PHASE_8_DETAILED_PLAN.md) for:
-- 6-day implementation plan with daily deliverables
-- 91+ new test specifications (target: 122+ total module tests)
-- Complete module system: declaration syntax, imports, standard library modules, project structure
-- 5 standard library modules (JSON, IO, Math, String, List)
+- 3-day implementation plan with daily deliverables
+- 20-30 new test specifications (target: 95-105 total behavior tests)
+- Remaining standard behaviors to implement
+- Behavior rulesets completion
 - Copy-paste ready Rust code examples
-- graphoid.toml specification
+- Integration tests and acceptance criteria
+
+**Duration**: 2-3 days
+**Goal**: Complete the behavior transformation system (a subset of the rules system)
 
 **Overview**:
-- Module declaration (`module name`, `alias`)
-- Import variations (relative, project-root, stdlib)
-- Standard library modules (JSON, IO, Math, String, List)
-- Load vs Import semantics (executable vs library)
-- Project structure (src/, lib/, graphoid.toml)
-- Module search paths and resolution
+- Finish remaining standard behaviors (none_to_zero, positive, uppercase, validate_range, etc.)
+- Complete mapping behaviors (hash-based value transformations)
+- Finalize custom function behaviors (user-defined transformations)
+- Complete conditional behaviors (context-aware with predicates)
+- Finalize rulesets (bundled behavior collections for reusability)
 
-**Current Status**: 31 module tests passing, module manager exists in `src/execution/module_manager.rs` (250 lines)
+**Why This Phase Comes Second**:
+- Already 75% done (75 tests passing)
+- Completes the rule/transformation architecture
+- Behaviors are "rules that transform" - architectural consistency
+- Needed before graph querying for result transformation
+- Low effort, high value
 
-### Phase 9: Advanced Features (18-25 days)
+**Architectural Note**: As correctly identified, "behavior system is really just a subset of rules" - behaviors transform values while rules validate structure. Both use the same `RetroactivePolicy` and application system.
+
+**Current Status**: 75 behavior tests passing, framework exists in `src/graph/behaviors.rs` (1,005 lines), ~75% complete
+
+---
+
+## Phase 9: Graph Pattern Matching & Advanced Querying (7-10 days)
 
 **📋 Detailed Implementation Plan**: See [`dev_docs/PHASE_9_DETAILED_PLAN.md`](PHASE_9_DETAILED_PLAN.md) for:
-- Complete architecture with copy-paste ready Rust structs
-- 5 milestones with detailed task breakdowns
-- 200+ test specifications
-- 4-week timeline with task dependencies
-- Integration strategy and risk mitigation
+- 10-day implementation plan with daily deliverables
+- 60+ test specifications covering all query levels
+- Cypher-style pattern syntax implementation
+- Pattern parser and matcher for graphs
+- Query execution engine
+- Subgraph operations
+- Copy-paste ready Rust code examples
+- Integration tests and acceptance criteria
+
+**Duration**: 7-10 days
+**Goal**: Implement Cypher-style graph pattern matching - the "make or break" feature for a graph language
 
 **Overview**:
-- **Configuration System** - Scoped settings for error handling, type coercion, precision
-- **Error Handling** - Try/catch/finally with three modes (strict/lenient/collect)
-- **Precision Context Blocks** - Decimal place control for numeric operations
-- **Freeze System** - Immutability for collections (deep/shallow freeze)
-- **Freeze Control Rules** - `:no_frozen`, `:copy_elements`, `:shallow_freeze_only`
+- **Level 3: Pattern-Based Querying** - Declarative pattern matching inspired by Cypher
+  - Pattern syntax: `(node:Type) -[:EDGE]-> (other:Type)`
+  - Pattern parser and AST nodes
+  - Pattern matching engine for graphs
+  - `.where()` filtering predicates
+  - `.return()` projection for specific fields
+  - Variable-length paths: `-[:FOLLOWS*1..3]->`
+  - Bidirectional patterns: `-[:FRIEND]-`
 
-**Why This Phase Comes First**: Stdlib modules (Phases 10-11) need these features for production-quality error handling, configuration options, and data protection.
+- **Level 5: Subgraph Operations** - Extract, manipulate, and compose subgraphs
+  - `graph.extract { nodes: ..., edges: ... }`
+  - `graph.delete { nodes: ..., edges: ... }`
+  - `graph.add_subgraph(other)`
+  - Filter-based extraction
 
-**Legacy/Future Features** (lower priority):
-- Pattern matching (future)
-- Trailing-block sugar (Ruby-style) for last-argument lambdas [low priority]
-  - Overview: Provide Ruby/Smalltalk-like trailing block syntax as pure sugar for a function's last lambda parameter. No new runtime type beyond existing lambdas; blocks are lambdas. Avoid Ruby's nonlocal-return semantics; `return` within a block returns from the block, not the enclosing function.
-  - Syntax and desugaring:
-    - Call with trailing block desugars to a last-argument lambda:
-      ```Graphoid
-      list.each { |x, i| print(i.to_string() + ": " + x) }
-      # == list.each((x, i) => { print(i.to_string() + ": " + x) })
+**Why This Phase Comes Third**:
+- Depends on function pattern matching (Phase 7) - shares parser/engine
+- Benefits from complete behavior system (Phase 8) - for result transformation
+- Fills critical capability gap (Level 3 querying currently missing)
+- Makes Graphoid credible as a graph-theoretic language
+- "Make or break" feature per language specification
 
-      numbers.map { |x| x * 2 }.filter { |x| x > 10 }
-      # == numbers.map((x) => x * 2).filter((x) => x > 10)
-      ```
-    - Functions that accept blocks declare the last parameter as `lambda` (or infer it from usage) and may provide a default no-op:
-      ```Graphoid
-      fn times(n, block: lambda = () => {}) {
-        i = 0
-        while i < n { block(i); i = i + 1 }
-      }
-      5.times { |i| print(i) }
-      ```
-    - Optional `yield()` sugar inside such functions calls the last-arg lambda:
-      ```Graphoid
-      fn with_transaction(graph, block: lambda) {
-        begin_tx(graph)
-        try { yield() ; commit_tx(graph) } catch Error { rollback_tx(graph); raise }
-      }
-      # yield() == block()
-      ```
-  - Semantics:
-    - Blocks are ordinary lambdas: capture rules, scoping, and return value semantics are identical to lambdas.
-    - No nonlocal return: `return` in a block returns from the block. Exceptions bubble per normal try/catch rules.
-    - Arity and error modes: In `:strict`, arity mismatch is a `TypeError`. In `:lenient`, extra args ignored, missing args become `none`.
-  - Parser/disambiguation:
-    - Allow an optional trailing `{ ... }` after any call/method call; if present, parse as a lambda argument. Inside the braces, a leading `|params|` declares parameters; otherwise, zero-arg.
-    - Remains unambiguous with pattern matching `|pattern| =>` which appears in statement/expression positions, not as a call argument.
-  - Interactions and idioms:
-    - Works with method chaining and `configure { ... } { ... }` blocks without altering existing semantics.
-    - Graph DSL ergonomics:
-      ```Graphoid
-      graph.transaction { /* atomic, rule-enforced mutations */ }
-      graph.nodes().each { |n| /* ... */ }
-      graph.match((u:User)-[:FRIEND]->(v:User)).each { |m| /* ... */ }
-      ```
-  - Acceptance criteria (when implemented):
-    - Desugaring is purely syntactic; runtime sees standard lambdas.
-    - Clear errors for arity/type in `:strict`; configurable behavior in other modes.
-    - 25+ tests: chaining with blocks, zero/one/multi-param blocks, yield() equivalence, interactions with try/catch and configure blocks, parser disambiguation with pattern matching.
-  - Scheduling and priority:
-    - Non-critical ergonomics feature; defer until after core features are stable. Target Phase 9 with a 1–2 day timebox, contingent on parser stability and lambda semantics being complete.
-- Optimizations
+**Key Use Cases**:
+```graphoid
+# Level 3: Pattern-based querying
+results = graph.match(
+    (person:User) -[:FRIEND]-> (friend:User)
+).where(person.age > 18, friend.age > 18)
 
-### Phase 10: Pure Graphoid Stdlib (10-14 days)
-- Statistics module (in .gr, using config for missing data handling)
-- CSV module
-- SQL module
-- HTML module
-- HTTP module
+# Variable-length paths
+influencers = graph.match(
+    (user:User) -[:FOLLOWS*1..3]-> (influencer:User)
+).where(influencer.follower_count > 1000)
 
-### Phase 11: Native Stdlib Modules (14-21 days)
-- Constants module
-- Random module
-- Time module
-- Regex module
-- I/O module
-- JSON module
-- Crypto module
+# Level 5: Subgraph extraction
+active_users = graph.extract {
+    nodes: n => n.type == "User" and n.get_attribute("active") == true
+}
+```
 
-### Phase 12: Testing Framework (7-10 days)
+**Current Status**: Level 1, 2, 4 complete (basic navigation, filtering, path algorithms). Level 3 & 5 missing.
+
+**Note**: Level 4 path algorithms (`shortest_path`, `has_path`, `distance`, etc.) are already implemented and working.
+
+---
+
+## Phase 10: Complete Module System (3-4 days)
+
+**📋 Detailed Implementation Plan**: See [`dev_docs/PHASE_10_DETAILED_PLAN.md`](PHASE_10_DETAILED_PLAN.md) for:
+- 4-day implementation plan with daily deliverables
+- 30+ new test specifications (target: 60+ total module tests)
+- Module loading from .gr files
+- Namespace management and scoping
+- Standard library imports
+- graphoid.toml specification
+- Copy-paste ready Rust code examples
+- Integration tests and acceptance criteria
+
+**Duration**: 3-4 days
+**Goal**: Complete module system for code organization and stdlib imports
+
+**Overview**:
+- **Module Loading**: Load .gr files as modules
+- **Namespace Management**: Proper scoping and symbol resolution
+- **Import Variations**: Relative, project-root, stdlib paths
+- **Module Declaration**: `module name`, `alias` syntax
+- **Load vs Import**: Executable vs library semantics
+- **Project Structure**: src/, lib/, graphoid.toml support
+- **Module Search Paths**: Resolution algorithm
+
+**Why This Phase Comes Fourth**:
+- Needs to be complete before stdlib work (Phases 11-12)
+- Module structure already exists (31 tests passing)
+- Final prerequisite for production stdlib
+- Clean separation of concerns
+
+**Current Status**: 31 module tests passing, module manager exists in `src/execution/module_manager.rs` (250 lines), ~40% complete
+
+**All Prerequisites Now Complete**: try/catch (✅), configure blocks (✅), precision (✅), pattern matching (Phases 7 & 9), behaviors (Phase 8), modules (Phase 10).
+
+---
+
+## Phase 11: Pure Graphoid Stdlib (10-14 days)
+
+**📋 Detailed Implementation Plan**: See [`dev_docs/PHASE_11_DETAILED_PLAN.md`](PHASE_11_DETAILED_PLAN.md) for complete specifications.
+
+Standard library modules written in .gr files:
+
+- **Statistics** (stats) - Descriptive statistics, using config for missing data handling
+- **CSV** - CSV parsing and generation with validation
+- **SQL** - SQL query builder (fluent interface)
+- **HTML** - HTML parsing and manipulation
+- **HTTP** - HTTP client for RESTful APIs
+- **Pretty-Print** (pp) - Formatted output for debugging and display
+- **Option Parser** (optparse) - Command-line argument parsing
+
+**Why Pure Graphoid**: These modules benefit from pattern matching, behaviors, and high-level abstractions. Implemented in .gr to dogfood the language.
+
+---
+
+## Phase 12: Native Stdlib Modules (14-21 days)
+
+**📋 Detailed Implementation Plan**: See [`dev_docs/PHASE_12_DETAILED_PLAN.md`](PHASE_12_DETAILED_PLAN.md) for complete specifications.
+
+Core modules implemented in Rust for performance:
+
+- **Constants** - Mathematical and physical constants
+- **Random** (rand) - Cryptographically secure random number generation
+- **Time** - Date/time handling with timezone support
+- **Regex** (re) - Regular expression engine
+- **I/O** (io) - File operations (read, write, append, delete)
+- **JSON** - JSON parsing and serialization
+- **YAML** - YAML parsing and serialization
+- **Crypto** - Cryptographic primitives (hashing, encryption)
+- **OS** - Operating system interface (environment, paths, processes)
+
+**Why Native Rust**: These modules require system calls, performance, or complex algorithms best implemented in Rust.
+
+---
+
+## Phase 13: Testing Framework (7-10 days)
+
+Built-in RSpec-style testing framework:
+
 - Built-in `assert` module with rich assertions
 - Test file discovery (.test.gr files)
 - Test runner with color output
@@ -3055,7 +3161,12 @@ Minimum **30 tests**:
 - Mocking and stubbing system
 - Property-based testing
 
-### Phase 13: Debugger (10-14 days)
+---
+
+## Phase 14: Debugger (10-14 days)
+
+Interactive debugging and profiling tools:
+
 - Breakpoint support (`debug.break()`)
 - Debug REPL with inspection commands
 - Variable and stack inspection
@@ -3065,7 +3176,12 @@ Minimum **30 tests**:
 - DAP (Debug Adapter Protocol) integration for IDEs
 - Graph visualization in debugger
 
-### Phase 14: Package Manager (14-21 days)
+---
+
+## Phase 15: Package Manager (14-21 days)
+
+Graph-based dependency management:
+
 - Package manifest format (`graphoid.toml`)
 - Dependency resolution algorithm (graph-based!)
 - Lock file generation (`graphoid.lock`)
@@ -3121,21 +3237,26 @@ Minimum **30 tests**:
 - Basic REPL works
 - **WHY LONGER**: Mutation operator convention doubles method surface area
 
-### Feature Complete (Updated)
+### Feature Complete (Updated - Revised Phase Ordering)
 **18-23 weeks** - Full language specification (+6-7 weeks from original)
-- Phases 0-11 complete
-- Phase 6a: Standard graph types (BST, DAG, Heap, AVL, Trie) in pure Graphoid
-- 5-level graph querying system
-- Error handling with configurable modes
+- Phases 0-12 complete (includes pattern matching in Phases 7 & 9)
+- Phase 6.5: Standard graph types (BST, DAG, Heap, AVL, Trie)
+- Function pattern matching (Phase 7) + Graph pattern matching (Phase 9)
+- Complete behavior system (Phase 8)
+- 5-level graph querying system (Phases 6 & 9)
+- Error handling with configurable modes (✅ already done)
+- Module system complete (Phase 10)
+- Pure Graphoid stdlib (Phase 11)
+- Native stdlib modules (Phase 12)
 - Documentation Milestones 1-4 complete
-- **WHY LONGER**: Graph querying is massive (+7 days), freeze model is complex, error handling is sophisticated
+- **WHY LONGER**: Graph querying is massive (+7 days), pattern matching is critical (+12 days), behaviors complete
 
-### Production Tools Complete (Updated)
+### Production Tools Complete (Updated - Revised Phase Ordering)
 **22-29 weeks** - Professional tooling added (+6-7 weeks from original)
-- Phases 0-14 complete
-- Testing framework operational (RSpec-style)
-- Debugger functional
-- Package manager working
+- Phases 0-15 complete
+- Testing framework operational (Phase 13 - RSpec-style)
+- Debugger functional (Phase 14)
+- Package manager working (Phase 15)
 - **WHY LONGER**: More features to test, REPL/CLI parity for everything
 
 ### Production Ready (Updated)
