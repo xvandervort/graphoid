@@ -83,6 +83,7 @@ impl Executor {
             params: Vec::new(),
             parameters: Vec::new(),
             body: Vec::new(),
+            pattern_clauses: None,
             env: Rc::new(RefCell::new(self.env.clone())),
             node_id: None,
         };
@@ -303,6 +304,7 @@ impl Executor {
                 name,
                 params,
                 body,
+                pattern_clauses,
                 ..
             } => {
                 // Extract parameter names
@@ -314,6 +316,7 @@ impl Executor {
                     params: param_names,
                     parameters: params.clone(),
                     body: body.clone(),
+                    pattern_clauses: pattern_clauses.clone(),
                     env: Rc::new(RefCell::new(self.env.clone())),
                     node_id: None,
                 };
@@ -701,6 +704,7 @@ impl Executor {
             params: params.to_vec(),
             parameters,
             body: body_stmts,
+            pattern_clauses: None,
             env: Rc::new(RefCell::new(self.env.clone())),
             node_id: None,
         };
@@ -2659,38 +2663,63 @@ impl Executor {
         // This enables closures to maintain state across calls
         let parent_env = func.env.borrow().clone();
 
-        let mut call_env = Environment::with_parent(parent_env);
-
-        // Bind parameters to argument values
-        // Note: arg_values already has variadic parameters properly bundled as lists
-        // thanks to process_arguments(), so we just bind them directly
-        for (i, param) in func.parameters.iter().enumerate() {
-            if i < arg_values.len() {
-                call_env.define(param.name.clone(), arg_values[i].clone());
-            } else {
-                // This should not happen since process_arguments validates everything
-                return Err(GraphoidError::runtime(format!(
-                    "Internal error: missing value for parameter '{}'",
-                    param.name
-                )));
-            }
-        }
+        let call_env = Environment::with_parent(parent_env);
 
         // Save current environment and switch to call environment
         let saved_env = std::mem::replace(&mut self.env, call_env);
 
-        // Execute function body
+        // Execute function body - either pattern matching or traditional
         let mut return_value = Value::None;
         let execution_result: Result<()> = (|| {
-            for stmt in &func.body {
-                match self.eval_stmt(stmt)? {
-                    Some(val) => {
-                        // Return statement executed
-                        return_value = val;
-                        break;
+            // Check if this is a pattern matching function
+            if let Some(ref pattern_clauses) = func.pattern_clauses {
+                // Pattern matching function - use PatternMatcher to find matching clause
+                use crate::execution::PatternMatcher;
+
+                let matcher = PatternMatcher::new();
+                let match_result = matcher.find_match(pattern_clauses, arg_values)?;
+
+                if let Some((matched_clause, bindings)) = match_result {
+                    // Bind pattern variables to environment
+                    for (var_name, value) in bindings {
+                        self.env.define(var_name, value);
                     }
-                    None => {
-                        // Normal statement, continue
+
+                    // Execute the clause body expression
+                    return_value = self.eval_expr(&matched_clause.body)?;
+                } else {
+                    // No pattern matched - return none
+                    return_value = Value::None;
+                }
+            } else {
+                // Traditional function with parameter binding and statement body
+
+                // Bind parameters to argument values
+                // Note: arg_values already has variadic parameters properly bundled as lists
+                // thanks to process_arguments(), so we just bind them directly
+                for (i, param) in func.parameters.iter().enumerate() {
+                    if i < arg_values.len() {
+                        self.env.define(param.name.clone(), arg_values[i].clone());
+                    } else {
+                        // This should not happen since process_arguments validates everything
+                        return Err(GraphoidError::runtime(format!(
+                            "Internal error: missing value for parameter '{}'",
+                            param.name
+                        )));
+                    }
+                }
+
+                // Execute function body statements
+                for stmt in &func.body {
+                    match self.eval_stmt(stmt)? {
+                        Some(val) => {
+                            // Return statement executed
+                            return_value = val;
+                            break;
+                        }
+                        None => {
+                            // Normal statement, continue
+                        }
                     }
                 }
             }

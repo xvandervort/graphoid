@@ -37,6 +37,8 @@ fn create_double_fn() -> Function {
                 position: pos(),
             }
         ],
+        pattern_clauses: None,
+
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
     }
@@ -58,6 +60,8 @@ fn create_negate_fn() -> Function {
                 position: pos(),
             }
         ],
+        pattern_clauses: None,
+
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
     }
@@ -80,6 +84,8 @@ fn create_is_negative_fn() -> Function {
                 position: pos(),
             }
         ],
+        pattern_clauses: None,
+
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
     }
@@ -124,6 +130,7 @@ fn test_custom_function_with_closure() {
                 position: pos(),
             }
         ],
+        pattern_clauses: None,
         env: Rc::new(RefCell::new(env)),
         node_id: None,
     };
@@ -155,6 +162,8 @@ fn test_custom_function_type_specific() {
                 position: pos(),
             }
         ],
+        pattern_clauses: None,
+
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
     };
@@ -192,6 +201,8 @@ fn test_custom_function_error_handling() {
                 position: pos(),
             }
         ],
+        pattern_clauses: None,
+
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
     };
@@ -317,6 +328,8 @@ fn test_conditional_without_fallback() {
                 position: pos(),
             }
         ],
+        pattern_clauses: None,
+
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
     };
@@ -337,6 +350,8 @@ fn test_conditional_without_fallback() {
                 position: pos(),
             }
         ],
+        pattern_clauses: None,
+
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
     };
@@ -429,6 +444,8 @@ fn test_conditional_chain() {
                 position: pos(),
             }
         ],
+        pattern_clauses: None,
+
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
     };
@@ -444,6 +461,8 @@ fn test_conditional_chain() {
                 position: pos(),
             }
         ],
+        pattern_clauses: None,
+
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
     };

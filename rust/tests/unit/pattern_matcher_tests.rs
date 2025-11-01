@@ -6,7 +6,6 @@ use graphoid::execution::pattern_matcher::PatternMatcher;
 use graphoid::ast::{Pattern, LiteralValue, PatternClause, Expr};
 use graphoid::values::Value;
 use graphoid::error::SourcePosition;
-use std::collections::HashMap;
 
 // Helper function for creating default position
 fn pos() -> SourcePosition {

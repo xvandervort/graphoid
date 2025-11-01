@@ -2,7 +2,7 @@ use std::fmt;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use crate::ast::{Stmt, Parameter};
+use crate::ast::{Stmt, Parameter, PatternClause};
 use crate::execution::Environment;
 use crate::execution::module_manager::Module;
 
@@ -186,6 +186,8 @@ pub struct Function {
     pub parameters: Vec<Parameter>,
     /// Function body statements
     pub body: Vec<Stmt>,
+    /// Pattern matching clauses (Phase 7) - for pipe syntax functions
+    pub pattern_clauses: Option<Vec<PatternClause>>,
     /// Captured environment (for closures) - shared mutable for closure state
     pub env: Rc<RefCell<Environment>>,
     /// Node ID in the function graph (set when registered, prevents duplicate registration)

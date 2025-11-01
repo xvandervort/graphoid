@@ -11,6 +11,8 @@ fn make_test_function(name: &str) -> Function {
         params: vec!["x".to_string()],
         parameters: vec![Parameter { name: "x".to_string(), default_value: None, is_variadic: false }],
         body: vec![],
+        pattern_clauses: None,
+
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
     }

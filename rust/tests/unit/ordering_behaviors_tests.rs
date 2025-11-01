@@ -205,6 +205,8 @@ fn test_ordering_custom_function() {
                 position: pos(),
             }
         ],
+        pattern_clauses: None,
+
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
     };
@@ -263,6 +265,8 @@ fn test_ordering_reverse() {
                 position: pos(),
             }
         ],
+        pattern_clauses: None,
+
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
     };
