@@ -24,4 +24,5 @@ mod unit {
     pub mod error_collector_tests;
     pub mod environment_tests;
     pub mod config_tests;
+    pub mod pattern_matching_parser_tests;
 }

@@ -24,6 +24,7 @@ pub enum Stmt {
         name: String,
         params: Vec<Parameter>,
         body: Vec<Stmt>,
+        pattern_clauses: Option<Vec<PatternClause>>,  // Phase 7: Pattern matching
         position: SourcePosition,
     },
     If {
@@ -280,5 +281,31 @@ pub enum AssignmentTarget {
     Index {
         object: Box<Expr>,
         index: Box<Expr>,
+    },
+}
+
+/// Pattern matching clause (Phase 7)
+/// Represents a pattern clause in a function: |pattern| => result
+#[derive(Debug, Clone, PartialEq)]
+pub struct PatternClause {
+    pub pattern: Pattern,
+    pub guard: Option<Expr>,  // Future: if conditions
+    pub body: Expr,
+    pub position: SourcePosition,
+}
+
+/// Pattern types for pattern matching (Phase 7)
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pattern {
+    Literal {
+        value: LiteralValue,
+        position: SourcePosition,
+    },
+    Variable {
+        name: String,
+        position: SourcePosition,
+    },
+    Wildcard {
+        position: SourcePosition,
     },
 }

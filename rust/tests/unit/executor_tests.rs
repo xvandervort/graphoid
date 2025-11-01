@@ -1134,6 +1134,7 @@ fn test_function_declaration() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1178,6 +1179,7 @@ fn test_function_call_simple() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1221,6 +1223,7 @@ fn test_function_no_params() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1267,6 +1270,7 @@ fn test_function_with_expression_body() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1323,6 +1327,7 @@ fn test_function_nested_calls() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1356,6 +1361,7 @@ fn test_function_nested_calls() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1428,6 +1434,7 @@ fn test_function_closure() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1462,6 +1469,7 @@ fn test_function_return_none() {
             value: None,
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1515,6 +1523,7 @@ fn test_function_wrong_arg_count() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1738,6 +1747,7 @@ fn test_function_as_value() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1795,6 +1805,7 @@ fn test_function_multiple_params() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1856,6 +1867,7 @@ fn test_recursive_function() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1904,6 +1916,7 @@ fn test_function_with_string_return() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -1943,6 +1956,7 @@ fn test_function_modifying_closure_var() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2102,6 +2116,7 @@ fn test_function_returning_boolean() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2173,6 +2188,7 @@ fn test_function_returning_list() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2230,6 +2246,7 @@ fn test_deeply_nested_calls() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2275,6 +2292,7 @@ fn test_function_with_no_return_statement() {
         name: "do_nothing".to_string(),
         params: vec![],
         body: vec![], // No statements
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2317,6 +2335,7 @@ fn test_function_early_return() {
                 position: pos(),
             },
         ],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2400,6 +2419,7 @@ fn test_function_with_side_effects() {
                 position: pos(),
             },
         ],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2445,6 +2465,7 @@ fn test_nested_closures() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2493,6 +2514,7 @@ fn test_function_parameter_shadowing() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2542,6 +2564,7 @@ fn test_function_returning_function_value() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2651,6 +2674,7 @@ fn test_function_with_comparison() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2762,6 +2786,7 @@ fn test_function_with_unary_ops() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2806,6 +2831,7 @@ fn test_function_with_not_op() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2895,6 +2921,7 @@ fn test_function_four_params() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -2988,6 +3015,7 @@ fn test_function_call_with_expression_args() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -3259,6 +3287,7 @@ fn test_if_return_in_function() {
                 position: pos(),
             },
         ],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -3337,6 +3366,7 @@ fn test_call_stack_cleared_after_return() {
             }),
             position: pos(),
         }],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -3675,6 +3705,7 @@ fn test_while_loop_in_function() {
                 position: pos(),
             },
         ],
+        pattern_clauses: None,
         position: pos(),
     };
 
@@ -4075,6 +4106,7 @@ fn test_for_loop_in_function() {
                 position: pos(),
             },
         ],
+        pattern_clauses: None,
         position: pos(),
     };
 

@@ -4,8 +4,8 @@
 //! for expression parsing.
 
 use crate::ast::{
-    Argument, AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Program, Stmt, TypeAnnotation,
-    UnaryOp,
+    Argument, AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Pattern, PatternClause,
+    Program, Stmt, TypeAnnotation, UnaryOp,
 };
 use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::lexer::token::{Token, TokenType};
@@ -316,8 +316,37 @@ impl Parser {
             });
         }
 
-        // Parse body
-        let body = self.block()?;
+        // Skip newlines after opening brace
+        while self.match_token(&TokenType::Newline) {}
+
+        // Check if function body starts with pattern clauses (|pattern| => ...)
+        // or regular body statements
+        let (body, pattern_clauses) = if self.check(&TokenType::Pipe) {
+            // Pattern matching function
+            let mut clauses = Vec::new();
+
+            // Parse pattern clauses
+            while self.check(&TokenType::Pipe) {
+                clauses.push(self.parse_pattern_clause()?);
+
+                // Skip newlines between clauses
+                while self.match_token(&TokenType::Newline) {}
+            }
+
+            if clauses.is_empty() {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Pattern matching function must have at least one pattern clause".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            // Pattern matching functions have empty body
+            (vec![], Some(clauses))
+        } else {
+            // Regular function with body
+            let body = self.block()?;
+            (body, None)
+        };
 
         // Expect '}'
         if !self.match_token(&TokenType::RightBrace) {
@@ -331,6 +360,7 @@ impl Parser {
             name,
             params,
             body,
+            pattern_clauses,
             position,
         })
     }
@@ -2061,5 +2091,116 @@ impl Parser {
         }
 
         Ok(entries)
+    }
+
+    // =========================================================================
+    // Pattern Matching (Phase 7)
+    // =========================================================================
+
+    /// Parse a pattern: |pattern|
+    fn parse_pattern(&mut self) -> Result<Pattern> {
+        let position = self.peek().position();
+
+        // Expect '|'
+        if !self.match_token(&TokenType::Pipe) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '|' to start pattern".to_string(),
+                position,
+            });
+        }
+
+        // Parse the pattern content
+        let pattern = match &self.peek().token_type {
+            TokenType::Number(n) => {
+                let value = *n;
+                self.advance();
+                Pattern::Literal {
+                    value: LiteralValue::Number(value),
+                    position,
+                }
+            }
+            TokenType::String(s) => {
+                let value = s.clone();
+                self.advance();
+                Pattern::Literal {
+                    value: LiteralValue::String(value),
+                    position,
+                }
+            }
+            TokenType::None => {
+                self.advance();
+                Pattern::Literal {
+                    value: LiteralValue::None,
+                    position,
+                }
+            }
+            TokenType::True => {
+                self.advance();
+                Pattern::Literal {
+                    value: LiteralValue::Boolean(true),
+                    position,
+                }
+            }
+            TokenType::False => {
+                self.advance();
+                Pattern::Literal {
+                    value: LiteralValue::Boolean(false),
+                    position,
+                }
+            }
+            TokenType::Identifier(sym) if sym == "_" => {
+                self.advance();
+                Pattern::Wildcard { position }
+            }
+            TokenType::Identifier(name) => {
+                let var_name = name.clone();
+                self.advance();
+                Pattern::Variable {
+                    name: var_name,
+                    position,
+                }
+            }
+            _ => {
+                return Err(GraphoidError::SyntaxError {
+                    message: format!("Expected pattern, got {:?}", self.peek().token_type),
+                    position,
+                });
+            }
+        };
+
+        // Expect closing '|'
+        if !self.match_token(&TokenType::Pipe) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '|' after pattern".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        Ok(pattern)
+    }
+
+    /// Parse pattern clause: |pattern| => result
+    fn parse_pattern_clause(&mut self) -> Result<PatternClause> {
+        let position = self.peek().position();
+
+        let pattern = self.parse_pattern()?;
+
+        // Expect '=>'
+        if !self.match_token(&TokenType::Arrow) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '=>' after pattern".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse body expression
+        let body = self.expression()?;
+
+        Ok(PatternClause {
+            pattern,
+            guard: None, // Future: guards
+            body,
+            position,
+        })
     }
 }
