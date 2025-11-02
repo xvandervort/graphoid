@@ -27,11 +27,11 @@ fn eval(code: &str) -> Value {
         executor.eval_stmt(stmt).unwrap();
     }
 
-    Value::None
+    Value::none()
 }
 
 fn list_nums(nums: Vec<f64>) -> Value {
-    Value::List(List::from_vec(nums.into_iter().map(Value::Number).collect()))
+    Value::list(List::from_vec(nums.into_iter().map(Value::number).collect()))
 }
 
 // ============================================================================
@@ -74,7 +74,7 @@ fn test_sort_mutating_returns_none() {
         nums = [3, 1, 2]
         nums.sort!()
     "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }
 
 // ============================================================================
@@ -117,7 +117,7 @@ fn test_reverse_mutating_returns_none() {
         nums = [1, 2, 3]
         nums.reverse!()
     "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }
 
 // ============================================================================
@@ -160,7 +160,7 @@ fn test_uniq_mutating_returns_none() {
         nums = [1, 2, 2, 3, 1]
         nums.uniq!()
     "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }
 
 // ============================================================================
@@ -203,7 +203,7 @@ fn test_map_mutating_returns_none() {
         nums = [1, 2, 3]
         nums.map!(x => x * 2)
     "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }
 
 // ============================================================================
@@ -246,7 +246,7 @@ fn test_filter_mutating_returns_none() {
         nums = [1, 2, 3, 4, 5]
         nums.filter!(x => x % 2 == 0)
     "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }
 
 // ============================================================================
@@ -289,7 +289,7 @@ fn test_reject_mutating_returns_none() {
         nums = [1, 2, 3, 4, 5]
         nums.reject!(x => x % 2 == 0)
     "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }
 
 // ============================================================================
@@ -313,7 +313,7 @@ fn test_compact_original_unchanged() {
         compacted = original.compact()
         original.length()
     "#;
-    assert_eq!(eval(code), Value::Number(5.0));
+    assert_eq!(eval(code), Value::number(5.0));
 }
 
 #[test]
@@ -332,7 +332,7 @@ fn test_compact_mutating_returns_none() {
         nums = [1, none, 2, none, 3]
         nums.compact!()
     "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }
 
 // ============================================================================

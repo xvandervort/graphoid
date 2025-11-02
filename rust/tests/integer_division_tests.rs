@@ -25,7 +25,7 @@ fn eval_expr(code: &str) -> Value {
         executor.eval_stmt(stmt).unwrap();
     }
 
-    Value::None
+    Value::none()
 }
 
 // ============================================================================
@@ -35,50 +35,50 @@ fn eval_expr(code: &str) -> Value {
 #[test]
 fn test_int_div_positive_exact() {
     let result = eval_expr("10 // 2");
-    assert_eq!(result, Value::Number(5.0));
+    assert_eq!(result, Value::number(5.0));
 }
 
 #[test]
 fn test_int_div_positive_truncate() {
     let result = eval_expr("10 // 3");
-    assert_eq!(result, Value::Number(3.0));
+    assert_eq!(result, Value::number(3.0));
 }
 
 #[test]
 fn test_int_div_negative_dividend() {
     let result = eval_expr("-10 // 3");
-    assert_eq!(result, Value::Number(-3.0));
+    assert_eq!(result, Value::number(-3.0));
 }
 
 #[test]
 fn test_int_div_negative_divisor() {
     let result = eval_expr("10 // -3");
-    assert_eq!(result, Value::Number(-3.0));
+    assert_eq!(result, Value::number(-3.0));
 }
 
 #[test]
 fn test_int_div_both_negative() {
     let result = eval_expr("-10 // -3");
-    assert_eq!(result, Value::Number(3.0));
+    assert_eq!(result, Value::number(3.0));
 }
 
 #[test]
 fn test_int_div_with_floats() {
     let result = eval_expr("10.5 // 2");
-    assert_eq!(result, Value::Number(5.0));
+    assert_eq!(result, Value::number(5.0));
 }
 
 #[test]
 fn test_int_div_result_is_floor() {
     // 7 / 2 = 3.5, floor = 3
     let result = eval_expr("7 // 2");
-    assert_eq!(result, Value::Number(3.0));
+    assert_eq!(result, Value::number(3.0));
 }
 
 #[test]
 fn test_int_div_zero_dividend() {
     let result = eval_expr("0 // 5");
-    assert_eq!(result, Value::Number(0.0));
+    assert_eq!(result, Value::number(0.0));
 }
 
 // ============================================================================
@@ -89,14 +89,14 @@ fn test_int_div_zero_dividend() {
 fn test_int_div_in_expression() {
     let result = eval_expr("(20 // 3) + 1");
     // 20 // 3 = 6, then 6 + 1 = 7
-    assert_eq!(result, Value::Number(7.0));
+    assert_eq!(result, Value::number(7.0));
 }
 
 #[test]
 fn test_int_div_with_multiplication() {
     let result = eval_expr("20 // 3 * 2");
     // 20 // 3 = 6, then 6 * 2 = 12
-    assert_eq!(result, Value::Number(12.0));
+    assert_eq!(result, Value::number(12.0));
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn test_int_div_precedence() {
     // // and / should have same precedence
     let result = eval_expr("20 / 2 // 3");
     // Left-to-right: 20 / 2 = 10, then 10 // 3 = 3
-    assert_eq!(result, Value::Number(3.0));
+    assert_eq!(result, Value::number(3.0));
 }
 
 // ============================================================================
@@ -119,5 +119,5 @@ fn test_int_div_with_variables() {
         x // y
     "#;
     let result = eval_expr(code);
-    assert_eq!(result, Value::Number(3.0));
+    assert_eq!(result, Value::number(3.0));
 }

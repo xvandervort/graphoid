@@ -28,7 +28,7 @@ fn test_literal_number_match_success() {
         position: pos(),
     };
 
-    assert!(matcher.matches(&pattern, &Value::Number(42.0)));
+    assert!(matcher.matches(&pattern, &Value::number(42.0)));
 }
 
 #[test]
@@ -39,7 +39,7 @@ fn test_literal_number_match_failure() {
         position: pos(),
     };
 
-    assert!(!matcher.matches(&pattern, &Value::Number(99.0)));
+    assert!(!matcher.matches(&pattern, &Value::number(99.0)));
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn test_literal_string_match_success() {
         position: pos(),
     };
 
-    assert!(matcher.matches(&pattern, &Value::String("hello".to_string())));
+    assert!(matcher.matches(&pattern, &Value::string("hello".to_string())));
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn test_literal_string_match_failure() {
         position: pos(),
     };
 
-    assert!(!matcher.matches(&pattern, &Value::String("world".to_string())));
+    assert!(!matcher.matches(&pattern, &Value::string("world".to_string())));
 }
 
 #[test]
@@ -72,8 +72,8 @@ fn test_literal_boolean_match_true() {
         position: pos(),
     };
 
-    assert!(matcher.matches(&pattern, &Value::Boolean(true)));
-    assert!(!matcher.matches(&pattern, &Value::Boolean(false)));
+    assert!(matcher.matches(&pattern, &Value::boolean(true)));
+    assert!(!matcher.matches(&pattern, &Value::boolean(false)));
 }
 
 #[test]
@@ -84,8 +84,8 @@ fn test_literal_boolean_match_false() {
         position: pos(),
     };
 
-    assert!(matcher.matches(&pattern, &Value::Boolean(false)));
-    assert!(!matcher.matches(&pattern, &Value::Boolean(true)));
+    assert!(matcher.matches(&pattern, &Value::boolean(false)));
+    assert!(!matcher.matches(&pattern, &Value::boolean(true)));
 }
 
 #[test]
@@ -96,8 +96,8 @@ fn test_literal_none_match() {
         position: pos(),
     };
 
-    assert!(matcher.matches(&pattern, &Value::None));
-    assert!(!matcher.matches(&pattern, &Value::Number(0.0)));
+    assert!(matcher.matches(&pattern, &Value::none()));
+    assert!(!matcher.matches(&pattern, &Value::number(0.0)));
 }
 
 #[test]
@@ -109,7 +109,7 @@ fn test_literal_type_mismatch() {
     };
 
     // Number pattern should not match string
-    assert!(!matcher.matches(&pattern, &Value::String("42".to_string())));
+    assert!(!matcher.matches(&pattern, &Value::string("42".to_string())));
 }
 
 #[test]
@@ -121,10 +121,10 @@ fn test_variable_pattern_matches_anything() {
     };
 
     // Variable patterns match any value
-    assert!(matcher.matches(&pattern, &Value::Number(42.0)));
-    assert!(matcher.matches(&pattern, &Value::String("hello".to_string())));
-    assert!(matcher.matches(&pattern, &Value::Boolean(true)));
-    assert!(matcher.matches(&pattern, &Value::None));
+    assert!(matcher.matches(&pattern, &Value::number(42.0)));
+    assert!(matcher.matches(&pattern, &Value::string("hello".to_string())));
+    assert!(matcher.matches(&pattern, &Value::boolean(true)));
+    assert!(matcher.matches(&pattern, &Value::none()));
 }
 
 #[test]
@@ -135,10 +135,10 @@ fn test_wildcard_pattern_matches_anything() {
     };
 
     // Wildcard patterns match any value
-    assert!(matcher.matches(&pattern, &Value::Number(42.0)));
-    assert!(matcher.matches(&pattern, &Value::String("hello".to_string())));
-    assert!(matcher.matches(&pattern, &Value::Boolean(true)));
-    assert!(matcher.matches(&pattern, &Value::None));
+    assert!(matcher.matches(&pattern, &Value::number(42.0)));
+    assert!(matcher.matches(&pattern, &Value::string("hello".to_string())));
+    assert!(matcher.matches(&pattern, &Value::boolean(true)));
+    assert!(matcher.matches(&pattern, &Value::none()));
 }
 
 // ============================================================================
@@ -153,11 +153,11 @@ fn test_bind_from_variable_pattern() {
         position: pos(),
     };
 
-    let value = Value::Number(42.0);
+    let value = Value::number(42.0);
     let bindings = matcher.bind(&pattern, &value).unwrap();
 
     assert_eq!(bindings.len(), 1);
-    assert_eq!(bindings.get("x"), Some(&Value::Number(42.0)));
+    assert_eq!(bindings.get("x"), Some(&Value::number(42.0)));
 }
 
 #[test]
@@ -168,7 +168,7 @@ fn test_bind_from_literal_pattern() {
         position: pos(),
     };
 
-    let value = Value::Number(42.0);
+    let value = Value::number(42.0);
     let bindings = matcher.bind(&pattern, &value).unwrap();
 
     // Literal patterns don't create bindings
@@ -182,7 +182,7 @@ fn test_bind_from_wildcard_pattern() {
         position: pos(),
     };
 
-    let value = Value::Number(42.0);
+    let value = Value::number(42.0);
     let bindings = matcher.bind(&pattern, &value).unwrap();
 
     // Wildcard patterns don't create bindings
@@ -197,15 +197,15 @@ fn test_bind_different_variable_names() {
         name: "foo".to_string(),
         position: pos(),
     };
-    let bindings1 = matcher.bind(&pattern1, &Value::String("hello".to_string())).unwrap();
-    assert_eq!(bindings1.get("foo"), Some(&Value::String("hello".to_string())));
+    let bindings1 = matcher.bind(&pattern1, &Value::string("hello".to_string())).unwrap();
+    assert_eq!(bindings1.get("foo"), Some(&Value::string("hello".to_string())));
 
     let pattern2 = Pattern::Variable {
         name: "bar".to_string(),
         position: pos(),
     };
-    let bindings2 = matcher.bind(&pattern2, &Value::Boolean(true)).unwrap();
-    assert_eq!(bindings2.get("bar"), Some(&Value::Boolean(true)));
+    let bindings2 = matcher.bind(&pattern2, &Value::boolean(true)).unwrap();
+    assert_eq!(bindings2.get("bar"), Some(&Value::boolean(true)));
 }
 
 // ============================================================================
@@ -243,7 +243,7 @@ fn test_find_match_first_clause() {
         },
     ];
 
-    let args = vec![Value::Number(0.0)];
+    let args = vec![Value::number(0.0)];
     let result = matcher.find_match(&clauses, &args).unwrap();
 
     assert!(result.is_some());
@@ -285,7 +285,7 @@ fn test_find_match_second_clause() {
         },
     ];
 
-    let args = vec![Value::Number(42.0)];
+    let args = vec![Value::number(42.0)];
     let result = matcher.find_match(&clauses, &args).unwrap();
 
     assert!(result.is_some());
@@ -294,7 +294,7 @@ fn test_find_match_second_clause() {
     // Should match second clause (variable pattern)
     assert!(matches!(&clause.pattern, Pattern::Variable { .. }));
     assert_eq!(bindings.len(), 1);
-    assert_eq!(bindings.get("x"), Some(&Value::Number(42.0)));
+    assert_eq!(bindings.get("x"), Some(&Value::number(42.0)));
 }
 
 #[test]
@@ -317,7 +317,7 @@ fn test_find_match_no_match() {
         },
     ];
 
-    let args = vec![Value::Number(42.0)];
+    let args = vec![Value::number(42.0)];
     let result = matcher.find_match(&clauses, &args).unwrap();
 
     // No match should return None
@@ -356,7 +356,7 @@ fn test_find_match_order_matters() {
         },
     ];
 
-    let args = vec![Value::Number(0.0)];
+    let args = vec![Value::number(0.0)];
     let result = matcher.find_match(&clauses, &args).unwrap();
 
     assert!(result.is_some());
@@ -386,7 +386,7 @@ fn test_find_match_wrong_arg_count() {
     ];
 
     // Pattern matching requires exactly 1 argument
-    let args = vec![Value::Number(1.0), Value::Number(2.0)];
+    let args = vec![Value::number(1.0), Value::number(2.0)];
     let result = matcher.find_match(&clauses, &args);
 
     // Should return error for wrong argument count
@@ -398,7 +398,7 @@ fn test_find_match_empty_clauses() {
     let matcher = PatternMatcher::new();
 
     let clauses = vec![];
-    let args = vec![Value::Number(42.0)];
+    let args = vec![Value::number(42.0)];
     let result = matcher.find_match(&clauses, &args).unwrap();
 
     // Empty clauses should return None (no match)

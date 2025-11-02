@@ -15,8 +15,8 @@ fn test_add_rule_enforces_constraint() {
     let mut graph = Graph::new(GraphType::Directed);
 
     // Should be able to create a cycle without rules
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
     assert!(graph.add_edge("B", "A", "edge".to_string(), None, HashMap::new()).is_ok());
 
@@ -25,8 +25,8 @@ fn test_add_rule_enforces_constraint() {
     graph2.add_rule(RuleInstance::new(RuleSpec::NoCycles)).unwrap();
 
     // Build same structure
-    graph2.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph2.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph2.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph2.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph2.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Now adding the reverse edge should fail
@@ -46,10 +46,10 @@ fn test_add_rule_with_parameter() {
     let mut graph = Graph::new(GraphType::Directed);
     graph.add_rule(RuleInstance::new(RuleSpec::MaxDegree(2))).unwrap();
 
-    graph.add_node("root".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("child1".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("child2".to_string(), Value::Number(3.0)).unwrap();
-    graph.add_node("child3".to_string(), Value::Number(4.0)).unwrap();
+    graph.add_node("root".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("child1".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("child2".to_string(), Value::number(3.0)).unwrap();
+    graph.add_node("child3".to_string(), Value::number(4.0)).unwrap();
 
     // First two edges should succeed
     graph.add_edge("root", "child1", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -73,8 +73,8 @@ fn test_remove_rule_disables_constraint() {
     let mut graph = Graph::new(GraphType::Directed);
     graph.add_rule(RuleInstance::new(RuleSpec::NoCycles)).unwrap();
 
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Cycle should fail
@@ -144,10 +144,10 @@ fn test_ad_hoc_rules_combine_with_rulesets() {
     assert!(graph.has_rule("max_degree"));
 
     // Build a tree
-    graph.add_node("root".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("left".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("right".to_string(), Value::Number(3.0)).unwrap();
-    graph.add_node("extra".to_string(), Value::Number(4.0)).unwrap();
+    graph.add_node("root".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("left".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("right".to_string(), Value::number(3.0)).unwrap();
+    graph.add_node("extra".to_string(), Value::number(4.0)).unwrap();
 
     graph.add_edge("root", "left", "child".to_string(), None, HashMap::new()).unwrap();
     graph.add_edge("root", "right", "child".to_string(), None, HashMap::new()).unwrap();
@@ -204,8 +204,8 @@ fn test_ruleset_and_ad_hoc_deduplication() {
     graph.add_rule(RuleInstance::new(RuleSpec::NoCycles)).unwrap();
 
     // Build a structure
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Cycle should still fail (rule should only be checked once, not twice)

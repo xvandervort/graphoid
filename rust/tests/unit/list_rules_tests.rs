@@ -22,11 +22,11 @@ fn test_list_no_duplicates_prevents_duplicate_addition() {
     list.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
 
     // Add first item - should succeed
-    assert!(list.append(Value::Number(1.0)).is_ok());
-    assert!(list.append(Value::Number(2.0)).is_ok());
+    assert!(list.append(Value::number(1.0)).is_ok());
+    assert!(list.append(Value::number(2.0)).is_ok());
 
     // Try to add duplicate - should fail
-    let result = list.append(Value::Number(1.0));
+    let result = list.append(Value::number(1.0));
     assert!(result.is_err());
 
     match result {
@@ -43,9 +43,9 @@ fn test_list_without_no_duplicates_allows_duplicates() {
     // Regular list without rule allows duplicates
     let mut list = List::new();
 
-    assert!(list.append(Value::Number(1.0)).is_ok());
-    assert!(list.append(Value::Number(1.0)).is_ok());
-    assert!(list.append(Value::Number(1.0)).is_ok());
+    assert!(list.append(Value::number(1.0)).is_ok());
+    assert!(list.append(Value::number(1.0)).is_ok());
+    assert!(list.append(Value::number(1.0)).is_ok());
 
     assert_eq!(list.len(), 3);
 }
@@ -55,11 +55,11 @@ fn test_list_no_duplicates_with_strings() {
     let mut list = List::new();
     list.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
 
-    assert!(list.append(Value::String("hello".to_string())).is_ok());
-    assert!(list.append(Value::String("world".to_string())).is_ok());
+    assert!(list.append(Value::string("hello".to_string())).is_ok());
+    assert!(list.append(Value::string("world".to_string())).is_ok());
 
     // Duplicate string should fail
-    let result = list.append(Value::String("hello".to_string()));
+    let result = list.append(Value::string("hello".to_string()));
     assert!(result.is_err());
 }
 
@@ -68,16 +68,16 @@ fn test_list_can_remove_rule() {
     let mut list = List::new();
     list.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
 
-    list.append(Value::Number(1.0)).unwrap();
+    list.append(Value::number(1.0)).unwrap();
 
     // Can't add duplicate
-    assert!(list.append(Value::Number(1.0)).is_err());
+    assert!(list.append(Value::number(1.0)).is_err());
 
     // Remove the rule
     list.remove_rule(&RuleSpec::NoDuplicates);
 
     // Now duplicate should be allowed
-    assert!(list.append(Value::Number(1.0)).is_ok());
+    assert!(list.append(Value::number(1.0)).is_ok());
     assert_eq!(list.len(), 2);
 }
 
@@ -85,10 +85,10 @@ fn test_list_can_remove_rule() {
 fn test_list_add_rule_to_existing_list_with_duplicates() {
     // Create list with duplicates
     let mut list = List::from_vec(vec![
-        Value::Number(1.0),
-        Value::Number(2.0),
-        Value::Number(2.0),
-        Value::Number(3.0),
+        Value::number(1.0),
+        Value::number(2.0),
+        Value::number(2.0),
+        Value::number(3.0),
     ]);
 
     assert_eq!(list.len(), 4);
@@ -104,7 +104,7 @@ fn test_list_add_rule_to_existing_list_with_duplicates() {
     assert_eq!(list.len(), 3);
 
     // Future duplicate additions should be blocked
-    let result = list.append(Value::Number(2.0));
+    let result = list.append(Value::number(2.0));
     assert!(result.is_err());
 }
 
@@ -118,7 +118,7 @@ fn test_list_unique_values_like_a_set() {
     let items = vec![1.0, 2.0, 3.0, 2.0, 4.0, 1.0, 5.0];
 
     for val in items {
-        let _ = unique_items.append(Value::Number(val)); // Ignore errors
+        let _ = unique_items.append(Value::number(val)); // Ignore errors
     }
 
     // Only unique values were added
@@ -136,10 +136,10 @@ fn test_multiple_rules_on_list() {
     assert!(list.has_rule("max_degree"));
 
     // Both rules are enforced
-    list.append(Value::Number(1.0)).unwrap();
+    list.append(Value::number(1.0)).unwrap();
 
     // Duplicate should fail (no_duplicates)
-    assert!(list.append(Value::Number(1.0)).is_err());
+    assert!(list.append(Value::number(1.0)).is_err());
 
     // Adding to middle would violate max_degree (lists are linear graphs)
     // This is implicitly enforced by the list's append implementation

@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 use crate::error::{GraphoidError, Result};
-use crate::values::Value;
+use crate::values::{Value, ValueKind};
 
 /// Configuration settings for the Graphoid runtime
 #[derive(Debug, Clone)]
@@ -187,8 +187,8 @@ impl Default for ConfigStack {
 // Helper functions to parse mode values from Value types
 
 fn parse_error_mode(value: &Value) -> Result<ErrorMode> {
-    match value {
-        Value::Symbol(s) => match s.as_str() {
+    match &value.kind {
+        ValueKind::Symbol(s) => match s.as_str() {
             "strict" => Ok(ErrorMode::Strict),
             "lenient" => Ok(ErrorMode::Lenient),
             "collect" => Ok(ErrorMode::Collect),
@@ -203,8 +203,8 @@ fn parse_error_mode(value: &Value) -> Result<ErrorMode> {
 }
 
 fn parse_bounds_checking_mode(value: &Value) -> Result<BoundsCheckingMode> {
-    match value {
-        Value::Symbol(s) => match s.as_str() {
+    match &value.kind {
+        ValueKind::Symbol(s) => match s.as_str() {
             "strict" => Ok(BoundsCheckingMode::Strict),
             "lenient" => Ok(BoundsCheckingMode::Lenient),
             _ => Err(GraphoidError::ConfigError {
@@ -218,8 +218,8 @@ fn parse_bounds_checking_mode(value: &Value) -> Result<BoundsCheckingMode> {
 }
 
 fn parse_type_coercion_mode(value: &Value) -> Result<TypeCoercionMode> {
-    match value {
-        Value::Symbol(s) => match s.as_str() {
+    match &value.kind {
+        ValueKind::Symbol(s) => match s.as_str() {
             "strict" => Ok(TypeCoercionMode::Strict),
             "lenient" => Ok(TypeCoercionMode::Lenient),
             _ => Err(GraphoidError::ConfigError {
@@ -233,8 +233,8 @@ fn parse_type_coercion_mode(value: &Value) -> Result<TypeCoercionMode> {
 }
 
 fn parse_none_handling_mode(value: &Value) -> Result<NoneHandlingMode> {
-    match value {
-        Value::Symbol(s) => match s.as_str() {
+    match &value.kind {
+        ValueKind::Symbol(s) => match s.as_str() {
             "propagate" => Ok(NoneHandlingMode::Propagate),
             "skip" => Ok(NoneHandlingMode::Skip),
             "error" => Ok(NoneHandlingMode::Error),

@@ -16,9 +16,9 @@ fn test_shortest_path_simple_linear() {
     let mut g = Graph::new(GraphType::Directed);
 
     // Create linear path: A -> B -> C
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
     g.add_edge("B", "C", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -39,10 +39,10 @@ fn test_shortest_path_with_multiple_routes() {
     //    \ /
     //     D
 
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-    g.add_node("D".to_string(), Value::Number(4.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    g.add_node("D".to_string(), Value::number(4.0)).unwrap();
 
     g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
     g.add_edge("A", "C", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -62,8 +62,8 @@ fn test_shortest_path_with_multiple_routes() {
 fn test_shortest_path_direct_edge() {
     let mut g = Graph::new(GraphType::Directed);
 
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
 
     g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
@@ -75,7 +75,7 @@ fn test_shortest_path_direct_edge() {
 fn test_shortest_path_same_node() {
     let mut g = Graph::new(GraphType::Directed);
 
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
 
     // Path from A to A should be just [A]
     let path = g.shortest_path("A", "A", None, false).unwrap();
@@ -87,8 +87,8 @@ fn test_shortest_path_no_path_exists() {
     let mut g = Graph::new(GraphType::Directed);
 
     // Disconnected nodes
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
 
     // No edge between them
     let path = g.shortest_path("A", "B", None, false).unwrap_or(vec![]);
@@ -99,7 +99,7 @@ fn test_shortest_path_no_path_exists() {
 fn test_shortest_path_nonexistent_start() {
     let mut g = Graph::new(GraphType::Directed);
 
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
 
     let path = g.shortest_path("Z", "A", None, false).unwrap_or(vec![]);
     assert_eq!(path.len(), 0);
@@ -109,7 +109,7 @@ fn test_shortest_path_nonexistent_start() {
 fn test_shortest_path_nonexistent_end() {
     let mut g = Graph::new(GraphType::Directed);
 
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
 
     let path = g.shortest_path("A", "Z", None, false).unwrap_or(vec![]);
     assert_eq!(path.len(), 0);
@@ -124,9 +124,9 @@ fn test_topological_sort_simple_dag() {
     let mut g = Graph::new(GraphType::Directed);
 
     // Create simple DAG: A -> B -> C
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
     g.add_edge("B", "C", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -153,10 +153,10 @@ fn test_topological_sort_diamond_dag() {
     //    \ /
     //     D
 
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-    g.add_node("D".to_string(), Value::Number(4.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    g.add_node("D".to_string(), Value::number(4.0)).unwrap();
 
     g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
     g.add_edge("A", "C", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -189,7 +189,7 @@ fn test_topological_sort_empty_graph() {
 fn test_topological_sort_single_node() {
     let mut g = Graph::new(GraphType::Directed);
 
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
 
     let sorted = g.topological_sort();
     assert_eq!(sorted, vec!["A"]);
@@ -200,9 +200,9 @@ fn test_topological_sort_with_cycle_returns_empty() {
     let mut g = Graph::new(GraphType::Directed);
 
     // Create cycle: A -> B -> C -> A
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     // Add edges that form a cycle
     // Note: This will only work if no_cycles rule is NOT active
@@ -225,10 +225,10 @@ fn test_shortest_path_uses_topological_sort_with_no_cycles_rule() {
         .with_ruleset("dag".to_string());
 
     // Create DAG
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-    g.add_node("D".to_string(), Value::Number(4.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    g.add_node("D".to_string(), Value::number(4.0)).unwrap();
 
     g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
     g.add_edge("A", "C", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -249,9 +249,9 @@ fn test_shortest_path_without_rules_uses_bfs() {
     let mut g = Graph::new(GraphType::Directed);
 
     // No rules applied - should use standard BFS
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
     g.add_edge("B", "C", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -287,9 +287,9 @@ fn test_shortest_path_undirected() {
     let mut g = Graph::new(GraphType::Undirected);
 
     // Create undirected graph
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     // In undirected graph, edge goes both ways
     g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();

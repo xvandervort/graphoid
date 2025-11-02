@@ -3,7 +3,7 @@
 /// Tests for Ruby/Smalltalk-style trailing blocks: method { |params| body }
 
 use graphoid::execution::Executor;
-use graphoid::values::Value;
+use graphoid::values::{Value, ValueKind};
 
 // ============================================================================
 // TRAILING BLOCKS - METHOD CALLS
@@ -25,10 +25,10 @@ result = numbers.each { |x|
     executor.execute_source(source).unwrap();
 
     // Verify each returns the original list
-    match executor.get_variable("result").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("result").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 5);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(1.0));
+            assert_eq!(list.get(0).unwrap(), &Value::number(1.0));
         }
         _ => panic!("Expected list"),
     }
@@ -43,14 +43,14 @@ doubled = numbers.map { |x| x * 2 }
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("doubled").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("doubled").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 5);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(2.0));
-            assert_eq!(list.get(1).unwrap(), &Value::Number(4.0));
-            assert_eq!(list.get(2).unwrap(), &Value::Number(6.0));
-            assert_eq!(list.get(3).unwrap(), &Value::Number(8.0));
-            assert_eq!(list.get(4).unwrap(), &Value::Number(10.0));
+            assert_eq!(list.get(0).unwrap(), &Value::number(2.0));
+            assert_eq!(list.get(1).unwrap(), &Value::number(4.0));
+            assert_eq!(list.get(2).unwrap(), &Value::number(6.0));
+            assert_eq!(list.get(3).unwrap(), &Value::number(8.0));
+            assert_eq!(list.get(4).unwrap(), &Value::number(10.0));
         }
         _ => panic!("Expected list"),
     }
@@ -65,14 +65,14 @@ evens = numbers.filter { |x| x % 2 == 0 }
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("evens").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("evens").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 5);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(2.0));
-            assert_eq!(list.get(1).unwrap(), &Value::Number(4.0));
-            assert_eq!(list.get(2).unwrap(), &Value::Number(6.0));
-            assert_eq!(list.get(3).unwrap(), &Value::Number(8.0));
-            assert_eq!(list.get(4).unwrap(), &Value::Number(10.0));
+            assert_eq!(list.get(0).unwrap(), &Value::number(2.0));
+            assert_eq!(list.get(1).unwrap(), &Value::number(4.0));
+            assert_eq!(list.get(2).unwrap(), &Value::number(6.0));
+            assert_eq!(list.get(3).unwrap(), &Value::number(8.0));
+            assert_eq!(list.get(4).unwrap(), &Value::number(10.0));
         }
         _ => panic!("Expected list"),
     }
@@ -95,7 +95,7 @@ result = with_coords() { |x, y|
     executor.execute_source(source).unwrap();
 
     // (10+20) + (30+40) = 30 + 70 = 100
-    assert_eq!(executor.get_variable("result").unwrap(), Value::Number(100.0));
+    assert_eq!(executor.get_variable("result").unwrap(), Value::number(100.0));
 }
 
 #[test]
@@ -114,7 +114,7 @@ count = run_twice() { ||
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("count").unwrap(), Value::Number(2.0));
+    assert_eq!(executor.get_variable("count").unwrap(), Value::number(2.0));
 }
 
 #[test]
@@ -128,14 +128,14 @@ result = numbers
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("result").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("result").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 5);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(4.0));   // 2*2
-            assert_eq!(list.get(1).unwrap(), &Value::Number(8.0));   // 4*2
-            assert_eq!(list.get(2).unwrap(), &Value::Number(12.0));  // 6*2
-            assert_eq!(list.get(3).unwrap(), &Value::Number(16.0));  // 8*2
-            assert_eq!(list.get(4).unwrap(), &Value::Number(20.0));  // 10*2
+            assert_eq!(list.get(0).unwrap(), &Value::number(4.0));   // 2*2
+            assert_eq!(list.get(1).unwrap(), &Value::number(8.0));   // 4*2
+            assert_eq!(list.get(2).unwrap(), &Value::number(12.0));  // 6*2
+            assert_eq!(list.get(3).unwrap(), &Value::number(16.0));  // 8*2
+            assert_eq!(list.get(4).unwrap(), &Value::number(20.0));  // 10*2
         }
         _ => panic!("Expected list"),
     }
@@ -154,14 +154,14 @@ transformed = numbers.map { |x|
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("transformed").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("transformed").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 5);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(3.0));   // 1*2+1
-            assert_eq!(list.get(1).unwrap(), &Value::Number(5.0));   // 2*2+1
-            assert_eq!(list.get(2).unwrap(), &Value::Number(7.0));   // 3*2+1
-            assert_eq!(list.get(3).unwrap(), &Value::Number(9.0));   // 4*2+1
-            assert_eq!(list.get(4).unwrap(), &Value::Number(11.0));  // 5*2+1
+            assert_eq!(list.get(0).unwrap(), &Value::number(3.0));   // 1*2+1
+            assert_eq!(list.get(1).unwrap(), &Value::number(5.0));   // 2*2+1
+            assert_eq!(list.get(2).unwrap(), &Value::number(7.0));   // 3*2+1
+            assert_eq!(list.get(3).unwrap(), &Value::number(9.0));   // 4*2+1
+            assert_eq!(list.get(4).unwrap(), &Value::number(11.0));  // 5*2+1
         }
         _ => panic!("Expected list"),
     }
@@ -181,14 +181,14 @@ absolutes = numbers.map { |x|
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("absolutes").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("absolutes").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 5);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(5.0));
-            assert_eq!(list.get(1).unwrap(), &Value::Number(3.0));
-            assert_eq!(list.get(2).unwrap(), &Value::Number(0.0));
-            assert_eq!(list.get(3).unwrap(), &Value::Number(3.0));
-            assert_eq!(list.get(4).unwrap(), &Value::Number(5.0));
+            assert_eq!(list.get(0).unwrap(), &Value::number(5.0));
+            assert_eq!(list.get(1).unwrap(), &Value::number(3.0));
+            assert_eq!(list.get(2).unwrap(), &Value::number(0.0));
+            assert_eq!(list.get(3).unwrap(), &Value::number(3.0));
+            assert_eq!(list.get(4).unwrap(), &Value::number(5.0));
         }
         _ => panic!("Expected list"),
     }
@@ -206,12 +206,12 @@ scaled = numbers.map { |x|
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("scaled").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("scaled").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 3);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(10.0));
-            assert_eq!(list.get(1).unwrap(), &Value::Number(20.0));
-            assert_eq!(list.get(2).unwrap(), &Value::Number(30.0));
+            assert_eq!(list.get(0).unwrap(), &Value::number(10.0));
+            assert_eq!(list.get(1).unwrap(), &Value::number(20.0));
+            assert_eq!(list.get(2).unwrap(), &Value::number(30.0));
         }
         _ => panic!("Expected list"),
     }
@@ -232,12 +232,12 @@ totals = lists.map { |lst|
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("totals").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("totals").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 3);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(3.0));   // 1+2
-            assert_eq!(list.get(1).unwrap(), &Value::Number(12.0));  // 3+4+5
-            assert_eq!(list.get(2).unwrap(), &Value::Number(6.0));   // 6
+            assert_eq!(list.get(0).unwrap(), &Value::number(3.0));   // 1+2
+            assert_eq!(list.get(1).unwrap(), &Value::number(12.0));  // 3+4+5
+            assert_eq!(list.get(2).unwrap(), &Value::number(6.0));   // 6
         }
         _ => panic!("Expected list"),
     }
@@ -261,7 +261,7 @@ result = apply(5) { |n|
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result").unwrap(), Value::Number(10.0));
+    assert_eq!(executor.get_variable("result").unwrap(), Value::number(10.0));
 }
 
 #[test]
@@ -278,7 +278,7 @@ result = apply_binary(10, 5) { |a, b|
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result").unwrap(), Value::Number(5.0));
+    assert_eq!(executor.get_variable("result").unwrap(), Value::number(5.0));
 }
 
 #[test]
@@ -299,8 +299,8 @@ result2 = numbers.map(x => x * 2)
     let result2 = executor.get_variable("result2").unwrap();
 
     // Both should produce the same result
-    match (&result1, &result2) {
-        (Value::List(list1), Value::List(list2)) => {
+    match (&result1.kind, &result2.kind) {
+        (ValueKind::List(list1), ValueKind::List(list2)) => {
             assert_eq!(list1.len(), list2.len());
             for i in 0..list1.len() {
                 assert_eq!(list1.get(i).unwrap(), list2.get(i).unwrap());
@@ -322,11 +322,11 @@ uppercased = words.map { |w|
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("uppercased").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("uppercased").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 2);
-            assert_eq!(list.get(0).unwrap(), &Value::String("hello".to_string()));
-            assert_eq!(list.get(1).unwrap(), &Value::String("world".to_string()));
+            assert_eq!(list.get(0).unwrap(), &Value::string("hello".to_string()));
+            assert_eq!(list.get(1).unwrap(), &Value::string("world".to_string()));
         }
         _ => panic!("Expected list"),
     }
@@ -347,7 +347,7 @@ result = outer() { |x|
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result").unwrap(), Value::Number(20.0));
+    assert_eq!(executor.get_variable("result").unwrap(), Value::number(20.0));
 }
 
 #[test]
@@ -364,11 +364,11 @@ first_big = numbers.filter { |x|
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("first_big").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("first_big").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 2);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(4.0));
-            assert_eq!(list.get(1).unwrap(), &Value::Number(5.0));
+            assert_eq!(list.get(0).unwrap(), &Value::number(4.0));
+            assert_eq!(list.get(1).unwrap(), &Value::number(5.0));
         }
         _ => panic!("Expected list"),
     }
@@ -391,14 +391,14 @@ result = numbers.map { |x|
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("result").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("result").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 5);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(3.0));   // 1*3 (odd)
-            assert_eq!(list.get(1).unwrap(), &Value::Number(4.0));   // 2*2 (even)
-            assert_eq!(list.get(2).unwrap(), &Value::Number(9.0));   // 3*3 (odd)
-            assert_eq!(list.get(3).unwrap(), &Value::Number(8.0));   // 4*2 (even)
-            assert_eq!(list.get(4).unwrap(), &Value::Number(15.0));  // 5*3 (odd)
+            assert_eq!(list.get(0).unwrap(), &Value::number(3.0));   // 1*3 (odd)
+            assert_eq!(list.get(1).unwrap(), &Value::number(4.0));   // 2*2 (even)
+            assert_eq!(list.get(2).unwrap(), &Value::number(9.0));   // 3*3 (odd)
+            assert_eq!(list.get(3).unwrap(), &Value::number(8.0));   // 4*2 (even)
+            assert_eq!(list.get(4).unwrap(), &Value::number(15.0));  // 5*3 (odd)
         }
         _ => panic!("Expected list"),
     }

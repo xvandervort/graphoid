@@ -7,7 +7,7 @@
 /// 4. Named parameters
 
 use graphoid::execution::Executor;
-use graphoid::values::Value;
+use graphoid::values::{Value, ValueKind};
 
 // ============================================================================
 // CLOSURES - Environment Capture
@@ -33,9 +33,9 @@ result3 = counter()
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(1.0));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(2.0));
-    assert_eq!(executor.get_variable("result3").unwrap(), Value::Number(3.0));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(1.0));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(2.0));
+    assert_eq!(executor.get_variable("result3").unwrap(), Value::number(3.0));
 }
 
 #[test]
@@ -57,8 +57,8 @@ result2 = add10(3)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(8.0));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(13.0));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(8.0));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(13.0));
 }
 
 #[test]
@@ -86,8 +86,8 @@ result2 = counter2()  # Should be 2
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(3.0));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(2.0));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(3.0));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(2.0));
 }
 
 #[test]
@@ -110,7 +110,7 @@ result = g(3)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result").unwrap(), Value::Number(6.0));
+    assert_eq!(executor.get_variable("result").unwrap(), Value::number(6.0));
 }
 
 #[test]
@@ -130,8 +130,8 @@ result2 = times5(10)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(20.0));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(50.0));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(20.0));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(50.0));
 }
 
 // ============================================================================
@@ -151,8 +151,8 @@ result2 = greet("Alice")
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::String("Hello World".to_string()));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::String("Hello Alice".to_string()));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::string("Hello World".to_string()));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::string("Hello Alice".to_string()));
 }
 
 #[test]
@@ -170,10 +170,10 @@ result4 = create_user("Charlie", 30, false)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::String("Anonymous:0:true".to_string()));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::String("Bob:0:true".to_string()));
-    assert_eq!(executor.get_variable("result3").unwrap(), Value::String("Alice:25:true".to_string()));
-    assert_eq!(executor.get_variable("result4").unwrap(), Value::String("Charlie:30:false".to_string()));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::string("Anonymous:0:true".to_string()));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::string("Bob:0:true".to_string()));
+    assert_eq!(executor.get_variable("result3").unwrap(), Value::string("Alice:25:true".to_string()));
+    assert_eq!(executor.get_variable("result4").unwrap(), Value::string("Charlie:30:false".to_string()));
 }
 
 #[test]
@@ -196,9 +196,9 @@ result3 = power(5, 1)  # 5^1 = 5
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(9.0));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(8.0));
-    assert_eq!(executor.get_variable("result3").unwrap(), Value::Number(5.0));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(9.0));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(8.0));
+    assert_eq!(executor.get_variable("result3").unwrap(), Value::number(5.0));
 }
 
 #[test]
@@ -215,12 +215,12 @@ result2 = add_tax(100, 0.2) # 100 * 1.2 = 120
     executor.execute_source(source).unwrap();
 
     // Use approximate equality for floating point comparisons
-    match executor.get_variable("result1").unwrap() {
-        Value::Number(n) => assert!((n - 110.0).abs() < 1e-10, "Expected ~110.0, got {}", n),
+    match &executor.get_variable("result1").unwrap().kind {
+        ValueKind::Number(n) => assert!((n - 110.0).abs() < 1e-10, "Expected ~110.0, got {}", n),
         other => panic!("Expected number, got {:?}", other),
     }
-    match executor.get_variable("result2").unwrap() {
-        Value::Number(n) => assert!((n - 120.0).abs() < 1e-10, "Expected ~120.0, got {}", n),
+    match &executor.get_variable("result2").unwrap().kind {
+        ValueKind::Number(n) => assert!((n - 120.0).abs() < 1e-10, "Expected ~120.0, got {}", n),
         other => panic!("Expected number, got {:?}", other),
     }
 }
@@ -242,14 +242,14 @@ result2 = append_item([1, 2, 3], 4)
     executor.execute_source(source).unwrap();
 
     // result1 should be empty list
-    match executor.get_variable("result1").unwrap() {
-        Value::List(list) => assert_eq!(list.len(), 0),
+    match &executor.get_variable("result1").unwrap().kind {
+        ValueKind::List(list) => assert_eq!(list.len(), 0),
         _ => panic!("Expected list"),
     }
 
     // result2 should be [1, 2, 3, 4]
-    match executor.get_variable("result2").unwrap() {
-        Value::List(list) => assert_eq!(list.len(), 4),
+    match &executor.get_variable("result2").unwrap().kind {
+        ValueKind::List(list) => assert_eq!(list.len(), 4),
         _ => panic!("Expected list"),
     }
 }
@@ -277,10 +277,10 @@ result4 = sum(1, 2, 3, 4, 5)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(0.0));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(1.0));
-    assert_eq!(executor.get_variable("result3").unwrap(), Value::Number(6.0));
-    assert_eq!(executor.get_variable("result4").unwrap(), Value::Number(15.0));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(0.0));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(1.0));
+    assert_eq!(executor.get_variable("result3").unwrap(), Value::number(6.0));
+    assert_eq!(executor.get_variable("result4").unwrap(), Value::number(15.0));
 }
 
 #[test]
@@ -300,8 +300,8 @@ result2 = format_list("Numbers", "1", "2", "3")
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::String("Values".to_string()));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::String("Numbers,1,2,3".to_string()));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::string("Values".to_string()));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::string("Numbers,1,2,3".to_string()));
 }
 
 #[test]
@@ -327,9 +327,9 @@ result3 = make_list("|", "x", "y")
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::String("".to_string()));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::String("a,b,c".to_string()));
-    assert_eq!(executor.get_variable("result3").unwrap(), Value::String("x|y".to_string()));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::string("".to_string()));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::string("a,b,c".to_string()));
+    assert_eq!(executor.get_variable("result3").unwrap(), Value::string("x|y".to_string()));
 }
 
 #[test]
@@ -355,9 +355,9 @@ result3 = max(-5, -2, -10)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(9.0));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(42.0));
-    assert_eq!(executor.get_variable("result3").unwrap(), Value::Number(-2.0));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(9.0));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(42.0));
+    assert_eq!(executor.get_variable("result3").unwrap(), Value::number(-2.0));
 }
 
 // ============================================================================
@@ -377,8 +377,8 @@ result2 = greet(greeting: "Hi", name: "Bob")
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::String("Hello Alice".to_string()));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::String("Hi Bob".to_string()));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::string("Hello Alice".to_string()));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::string("Hi Bob".to_string()));
 }
 
 #[test]
@@ -394,8 +394,8 @@ result2 = create_user("Bob", city: "LA", age: 30)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::String("Alice:25:NYC".to_string()));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::String("Bob:30:LA".to_string()));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::string("Alice:25:NYC".to_string()));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::string("Bob:30:LA".to_string()));
 }
 
 #[test]
@@ -413,10 +413,10 @@ result4 = make_config(host: "example.com", debug: true)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::String("localhost:8080:false".to_string()));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::String("localhost:3000:false".to_string()));
-    assert_eq!(executor.get_variable("result3").unwrap(), Value::String("localhost:9000:true".to_string()));
-    assert_eq!(executor.get_variable("result4").unwrap(), Value::String("example.com:8080:true".to_string()));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::string("localhost:8080:false".to_string()));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::string("localhost:3000:false".to_string()));
+    assert_eq!(executor.get_variable("result3").unwrap(), Value::string("localhost:9000:true".to_string()));
+    assert_eq!(executor.get_variable("result4").unwrap(), Value::string("example.com:8080:true".to_string()));
 }
 
 #[test]
@@ -438,10 +438,10 @@ result4 = process("G", optional: "H", "I", "J")
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::String("A:default".to_string()));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::String("B:custom".to_string()));
-    assert_eq!(executor.get_variable("result3").unwrap(), Value::String("C:D,E,F".to_string()));
-    assert_eq!(executor.get_variable("result4").unwrap(), Value::String("G:H,I,J".to_string()));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::string("A:default".to_string()));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::string("B:custom".to_string()));
+    assert_eq!(executor.get_variable("result3").unwrap(), Value::string("C:D,E,F".to_string()));
+    assert_eq!(executor.get_variable("result4").unwrap(), Value::string("G:H,I,J".to_string()));
 }
 
 // ============================================================================

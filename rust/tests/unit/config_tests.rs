@@ -57,7 +57,7 @@ fn test_push_with_changes_skip_none() {
     let mut stack = ConfigStack::new();
 
     let mut changes = HashMap::new();
-    changes.insert("skip_none".to_string(), Value::Boolean(true));
+    changes.insert("skip_none".to_string(), Value::boolean(true));
 
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().skip_none, true);
@@ -69,7 +69,7 @@ fn test_push_with_changes_error_mode() {
     let mut stack = ConfigStack::new();
 
     let mut changes = HashMap::new();
-    changes.insert("error_mode".to_string(), Value::Symbol("lenient".to_string()));
+    changes.insert("error_mode".to_string(), Value::symbol("lenient".to_string()));
 
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().error_mode, ErrorMode::Lenient);
@@ -80,7 +80,7 @@ fn test_push_with_changes_invalid_key() {
     let mut stack = ConfigStack::new();
 
     let mut changes = HashMap::new();
-    changes.insert("invalid_key".to_string(), Value::Boolean(true));
+    changes.insert("invalid_key".to_string(), Value::boolean(true));
 
     let result = stack.push_with_changes(changes);
     assert!(result.is_err());
@@ -93,19 +93,19 @@ fn test_parse_error_mode_valid() {
     let mut stack = ConfigStack::new();
 
     let mut changes = HashMap::new();
-    changes.insert("error_mode".to_string(), Value::Symbol("strict".to_string()));
+    changes.insert("error_mode".to_string(), Value::symbol("strict".to_string()));
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().error_mode, ErrorMode::Strict);
 
     let mut stack = ConfigStack::new();
     let mut changes = HashMap::new();
-    changes.insert("error_mode".to_string(), Value::Symbol("lenient".to_string()));
+    changes.insert("error_mode".to_string(), Value::symbol("lenient".to_string()));
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().error_mode, ErrorMode::Lenient);
 
     let mut stack = ConfigStack::new();
     let mut changes = HashMap::new();
-    changes.insert("error_mode".to_string(), Value::Symbol("collect".to_string()));
+    changes.insert("error_mode".to_string(), Value::symbol("collect".to_string()));
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().error_mode, ErrorMode::Collect);
 }
@@ -115,11 +115,11 @@ fn test_parse_error_mode_invalid() {
     let mut stack = ConfigStack::new();
 
     let mut changes = HashMap::new();
-    changes.insert("error_mode".to_string(), Value::Symbol("invalid".to_string()));
+    changes.insert("error_mode".to_string(), Value::symbol("invalid".to_string()));
     assert!(stack.push_with_changes(changes).is_err());
 
     let mut changes = HashMap::new();
-    changes.insert("error_mode".to_string(), Value::Number(123.0));
+    changes.insert("error_mode".to_string(), Value::number(123.0));
     assert!(stack.push_with_changes(changes).is_err());
 }
 
@@ -128,13 +128,13 @@ fn test_parse_bounds_checking_mode() {
     let mut stack = ConfigStack::new();
 
     let mut changes = HashMap::new();
-    changes.insert("bounds_checking".to_string(), Value::Symbol("strict".to_string()));
+    changes.insert("bounds_checking".to_string(), Value::symbol("strict".to_string()));
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().bounds_checking, BoundsCheckingMode::Strict);
 
     let mut stack = ConfigStack::new();
     let mut changes = HashMap::new();
-    changes.insert("bounds_checking".to_string(), Value::Symbol("lenient".to_string()));
+    changes.insert("bounds_checking".to_string(), Value::symbol("lenient".to_string()));
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().bounds_checking, BoundsCheckingMode::Lenient);
 }
@@ -144,13 +144,13 @@ fn test_parse_type_coercion_mode() {
     let mut stack = ConfigStack::new();
 
     let mut changes = HashMap::new();
-    changes.insert("type_coercion".to_string(), Value::Symbol("strict".to_string()));
+    changes.insert("type_coercion".to_string(), Value::symbol("strict".to_string()));
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().type_coercion, TypeCoercionMode::Strict);
 
     let mut stack = ConfigStack::new();
     let mut changes = HashMap::new();
-    changes.insert("type_coercion".to_string(), Value::Symbol("lenient".to_string()));
+    changes.insert("type_coercion".to_string(), Value::symbol("lenient".to_string()));
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().type_coercion, TypeCoercionMode::Lenient);
 }
@@ -160,19 +160,19 @@ fn test_parse_none_handling_mode() {
     let mut stack = ConfigStack::new();
 
     let mut changes = HashMap::new();
-    changes.insert("none_handling".to_string(), Value::Symbol("propagate".to_string()));
+    changes.insert("none_handling".to_string(), Value::symbol("propagate".to_string()));
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().none_handling, NoneHandlingMode::Propagate);
 
     let mut stack = ConfigStack::new();
     let mut changes = HashMap::new();
-    changes.insert("none_handling".to_string(), Value::Symbol("skip".to_string()));
+    changes.insert("none_handling".to_string(), Value::symbol("skip".to_string()));
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().none_handling, NoneHandlingMode::Skip);
 
     let mut stack = ConfigStack::new();
     let mut changes = HashMap::new();
-    changes.insert("none_handling".to_string(), Value::Symbol("error".to_string()));
+    changes.insert("none_handling".to_string(), Value::symbol("error".to_string()));
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().none_handling, NoneHandlingMode::Error);
 }
@@ -183,14 +183,14 @@ fn test_nested_config_changes() {
 
     // Push first level
     let mut changes1 = HashMap::new();
-    changes1.insert("skip_none".to_string(), Value::Boolean(true));
+    changes1.insert("skip_none".to_string(), Value::boolean(true));
     stack.push_with_changes(changes1).unwrap();
     assert_eq!(stack.depth(), 2);
     assert_eq!(stack.current().skip_none, true);
 
     // Push second level
     let mut changes2 = HashMap::new();
-    changes2.insert("error_mode".to_string(), Value::Symbol("lenient".to_string()));
+    changes2.insert("error_mode".to_string(), Value::symbol("lenient".to_string()));
     stack.push_with_changes(changes2).unwrap();
     assert_eq!(stack.depth(), 3);
     assert_eq!(stack.current().skip_none, true);  // Inherited from previous level
@@ -224,9 +224,9 @@ fn test_multiple_config_keys() {
     let mut stack = ConfigStack::new();
 
     let mut changes = HashMap::new();
-    changes.insert("skip_none".to_string(), Value::Boolean(true));
-    changes.insert("error_mode".to_string(), Value::Symbol("lenient".to_string()));
-    changes.insert("strict_types".to_string(), Value::Boolean(false));
+    changes.insert("skip_none".to_string(), Value::boolean(true));
+    changes.insert("error_mode".to_string(), Value::symbol("lenient".to_string()));
+    changes.insert("strict_types".to_string(), Value::boolean(false));
 
     stack.push_with_changes(changes).unwrap();
     assert_eq!(stack.current().skip_none, true);

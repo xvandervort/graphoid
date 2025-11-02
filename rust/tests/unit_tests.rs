@@ -26,4 +26,5 @@ mod unit {
     pub mod config_tests;
     pub mod pattern_matching_parser_tests;
     pub mod pattern_matcher_tests;
+    pub mod freeze_behaviors_tests;
 }

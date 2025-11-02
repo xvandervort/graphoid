@@ -32,9 +32,9 @@ fn test_tree_ruleset_prevents_cycles() {
     let mut g = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
 
     // Add nodes and edges to form a tree
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
     g.add_edge("A", "C", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -53,10 +53,10 @@ fn test_tree_ruleset_enforces_single_root() {
     let mut g = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
 
     // Add root node
-    g.add_node("root".to_string(), Value::Number(1.0)).unwrap();
+    g.add_node("root".to_string(), Value::number(1.0)).unwrap();
 
     // Try to add a second orphan node (would create second root)
-    let _result = g.add_node("orphan".to_string(), Value::Number(2.0));
+    let _result = g.add_node("orphan".to_string(), Value::number(2.0));
 
     // Should be rejected by SingleRootRule
     // Note: SingleRootRule only validates on RemoveNode, not AddNode during construction
@@ -98,9 +98,9 @@ fn test_binary_tree_ruleset_allows_two_children() {
     let mut g = Graph::new(GraphType::Directed).with_ruleset("binary_tree".to_string());
 
     // Add nodes
-    g.add_node("root".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("left".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("right".to_string(), Value::Number(3.0)).unwrap();
+    g.add_node("root".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("left".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("right".to_string(), Value::number(3.0)).unwrap();
 
     // Add two children - should succeed
     g.add_edge("root", "left", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -115,10 +115,10 @@ fn test_binary_tree_ruleset_rejects_three_children() {
     let mut g = Graph::new(GraphType::Directed).with_ruleset("binary_tree".to_string());
 
     // Add nodes
-    g.add_node("root".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("child1".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("child2".to_string(), Value::Number(3.0)).unwrap();
-    g.add_node("child3".to_string(), Value::Number(4.0)).unwrap();
+    g.add_node("root".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("child1".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("child2".to_string(), Value::number(3.0)).unwrap();
+    g.add_node("child3".to_string(), Value::number(4.0)).unwrap();
 
     // Add two children - should succeed
     g.add_edge("root", "child1", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -152,9 +152,9 @@ fn test_dag_ruleset_activates_rules() {
 fn test_dag_ruleset_prevents_cycles() {
     let mut g = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
 
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     // Create a path: A -> B -> C
     g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -172,9 +172,9 @@ fn test_dag_ruleset_allows_multiple_roots() {
     let mut g = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
 
     // Add multiple root nodes (no incoming edges)
-    g.add_node("root1".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("root2".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("child".to_string(), Value::Number(3.0)).unwrap();
+    g.add_node("root1".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("root2".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("child".to_string(), Value::number(3.0)).unwrap();
 
     // Both roots point to the same child - should be allowed in DAG
     g.add_edge("root1", "child", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -196,10 +196,10 @@ fn test_dag_ruleset_allows_diamond_structure() {
     //    \ /
     //     D
 
-    g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-    g.add_node("D".to_string(), Value::Number(4.0)).unwrap();
+    g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    g.add_node("D".to_string(), Value::number(4.0)).unwrap();
 
     g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
     g.add_edge("A", "C", "edge".to_string(), None, HashMap::new()).unwrap();

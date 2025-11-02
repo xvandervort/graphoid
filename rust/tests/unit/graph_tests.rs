@@ -18,8 +18,8 @@ fn test_graph_creation() {
 #[test]
 fn test_graph_add_node() {
     let mut g = Graph::new(GraphType::Directed);
-    g.add_node("alice".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("bob".to_string(), Value::Number(2.0)).unwrap();
+    g.add_node("alice".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("bob".to_string(), Value::number(2.0)).unwrap();
 
     assert_eq!(g.node_count(), 2);
     assert!(g.has_node("alice"));
@@ -30,8 +30,8 @@ fn test_graph_add_node() {
 #[test]
 fn test_graph_add_edge() {
     let mut g = Graph::new(GraphType::Directed);
-    g.add_node("alice".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("bob".to_string(), Value::Number(2.0)).unwrap();
+    g.add_node("alice".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("bob".to_string(), Value::number(2.0)).unwrap();
     g.add_edge("alice", "bob", "follows".to_string(), None, HashMap::new()).unwrap();
 
     assert_eq!(g.edge_count(), 1);
@@ -42,8 +42,8 @@ fn test_graph_add_edge() {
 #[test]
 fn test_graph_undirected_edge() {
     let mut g = Graph::new(GraphType::Undirected);
-    g.add_node("alice".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("bob".to_string(), Value::Number(2.0)).unwrap();
+    g.add_node("alice".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("bob".to_string(), Value::number(2.0)).unwrap();
     g.add_edge("alice", "bob", "friend".to_string(), None, HashMap::new()).unwrap();
 
     // Undirected graphs have edges in both directions
@@ -56,9 +56,9 @@ fn test_graph_undirected_edge() {
 #[test]
 fn test_graph_neighbors() {
     let mut g = Graph::new(GraphType::Directed);
-    g.add_node("alice".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("bob".to_string(), Value::Number(2.0)).unwrap();
-    g.add_node("charlie".to_string(), Value::Number(3.0)).unwrap();
+    g.add_node("alice".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("bob".to_string(), Value::number(2.0)).unwrap();
+    g.add_node("charlie".to_string(), Value::number(3.0)).unwrap();
 
     g.add_edge("alice", "bob", "follows".to_string(), None, HashMap::new()).unwrap();
     g.add_edge("alice", "charlie", "follows".to_string(), None, HashMap::new()).unwrap();
@@ -75,8 +75,8 @@ fn test_graph_neighbors() {
 #[test]
 fn test_graph_remove_node() {
     let mut g = Graph::new(GraphType::Directed);
-    g.add_node("alice".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("bob".to_string(), Value::Number(2.0)).unwrap();
+    g.add_node("alice".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("bob".to_string(), Value::number(2.0)).unwrap();
     g.add_edge("alice", "bob", "follows".to_string(), None, HashMap::new()).unwrap();
 
     assert_eq!(g.node_count(), 2);
@@ -91,8 +91,8 @@ fn test_graph_remove_node() {
 #[test]
 fn test_graph_remove_edge() {
     let mut g = Graph::new(GraphType::Directed);
-    g.add_node("alice".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("bob".to_string(), Value::Number(2.0)).unwrap();
+    g.add_node("alice".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("bob".to_string(), Value::number(2.0)).unwrap();
     g.add_edge("alice", "bob", "follows".to_string(), None, HashMap::new()).unwrap();
 
     assert!(g.has_edge("alice", "bob"));
@@ -106,17 +106,17 @@ fn test_graph_remove_edge() {
 #[test]
 fn test_graph_get_node() {
     let mut g = Graph::new(GraphType::Directed);
-    g.add_node("alice".to_string(), Value::Number(42.0)).unwrap();
+    g.add_node("alice".to_string(), Value::number(42.0)).unwrap();
 
-    assert_eq!(g.get_node("alice"), Some(&Value::Number(42.0)));
+    assert_eq!(g.get_node("alice"), Some(&Value::number(42.0)));
     assert_eq!(g.get_node("bob"), None);
 }
 
 #[test]
 fn test_graph_keys_values() {
     let mut g = Graph::new(GraphType::Directed);
-    g.add_node("alice".to_string(), Value::Number(1.0)).unwrap();
-    g.add_node("bob".to_string(), Value::Number(2.0)).unwrap();
+    g.add_node("alice".to_string(), Value::number(1.0)).unwrap();
+    g.add_node("bob".to_string(), Value::number(2.0)).unwrap();
 
     let keys = g.keys();
     assert_eq!(keys.len(), 2);
@@ -145,9 +145,9 @@ fn test_basic_tree_creation() {
 fn test_basic_tree_manual_structure() {
     // Basic tree requires manual parent specification
     let mut t = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
-    let root = t.insert(Value::Number(5.0), None).unwrap();
-    let left = t.insert(Value::Number(3.0), Some(&root)).unwrap();
-    let right = t.insert(Value::Number(7.0), Some(&root)).unwrap();
+    let root = t.insert(Value::number(5.0), None).unwrap();
+    let left = t.insert(Value::number(3.0), Some(&root)).unwrap();
+    let right = t.insert(Value::number(7.0), Some(&root)).unwrap();
 
     assert_eq!(t.node_count(), 3);
     assert!(t.has_node(&root));
@@ -158,14 +158,14 @@ fn test_basic_tree_manual_structure() {
 #[test]
 fn test_basic_tree_contains() {
     let mut t = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
-    let root = t.insert(Value::Number(5.0), None).unwrap();
-    t.insert(Value::Number(3.0), Some(&root)).unwrap();
-    t.insert(Value::Number(7.0), Some(&root)).unwrap();
+    let root = t.insert(Value::number(5.0), None).unwrap();
+    t.insert(Value::number(3.0), Some(&root)).unwrap();
+    t.insert(Value::number(7.0), Some(&root)).unwrap();
 
-    assert!(t.contains(&Value::Number(5.0)));
-    assert!(t.contains(&Value::Number(3.0)));
-    assert!(t.contains(&Value::Number(7.0)));
-    assert!(!t.contains(&Value::Number(10.0)));
+    assert!(t.contains(&Value::number(5.0)));
+    assert!(t.contains(&Value::number(3.0)));
+    assert!(t.contains(&Value::number(7.0)));
+    assert!(!t.contains(&Value::number(10.0)));
 }
 
 #[test]
@@ -175,9 +175,9 @@ fn test_basic_tree_traversals() {
     //    / \
     //   3   7
     let mut t = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
-    let root = t.insert(Value::Number(5.0), None).unwrap();
-    t.insert(Value::Number(3.0), Some(&root)).unwrap();
-    t.insert(Value::Number(7.0), Some(&root)).unwrap();
+    let root = t.insert(Value::number(5.0), None).unwrap();
+    t.insert(Value::number(3.0), Some(&root)).unwrap();
+    t.insert(Value::number(7.0), Some(&root)).unwrap();
 
     // BFS and DFS should work
     let bfs = t.bfs(&root);
@@ -199,18 +199,18 @@ fn test_basic_tree_traversals() {
 #[test]
 fn test_graph_insert_without_parent() {
     let mut g = Graph::new(GraphType::Directed);
-    let node_id = g.insert(Value::Number(5.0), None).unwrap();
+    let node_id = g.insert(Value::number(5.0), None).unwrap();
 
     assert_eq!(g.node_count(), 1);
     assert!(g.has_node(&node_id));
-    assert_eq!(g.get_node(&node_id), Some(&Value::Number(5.0)));
+    assert_eq!(g.get_node(&node_id), Some(&Value::number(5.0)));
 }
 
 #[test]
 fn test_graph_insert_with_parent() {
     let mut g = Graph::new(GraphType::Directed);
-    let root = g.insert(Value::Number(5.0), None).unwrap();
-    let child = g.insert(Value::Number(3.0), Some(&root)).unwrap();
+    let root = g.insert(Value::number(5.0), None).unwrap();
+    let child = g.insert(Value::number(3.0), Some(&root)).unwrap();
 
     assert_eq!(g.node_count(), 2);
     assert!(g.has_node(&root));
@@ -221,9 +221,9 @@ fn test_graph_insert_with_parent() {
 #[test]
 fn test_graph_insert_multiple_children() {
     let mut g = Graph::new(GraphType::Directed);
-    let root = g.insert(Value::Number(5.0), None).unwrap();
-    let left = g.insert(Value::Number(3.0), Some(&root)).unwrap();
-    let right = g.insert(Value::Number(7.0), Some(&root)).unwrap();
+    let root = g.insert(Value::number(5.0), None).unwrap();
+    let left = g.insert(Value::number(3.0), Some(&root)).unwrap();
+    let right = g.insert(Value::number(7.0), Some(&root)).unwrap();
 
     assert_eq!(g.node_count(), 3);
     let neighbors = g.neighbors(&root);
@@ -235,35 +235,35 @@ fn test_graph_insert_multiple_children() {
 #[test]
 fn test_graph_contains_found() {
     let mut g = Graph::new(GraphType::Directed);
-    g.insert(Value::Number(5.0), None).unwrap();
-    g.insert(Value::Number(3.0), None).unwrap();
-    g.insert(Value::Number(7.0), None).unwrap();
+    g.insert(Value::number(5.0), None).unwrap();
+    g.insert(Value::number(3.0), None).unwrap();
+    g.insert(Value::number(7.0), None).unwrap();
 
-    assert!(g.contains(&Value::Number(5.0)));
-    assert!(g.contains(&Value::Number(3.0)));
-    assert!(g.contains(&Value::Number(7.0)));
+    assert!(g.contains(&Value::number(5.0)));
+    assert!(g.contains(&Value::number(3.0)));
+    assert!(g.contains(&Value::number(7.0)));
 }
 
 #[test]
 fn test_graph_contains_not_found() {
     let mut g = Graph::new(GraphType::Directed);
-    g.insert(Value::Number(5.0), None).unwrap();
+    g.insert(Value::number(5.0), None).unwrap();
 
-    assert!(!g.contains(&Value::Number(10.0)));
+    assert!(!g.contains(&Value::number(10.0)));
 }
 
 #[test]
 fn test_graph_contains_empty() {
     let g = Graph::new(GraphType::Directed);
-    assert!(!g.contains(&Value::Number(5.0)));
+    assert!(!g.contains(&Value::number(5.0)));
 }
 
 #[test]
 fn test_graph_bfs_simple() {
     let mut g = Graph::new(GraphType::Directed);
-    let root = g.insert(Value::Number(1.0), None).unwrap();
-    let left = g.insert(Value::Number(2.0), Some(&root)).unwrap();
-    let right = g.insert(Value::Number(3.0), Some(&root)).unwrap();
+    let root = g.insert(Value::number(1.0), None).unwrap();
+    let left = g.insert(Value::number(2.0), Some(&root)).unwrap();
+    let right = g.insert(Value::number(3.0), Some(&root)).unwrap();
 
     let traversal = g.bfs(&root);
     // BFS should visit root first, then both children (order doesn't matter)
@@ -288,10 +288,10 @@ fn test_graph_bfs_deeper_tree() {
     //     2   3
     //    /
     //   4
-    let n1 = g.insert(Value::Number(1.0), None).unwrap();
-    let n2 = g.insert(Value::Number(2.0), Some(&n1)).unwrap();
-    let n3 = g.insert(Value::Number(3.0), Some(&n1)).unwrap();
-    let n4 = g.insert(Value::Number(4.0), Some(&n2)).unwrap();
+    let n1 = g.insert(Value::number(1.0), None).unwrap();
+    let n2 = g.insert(Value::number(2.0), Some(&n1)).unwrap();
+    let n3 = g.insert(Value::number(3.0), Some(&n1)).unwrap();
+    let n4 = g.insert(Value::number(4.0), Some(&n2)).unwrap();
 
     let traversal = g.bfs(&n1);
     // BFS order: n1 first, then n2 and n3 (in any order), then n4
@@ -306,9 +306,9 @@ fn test_graph_bfs_deeper_tree() {
 #[test]
 fn test_graph_dfs_simple() {
     let mut g = Graph::new(GraphType::Directed);
-    let root = g.insert(Value::Number(1.0), None).unwrap();
-    let left = g.insert(Value::Number(2.0), Some(&root)).unwrap();
-    let right = g.insert(Value::Number(3.0), Some(&root)).unwrap();
+    let root = g.insert(Value::number(1.0), None).unwrap();
+    let left = g.insert(Value::number(2.0), Some(&root)).unwrap();
+    let right = g.insert(Value::number(3.0), Some(&root)).unwrap();
 
     let traversal = g.dfs(&root);
     // DFS should visit root first, then explore depth-first
@@ -333,10 +333,10 @@ fn test_graph_dfs_deeper_tree() {
     //     2   3
     //    /
     //   4
-    let n1 = g.insert(Value::Number(1.0), None).unwrap();
-    let n2 = g.insert(Value::Number(2.0), Some(&n1)).unwrap();
-    let n3 = g.insert(Value::Number(3.0), Some(&n1)).unwrap();
-    let n4 = g.insert(Value::Number(4.0), Some(&n2)).unwrap();
+    let n1 = g.insert(Value::number(1.0), None).unwrap();
+    let n2 = g.insert(Value::number(2.0), Some(&n1)).unwrap();
+    let n3 = g.insert(Value::number(3.0), Some(&n1)).unwrap();
+    let n4 = g.insert(Value::number(4.0), Some(&n2)).unwrap();
 
     let traversal = g.dfs(&n1);
     // DFS should go deep before wide
@@ -353,16 +353,16 @@ fn test_graph_in_order_simple() {
     //     5
     //    / \
     //   3   7
-    let root = g.insert(Value::Number(5.0), None).unwrap();
-    g.insert(Value::Number(3.0), Some(&root)).unwrap();
-    g.insert(Value::Number(7.0), Some(&root)).unwrap();
+    let root = g.insert(Value::number(5.0), None).unwrap();
+    g.insert(Value::number(3.0), Some(&root)).unwrap();
+    g.insert(Value::number(7.0), Some(&root)).unwrap();
 
     let values = g.in_order(&root);
     // In-order: left, root, right = 3, 5, 7
     assert_eq!(values.len(), 3);
-    assert!(values.contains(&Value::Number(3.0)));
-    assert!(values.contains(&Value::Number(5.0)));
-    assert!(values.contains(&Value::Number(7.0)));
+    assert!(values.contains(&Value::number(3.0)));
+    assert!(values.contains(&Value::number(5.0)));
+    assert!(values.contains(&Value::number(7.0)));
 }
 
 #[test]
@@ -375,10 +375,10 @@ fn test_graph_in_order_empty() {
 #[test]
 fn test_graph_in_order_single_node() {
     let mut g = Graph::new(GraphType::Directed);
-    let root = g.insert(Value::Number(5.0), None).unwrap();
+    let root = g.insert(Value::number(5.0), None).unwrap();
 
     let values = g.in_order(&root);
-    assert_eq!(values, vec![Value::Number(5.0)]);
+    assert_eq!(values, vec![Value::number(5.0)]);
 }
 
 #[test]
@@ -387,18 +387,18 @@ fn test_graph_pre_order_simple() {
     //     5
     //    / \
     //   3   7
-    let root = g.insert(Value::Number(5.0), None).unwrap();
-    g.insert(Value::Number(3.0), Some(&root)).unwrap();
-    g.insert(Value::Number(7.0), Some(&root)).unwrap();
+    let root = g.insert(Value::number(5.0), None).unwrap();
+    g.insert(Value::number(3.0), Some(&root)).unwrap();
+    g.insert(Value::number(7.0), Some(&root)).unwrap();
 
     let values = g.pre_order(&root);
     // Pre-order: root, left, right
     assert_eq!(values.len(), 3);
-    assert!(values.contains(&Value::Number(3.0)));
-    assert!(values.contains(&Value::Number(5.0)));
-    assert!(values.contains(&Value::Number(7.0)));
+    assert!(values.contains(&Value::number(3.0)));
+    assert!(values.contains(&Value::number(5.0)));
+    assert!(values.contains(&Value::number(7.0)));
     // Root should be first
-    assert_eq!(values[0], Value::Number(5.0));
+    assert_eq!(values[0], Value::number(5.0));
 }
 
 #[test]
@@ -411,10 +411,10 @@ fn test_graph_pre_order_empty() {
 #[test]
 fn test_graph_pre_order_single_node() {
     let mut g = Graph::new(GraphType::Directed);
-    let root = g.insert(Value::Number(5.0), None).unwrap();
+    let root = g.insert(Value::number(5.0), None).unwrap();
 
     let values = g.pre_order(&root);
-    assert_eq!(values, vec![Value::Number(5.0)]);
+    assert_eq!(values, vec![Value::number(5.0)]);
 }
 
 #[test]
@@ -423,18 +423,18 @@ fn test_graph_post_order_simple() {
     //     5
     //    / \
     //   3   7
-    let root = g.insert(Value::Number(5.0), None).unwrap();
-    g.insert(Value::Number(3.0), Some(&root)).unwrap();
-    g.insert(Value::Number(7.0), Some(&root)).unwrap();
+    let root = g.insert(Value::number(5.0), None).unwrap();
+    g.insert(Value::number(3.0), Some(&root)).unwrap();
+    g.insert(Value::number(7.0), Some(&root)).unwrap();
 
     let values = g.post_order(&root);
     // Post-order: left, right, root
     assert_eq!(values.len(), 3);
-    assert!(values.contains(&Value::Number(3.0)));
-    assert!(values.contains(&Value::Number(5.0)));
-    assert!(values.contains(&Value::Number(7.0)));
+    assert!(values.contains(&Value::number(3.0)));
+    assert!(values.contains(&Value::number(5.0)));
+    assert!(values.contains(&Value::number(7.0)));
     // Root should be last
-    assert_eq!(values[2], Value::Number(5.0));
+    assert_eq!(values[2], Value::number(5.0));
 }
 
 #[test]
@@ -447,10 +447,10 @@ fn test_graph_post_order_empty() {
 #[test]
 fn test_graph_post_order_single_node() {
     let mut g = Graph::new(GraphType::Directed);
-    let root = g.insert(Value::Number(5.0), None).unwrap();
+    let root = g.insert(Value::number(5.0), None).unwrap();
 
     let values = g.post_order(&root);
-    assert_eq!(values, vec![Value::Number(5.0)]);
+    assert_eq!(values, vec![Value::number(5.0)]);
 }
 
 // ============================================================================
@@ -460,9 +460,9 @@ fn test_graph_post_order_single_node() {
 #[test]
 fn test_graph_as_value() {
     let mut g = Graph::new(GraphType::Directed);
-    g.add_node("alice".to_string(), Value::Number(1.0)).unwrap();
+    g.add_node("alice".to_string(), Value::number(1.0)).unwrap();
 
-    let val = Value::Graph(g);
+    let val = Value::graph(g);
     assert_eq!(val.type_name(), "graph");
     assert!(val.is_truthy());
 }
@@ -470,7 +470,7 @@ fn test_graph_as_value() {
 #[test]
 fn test_empty_graph_is_falsy() {
     let g = Graph::new(GraphType::Directed);
-    let val = Value::Graph(g);
+    let val = Value::graph(g);
     assert!(!val.is_truthy());
 }
 
@@ -481,9 +481,9 @@ fn test_tree_as_graph_value() {
     // tree{} creates a graph with :tree ruleset
     let t = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
     let mut graph_with_node = t.clone();
-    graph_with_node.insert(Value::Number(5.0), None).unwrap();
+    graph_with_node.insert(Value::number(5.0), None).unwrap();
 
-    let val = Value::Graph(graph_with_node);
+    let val = Value::graph(graph_with_node);
     assert_eq!(val.type_name(), "graph");  // It's a graph, not a separate type
     assert!(val.is_truthy());  // Non-empty graph is truthy
 }
@@ -491,6 +491,6 @@ fn test_tree_as_graph_value() {
 #[test]
 fn test_empty_tree_graph_is_falsy() {
     let t = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
-    let val = Value::Graph(t);
+    let val = Value::graph(t);
     assert!(!val.is_truthy());  // Empty graph is falsy
 }

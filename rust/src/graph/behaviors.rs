@@ -25,7 +25,7 @@
 
 use crate::error::GraphoidError;
 use crate::graph::rules::{RetroactivePolicy, Rule, RuleContext, GraphOperation};
-use crate::values::{Value, List, Graph};
+use crate::values::{Value, ValueKind, List, Graph};
 use std::collections::HashMap;
 
 /// Core behavior trait - transforms a value
@@ -299,14 +299,14 @@ impl BehaviorInstance {
 /// use graphoid::graph::behaviors::{BehaviorSpec, BehaviorInstance, apply_behaviors};
 /// use graphoid::values::Value;
 ///
-/// let value = Value::None;
+/// let value = Value::none();
 /// let behaviors = vec![
 ///     BehaviorInstance::new(BehaviorSpec::NoneToZero),
 ///     BehaviorInstance::new(BehaviorSpec::Positive),
 /// ];
 /// let result = apply_behaviors(value, &behaviors).unwrap();
 /// // none → 0 → 0 (already positive)
-/// assert_eq!(result, Value::Number(0.0));
+/// assert_eq!(result, Value::number(0.0));
 /// ```
 pub fn apply_behaviors(
     value: Value,
@@ -509,9 +509,9 @@ pub fn apply_retroactive_to_hash(
 /// # Returns
 /// A String representation suitable for use as a hash key
 fn value_to_key(value: &Value) -> String {
-    match value {
-        Value::String(s) => s.clone(),
-        Value::Number(n) => {
+    match &value.kind {
+        ValueKind::String(s) => s.clone(),
+        ValueKind::Number(n) => {
             // For integers, use simple format; for floats, use full precision
             if n.fract() == 0.0 {
                 format!("{}", *n as i64)
@@ -519,9 +519,9 @@ fn value_to_key(value: &Value) -> String {
                 n.to_string()
             }
         }
-        Value::Symbol(s) => s.clone(),
-        Value::Boolean(b) => b.to_string(),
-        Value::None => "none".to_string(),
+        ValueKind::Symbol(s) => s.clone(),
+        ValueKind::Boolean(b) => b.to_string(),
+        ValueKind::None => "none".to_string(),
         // For complex types, use Debug representation
         _ => format!("{:?}", value),
     }
@@ -536,9 +536,9 @@ pub struct NoneToZeroBehavior;
 
 impl Behavior for NoneToZeroBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        match value {
-            Value::None => Ok(Value::Number(0.0)),
-            other => Ok(other.clone()),
+        match &value.kind {
+            ValueKind::None => Ok(Value::number(0.0)),
+            _ => Ok(value.clone()),
         }
     }
 
@@ -547,7 +547,7 @@ impl Behavior for NoneToZeroBehavior {
     }
 
     fn applies_to(&self, value: &Value) -> bool {
-        matches!(value, Value::None)
+        matches!(&value.kind, ValueKind::None)
     }
 }
 
@@ -581,9 +581,9 @@ pub struct NoneToEmptyBehavior;
 
 impl Behavior for NoneToEmptyBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        match value {
-            Value::None => Ok(Value::String(String::new())),
-            other => Ok(other.clone()),
+        match &value.kind {
+            ValueKind::None => Ok(Value::string(String::new())),
+            _ => Ok(value.clone()),
         }
     }
 
@@ -592,7 +592,7 @@ impl Behavior for NoneToEmptyBehavior {
     }
 
     fn applies_to(&self, value: &Value) -> bool {
-        matches!(value, Value::None)
+        matches!(&value.kind, ValueKind::None)
     }
 }
 
@@ -623,9 +623,9 @@ pub struct PositiveBehavior;
 
 impl Behavior for PositiveBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        match value {
-            Value::Number(n) if *n < 0.0 => Ok(Value::Number(n.abs())),
-            other => Ok(other.clone()),
+        match &value.kind {
+            ValueKind::Number(n) if *n < 0.0 => Ok(Value::number(n.abs())),
+            _ => Ok(value.clone()),
         }
     }
 
@@ -634,7 +634,7 @@ impl Behavior for PositiveBehavior {
     }
 
     fn applies_to(&self, value: &Value) -> bool {
-        matches!(value, Value::Number(_))
+        matches!(&value.kind, ValueKind::Number(_))
     }
 }
 
@@ -665,9 +665,9 @@ pub struct RoundToIntBehavior;
 
 impl Behavior for RoundToIntBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        match value {
-            Value::Number(n) => Ok(Value::Number(n.round())),
-            other => Ok(other.clone()),
+        match &value.kind {
+            ValueKind::Number(n) => Ok(Value::number(n.round())),
+            _ => Ok(value.clone()),
         }
     }
 
@@ -676,7 +676,7 @@ impl Behavior for RoundToIntBehavior {
     }
 
     fn applies_to(&self, value: &Value) -> bool {
-        matches!(value, Value::Number(_))
+        matches!(&value.kind, ValueKind::Number(_))
     }
 }
 
@@ -707,9 +707,9 @@ pub struct UppercaseBehavior;
 
 impl Behavior for UppercaseBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        match value {
-            Value::String(s) => Ok(Value::String(s.to_uppercase())),
-            other => Ok(other.clone()),
+        match &value.kind {
+            ValueKind::String(s) => Ok(Value::string(s.to_uppercase())),
+            _ => Ok(value.clone()),
         }
     }
 
@@ -718,7 +718,7 @@ impl Behavior for UppercaseBehavior {
     }
 
     fn applies_to(&self, value: &Value) -> bool {
-        matches!(value, Value::String(_))
+        matches!(&value.kind, ValueKind::String(_))
     }
 }
 
@@ -749,9 +749,9 @@ pub struct LowercaseBehavior;
 
 impl Behavior for LowercaseBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        match value {
-            Value::String(s) => Ok(Value::String(s.to_lowercase())),
-            other => Ok(other.clone()),
+        match &value.kind {
+            ValueKind::String(s) => Ok(Value::string(s.to_lowercase())),
+            _ => Ok(value.clone()),
         }
     }
 
@@ -760,7 +760,7 @@ impl Behavior for LowercaseBehavior {
     }
 
     fn applies_to(&self, value: &Value) -> bool {
-        matches!(value, Value::String(_))
+        matches!(&value.kind, ValueKind::String(_))
     }
 }
 
@@ -794,12 +794,12 @@ pub struct ValidateRangeBehavior {
 
 impl Behavior for ValidateRangeBehavior {
     fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
-        match value {
-            Value::Number(n) => {
+        match &value.kind {
+            ValueKind::Number(n) => {
                 let clamped = n.clamp(self.min, self.max);
-                Ok(Value::Number(clamped))
+                Ok(Value::number(clamped))
             }
-            other => Ok(other.clone()),
+            _ => Ok(value.clone()),
         }
     }
 
@@ -808,7 +808,7 @@ impl Behavior for ValidateRangeBehavior {
     }
 
     fn applies_to(&self, value: &Value) -> bool {
-        matches!(value, Value::Number(_))
+        matches!(&value.kind, ValueKind::Number(_))
     }
 }
 
@@ -1001,5 +1001,133 @@ impl Rule for OrderingBehavior {
 
     fn should_run_on(&self, _operation: &GraphOperation) -> bool {
         false
+    }
+}
+
+// ============================================================================
+// Freeze Control Behaviors (Phase 8)
+// ============================================================================
+
+/// Reject frozen elements - don't allow frozen values to be added
+#[derive(Debug)]
+pub struct NoFrozenBehavior;
+
+impl Behavior for NoFrozenBehavior {
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        // Check if value is frozen
+        if value.is_frozen() {
+            return Err(GraphoidError::runtime(
+                "Cannot add frozen element (no_frozen rule active)".to_string()
+            ));
+        }
+        Ok(value.clone())
+    }
+
+    fn name(&self) -> &str {
+        "no_frozen"
+    }
+}
+
+impl Rule for NoFrozenBehavior {
+    fn name(&self) -> &str {
+        "no_frozen"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true  // It transforms (or rejects)
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
+    }
+}
+
+/// Create unfrozen copies of all elements
+#[derive(Debug)]
+pub struct CopyElementsBehavior;
+
+impl Behavior for CopyElementsBehavior {
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        // Always return an unfrozen copy
+        Ok(value.deep_copy_unfrozen())
+    }
+
+    fn name(&self) -> &str {
+        "copy_elements"
+    }
+}
+
+impl Rule for CopyElementsBehavior {
+    fn name(&self) -> &str {
+        "copy_elements"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
+    }
+}
+
+/// Freeze the collection itself, but not its elements
+#[derive(Debug)]
+pub struct ShallowFreezeOnlyBehavior;
+
+impl Behavior for ShallowFreezeOnlyBehavior {
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        // This behavior doesn't transform individual elements
+        // Instead, it should freeze the collection when applied
+        // For now, just return the value unchanged
+        Ok(value.clone())
+    }
+
+    fn name(&self) -> &str {
+        "shallow_freeze_only"
+    }
+}
+
+impl Rule for ShallowFreezeOnlyBehavior {
+    fn name(&self) -> &str {
+        "shallow_freeze_only"
+    }
+
+    fn is_transformation_rule(&self) -> bool {
+        true
+    }
+
+    fn transform(&self, value: &Value) -> Result<Value, GraphoidError> {
+        Behavior::transform(self, value)
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        false
+    }
+
+    fn clean(&self, graph: &mut Graph) -> Result<(), GraphoidError> {
+        // Freeze the graph itself (shallow freeze - doesn't freeze elements)
+        graph.freeze();
+        Ok(())
     }
 }

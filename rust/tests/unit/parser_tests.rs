@@ -18,7 +18,7 @@ fn test_parse_number_literal() {
     assert_eq!(program.statements.len(), 1);
     match &program.statements[0] {
         Stmt::Expression { expr, .. } => {
-            match expr {
+            match &expr {
                 Expr::Literal { value: LiteralValue::Number(n), .. } => {
                     assert_eq!(*n, 42.0);
                 }
@@ -38,7 +38,7 @@ fn test_parse_float_literal() {
 
     match &program.statements[0] {
         Stmt::Expression { expr, .. } => {
-            match expr {
+            match &expr {
                 Expr::Literal { value: LiteralValue::Number(n), .. } => {
                     assert_eq!(*n, 3.14);
                 }
@@ -58,7 +58,7 @@ fn test_parse_string_literal() {
 
     match &program.statements[0] {
         Stmt::Expression { expr, .. } => {
-            match expr {
+            match &expr {
                 Expr::Literal { value: LiteralValue::String(s), .. } => {
                     assert_eq!(s, "hello");
                 }
@@ -78,7 +78,7 @@ fn test_parse_boolean_true() {
 
     match &program.statements[0] {
         Stmt::Expression { expr, .. } => {
-            match expr {
+            match &expr {
                 Expr::Literal { value: LiteralValue::Boolean(b), .. } => {
                     assert_eq!(*b, true);
                 }
@@ -98,7 +98,7 @@ fn test_parse_boolean_false() {
 
     match &program.statements[0] {
         Stmt::Expression { expr, .. } => {
-            match expr {
+            match &expr {
                 Expr::Literal { value: LiteralValue::Boolean(b), .. } => {
                     assert_eq!(*b, false);
                 }
@@ -162,7 +162,7 @@ fn test_parse_addition() {
 
     match &program.statements[0] {
         Stmt::Expression { expr, .. } => {
-            match expr {
+            match &expr {
                 Expr::Binary { left, op, right, .. } => {
                     assert_eq!(*op, BinaryOp::Add);
                     // Verify left is 2
@@ -197,7 +197,7 @@ fn test_parse_operator_precedence() {
 
     match &program.statements[0] {
         Stmt::Expression { expr, .. } => {
-            match expr {
+            match &expr {
                 Expr::Binary { left, op, right, .. } => {
                     assert_eq!(*op, BinaryOp::Add);
                     // Left should be 2
@@ -725,7 +725,7 @@ fn test_parse_single_param_lambda() {
                     assert_eq!(params.len(), 1);
                     assert_eq!(params[0], "x");
                     // Body should be: x * 2
-                    match &**body {
+                    match body.as_ref() {
                         Expr::Binary { op: BinaryOp::Multiply, .. } => {
                             // Success
                         }
@@ -754,7 +754,7 @@ fn test_parse_multi_param_lambda() {
                     assert_eq!(params[0], "a");
                     assert_eq!(params[1], "b");
                     // Body should be: a + b
-                    match &**body {
+                    match body.as_ref() {
                         Expr::Binary { op: BinaryOp::Add, .. } => {
                             // Success
                         }
@@ -777,11 +777,11 @@ fn test_parse_zero_param_lambda() {
 
     match &program.statements[0] {
         Stmt::Assignment { value, .. } => {
-            match value {
+            match &value {
                 Expr::Lambda { params, body, .. } => {
                     assert_eq!(params.len(), 0);
                     // Body should be: 42
-                    match &**body {
+                    match body.as_ref() {
                         Expr::Literal { value: LiteralValue::Number(n), .. } => {
                             assert_eq!(*n, 42.0);
                         }
@@ -810,7 +810,7 @@ fn test_parse_lambda_in_assignment() {
                 }
                 _ => panic!("Expected variable assignment target"),
             }
-            match value {
+            match &value {
                 Expr::Lambda { params, .. } => {
                     assert_eq!(params.len(), 1);
                     assert_eq!(params[0], "x");

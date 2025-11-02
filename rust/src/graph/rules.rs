@@ -143,6 +143,17 @@ pub enum RuleSpec {
     Ordering {
         compare_fn: Option<Value>,  // Optional comparison function
     },
+
+    // ========================================================================
+    // Freeze Control Rules (Phase 8)
+    // ========================================================================
+
+    /// Reject frozen elements (don't allow frozen values to be added)
+    NoFrozen,
+    /// Create unfrozen copies of all elements
+    CopyElements,
+    /// Freeze the collection itself, but not its elements
+    ShallowFreezeOnly,
 }
 
 impl RuleSpec {
@@ -177,6 +188,11 @@ impl RuleSpec {
                 fallback: fallback.clone(),
             }),
             RuleSpec::Ordering { compare_fn } => Box::new(OrderingBehavior { compare_fn: compare_fn.clone() }),
+
+            // Freeze control rules
+            RuleSpec::NoFrozen => Box::new(NoFrozenBehavior),
+            RuleSpec::CopyElements => Box::new(CopyElementsBehavior),
+            RuleSpec::ShallowFreezeOnly => Box::new(ShallowFreezeOnlyBehavior),
         }
     }
 
@@ -205,6 +221,11 @@ impl RuleSpec {
             RuleSpec::CustomFunction { .. } => "custom_function",
             RuleSpec::Conditional { .. } => "conditional",
             RuleSpec::Ordering { .. } => "ordering",
+
+            // Freeze control rules
+            RuleSpec::NoFrozen => "no_frozen",
+            RuleSpec::CopyElements => "copy_elements",
+            RuleSpec::ShallowFreezeOnly => "shallow_freeze_only",
         }
     }
 
@@ -228,6 +249,11 @@ impl RuleSpec {
             "uppercase" => Some(RuleSpec::Uppercase),
             "lowercase" => Some(RuleSpec::Lowercase),
 
+            // Freeze control rules
+            "no_frozen" => Some(RuleSpec::NoFrozen),
+            "copy_elements" => Some(RuleSpec::CopyElements),
+            "shallow_freeze_only" => Some(RuleSpec::ShallowFreezeOnly),
+
             _ => None,
         }
     }
@@ -245,7 +271,10 @@ impl RuleSpec {
             RuleSpec::Mapping { .. } |
             RuleSpec::CustomFunction { .. } |
             RuleSpec::Conditional { .. } |
-            RuleSpec::Ordering { .. }
+            RuleSpec::Ordering { .. } |
+            RuleSpec::NoFrozen |
+            RuleSpec::CopyElements |
+            RuleSpec::ShallowFreezeOnly
         )
     }
 }

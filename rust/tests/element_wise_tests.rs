@@ -25,15 +25,15 @@ fn eval_expr(code: &str) -> Value {
         executor.eval_stmt(stmt).unwrap();
     }
 
-    Value::None
+    Value::none()
 }
 
 fn list_from_numbers(nums: Vec<f64>) -> Value {
-    Value::List(List::from_vec(nums.into_iter().map(Value::Number).collect()))
+    Value::list(List::from_vec(nums.into_iter().map(Value::number).collect()))
 }
 
 fn list_from_bools(bools: Vec<bool>) -> Value {
-    Value::List(List::from_vec(bools.into_iter().map(Value::Boolean).collect()))
+    Value::list(List::from_vec(bools.into_iter().map(Value::boolean).collect()))
 }
 
 // ============================================================================

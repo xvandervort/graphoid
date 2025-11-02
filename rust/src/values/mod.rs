@@ -212,12 +212,9 @@ impl std::hash::Hash for Function {
     }
 }
 
-/// Runtime value types in Graphoid.
-///
-/// IMPORTANT: List and Map are graphs internally.
-/// This means ALL collections have the full rule system available.
+/// The actual data/kind of a value
 #[derive(Debug, Clone, PartialEq)]
-pub enum Value {
+pub enum ValueKind {
     /// Numeric value (64-bit floating point)
     Number(f64),
     /// String value
@@ -242,41 +239,111 @@ pub enum Value {
     Error(ErrorObject),
 }
 
+/// A value with freeze tracking
+///
+/// All values (including primitives) can be frozen to prevent modification.
+#[derive(Debug, Clone)]
+pub struct Value {
+    /// The actual data/kind of this value
+    pub kind: ValueKind,
+    /// Whether this value is frozen (immutable)
+    pub frozen: bool,
+}
+
+// Custom PartialEq that only compares the kind, not the frozen status
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+        // Intentionally exclude frozen from equality comparison
+        // Two values with the same data but different frozen status are considered equal
+    }
+}
+
+impl Eq for Value {}
+
 impl Value {
+    // Constructors
+    pub fn number(n: f64) -> Self {
+        Value { kind: ValueKind::Number(n), frozen: false }
+    }
+
+    pub fn string(s: String) -> Self {
+        Value { kind: ValueKind::String(s), frozen: false }
+    }
+
+    pub fn boolean(b: bool) -> Self {
+        Value { kind: ValueKind::Boolean(b), frozen: false }
+    }
+
+    pub fn none() -> Self {
+        Value { kind: ValueKind::None, frozen: false }
+    }
+
+    pub fn symbol(s: String) -> Self {
+        Value { kind: ValueKind::Symbol(s), frozen: false }
+    }
+
+    pub fn list(l: List) -> Self {
+        let frozen = l.graph.is_frozen();
+        Value { kind: ValueKind::List(l), frozen }
+    }
+
+    pub fn map(h: Hash) -> Self {
+        let frozen = h.graph.is_frozen();
+        Value { kind: ValueKind::Map(h), frozen }
+    }
+
+    pub fn function(f: Function) -> Self {
+        Value { kind: ValueKind::Function(f), frozen: false }
+    }
+
+    pub fn graph(g: Graph) -> Self {
+        let frozen = g.is_frozen();
+        Value { kind: ValueKind::Graph(g), frozen }
+    }
+
+    pub fn module(m: Module) -> Self {
+        Value { kind: ValueKind::Module(m), frozen: false }
+    }
+
+    pub fn error(e: ErrorObject) -> Self {
+        Value { kind: ValueKind::Error(e), frozen: false }
+    }
+
     /// Returns true if the value is "truthy" in Graphoid.
     /// Falsy values: `false`, `none`, `0`, empty strings, and empty collections.
     pub fn is_truthy(&self) -> bool {
-        match self {
-            Value::Boolean(b) => *b,
-            Value::None => false,
-            Value::Number(n) => *n != 0.0,
-            Value::String(s) => !s.is_empty(),
-            Value::List(l) => !l.is_empty(),
-            Value::Map(h) => !h.is_empty(),
-            Value::Symbol(_) => true,
-            Value::Function(_) => true, // Functions are always truthy
-            Value::Graph(g) => g.node_count() > 0,
-            Value::Module(_) => true, // Modules are always truthy
-            Value::Error(_) => true, // Errors are always truthy
+        match &self.kind {
+            ValueKind::Boolean(b) => *b,
+            ValueKind::None => false,
+            ValueKind::Number(n) => *n != 0.0,
+            ValueKind::String(s) => !s.is_empty(),
+            ValueKind::List(l) => !l.is_empty(),
+            ValueKind::Map(h) => !h.is_empty(),
+            ValueKind::Symbol(_) => true,
+            ValueKind::Function(_) => true, // Functions are always truthy
+            ValueKind::Graph(g) => g.node_count() > 0,
+            ValueKind::Module(_) => true, // Modules are always truthy
+            ValueKind::Error(_) => true, // Errors are always truthy
         }
     }
 
     /// Converts value to a number if possible.
     /// Returns None if conversion is not possible.
     pub fn to_number(&self) -> Option<f64> {
-        match self {
-            Value::Number(n) => Some(*n),
-            Value::Boolean(true) => Some(1.0),
-            Value::Boolean(false) => Some(0.0),
-            Value::String(s) => s.parse::<f64>().ok(),
+        match &self.kind {
+            ValueKind::Number(n) => Some(*n),
+            ValueKind::Boolean(true) => Some(1.0),
+            ValueKind::Boolean(false) => Some(0.0),
+            ValueKind::String(s) => s.parse::<f64>().ok(),
             _ => None,
         }
     }
 
     /// Converts value to a string.
     pub fn to_string_value(&self) -> String {
-        match self {
-            Value::Number(n) => {
+        match &self.kind {
+            ValueKind::Number(n) => {
                 // Format numbers nicely (no .0 for integers)
                 if n.fract() == 0.0 {
                     format!("{:.0}", n)
@@ -284,53 +351,98 @@ impl Value {
                     n.to_string()
                 }
             }
-            Value::String(s) => s.clone(),
-            Value::Boolean(b) => b.to_string(),
-            Value::None => "none".to_string(),
-            Value::Symbol(s) => format!(":{}", s),
-            Value::List(list) => {
+            ValueKind::String(s) => s.clone(),
+            ValueKind::Boolean(b) => b.to_string(),
+            ValueKind::None => "none".to_string(),
+            ValueKind::Symbol(s) => format!(":{}", s),
+            ValueKind::List(list) => {
                 let strs: Vec<String> = list.to_vec().iter().map(|v| v.to_string_value()).collect();
                 format!("[{}]", strs.join(", "))
             }
-            Value::Map(hash) => {
+            ValueKind::Map(hash) => {
                 let pairs: Vec<String> = hash.to_hashmap()
                     .iter()
                     .map(|(k, v)| format!("\"{}\": {}", k, v.to_string_value()))
                     .collect();
                 format!("{{{}}}", pairs.join(", "))
             }
-            Value::Function(func) => {
+            ValueKind::Function(func) => {
                 if let Some(name) = &func.name {
                     format!("<function {}>", name)
                 } else {
                     format!("<lambda({})>", func.params.join(", "))
                 }
             }
-            Value::Graph(g) => {
+            ValueKind::Graph(g) => {
                 format!("<graph: {} nodes, {} edges>", g.node_count(), g.edge_count())
             }
-            Value::Module(m) => {
+            ValueKind::Module(m) => {
                 format!("<module {}>", m.name)
             }
-            Value::Error(e) => e.full_message(),
+            ValueKind::Error(e) => e.full_message(),
         }
     }
 
     /// Returns the type name of the value as a string.
     pub fn type_name(&self) -> &str {
-        match self {
-            Value::Number(_) => "num",
-            Value::String(_) => "string",
-            Value::Boolean(_) => "bool",
-            Value::None => "none",
-            Value::Symbol(_) => "symbol",
-            Value::List(_) => "list",
-            Value::Map(_) => "map",
-            Value::Function(_) => "function",
-            Value::Graph(_) => "graph",
-            Value::Module(_) => "module",
-            Value::Error(_) => "error",
+        match &self.kind {
+            ValueKind::Number(_) => "num",
+            ValueKind::String(_) => "string",
+            ValueKind::Boolean(_) => "bool",
+            ValueKind::None => "none",
+            ValueKind::Symbol(_) => "symbol",
+            ValueKind::List(_) => "list",
+            ValueKind::Map(_) => "map",
+            ValueKind::Function(_) => "function",
+            ValueKind::Graph(_) => "graph",
+            ValueKind::Module(_) => "module",
+            ValueKind::Error(_) => "error",
         }
+    }
+
+    // =========================================================================
+    // Freeze Control (Phase 8)
+    // =========================================================================
+
+    /// Mark this value as frozen (immutable)
+    ///
+    /// All values can be frozen, including primitives.
+    pub fn freeze(&mut self) {
+        self.frozen = true;
+        // Also freeze backing graph for collections
+        match &mut self.kind {
+            ValueKind::List(list) => list.graph.freeze(),
+            ValueKind::Map(map) => map.graph.freeze(),
+            ValueKind::Graph(graph) => graph.freeze(),
+            _ => {},
+        }
+    }
+
+    /// Check if this value is frozen
+    pub fn is_frozen(&self) -> bool {
+        self.frozen
+    }
+
+    /// Create an unfrozen deep copy of this value
+    ///
+    /// The copy will have the same data, but frozen=false
+    pub fn deep_copy_unfrozen(&self) -> Self {
+        let new_kind = match &self.kind {
+            ValueKind::List(list) => {
+                let mut new_list = list.clone();
+                new_list.graph = list.graph.deep_copy_unfrozen();
+                ValueKind::List(new_list)
+            }
+            ValueKind::Map(map) => {
+                let mut new_map = map.clone();
+                new_map.graph = map.graph.deep_copy_unfrozen();
+                ValueKind::Map(new_map)
+            }
+            ValueKind::Graph(graph) => ValueKind::Graph(graph.deep_copy_unfrozen()),
+            // Primitive types just clone
+            other => other.clone(),
+        };
+        Value { kind: new_kind, frozen: false }
     }
 }
 

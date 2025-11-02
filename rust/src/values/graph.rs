@@ -164,6 +164,11 @@ pub struct Graph {
     /// Each rule includes its configured severity
     pub rules: Vec<RuleInstance>,
 
+    // Freeze state (not included in PartialEq)
+    /// Whether this graph (and by extension, List/Hash backed by it) is frozen
+    /// Frozen graphs cannot be modified
+    frozen: bool,
+
     // Auto-optimization state (not included in PartialEq)
     /// Track property lookup frequencies for auto-indexing
     /// Maps property name -> access count
@@ -195,6 +200,8 @@ impl Graph {
             nodes: HashMap::new(),
             rulesets: Vec::new(),
             rules: Vec::new(),
+            // Freeze state
+            frozen: false,
             // Auto-optimization state
             property_access_counts: HashMap::new(),
             property_indices: HashMap::new(),
@@ -255,6 +262,13 @@ impl Graph {
 
     /// Add a node to the graph
     pub fn add_node(&mut self, id: String, value: Value) -> Result<(), GraphoidError> {
+        // Check if graph is frozen
+        if self.frozen {
+            return Err(GraphoidError::runtime(
+                "Cannot modify frozen graph".to_string()
+            ));
+        }
+
         // Validate the operation against active rules
         let operation = GraphOperation::AddNode {
             id: id.clone(),
@@ -306,6 +320,13 @@ impl Graph {
 
     /// Add an edge between two nodes
     pub fn add_edge(&mut self, from: &str, to: &str, edge_type: String, weight: Option<f64>, properties: HashMap<String, Value>) -> Result<(), GraphoidError> {
+        // Check if graph is frozen
+        if self.frozen {
+            return Err(GraphoidError::runtime(
+                "Cannot modify frozen graph".to_string()
+            ));
+        }
+
         // Validate the operation against active rules
         let operation = GraphOperation::AddEdge {
             from: from.to_string(),
@@ -440,6 +461,13 @@ impl Graph {
     ///
     /// If the edge exists, removes its weight. Returns an error if the edge doesn't exist.
     pub fn remove_edge_weight(&mut self, from: &str, to: &str) -> Result<(), GraphoidError> {
+        // Check if graph is frozen
+        if self.frozen {
+            return Err(GraphoidError::runtime(
+                "Cannot modify frozen graph".to_string()
+            ));
+        }
+
         if let Some(node) = self.nodes.get_mut(from) {
             if let Some(edge_info) = node.neighbors.get_mut(to) {
                 edge_info.set_weight(None);
@@ -496,6 +524,13 @@ impl Graph {
 
     /// Remove a node from the graph
     pub fn remove_node(&mut self, id: &str) -> Result<Option<GraphNode>, GraphoidError> {
+        // Check if graph is frozen
+        if self.frozen {
+            return Err(GraphoidError::runtime(
+                "Cannot modify frozen graph".to_string()
+            ));
+        }
+
         // Validate the operation against active rules
         let operation = GraphOperation::RemoveNode {
             id: id.to_string(),
@@ -545,6 +580,13 @@ impl Graph {
 
     /// Remove an edge
     pub fn remove_edge(&mut self, from: &str, to: &str) -> Result<bool, GraphoidError> {
+        // Check if graph is frozen
+        if self.frozen {
+            return Err(GraphoidError::runtime(
+                "Cannot modify frozen graph".to_string()
+            ));
+        }
+
         // Validate the operation against active rules
         let operation = GraphOperation::RemoveEdge {
             from: from.to_string(),
@@ -730,9 +772,9 @@ impl Graph {
     /// use std::collections::HashMap;
     ///
     /// let mut g = Graph::new(GraphType::Directed);
-    /// g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    /// g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    /// g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    /// g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    /// g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    /// g.add_node("C".to_string(), Value::number(3.0)).unwrap();
     /// g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
     /// g.add_edge("B", "C", "edge".to_string(), None, HashMap::new()).unwrap();
     ///
@@ -1079,9 +1121,9 @@ impl Graph {
     /// use std::collections::HashMap;
     ///
     /// let mut g = Graph::new(GraphType::Directed);
-    /// g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    /// g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    /// g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    /// g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    /// g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    /// g.add_node("C".to_string(), Value::number(3.0)).unwrap();
     /// g.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
     /// g.add_edge("B", "C", "edge".to_string(), None, HashMap::new()).unwrap();
     ///
@@ -1193,9 +1235,9 @@ impl Graph {
     /// use std::collections::HashMap;
     ///
     /// let mut g = Graph::new(GraphType::Directed);
-    /// g.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    /// g.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    /// g.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    /// g.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    /// g.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    /// g.add_node("C".to_string(), Value::number(3.0)).unwrap();
     /// g.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
     /// g.add_edge("B", "C", "road".to_string(), None, HashMap::new()).unwrap();
     ///
@@ -1477,7 +1519,7 @@ impl Graph {
     /// use graphoid::values::{Graph, GraphType, Value};
     ///
     /// let mut g = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
-    /// g.add_node("root".to_string(), Value::Number(1.0)).unwrap();
+    /// g.add_node("root".to_string(), Value::number(1.0)).unwrap();
     /// // Tree rules are now enforced: no_cycles, single_root, connected
     /// ```
     pub fn with_ruleset(mut self, ruleset: String) -> Self {
@@ -1524,7 +1566,7 @@ impl Graph {
                         // Check if there are ACTUAL violations
                         let dummy_op = GraphOperation::AddNode {
                             id: "__validation_check__".to_string(),
-                            value: Value::Number(0.0),
+                            value: Value::number(0.0),
                         };
                         let context = RuleContext::new(dummy_op);
 
@@ -1655,7 +1697,7 @@ impl Graph {
     ///
     /// let mut g = Graph::new(GraphType::Directed);
     /// // After 10+ lookups on "user_id", an index is auto-created
-    /// let nodes = g.find_nodes_by_property("user_id", &Value::Number(42.0));
+    /// let nodes = g.find_nodes_by_property("user_id", &Value::number(42.0));
     /// ```
     pub fn find_nodes_by_property(&mut self, property: &str, value: &Value) -> Vec<String> {
         // Track access pattern
@@ -1846,6 +1888,31 @@ impl Graph {
         plan.set_cost(self.nodes.len() + self.edge_count());
 
         plan
+    }
+
+    // =========================================================================
+    // Freeze Control (Phase 8)
+    // =========================================================================
+
+    /// Mark this graph as frozen (immutable)
+    ///
+    /// Frozen graphs cannot be modified (no add_node, add_edge, remove operations)
+    pub fn freeze(&mut self) {
+        self.frozen = true;
+    }
+
+    /// Check if this graph is frozen
+    pub fn is_frozen(&self) -> bool {
+        self.frozen
+    }
+
+    /// Create an unfrozen deep copy of this graph
+    ///
+    /// The copy will have the same structure and data, but frozen=false
+    pub fn deep_copy_unfrozen(&self) -> Self {
+        let mut copy = self.clone();
+        copy.frozen = false;
+        copy
     }
 }
 

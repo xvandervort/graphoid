@@ -3,7 +3,7 @@
 /// Tests for multi-statement lambda bodies: x => { statements }
 
 use graphoid::execution::Executor;
-use graphoid::values::Value;
+use graphoid::values::{Value, ValueKind};
 
 // ============================================================================
 // LAMBDA BLOCK BODIES
@@ -22,7 +22,7 @@ result = process(5)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result").unwrap(), Value::Number(11.0));
+    assert_eq!(executor.get_variable("result").unwrap(), Value::number(11.0));
 }
 
 #[test]
@@ -42,7 +42,7 @@ result = calculate(2, 3, 4)
     // sum = 2 + 3 + 4 = 9
     // product = 2 * 3 * 4 = 24
     // result = 9 + 24 = 33
-    assert_eq!(executor.get_variable("result").unwrap(), Value::Number(33.0));
+    assert_eq!(executor.get_variable("result").unwrap(), Value::number(33.0));
 }
 
 #[test]
@@ -59,7 +59,7 @@ result = get_value()
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result").unwrap(), Value::Number(30.0));
+    assert_eq!(executor.get_variable("result").unwrap(), Value::number(30.0));
 }
 
 #[test]
@@ -78,8 +78,8 @@ result2 = abs_value(-5)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(5.0));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(5.0));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(5.0));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(5.0));
 }
 
 #[test]
@@ -101,8 +101,8 @@ result2 = factorial(3)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(120.0)); // 5! = 120
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(6.0));   // 3! = 6
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(120.0)); // 5! = 120
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(6.0));   // 3! = 6
 }
 
 #[test]
@@ -122,7 +122,7 @@ result = add5(3)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result").unwrap(), Value::Number(8.0));
+    assert_eq!(executor.get_variable("result").unwrap(), Value::number(8.0));
 }
 
 #[test]
@@ -138,14 +138,14 @@ doubled_plus_one = numbers.map(x => {
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("doubled_plus_one").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("doubled_plus_one").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 5);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(3.0));  // 1*2+1
-            assert_eq!(list.get(1).unwrap(), &Value::Number(5.0));  // 2*2+1
-            assert_eq!(list.get(2).unwrap(), &Value::Number(7.0));  // 3*2+1
-            assert_eq!(list.get(3).unwrap(), &Value::Number(9.0));  // 4*2+1
-            assert_eq!(list.get(4).unwrap(), &Value::Number(11.0)); // 5*2+1
+            assert_eq!(list.get(0).unwrap(), &Value::number(3.0));  // 1*2+1
+            assert_eq!(list.get(1).unwrap(), &Value::number(5.0));  // 2*2+1
+            assert_eq!(list.get(2).unwrap(), &Value::number(7.0));  // 3*2+1
+            assert_eq!(list.get(3).unwrap(), &Value::number(9.0));  // 4*2+1
+            assert_eq!(list.get(4).unwrap(), &Value::number(11.0)); // 5*2+1
         }
         _ => panic!("Expected list"),
     }
@@ -165,12 +165,12 @@ big_evens = numbers.filter(x => {
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("big_evens").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("big_evens").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 3);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(6.0));
-            assert_eq!(list.get(1).unwrap(), &Value::Number(8.0));
-            assert_eq!(list.get(2).unwrap(), &Value::Number(10.0));
+            assert_eq!(list.get(0).unwrap(), &Value::number(6.0));
+            assert_eq!(list.get(1).unwrap(), &Value::number(8.0));
+            assert_eq!(list.get(2).unwrap(), &Value::number(10.0));
         }
         _ => panic!("Expected list"),
     }
@@ -193,8 +193,8 @@ result2 = find_first_positive(-5)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(5.0));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(999.0));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(5.0));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(999.0));
 }
 
 #[test]
@@ -216,8 +216,8 @@ result2 = complex(-5)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(10.0));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(5.0));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(10.0));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(5.0));
 }
 
 #[test]
@@ -234,7 +234,7 @@ result = format_name("Alice")
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result").unwrap(), Value::String("Hello, Alice!".to_string()));
+    assert_eq!(executor.get_variable("result").unwrap(), Value::string("Hello, Alice!".to_string()));
 }
 
 #[test]
@@ -253,12 +253,12 @@ result = process_list([1, 2, 3])
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    match executor.get_variable("result").unwrap() {
-        Value::List(list) => {
+    match &executor.get_variable("result").unwrap().kind {
+        ValueKind::List(list) => {
             assert_eq!(list.len(), 3);
-            assert_eq!(list.get(0).unwrap(), &Value::Number(2.0));
-            assert_eq!(list.get(1).unwrap(), &Value::Number(4.0));
-            assert_eq!(list.get(2).unwrap(), &Value::Number(6.0));
+            assert_eq!(list.get(0).unwrap(), &Value::number(2.0));
+            assert_eq!(list.get(1).unwrap(), &Value::number(4.0));
+            assert_eq!(list.get(2).unwrap(), &Value::number(6.0));
         }
         _ => panic!("Expected list"),
     }
@@ -284,9 +284,9 @@ result3 = sign(0)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(1.0));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(-1.0));
-    assert_eq!(executor.get_variable("result3").unwrap(), Value::Number(0.0));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(1.0));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(-1.0));
+    assert_eq!(executor.get_variable("result3").unwrap(), Value::number(0.0));
 }
 
 #[test]
@@ -305,8 +305,8 @@ outer_x = x  # Should still be 100
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result").unwrap(), Value::Number(10.0));
-    assert_eq!(executor.get_variable("outer_x").unwrap(), Value::Number(100.0));
+    assert_eq!(executor.get_variable("result").unwrap(), Value::number(10.0));
+    assert_eq!(executor.get_variable("outer_x").unwrap(), Value::number(100.0));
 }
 
 #[test]
@@ -327,6 +327,6 @@ result2 = complex(5)
     let mut executor = Executor::new();
     executor.execute_source(source).unwrap();
 
-    assert_eq!(executor.get_variable("result1").unwrap(), Value::Number(10.0));
-    assert_eq!(executor.get_variable("result2").unwrap(), Value::Number(11.0));
+    assert_eq!(executor.get_variable("result1").unwrap(), Value::number(10.0));
+    assert_eq!(executor.get_variable("result2").unwrap(), Value::number(11.0));
 }

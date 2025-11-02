@@ -374,8 +374,8 @@ fn test_function_arguments_tracked_in_edges() {
     // Arguments should be tracked
     let edge = add_edges[0];
     assert_eq!(edge.arguments.len(), 2);
-    assert_eq!(edge.arguments[0], Value::Number(10.0));
-    assert_eq!(edge.arguments[1], Value::Number(20.0));
+    assert_eq!(edge.arguments[0], Value::number(10.0));
+    assert_eq!(edge.arguments[1], Value::number(20.0));
 }
 
 #[test]
@@ -411,7 +411,7 @@ fn test_return_values_tracked_in_edges() {
     // Return value should be tracked when profiling enabled
     let edge = value_edges[0];
     if let Some(ref return_val) = edge.return_value {
-        assert_eq!(*return_val, Value::Number(42.0));
+        assert_eq!(*return_val, Value::number(42.0));
     } else {
         panic!("Expected return value to be tracked");
     }

@@ -35,18 +35,18 @@ fn execute_and_return(code: &str) -> Result<Value, String> {
         match last_stmt {
             Stmt::Expression { expr, .. } => {
                 executor
-                    .eval_expr(expr)
+                    .eval_expr(&expr)
                     .map_err(|e| format!("Runtime error: {}", e))
             }
             _ => {
                 executor
                     .eval_stmt(last_stmt)
                     .map_err(|e| format!("Runtime error: {}", e))?;
-                Ok(Value::None)
+                Ok(Value::none())
             }
         }
     } else {
-        Ok(Value::None)
+        Ok(Value::none())
     }
 }
 
@@ -65,7 +65,7 @@ fn test_literal_number_pattern_matching() {
     "#;
 
     let result = execute_and_return(code).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn test_literal_number_pattern_no_match() {
     "#;
 
     let result = execute_and_return(code).unwrap();
-    assert_eq!(result, Value::Boolean(false));
+    assert_eq!(result, Value::boolean(false));
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn test_variable_pattern_binding() {
     "#;
 
     let result = execute_and_return(code).unwrap();
-    assert_eq!(result, Value::Number(42.0));
+    assert_eq!(result, Value::number(42.0));
 }
 
 // ============================================================================
@@ -111,7 +111,7 @@ fn test_factorial_pattern_matching() {
     "#;
 
     let result = execute_and_return(code).unwrap();
-    assert_eq!(result, Value::Number(120.0));
+    assert_eq!(result, Value::number(120.0));
 }
 
 #[test]
@@ -126,7 +126,7 @@ fn test_fibonacci_pattern_matching() {
     "#;
 
     let result = execute_and_return(code).unwrap();
-    assert_eq!(result, Value::Number(55.0));
+    assert_eq!(result, Value::number(55.0));
 }
 
 // ============================================================================
@@ -145,7 +145,7 @@ fn test_string_pattern_matching() {
     "#;
 
     let result = execute_and_return(code).unwrap();
-    assert_eq!(result, Value::String("meow".to_string()));
+    assert_eq!(result, Value::string("meow".to_string()));
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn test_string_pattern_no_match_returns_none() {
     "#;
 
     let result = execute_and_return(code).unwrap();
-    assert_eq!(result, Value::None);
+    assert_eq!(result, Value::none());
 }
 
 // ============================================================================
@@ -177,7 +177,7 @@ fn test_boolean_pattern_matching() {
     "#;
 
     let result = execute_and_return(code).unwrap();
-    assert_eq!(result, Value::String("yes".to_string()));
+    assert_eq!(result, Value::string("yes".to_string()));
 }
 
 // ============================================================================
@@ -195,7 +195,7 @@ fn test_none_pattern_matching() {
     "#;
 
     let result = execute_and_return(code).unwrap();
-    assert_eq!(result, Value::String("nothing".to_string()));
+    assert_eq!(result, Value::string("nothing".to_string()));
 }
 
 // ============================================================================
@@ -212,7 +212,7 @@ fn test_wildcard_pattern() {
     "#;
 
     let result = execute_and_return(code).unwrap();
-    assert_eq!(result, Value::String("matched".to_string()));
+    assert_eq!(result, Value::string("matched".to_string()));
 }
 
 // ============================================================================
@@ -231,7 +231,7 @@ fn test_pattern_order_matters() {
 
     let result = execute_and_return(code).unwrap();
     // First pattern matches, so returns "any"
-    assert_eq!(result, Value::String("any".to_string()));
+    assert_eq!(result, Value::string("any".to_string()));
 }
 
 // ============================================================================
@@ -249,7 +249,7 @@ fn test_complex_expression_in_pattern_body() {
     "#;
 
     let result = execute_and_return(code).unwrap();
-    assert_eq!(result, Value::Number(20.0));
+    assert_eq!(result, Value::number(20.0));
 }
 
 // ============================================================================
@@ -269,7 +269,7 @@ fn test_variable_shadowing_in_patterns() {
 
     let result = execute_and_return(code).unwrap();
     // Pattern variable x shadows outer x, so 5 * 2 = 10
-    assert_eq!(result, Value::Number(10.0));
+    assert_eq!(result, Value::number(10.0));
 }
 
 #[test]
@@ -285,5 +285,5 @@ fn test_outer_variable_accessible_in_pattern_body() {
 
     let result = execute_and_return(code).unwrap();
     // Outer x is accessible
-    assert_eq!(result, Value::Number(100.0));
+    assert_eq!(result, Value::number(100.0));
 }

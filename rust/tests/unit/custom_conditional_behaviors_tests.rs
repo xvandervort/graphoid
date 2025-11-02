@@ -98,21 +98,21 @@ fn create_is_negative_fn() -> Function {
 #[test]
 fn test_custom_function_basic() {
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
-            function: Value::Function(create_double_fn()),
+            function: Value::function(create_double_fn()),
         });
 
     let mut executor = Executor::new();
 
     // Test basic transformation
-    let result = executor.apply_transformation_rules_with_context(Value::Number(5.0), &[rule]).unwrap();
-    assert_eq!(result, Value::Number(10.0)); // 5 * 2
+    let result = executor.apply_transformation_rules_with_context(Value::number(5.0), &[rule]).unwrap();
+    assert_eq!(result, Value::number(10.0)); // 5 * 2
 }
 
 #[test]
 fn test_custom_function_with_closure() {
     // Create a function that uses a captured variable
     let mut env = Environment::new();
-    env.define("multiplier".to_string(), Value::Number(3.0));
+    env.define("multiplier".to_string(), Value::number(3.0));
 
     // func(x) { return x * multiplier }
     let multiply_fn = Function {
@@ -136,12 +136,12 @@ fn test_custom_function_with_closure() {
     };
 
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
-            function: Value::Function(multiply_fn),
+            function: Value::function(multiply_fn),
         });
 
     let mut executor = Executor::new();
-    let result = executor.apply_transformation_rules_with_context(Value::Number(5.0), &[rule]).unwrap();
-    assert_eq!(result, Value::Number(15.0)); // 5 * 3
+    let result = executor.apply_transformation_rules_with_context(Value::number(5.0), &[rule]).unwrap();
+    assert_eq!(result, Value::number(15.0)); // 5 * 3
 }
 
 #[test]
@@ -169,18 +169,18 @@ fn test_custom_function_type_specific() {
     };
 
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
-            function: Value::Function(add_ten_fn),
+            function: Value::function(add_ten_fn),
         });
 
     let mut executor = Executor::new();
 
     // Test with number
-    let result = executor.apply_transformation_rules_with_context(Value::Number(5.0), &[rule.clone()]).unwrap();
-    assert_eq!(result, Value::Number(15.0));
+    let result = executor.apply_transformation_rules_with_context(Value::number(5.0), &[rule.clone()]).unwrap();
+    assert_eq!(result, Value::number(15.0));
 
     // Test with string - type coercion converts number to string for concatenation
-    let result = executor.apply_transformation_rules_with_context(Value::String("hello".to_string()), &[rule]);
-    assert_eq!(result.unwrap(), Value::String("hello10".to_string()));
+    let result = executor.apply_transformation_rules_with_context(Value::string("hello".to_string()), &[rule]);
+    assert_eq!(result.unwrap(), Value::string("hello10".to_string()));
 }
 
 #[test]
@@ -208,17 +208,17 @@ fn test_custom_function_error_handling() {
     };
 
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
-            function: Value::Function(divide_fn),
+            function: Value::function(divide_fn),
         });
 
     let mut executor = Executor::new();
 
     // 10 / 2 = 5
-    let result = executor.apply_transformation_rules_with_context(Value::Number(2.0), &[rule.clone()]).unwrap();
-    assert_eq!(result, Value::Number(5.0));
+    let result = executor.apply_transformation_rules_with_context(Value::number(2.0), &[rule.clone()]).unwrap();
+    assert_eq!(result, Value::number(5.0));
 
     // Division by zero should error
-    let result = executor.apply_transformation_rules_with_context(Value::Number(0.0), &[rule]);
+    let result = executor.apply_transformation_rules_with_context(Value::number(0.0), &[rule]);
     assert!(result.is_err());
 }
 
@@ -227,29 +227,29 @@ fn test_custom_function_proactive() {
     // Test that new values added to a list are transformed
     let mut list = List::new();
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
-            function: Value::Function(create_double_fn()),
+            function: Value::function(create_double_fn()),
         });
     list.graph.rules.push(rule);
 
     let mut executor = Executor::new();
 
     // Add value through executor
-    let val = executor.apply_transformation_rules_with_context(Value::Number(7.0), &list.graph.rules).unwrap();
+    let val = executor.apply_transformation_rules_with_context(Value::number(7.0), &list.graph.rules).unwrap();
     list.append_raw(val).unwrap();
 
     // Verify it was doubled
-    assert_eq!(list.get(0), Some(&Value::Number(14.0)));
+    assert_eq!(list.get(0), Some(&Value::number(14.0)));
 }
 
 #[test]
 fn test_custom_function_retroactive() {
     // Test retroactive application
     let mut list = List::new();
-    list.append(Value::Number(5.0)).unwrap();
-    list.append(Value::Number(10.0)).unwrap();
+    list.append(Value::number(5.0)).unwrap();
+    list.append(Value::number(10.0)).unwrap();
 
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
-            function: Value::Function(create_double_fn()),
+            function: Value::function(create_double_fn()),
         });
 
     let mut executor = Executor::new();
@@ -264,8 +264,8 @@ fn test_custom_function_retroactive() {
     new_list.graph.rules.push(rule);
 
     // Verify retroactive transformation
-    assert_eq!(new_list.get(0), Some(&Value::Number(10.0))); // 5 * 2
-    assert_eq!(new_list.get(1), Some(&Value::Number(20.0))); // 10 * 2
+    assert_eq!(new_list.get(0), Some(&Value::number(10.0))); // 5 * 2
+    assert_eq!(new_list.get(1), Some(&Value::number(20.0))); // 10 * 2
 }
 
 // ============================================================================
@@ -275,39 +275,39 @@ fn test_custom_function_retroactive() {
 #[test]
 fn test_conditional_basic() {
     let rule = RuleInstance::new(RuleSpec::Conditional {
-            condition: Value::Function(create_is_negative_fn()),
-            transform: Value::Function(create_negate_fn()),
+            condition: Value::function(create_is_negative_fn()),
+            transform: Value::function(create_negate_fn()),
             fallback: None,
         });
 
     let mut executor = Executor::new();
 
     // Negative: should be transformed to positive
-    let result = executor.apply_transformation_rules_with_context(Value::Number(-5.0), &[rule.clone()]).unwrap();
-    assert_eq!(result, Value::Number(5.0));
+    let result = executor.apply_transformation_rules_with_context(Value::number(-5.0), &[rule.clone()]).unwrap();
+    assert_eq!(result, Value::number(5.0));
 
     // Positive: should stay unchanged (no fallback)
-    let result = executor.apply_transformation_rules_with_context(Value::Number(3.0), &[rule]).unwrap();
-    assert_eq!(result, Value::Number(3.0));
+    let result = executor.apply_transformation_rules_with_context(Value::number(3.0), &[rule]).unwrap();
+    assert_eq!(result, Value::number(3.0));
 }
 
 #[test]
 fn test_conditional_with_fallback() {
     let rule = RuleInstance::new(RuleSpec::Conditional {
-            condition: Value::Function(create_is_negative_fn()),
-            transform: Value::Function(create_negate_fn()),
-            fallback: Some(Value::Function(create_double_fn())),
+            condition: Value::function(create_is_negative_fn()),
+            transform: Value::function(create_negate_fn()),
+            fallback: Some(Value::function(create_double_fn())),
         });
 
     let mut executor = Executor::new();
 
     // Negative: condition true, use transform
-    let result = executor.apply_transformation_rules_with_context(Value::Number(-5.0), &[rule.clone()]).unwrap();
-    assert_eq!(result, Value::Number(5.0));
+    let result = executor.apply_transformation_rules_with_context(Value::number(-5.0), &[rule.clone()]).unwrap();
+    assert_eq!(result, Value::number(5.0));
 
     // Positive: condition false, use fallback
-    let result = executor.apply_transformation_rules_with_context(Value::Number(3.0), &[rule]).unwrap();
-    assert_eq!(result, Value::Number(6.0)); // 3 * 2
+    let result = executor.apply_transformation_rules_with_context(Value::number(3.0), &[rule]).unwrap();
+    assert_eq!(result, Value::number(6.0)); // 3 * 2
 }
 
 #[test]
@@ -357,23 +357,23 @@ fn test_conditional_without_fallback() {
     };
 
     let rule = RuleInstance::new(RuleSpec::Conditional {
-            condition: Value::Function(is_positive),
-            transform: Value::Function(square),
+            condition: Value::function(is_positive),
+            transform: Value::function(square),
             fallback: None,
         });
 
     let mut executor = Executor::new();
 
     // Positive: square it
-    let result = executor.apply_transformation_rules_with_context(Value::Number(4.0), &[rule.clone()]).unwrap();
-    assert_eq!(result, Value::Number(16.0));
+    let result = executor.apply_transformation_rules_with_context(Value::number(4.0), &[rule.clone()]).unwrap();
+    assert_eq!(result, Value::number(16.0));
 
     // Zero or negative: keep unchanged
-    let result = executor.apply_transformation_rules_with_context(Value::Number(0.0), &[rule.clone()]).unwrap();
-    assert_eq!(result, Value::Number(0.0));
+    let result = executor.apply_transformation_rules_with_context(Value::number(0.0), &[rule.clone()]).unwrap();
+    assert_eq!(result, Value::number(0.0));
 
-    let result = executor.apply_transformation_rules_with_context(Value::Number(-3.0), &[rule]).unwrap();
-    assert_eq!(result, Value::Number(-3.0));
+    let result = executor.apply_transformation_rules_with_context(Value::number(-3.0), &[rule]).unwrap();
+    assert_eq!(result, Value::number(-3.0));
 }
 
 #[test]
@@ -381,8 +381,8 @@ fn test_conditional_proactive() {
     // Test proactive application
     let mut list = List::new();
     let rule = RuleInstance::new(RuleSpec::Conditional {
-            condition: Value::Function(create_is_negative_fn()),
-            transform: Value::Function(create_negate_fn()),
+            condition: Value::function(create_is_negative_fn()),
+            transform: Value::function(create_negate_fn()),
             fallback: None,
         });
     list.graph.rules.push(rule);
@@ -390,23 +390,23 @@ fn test_conditional_proactive() {
     let mut executor = Executor::new();
 
     // Add negative value
-    let val = executor.apply_transformation_rules_with_context(Value::Number(-8.0), &list.graph.rules).unwrap();
+    let val = executor.apply_transformation_rules_with_context(Value::number(-8.0), &list.graph.rules).unwrap();
     list.append_raw(val).unwrap();
 
     // Verify it was made positive
-    assert_eq!(list.get(0), Some(&Value::Number(8.0)));
+    assert_eq!(list.get(0), Some(&Value::number(8.0)));
 }
 
 #[test]
 fn test_conditional_retroactive() {
     // Test retroactive application
     let mut list = List::new();
-    list.append(Value::Number(-5.0)).unwrap();
-    list.append(Value::Number(3.0)).unwrap();
+    list.append(Value::number(-5.0)).unwrap();
+    list.append(Value::number(3.0)).unwrap();
 
     let rule = RuleInstance::new(RuleSpec::Conditional {
-            condition: Value::Function(create_is_negative_fn()),
-            transform: Value::Function(create_negate_fn()),
+            condition: Value::function(create_is_negative_fn()),
+            transform: Value::function(create_negate_fn()),
             fallback: None,
         });
 
@@ -422,8 +422,8 @@ fn test_conditional_retroactive() {
     new_list.graph.rules.push(rule);
 
     // Verify
-    assert_eq!(new_list.get(0), Some(&Value::Number(5.0)));  // -5 -> 5
-    assert_eq!(new_list.get(1), Some(&Value::Number(3.0)));  // 3 -> 3
+    assert_eq!(new_list.get(0), Some(&Value::number(5.0)));  // -5 -> 5
+    assert_eq!(new_list.get(1), Some(&Value::number(3.0)));  // 3 -> 3
 }
 
 #[test]
@@ -468,14 +468,14 @@ fn test_conditional_chain() {
     };
 
     let behavior1 = RuleInstance::new(RuleSpec::Conditional {
-        condition: Value::Function(create_is_negative_fn()),
-        transform: Value::Function(create_negate_fn()),
+        condition: Value::function(create_is_negative_fn()),
+        transform: Value::function(create_negate_fn()),
         fallback: None,
     });
 
     let behavior2 = RuleInstance::new(RuleSpec::Conditional {
-        condition: Value::Function(is_large),
-        transform: Value::Function(clamp_to_10),
+        condition: Value::function(is_large),
+        transform: Value::function(clamp_to_10),
         fallback: None,
     });
 
@@ -483,16 +483,16 @@ fn test_conditional_chain() {
     let behaviors = vec![behavior1, behavior2];
 
     // Test: -15 -> 15 (negated) -> 10 (clamped)
-    let result = executor.apply_transformation_rules_with_context(Value::Number(-15.0), &behaviors).unwrap();
-    assert_eq!(result, Value::Number(10.0));
+    let result = executor.apply_transformation_rules_with_context(Value::number(-15.0), &behaviors).unwrap();
+    assert_eq!(result, Value::number(10.0));
 
     // Test: -5 -> 5 (negated) -> 5 (not clamped)
-    let result = executor.apply_transformation_rules_with_context(Value::Number(-5.0), &behaviors).unwrap();
-    assert_eq!(result, Value::Number(5.0));
+    let result = executor.apply_transformation_rules_with_context(Value::number(-5.0), &behaviors).unwrap();
+    assert_eq!(result, Value::number(5.0));
 
     // Test: 20 -> 20 (not negated) -> 10 (clamped)
-    let result = executor.apply_transformation_rules_with_context(Value::Number(20.0), &behaviors).unwrap();
-    assert_eq!(result, Value::Number(10.0));
+    let result = executor.apply_transformation_rules_with_context(Value::number(20.0), &behaviors).unwrap();
+    assert_eq!(result, Value::number(10.0));
 }
 
 // ============================================================================
@@ -503,7 +503,7 @@ fn test_conditional_chain() {
 fn test_list_with_custom_function() {
     let mut list = List::new();
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
-            function: Value::Function(create_double_fn()),
+            function: Value::function(create_double_fn()),
         });
     list.graph.rules.push(rule);
 
@@ -511,22 +511,22 @@ fn test_list_with_custom_function() {
 
     // Add multiple values
     for val in vec![5.0, 10.0, 15.0] {
-        let transformed = executor.apply_transformation_rules_with_context(Value::Number(val), &list.graph.rules).unwrap();
+        let transformed = executor.apply_transformation_rules_with_context(Value::number(val), &list.graph.rules).unwrap();
         list.append_raw(transformed).unwrap();
     }
 
     // Verify all were doubled
-    assert_eq!(list.get(0), Some(&Value::Number(10.0)));  // 5 * 2
-    assert_eq!(list.get(1), Some(&Value::Number(20.0)));  // 10 * 2
-    assert_eq!(list.get(2), Some(&Value::Number(30.0)));  // 15 * 2
+    assert_eq!(list.get(0), Some(&Value::number(10.0)));  // 5 * 2
+    assert_eq!(list.get(1), Some(&Value::number(20.0)));  // 10 * 2
+    assert_eq!(list.get(2), Some(&Value::number(30.0)));  // 15 * 2
 }
 
 #[test]
 fn test_list_with_conditional() {
     let mut list = List::new();
     let rule = RuleInstance::new(RuleSpec::Conditional {
-            condition: Value::Function(create_is_negative_fn()),
-            transform: Value::Function(create_negate_fn()),
+            condition: Value::function(create_is_negative_fn()),
+            transform: Value::function(create_negate_fn()),
             fallback: None,
         });
     list.graph.rules.push(rule);
@@ -535,15 +535,15 @@ fn test_list_with_conditional() {
 
     // Add mixed positive and negative values
     for val in vec![-5.0, 3.0, -2.0, 7.0] {
-        let transformed = executor.apply_transformation_rules_with_context(Value::Number(val), &list.graph.rules).unwrap();
+        let transformed = executor.apply_transformation_rules_with_context(Value::number(val), &list.graph.rules).unwrap();
         list.append_raw(transformed).unwrap();
     }
 
     // Verify all are positive
-    assert_eq!(list.get(0), Some(&Value::Number(5.0)));
-    assert_eq!(list.get(1), Some(&Value::Number(3.0)));
-    assert_eq!(list.get(2), Some(&Value::Number(2.0)));
-    assert_eq!(list.get(3), Some(&Value::Number(7.0)));
+    assert_eq!(list.get(0), Some(&Value::number(5.0)));
+    assert_eq!(list.get(1), Some(&Value::number(3.0)));
+    assert_eq!(list.get(2), Some(&Value::number(2.0)));
+    assert_eq!(list.get(3), Some(&Value::number(7.0)));
 }
 
 #[test]
@@ -552,17 +552,17 @@ fn test_mixed_behaviors() {
     let behavior1 = RuleInstance::new(RuleSpec::NoneToZero);
 
     let behavior2 = RuleInstance::new(RuleSpec::CustomFunction {
-        function: Value::Function(create_double_fn()),
+        function: Value::function(create_double_fn()),
     });
 
     let behaviors = vec![behavior1, behavior2];
     let mut executor = Executor::new();
 
     // Test: None -> 0 (NoneToZero) -> 0 (double)
-    let result = executor.apply_transformation_rules_with_context(Value::None, &behaviors).unwrap();
-    assert_eq!(result, Value::Number(0.0));
+    let result = executor.apply_transformation_rules_with_context(Value::none(), &behaviors).unwrap();
+    assert_eq!(result, Value::number(0.0));
 
     // Test: 5 -> 5 (NoneToZero doesn't apply) -> 10 (double)
-    let result = executor.apply_transformation_rules_with_context(Value::Number(5.0), &behaviors).unwrap();
-    assert_eq!(result, Value::Number(10.0));
+    let result = executor.apply_transformation_rules_with_context(Value::number(5.0), &behaviors).unwrap();
+    assert_eq!(result, Value::number(10.0));
 }

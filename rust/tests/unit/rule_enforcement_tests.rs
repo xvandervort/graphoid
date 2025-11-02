@@ -13,9 +13,9 @@ fn test_tree_ruleset_prevents_cycles() {
     let mut tree = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
 
     // Build a simple tree structure
-    tree.add_node("root".to_string(), Value::Number(1.0)).unwrap();
-    tree.add_node("child1".to_string(), Value::Number(2.0)).unwrap();
-    tree.add_node("child2".to_string(), Value::Number(3.0)).unwrap();
+    tree.add_node("root".to_string(), Value::number(1.0)).unwrap();
+    tree.add_node("child1".to_string(), Value::number(2.0)).unwrap();
+    tree.add_node("child2".to_string(), Value::number(3.0)).unwrap();
 
     // Add edges to form tree
     tree.add_edge("root", "child1", "child".to_string(), None, HashMap::new()).unwrap();
@@ -40,9 +40,9 @@ fn test_tree_ruleset_prevents_multiple_roots_on_removal() {
     let mut tree = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
 
     // Build a valid connected tree
-    tree.add_node("root".to_string(), Value::Number(1.0)).unwrap();
-    tree.add_node("left".to_string(), Value::Number(2.0)).unwrap();
-    tree.add_node("right".to_string(), Value::Number(3.0)).unwrap();
+    tree.add_node("root".to_string(), Value::number(1.0)).unwrap();
+    tree.add_node("left".to_string(), Value::number(2.0)).unwrap();
+    tree.add_node("right".to_string(), Value::number(3.0)).unwrap();
 
     tree.add_edge("root", "left", "child".to_string(), None, HashMap::new()).unwrap();
     tree.add_edge("root", "right", "child".to_string(), None, HashMap::new()).unwrap();
@@ -65,11 +65,11 @@ fn test_tree_ruleset_allows_valid_tree_structure() {
     let mut tree = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
 
     // Build a valid tree structure
-    tree.add_node("root".to_string(), Value::Number(1.0)).unwrap();
-    tree.add_node("left".to_string(), Value::Number(2.0)).unwrap();
-    tree.add_node("right".to_string(), Value::Number(3.0)).unwrap();
-    tree.add_node("left_left".to_string(), Value::Number(4.0)).unwrap();
-    tree.add_node("left_right".to_string(), Value::Number(5.0)).unwrap();
+    tree.add_node("root".to_string(), Value::number(1.0)).unwrap();
+    tree.add_node("left".to_string(), Value::number(2.0)).unwrap();
+    tree.add_node("right".to_string(), Value::number(3.0)).unwrap();
+    tree.add_node("left_left".to_string(), Value::number(4.0)).unwrap();
+    tree.add_node("left_right".to_string(), Value::number(5.0)).unwrap();
 
     // Add edges to form valid tree
     assert!(tree.add_edge("root", "left", "child".to_string(), None, HashMap::new()).is_ok());
@@ -89,10 +89,10 @@ fn test_binary_tree_ruleset_limits_children() {
     let mut btree = Graph::new(GraphType::Directed).with_ruleset("binary_tree".to_string());
 
     // Add root and two children (should succeed)
-    btree.add_node("root".to_string(), Value::Number(1.0)).unwrap();
-    btree.add_node("left".to_string(), Value::Number(2.0)).unwrap();
-    btree.add_node("right".to_string(), Value::Number(3.0)).unwrap();
-    btree.add_node("third".to_string(), Value::Number(4.0)).unwrap();
+    btree.add_node("root".to_string(), Value::number(1.0)).unwrap();
+    btree.add_node("left".to_string(), Value::number(2.0)).unwrap();
+    btree.add_node("right".to_string(), Value::number(3.0)).unwrap();
+    btree.add_node("third".to_string(), Value::number(4.0)).unwrap();
 
     btree.add_edge("root", "left", "child".to_string(), None, HashMap::new()).unwrap();
     btree.add_edge("root", "right", "child".to_string(), None, HashMap::new()).unwrap();
@@ -116,17 +116,17 @@ fn test_binary_tree_allows_two_children() {
     let mut btree = Graph::new(GraphType::Directed).with_ruleset("binary_tree".to_string());
 
     // Add root and two children
-    btree.add_node("root".to_string(), Value::Number(1.0)).unwrap();
-    btree.add_node("left".to_string(), Value::Number(2.0)).unwrap();
-    btree.add_node("right".to_string(), Value::Number(3.0)).unwrap();
+    btree.add_node("root".to_string(), Value::number(1.0)).unwrap();
+    btree.add_node("left".to_string(), Value::number(2.0)).unwrap();
+    btree.add_node("right".to_string(), Value::number(3.0)).unwrap();
 
     // Should succeed - exactly 2 children is allowed
     assert!(btree.add_edge("root", "left", "child".to_string(), None, HashMap::new()).is_ok());
     assert!(btree.add_edge("root", "right", "child".to_string(), None, HashMap::new()).is_ok());
 
     // Add children to left node
-    btree.add_node("left_left".to_string(), Value::Number(4.0)).unwrap();
-    btree.add_node("left_right".to_string(), Value::Number(5.0)).unwrap();
+    btree.add_node("left_left".to_string(), Value::number(4.0)).unwrap();
+    btree.add_node("left_right".to_string(), Value::number(5.0)).unwrap();
 
     assert!(btree.add_edge("left", "left_left", "child".to_string(), None, HashMap::new()).is_ok());
     assert!(btree.add_edge("left", "left_right", "child".to_string(), None, HashMap::new()).is_ok());
@@ -140,10 +140,10 @@ fn test_dag_ruleset_prevents_cycles() {
     let mut dag = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
 
     // Build a DAG
-    dag.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    dag.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    dag.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-    dag.add_node("D".to_string(), Value::Number(4.0)).unwrap();
+    dag.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    dag.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    dag.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    dag.add_node("D".to_string(), Value::number(4.0)).unwrap();
 
     // Create valid DAG structure: A -> B -> D, A -> C -> D
     dag.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
@@ -170,9 +170,9 @@ fn test_dag_allows_multiple_roots() {
     let mut dag = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
 
     // Add multiple root nodes
-    dag.add_node("root1".to_string(), Value::Number(1.0)).unwrap();
-    dag.add_node("root2".to_string(), Value::Number(2.0)).unwrap();
-    dag.add_node("child".to_string(), Value::Number(3.0)).unwrap();
+    dag.add_node("root1".to_string(), Value::number(1.0)).unwrap();
+    dag.add_node("root2".to_string(), Value::number(2.0)).unwrap();
+    dag.add_node("child".to_string(), Value::number(3.0)).unwrap();
 
     // Both roots can point to same child - this is valid in a DAG
     assert!(dag.add_edge("root1", "child", "edge".to_string(), None, HashMap::new()).is_ok());
@@ -186,8 +186,8 @@ fn test_graph_without_ruleset_allows_cycles() {
     // Regular graph without rulesets should allow cycles
     let mut graph = Graph::new(GraphType::Directed);
 
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
 
     // Should be able to create a cycle
     assert!(graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).is_ok());
@@ -204,15 +204,15 @@ fn test_insert_method_respects_tree_rules() {
     let mut tree = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
 
     // Insert root
-    let root = tree.insert(Value::Number(5.0), None).unwrap();
+    let root = tree.insert(Value::number(5.0), None).unwrap();
 
     // Insert children
-    let left = tree.insert(Value::Number(3.0), Some(&root)).unwrap();
-    let right = tree.insert(Value::Number(7.0), Some(&root)).unwrap();
+    let left = tree.insert(Value::number(3.0), Some(&root)).unwrap();
+    let right = tree.insert(Value::number(7.0), Some(&root)).unwrap();
 
     // Insert grandchildren
-    let left_left = tree.insert(Value::Number(1.0), Some(&left)).unwrap();
-    let left_right = tree.insert(Value::Number(4.0), Some(&left)).unwrap();
+    let left_left = tree.insert(Value::number(1.0), Some(&left)).unwrap();
+    let left_right = tree.insert(Value::number(4.0), Some(&left)).unwrap();
 
     // Verify structure
     assert_eq!(tree.node_count(), 5);
@@ -232,8 +232,8 @@ fn test_ruleset_chaining() {
     assert!(graph.has_ruleset("dag"));
 
     // Add nodes and verify DAG rules apply
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Cycle should fail
@@ -255,7 +255,7 @@ fn test_single_node_tree() {
     // A tree with a single node (root) should be valid
     let mut tree = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
 
-    tree.add_node("root".to_string(), Value::Number(1.0)).unwrap();
+    tree.add_node("root".to_string(), Value::number(1.0)).unwrap();
 
     assert_eq!(tree.node_count(), 1);
     // Single node is a valid tree (it's the root with no children)

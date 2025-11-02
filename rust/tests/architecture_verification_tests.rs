@@ -29,9 +29,9 @@ fn test_list_graph_structure_reflects_list_contents() {
     let mut list = List::new();
 
     // Add some values to the list
-    list.append(Value::Number(1.0)).unwrap();
-    list.append(Value::Number(2.0)).unwrap();
-    list.append(Value::Number(3.0)).unwrap();
+    list.append(Value::number(1.0)).unwrap();
+    list.append(Value::number(2.0)).unwrap();
+    list.append(Value::number(3.0)).unwrap();
 
     // Verify: Underlying graph has nodes for each list element
     assert_eq!(list.graph.node_count(), 3, "Graph should have 3 nodes");
@@ -46,7 +46,7 @@ fn test_list_graph_structure_reflects_list_contents() {
 #[test]
 fn test_list_graph_operations_accessible() {
     let mut list = List::new();
-    list.append(Value::Number(42.0)).unwrap();
+    list.append(Value::number(42.0)).unwrap();
 
     // Verify: Can access graph traversal methods through list.graph
     let bfs_result = list.graph.bfs("node_0");
@@ -78,9 +78,9 @@ fn test_hash_graph_structure_reflects_hash_contents() {
     let mut hash = Hash::new();
 
     // Add some key-value pairs
-    hash.insert("name".to_string(), Value::String("Alice".to_string())).unwrap();
-    hash.insert("age".to_string(), Value::Number(30.0)).unwrap();
-    hash.insert("active".to_string(), Value::Boolean(true)).unwrap();
+    hash.insert("name".to_string(), Value::string("Alice".to_string())).unwrap();
+    hash.insert("age".to_string(), Value::number(30.0)).unwrap();
+    hash.insert("active".to_string(), Value::boolean(true)).unwrap();
 
     // Verify: Underlying graph has nodes for each key
     assert_eq!(hash.graph.node_count(), 3, "Graph should have 3 nodes");
@@ -96,7 +96,7 @@ fn test_hash_graph_structure_reflects_hash_contents() {
 #[test]
 fn test_hash_graph_operations_accessible() {
     let mut hash = Hash::new();
-    hash.insert("key1".to_string(), Value::Number(100.0)).unwrap();
+    hash.insert("key1".to_string(), Value::number(100.0)).unwrap();
 
     // Verify: Can access graph query methods through hash.graph
     let node_count = hash.graph.node_count();
@@ -133,9 +133,9 @@ fn test_list_graph_maintains_linear_structure() {
     let mut list = List::new();
 
     // Build a list
-    list.append(Value::Number(10.0)).unwrap();
-    list.append(Value::Number(20.0)).unwrap();
-    list.append(Value::Number(30.0)).unwrap();
+    list.append(Value::number(10.0)).unwrap();
+    list.append(Value::number(20.0)).unwrap();
+    list.append(Value::number(30.0)).unwrap();
 
     // Verify: Each node has at most 1 outgoing edge (linear)
     // node_0 → node_1 → node_2
@@ -160,9 +160,9 @@ fn test_hash_graph_has_no_edges() {
     let mut hash = Hash::new();
 
     // Add several key-value pairs
-    hash.insert("a".to_string(), Value::Number(1.0)).unwrap();
-    hash.insert("b".to_string(), Value::Number(2.0)).unwrap();
-    hash.insert("c".to_string(), Value::Number(3.0)).unwrap();
+    hash.insert("a".to_string(), Value::number(1.0)).unwrap();
+    hash.insert("b".to_string(), Value::number(2.0)).unwrap();
+    hash.insert("c".to_string(), Value::number(3.0)).unwrap();
 
     // Verify: Hash graph has no edges (just isolated nodes)
     assert_eq!(hash.graph.edge_count(), 0, "Hash graph should have no edges");
@@ -225,7 +225,7 @@ fn test_tree_has_tree_ruleset_applied() {
     use graphoid::execution::Executor;
     use graphoid::lexer::Lexer;
     use graphoid::parser::Parser;
-    use graphoid::values::Value;
+    use graphoid::values::{Value, ValueKind};
 
     let source = "t = tree {}";
 
@@ -242,7 +242,7 @@ fn test_tree_has_tree_ruleset_applied() {
     let t = executor.env().get("t").unwrap();
 
     // Verify: tree{} applies :tree ruleset
-    if let Value::Graph(graph) = t {
+    if let ValueKind::Graph(graph) = &t.kind {
         assert!(graph.has_ruleset("tree"), "tree{{}} should apply :tree ruleset");
     } else {
         panic!("tree{{}} should create a Graph value");
@@ -259,7 +259,7 @@ fn test_graph_index_access() {
     use graphoid::execution::Executor;
     use graphoid::lexer::Lexer;
     use graphoid::parser::Parser;
-    use graphoid::values::Value;
+    use graphoid::values::{Value, ValueKind};
 
     let source = r#"
         g = graph {}
@@ -280,7 +280,7 @@ fn test_graph_index_access() {
     let value = executor.env().get("value").unwrap();
 
     // Verify: graph["node_id"] returns node value
-    assert_eq!(value, Value::Number(100.0), "graph[\"node_id\"] should return node value");
+    assert_eq!(value, Value::number(100.0), "graph[\"node_id\"] should return node value");
 }
 
 #[test]
@@ -289,7 +289,7 @@ fn test_graph_index_assignment() {
     use graphoid::execution::Executor;
     use graphoid::lexer::Lexer;
     use graphoid::parser::Parser;
-    use graphoid::values::Value;
+    use graphoid::values::{Value, ValueKind};
 
     let source = r#"
         g = graph {}
@@ -310,7 +310,7 @@ fn test_graph_index_assignment() {
     let value = executor.env().get("value").unwrap();
 
     // Verify: graph["node_id"] = value adds/updates node
-    assert_eq!(value, Value::Number(200.0), "graph[\"node_id\"] = value should add/update node");
+    assert_eq!(value, Value::number(200.0), "graph[\"node_id\"] = value should add/update node");
 }
 
 #[test]
@@ -319,7 +319,7 @@ fn test_graph_index_consistency_with_hash() {
     use graphoid::execution::Executor;
     use graphoid::lexer::Lexer;
     use graphoid::parser::Parser;
-    use graphoid::values::Value;
+    use graphoid::values::{Value, ValueKind};
 
     let source = r#"
         g = graph {}
@@ -346,7 +346,7 @@ fn test_graph_index_consistency_with_hash() {
 
     // Verify: graph and hash indexing syntax is consistent
     assert_eq!(g_value, h_value, "graph and hash indexing should be consistent");
-    assert_eq!(g_value, Value::String("Alice".to_string()));
+    assert_eq!(g_value, Value::string("Alice".to_string()));
 }
 
 // ============================================================================

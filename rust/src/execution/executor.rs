@@ -5,7 +5,7 @@ use crate::execution::config::{ConfigStack, ErrorMode};
 use crate::execution::error_collector::ErrorCollector;
 use crate::execution::function_graph::FunctionGraph;
 use crate::execution::module_manager::{ModuleManager, Module};
-use crate::values::{Function, Value, List, Hash, ErrorObject};
+use crate::values::{Function, Value, ValueKind, List, Hash, ErrorObject};
 use crate::graph::{RuleSpec, RuleInstance};
 use crate::lexer::Lexer;
 use crate::parser::Parser;
@@ -97,7 +97,7 @@ impl Executor {
         }
 
         // Pop the toplevel function from the call stack
-        self.function_graph.borrow_mut().pop_call(Value::None);
+        self.function_graph.borrow_mut().pop_call(Value::none());
 
         Ok(())
     }
@@ -138,7 +138,7 @@ impl Executor {
                     Err(_) => {
                         // If not in environment, check global functions table
                         if let Some(func) = self.global_functions.get(name) {
-                            Ok(Value::Function(func.clone()))
+                            Ok(Value::function(func.clone()))
                         } else {
                             Err(GraphoidError::undefined_variable(name))
                         }
@@ -173,15 +173,15 @@ impl Executor {
                 let error_value = self.eval_expr(error)?;
 
                 // Convert to GraphoidError based on value type
-                let graphoid_error = match error_value {
+                let graphoid_error = match &error_value.kind {
                     // If it's already an Error value, convert to GraphoidError
-                    Value::Error(err_obj) => {
+                    ValueKind::Error(err_obj) => {
                         // All user-raised errors become RuntimeError in GraphoidError
                         // The error type is preserved in the Error object itself
                         GraphoidError::runtime(err_obj.full_message())
                     },
                     // If it's a string, create a RuntimeError
-                    Value::String(s) => GraphoidError::runtime(s),
+                    ValueKind::String(s) => GraphoidError::runtime(s.clone()),
                     // Any other value, convert to string and create RuntimeError
                     other => GraphoidError::runtime(format!("{:?}", other)),
                 };
@@ -195,7 +195,7 @@ impl Executor {
                         position.clone(),
                     );
                     // Return None to continue execution
-                    Ok(Value::None)
+                    Ok(Value::none())
                 } else {
                     // Propagate the error (default behavior)
                     Err(graphoid_error)
@@ -236,11 +236,11 @@ impl Executor {
                         let idx = self.eval_expr(index)?;
 
                         // Handle different collection types
-                        match obj {
-                            Value::Graph(mut graph) => {
+                        match obj.kind {
+                            ValueKind::Graph(mut graph) => {
                                 // For graphs, index must be a string (node ID)
-                                let node_id = match idx {
-                                    Value::String(s) => s,
+                                let node_id = match &idx.kind {
+                                    ValueKind::String(s) => s.clone(),
                                     _ => return Err(GraphoidError::type_error("string", idx.type_name())),
                                 };
 
@@ -250,14 +250,14 @@ impl Executor {
                                 // Update the graph in the environment
                                 // We need to get the variable name from the object expression
                                 if let Expr::Variable { name, .. } = object.as_ref() {
-                                    self.env.set(name, Value::Graph(graph))?;
+                                    self.env.set(name, Value::graph(graph))?;
                                 }
                                 Ok(None)
                             }
-                            Value::Map(mut hash) => {
+                            ValueKind::Map(mut hash) => {
                                 // For maps, index must be a string (key)
-                                let key = match idx {
-                                    Value::String(s) => s,
+                                let key = match &idx.kind {
+                                    ValueKind::String(s) => s.clone(),
                                     _ => return Err(GraphoidError::type_error("string", idx.type_name())),
                                 };
 
@@ -269,14 +269,14 @@ impl Executor {
 
                                 // Update the map in the environment
                                 if let Expr::Variable { name, .. } = object.as_ref() {
-                                    self.env.set(name, Value::Map(hash))?;
+                                    self.env.set(name, Value::map(hash))?;
                                 }
                                 Ok(None)
                             }
-                            Value::List(mut list) => {
+                            ValueKind::List(mut list) => {
                                 // For lists, index must be a number
-                                let index_num = match idx {
-                                    Value::Number(n) => n as usize,
+                                let index_num = match &idx.kind {
+                                    ValueKind::Number(n) => *n as usize,
                                     _ => return Err(GraphoidError::type_error("number", idx.type_name())),
                                 };
 
@@ -288,7 +288,7 @@ impl Executor {
 
                                 // Update the list in the environment
                                 if let Expr::Variable { name, .. } = object.as_ref() {
-                                    self.env.set(name, Value::List(list))?;
+                                    self.env.set(name, Value::list(list))?;
                                 }
                                 Ok(None)
                             }
@@ -329,14 +329,14 @@ impl Executor {
                 self.global_functions.insert(name.clone(), func.clone());
 
                 // Store function in environment
-                self.env.define(name.clone(), Value::Function(func));
+                self.env.define(name.clone(), Value::function(func));
                 Ok(None)
             }
             Stmt::Return { value, .. } => {
                 let return_value = if let Some(expr) = value {
                     self.eval_expr(expr)?
                 } else {
-                    Value::None
+                    Value::none()
                 };
                 Ok(Some(return_value))
             }
@@ -405,12 +405,12 @@ impl Executor {
                 let iterable_value = self.eval_expr(iterable)?;
 
                 // Get the list of values to iterate over
-                let values = match iterable_value {
-                    Value::List(ref items) => items.to_vec(),
+                let values = match &iterable_value.kind {
+                    ValueKind::List(ref items) => items.to_vec(),
                     other => {
                         return Err(GraphoidError::type_error(
                             "list",
-                            other.type_name(),
+                            iterable_value.type_name(),
                         ));
                     }
                 };
@@ -449,9 +449,9 @@ impl Executor {
                 // Module declaration - store metadata for later use
                 // For now, we just note that this file declares itself as a module
                 // The actual module name/alias are used when importing this file
-                self.env.define("__module_name__".to_string(), Value::String(name.clone()));
+                self.env.define("__module_name__".to_string(), Value::string(name.clone()));
                 if let Some(alias_name) = alias {
-                    self.env.define("__module_alias__".to_string(), Value::String(alias_name.clone()));
+                    self.env.define("__module_alias__".to_string(), Value::string(alias_name.clone()));
                 }
                 Ok(None)
             }
@@ -522,11 +522,11 @@ impl Executor {
     /// Evaluates a literal value.
     fn eval_literal(&self, lit: &LiteralValue) -> Result<Value> {
         match lit {
-            LiteralValue::Number(n) => Ok(Value::Number(*n)),
-            LiteralValue::String(s) => Ok(Value::String(s.clone())),
-            LiteralValue::Boolean(b) => Ok(Value::Boolean(*b)),
-            LiteralValue::None => Ok(Value::None),
-            LiteralValue::Symbol(s) => Ok(Value::Symbol(s.clone())),
+            LiteralValue::Number(n) => Ok(Value::number(*n)),
+            LiteralValue::String(s) => Ok(Value::string(s.clone())),
+            LiteralValue::Boolean(b) => Ok(Value::boolean(*b)),
+            LiteralValue::None => Ok(Value::none()),
+            LiteralValue::Symbol(s) => Ok(Value::symbol(s.clone())),
         }
     }
 
@@ -546,16 +546,16 @@ impl Executor {
             BinaryOp::Power => self.eval_power(left_val, right_val),
 
             // Comparison operators
-            BinaryOp::Equal => Ok(Value::Boolean(left_val == right_val)),
-            BinaryOp::NotEqual => Ok(Value::Boolean(left_val != right_val)),
+            BinaryOp::Equal => Ok(Value::boolean(left_val == right_val)),
+            BinaryOp::NotEqual => Ok(Value::boolean(left_val != right_val)),
             BinaryOp::Less => self.eval_less(left_val, right_val),
             BinaryOp::LessEqual => self.eval_less_equal(left_val, right_val),
             BinaryOp::Greater => self.eval_greater(left_val, right_val),
             BinaryOp::GreaterEqual => self.eval_greater_equal(left_val, right_val),
 
             // Logical operators
-            BinaryOp::And => Ok(Value::Boolean(left_val.is_truthy() && right_val.is_truthy())),
-            BinaryOp::Or => Ok(Value::Boolean(left_val.is_truthy() || right_val.is_truthy())),
+            BinaryOp::And => Ok(Value::boolean(left_val.is_truthy() && right_val.is_truthy())),
+            BinaryOp::Or => Ok(Value::boolean(left_val.is_truthy() || right_val.is_truthy())),
 
             // Element-wise operators
             BinaryOp::DotAdd => self.eval_element_wise(left_val, right_val, BinaryOp::Add),
@@ -584,11 +584,11 @@ impl Executor {
         let val = self.eval_expr(operand)?;
 
         match op {
-            UnaryOp::Negate => match val {
-                Value::Number(n) => Ok(Value::Number(-n)),
+            UnaryOp::Negate => match &val.kind {
+                ValueKind::Number(n) => Ok(Value::number(-n)),
                 _ => Err(GraphoidError::type_error("number", val.type_name())),
             },
-            UnaryOp::Not => Ok(Value::Boolean(!val.is_truthy())),
+            UnaryOp::Not => Ok(Value::boolean(!val.is_truthy())),
         }
     }
 
@@ -598,7 +598,7 @@ impl Executor {
         for elem in elements {
             values.push(self.eval_expr(elem)?);
         }
-        Ok(Value::List(List::from_vec(values)))
+        Ok(Value::list(List::from_vec(values)))
     }
 
     /// Evaluates a map expression.
@@ -608,7 +608,7 @@ impl Executor {
             let value = self.eval_expr(value_expr)?;
             map.insert(key.clone(), value);
         }
-        Ok(Value::Map(Hash::from_hashmap(map)))
+        Ok(Value::map(Hash::from_hashmap(map)))
     }
 
     /// Evaluates a graph expression.
@@ -621,7 +621,7 @@ impl Executor {
         for (key, value_expr) in config {
             if key == "type" {
                 let value = self.eval_expr(value_expr)?;
-                if let Value::Symbol(s) = value {
+                if let ValueKind::Symbol(s) = &value.kind {
                     match s.as_str() {
                         "directed" => graph_type = GraphType::Directed,
                         "undirected" => graph_type = GraphType::Undirected,
@@ -636,7 +636,7 @@ impl Executor {
             }
         }
 
-        Ok(Value::Graph(Graph::new(graph_type)))
+        Ok(Value::graph(Graph::new(graph_type)))
     }
 
     /// Evaluates a conditional expression (inline if-then-else or suffix if/unless).
@@ -651,14 +651,14 @@ impl Executor {
         let condition_value = self.eval_expr(condition)?;
 
         // Check if condition is truthy
-        let is_truthy = match condition_value {
-            Value::Boolean(b) => b,
-            Value::None => false,
-            Value::Number(n) => n != 0.0,
-            Value::String(ref s) => !s.is_empty(),
-            Value::List(ref l) => l.len() > 0,
-            Value::Map(ref h) => h.len() > 0,
-            Value::Graph(ref g) => g.node_count() > 0,
+        let is_truthy = match &condition_value.kind {
+            ValueKind::Boolean(b) => *b,
+            ValueKind::None => false,
+            ValueKind::Number(n) => *n != 0.0,
+            ValueKind::String(ref s) => !s.is_empty(),
+            ValueKind::List(ref l) => l.len() > 0,
+            ValueKind::Map(ref h) => h.len() > 0,
+            ValueKind::Graph(ref g) => g.node_count() > 0,
             _ => true, // Everything else is truthy
         };
 
@@ -672,7 +672,7 @@ impl Executor {
             // Execute else branch (or return none if suffix form)
             match else_expr {
                 Some(else_e) => self.eval_expr(else_e),
-                None => Ok(Value::None),
+                None => Ok(Value::none()),
             }
         }
     }
@@ -713,7 +713,7 @@ impl Executor {
         let node_id = self.function_graph.borrow_mut().register_function(func.clone());
         func.node_id = Some(node_id);
 
-        Ok(Value::Function(func))
+        Ok(Value::function(func))
     }
 
     /// Evaluates a block expression (used in lambda bodies).
@@ -728,7 +728,7 @@ impl Executor {
         }
 
         // No explicit return, return none
-        Ok(Value::None)
+        Ok(Value::none())
     }
 
     /// Evaluates an index expression (list[i] or map[key]).
@@ -739,21 +739,21 @@ impl Executor {
         // Evaluate the index expression
         let index_value = self.eval_expr(index)?;
 
-        match object_value {
-            Value::List(ref list) => {
+        match &object_value.kind {
+            ValueKind::List(ref list) => {
                 // Index must be a number for lists
-                let idx = match index_value {
-                    Value::Number(n) => n,
+                let idx = match &index_value.kind {
+                    ValueKind::Number(n) => n,
                     other => {
                         return Err(GraphoidError::type_error(
                             "number",
-                            other.type_name(),
+                            index_value.type_name(),
                         ));
                     }
                 };
 
                 // Handle fractional indices by truncating to integer
-                let idx_int = idx as i64;
+                let idx_int = *idx as i64;
 
                 // Calculate actual index (handle negative indices)
                 let actual_index = if idx_int < 0 {
@@ -769,7 +769,7 @@ impl Executor {
                     // Check error mode
                     match self.config_stack.current().error_mode {
                         ErrorMode::Lenient => {
-                            return Ok(Value::None);
+                            return Ok(Value::none());
                         }
                         ErrorMode::Collect => {
                             let error = GraphoidError::runtime(format!(
@@ -782,7 +782,7 @@ impl Executor {
                                 self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
                                 SourcePosition::unknown(),
                             );
-                            return Ok(Value::None);
+                            return Ok(Value::none());
                         }
                         ErrorMode::Strict => {
                             return Err(GraphoidError::runtime(format!(
@@ -796,14 +796,14 @@ impl Executor {
 
                 Ok(list.get(actual_index as usize).unwrap().clone())
             }
-            Value::Map(ref hash) => {
+            ValueKind::Map(ref hash) => {
                 // Index must be a string for maps
-                let key = match index_value {
-                    Value::String(s) => s,
+                let key = match &index_value.kind {
+                    ValueKind::String(s) => s,
                     other => {
                         return Err(GraphoidError::type_error(
                             "string",
-                            other.type_name(),
+                            index_value.type_name(),
                         ));
                     }
                 };
@@ -815,7 +815,7 @@ impl Executor {
                         // Check error mode
                         match self.config_stack.current().error_mode {
                             ErrorMode::Lenient => {
-                                return Ok(Value::None);
+                                return Ok(Value::none());
                             }
                             ErrorMode::Collect => {
                                 let error = GraphoidError::runtime(format!(
@@ -827,7 +827,7 @@ impl Executor {
                                     self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
                                     SourcePosition::unknown(),
                                 );
-                                return Ok(Value::None);
+                                return Ok(Value::none());
                             }
                             ErrorMode::Strict => {
                                 return Err(GraphoidError::runtime(format!(
@@ -839,14 +839,14 @@ impl Executor {
                     }
                 }
             }
-            Value::Graph(ref graph) => {
+            ValueKind::Graph(ref graph) => {
                 // Index must be a string for graphs (node ID)
-                let node_id = match index_value {
-                    Value::String(s) => s,
+                let node_id = match &index_value.kind {
+                    ValueKind::String(s) => s,
                     other => {
                         return Err(GraphoidError::type_error(
                             "string",
-                            other.type_name(),
+                            index_value.type_name(),
                         ));
                     }
                 };
@@ -860,10 +860,10 @@ impl Executor {
                     ))),
                 }
             }
-            other => {
+            _other => {
                 Err(GraphoidError::runtime(format!(
                     "Cannot index value of type '{}'",
-                    other.type_name()
+                    object_value.type_name()
                 )))
             }
         }
@@ -905,12 +905,12 @@ impl Executor {
         let object_value = self.eval_expr(object)?;
 
         // Check for module member access (e.g., module.function(args) or module.variable)
-        if let Value::Module(ref module) = object_value {
+        if let ValueKind::Module(ref module) = &object_value.kind {
             // Look up the member in the module's namespace
             let member = module.namespace.get(method)?;
 
             // If it's a function, call it with args
-            if let Value::Function(func) = member {
+            if let ValueKind::Function(func) = &member.kind {
                 // Evaluate argument expressions
                 let arg_values = self.eval_arguments(args)?;
                 return self.call_function(&func, &arg_values);
@@ -954,10 +954,10 @@ impl Executor {
             // Special case for pop: it returns the popped value, not the mutated list
             if base_method == "pop" {
                 // Clone the list for mutation
-                if let Value::List(list) = &object_value {
+                if let ValueKind::List(list) = &object_value.kind {
                     let mut list_to_mutate = list.clone();
                     let popped_value = list_to_mutate.pop()?; // Get popped value and mutate
-                    self.env.set(&var_name, Value::List(list_to_mutate))?;
+                    self.env.set(&var_name, Value::list(list_to_mutate))?;
                     return Ok(popped_value); // Return the popped value
                 }
             }
@@ -967,7 +967,7 @@ impl Executor {
             self.env.set(&var_name, result)?;
 
             // Mutating methods return none
-            Ok(Value::None)
+            Ok(Value::none())
         } else {
             // Immutable method - use the already-evaluated value
             self.apply_method_to_value(object_value, base_method, &arg_values, object)
@@ -976,15 +976,15 @@ impl Executor {
 
     /// Applies a method to a value (helper to avoid duplication).
     fn apply_method_to_value(&mut self, value: Value, method: &str, args: &[Value], object_expr: &Expr) -> Result<Value> {
-        match value {
-            Value::List(list) => self.eval_list_method(&list, method, args),
-            Value::Map(hash) => self.eval_map_method(&hash, method, args),
-            Value::Graph(graph) => self.eval_graph_method(graph, method, args, object_expr),
-            Value::String(ref s) => self.eval_string_method(s, method, args),
-            Value::Error(ref err) => self.eval_error_method(err, method, args),
+        match &value.kind {
+            ValueKind::List(list) => self.eval_list_method(&list, method, args),
+            ValueKind::Map(hash) => self.eval_map_method(&hash, method, args),
+            ValueKind::Graph(graph) => self.eval_graph_method(graph.clone(), method, args, object_expr),
+            ValueKind::String(ref s) => self.eval_string_method(s, method, args),
+            ValueKind::Error(ref err) => self.eval_error_method(err, method, args),
             other => Err(GraphoidError::runtime(format!(
                 "Type '{}' does not have method '{}'",
-                other.type_name(),
+                value.type_name(),
                 method
             ))),
         }
@@ -1001,58 +1001,58 @@ impl Executor {
                     )));
                 }
 
-                let start = match &args[0] {
-                    Value::Number(n) => *n,
+                let start = match &args[0].kind {
+                    ValueKind::Number(n) => *n,
                     other => {
-                        return Err(GraphoidError::type_error("number", other.type_name()));
+                        return Err(GraphoidError::type_error("number", args[0].type_name()));
                     }
                 };
 
-                let end = match &args[1] {
-                    Value::Number(n) => *n,
+                let end = match &args[1].kind {
+                    ValueKind::Number(n) => *n,
                     other => {
-                        return Err(GraphoidError::type_error("number", other.type_name()));
+                        return Err(GraphoidError::type_error("number", args[1].type_name()));
                     }
                 };
 
                 // Check if third argument is a function or a number (step)
-                match &args[2] {
-                    Value::Number(step) => {
+                match &args[2].kind {
+                    ValueKind::Number(step) => {
                         // Range mode with step
                         let mut result = Vec::new();
                         if *step > 0.0 {
                             let mut current = start;
                             while current <= end {
-                                result.push(Value::Number(current));
+                                result.push(Value::number(current));
                                 current += step;
                             }
                         } else if *step < 0.0 {
                             let mut current = start;
                             while current >= end {
-                                result.push(Value::Number(current));
+                                result.push(Value::number(current));
                                 current += step;
                             }
                         } else {
                             return Err(GraphoidError::runtime("generate step cannot be zero".to_string()));
                         }
-                        Ok(Value::List(List::from_vec(result)))
+                        Ok(Value::list(List::from_vec(result)))
                     }
-                    Value::Function(func) => {
+                    ValueKind::Function(func) => {
                         // Function mode
                         let mut result = Vec::new();
                         let start_i = start as i64;
                         let end_i = end as i64;
                         for i in start_i..=end_i {
-                            let arg = Value::Number(i as f64);
+                            let arg = Value::number(i as f64);
                             let value = self.call_function(func, &[arg])?;
                             result.push(value);
                         }
-                        Ok(Value::List(List::from_vec(result)))
+                        Ok(Value::list(List::from_vec(result)))
                     }
                     other => {
                         return Err(GraphoidError::runtime(format!(
                             "list.generate() expects third argument to be number or function, got {}",
-                            other.type_name()
+                            args[2].type_name()
                         )));
                     }
                 }
@@ -1065,18 +1065,18 @@ impl Executor {
                     )));
                 }
 
-                let n = match &args[0] {
-                    Value::Number(num) => *num as i64,
+                let n = match &args[0].kind {
+                    ValueKind::Number(num) => *num as i64,
                     other => {
-                        return Err(GraphoidError::type_error("number", other.type_name()));
+                        return Err(GraphoidError::type_error("number", args[0].type_name()));
                     }
                 };
 
                 let mut result = Vec::new();
                 for i in 0..=n {
-                    result.push(Value::Number(i as f64));
+                    result.push(Value::number(i as f64));
                 }
-                Ok(Value::List(List::from_vec(result)))
+                Ok(Value::list(List::from_vec(result)))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "list does not have static method '{}'",
@@ -1096,7 +1096,7 @@ impl Executor {
                         args.len()
                     )));
                 }
-                Ok(Value::Number(list.len() as f64))
+                Ok(Value::number(list.len() as f64))
             }
             "first" => {
                 if !args.is_empty() {
@@ -1130,10 +1130,10 @@ impl Executor {
                 let search_value = &args[0];
                 for element in &elements {
                     if element == search_value {
-                        return Ok(Value::Boolean(true));
+                        return Ok(Value::boolean(true));
                     }
                 }
-                Ok(Value::Boolean(false))
+                Ok(Value::boolean(false))
             }
             "is_empty" => {
                 if !args.is_empty() {
@@ -1142,7 +1142,7 @@ impl Executor {
                         args.len()
                     )));
                 }
-                Ok(Value::Boolean(list.is_empty()))
+                Ok(Value::boolean(list.is_empty()))
             }
             "map" => {
                 if args.len() != 1 {
@@ -1153,17 +1153,17 @@ impl Executor {
                 }
 
                 // Check if argument is a symbol (named transformation) or function
-                match &args[0] {
-                    Value::Symbol(transform_name) => {
+                match &args[0].kind {
+                    ValueKind::Symbol(transform_name) => {
                         // Apply named transformation
                         let mut results = Vec::new();
                         for element in &elements {
                             let result = self.apply_named_transformation(element, transform_name)?;
                             results.push(result);
                         }
-                        Ok(Value::List(List::from_vec(results)))
+                        Ok(Value::list(List::from_vec(results)))
                     }
-                    Value::Function(func) => {
+                    ValueKind::Function(func) => {
                         // Apply the function to each element
                         let mut results = Vec::new();
                         for element in &elements {
@@ -1171,12 +1171,12 @@ impl Executor {
                             let result = self.call_function(func, &[element.clone()])?;
                             results.push(result);
                         }
-                        Ok(Value::List(List::from_vec(results)))
+                        Ok(Value::list(List::from_vec(results)))
                     }
                     other => {
                         return Err(GraphoidError::runtime(format!(
                             "Method 'map' expects function or symbol, got {}",
-                            other.type_name()
+                            args[0].type_name()
                         )));
                     }
                 }
@@ -1190,8 +1190,8 @@ impl Executor {
                 }
 
                 // Check if argument is a symbol (named predicate) or function
-                match &args[0] {
-                    Value::Symbol(predicate_name) => {
+                match &args[0].kind {
+                    ValueKind::Symbol(predicate_name) => {
                         // Apply named predicate
                         let mut results = Vec::new();
                         for element in &elements {
@@ -1199,9 +1199,9 @@ impl Executor {
                                 results.push(element.clone());
                             }
                         }
-                        Ok(Value::List(List::from_vec(results)))
+                        Ok(Value::list(List::from_vec(results)))
                     }
-                    Value::Function(func) => {
+                    ValueKind::Function(func) => {
                         // Filter elements based on predicate function
                         let mut results = Vec::new();
                         for element in &elements {
@@ -1213,12 +1213,12 @@ impl Executor {
                                 results.push(element.clone());
                             }
                         }
-                        Ok(Value::List(List::from_vec(results)))
+                        Ok(Value::list(List::from_vec(results)))
                     }
                     other => {
                         return Err(GraphoidError::runtime(format!(
                             "Method 'filter' expects function or symbol, got {}",
-                            other.type_name()
+                            args[0].type_name()
                         )));
                     }
                 }
@@ -1232,12 +1232,12 @@ impl Executor {
                 }
 
                 // Get the function argument
-                let func = match &args[0] {
-                    Value::Function(f) => f,
+                let func = match &args[0].kind {
+                    ValueKind::Function(f) => f,
                     other => {
                         return Err(GraphoidError::type_error(
                             "function",
-                            other.type_name(),
+                            args[0].type_name(),
                         ));
                     }
                 };
@@ -1249,7 +1249,7 @@ impl Executor {
                 }
 
                 // Return the original list
-                Ok(Value::List(list.clone()))
+                Ok(Value::list(list.clone()))
             }
             "slice" => {
                 if args.len() < 2 || args.len() > 3 {
@@ -1260,34 +1260,34 @@ impl Executor {
                 }
 
                 // Get start and end indices
-                let start_idx = match &args[0] {
-                    Value::Number(n) => *n as i64,
+                let start_idx = match &args[0].kind {
+                    ValueKind::Number(n) => *n as i64,
                     other => {
                         return Err(GraphoidError::type_error(
                             "number",
-                            other.type_name(),
+                            args[0].type_name(),
                         ));
                     }
                 };
 
-                let end_idx = match &args[1] {
-                    Value::Number(n) => *n as i64,
+                let end_idx = match &args[1].kind {
+                    ValueKind::Number(n) => *n as i64,
                     other => {
                         return Err(GraphoidError::type_error(
                             "number",
-                            other.type_name(),
+                            args[1].type_name(),
                         ));
                     }
                 };
 
                 // Get optional step parameter (default 1)
                 let step = if args.len() == 3 {
-                    match &args[2] {
-                        Value::Number(n) => *n as i64,
+                    match &args[2].kind {
+                        ValueKind::Number(n) => *n as i64,
                         other => {
                             return Err(GraphoidError::type_error(
                                 "number",
-                                other.type_name(),
+                                args[2].type_name(),
                             ));
                         }
                     }
@@ -1316,7 +1316,7 @@ impl Executor {
 
                 // Ensure start <= end
                 if actual_start > actual_end {
-                    return Ok(Value::List(List::new()));
+                    return Ok(Value::list(List::new()));
                 }
 
                 // Extract slice with step
@@ -1326,7 +1326,7 @@ impl Executor {
                     slice.push(elements[i as usize].clone());
                     i += step;
                 }
-                Ok(Value::List(List::from_vec(slice)))
+                Ok(Value::list(List::from_vec(slice)))
             }
             "add_rule" => {
                 // add_rule(rule_symbol) or add_rule(rule_symbol, param)
@@ -1339,12 +1339,12 @@ impl Executor {
                 }
 
                 // Get rule symbol
-                let rule_symbol = match &args[0] {
-                    Value::Symbol(name) => name.as_str(),
+                let rule_symbol = match &args[0].kind {
+                    ValueKind::Symbol(name) => name.as_str(),
                     other => {
                         return Err(GraphoidError::runtime(format!(
                             "add_rule() expects a symbol, got {}",
-                            other.type_name()
+                            args[0].type_name()
                         )));
                     }
                 };
@@ -1355,12 +1355,12 @@ impl Executor {
                 // Try to parse rule from symbol (handles both validation and transformation rules)
                 // Get optional parameter
                 let param = if args.len() == 2 {
-                    match &args[1] {
-                        Value::Number(n) => Some(*n),
+                    match &args[1].kind {
+                        ValueKind::Number(n) => Some(*n),
                         other => {
                             return Err(GraphoidError::runtime(format!(
                                 "add_rule() parameter must be a number, got {}",
-                                other.type_name()
+                                args[1].type_name()
                             )));
                         }
                     }
@@ -1373,7 +1373,7 @@ impl Executor {
 
                 // Add validation rule, return
                 new_list.add_rule(RuleInstance::new(rule_spec))?;
-                Ok(Value::List(new_list))
+                Ok(Value::list(new_list))
             }
             "remove_rule" => {
                 // remove_rule(rule_symbol) or remove_rule(rule_symbol, param)
@@ -1385,24 +1385,24 @@ impl Executor {
                 }
 
                 // Get rule symbol
-                let rule_symbol = match &args[0] {
-                    Value::Symbol(name) => name.as_str(),
+                let rule_symbol = match &args[0].kind {
+                    ValueKind::Symbol(name) => name.as_str(),
                     other => {
                         return Err(GraphoidError::runtime(format!(
                             "remove_rule() expects a symbol, got {}",
-                            other.type_name()
+                            args[0].type_name()
                         )));
                     }
                 };
 
                 // Get optional parameter
                 let param = if args.len() == 2 {
-                    match &args[1] {
-                        Value::Number(n) => Some(*n),
+                    match &args[1].kind {
+                        ValueKind::Number(n) => Some(*n),
                         other => {
                             return Err(GraphoidError::runtime(format!(
                                 "remove_rule() parameter must be a number, got {}",
-                                other.type_name()
+                                args[1].type_name()
                             )));
                         }
                     }
@@ -1416,7 +1416,7 @@ impl Executor {
                 // Clone list, remove rule, return
                 let mut new_list = list.clone();
                 new_list.remove_rule(&rule_spec);
-                Ok(Value::List(new_list))
+                Ok(Value::list(new_list))
             }
             "sort" => {
                 if !args.is_empty() {
@@ -1429,14 +1429,14 @@ impl Executor {
                 // Sort numeric lists
                 let mut sorted = elements.clone();
                 sorted.sort_by(|a, b| {
-                    match (a, b) {
-                        (Value::Number(n1), Value::Number(n2)) => {
+                    match (&a.kind, &b.kind) {
+                        (ValueKind::Number(n1), ValueKind::Number(n2)) => {
                             n1.partial_cmp(n2).unwrap_or(std::cmp::Ordering::Equal)
                         }
                         _ => std::cmp::Ordering::Equal,
                     }
                 });
-                Ok(Value::List(List::from_vec(sorted)))
+                Ok(Value::list(List::from_vec(sorted)))
             }
             "reverse" => {
                 if !args.is_empty() {
@@ -1448,7 +1448,7 @@ impl Executor {
 
                 let mut reversed = elements.clone();
                 reversed.reverse();
-                Ok(Value::List(List::from_vec(reversed)))
+                Ok(Value::list(List::from_vec(reversed)))
             }
             "uniq" => {
                 if !args.is_empty() {
@@ -1468,7 +1468,7 @@ impl Executor {
                         unique.push(elem.clone());
                     }
                 }
-                Ok(Value::List(List::from_vec(unique)))
+                Ok(Value::list(List::from_vec(unique)))
             }
             "reject" => {
                 if args.len() != 1 {
@@ -1479,17 +1479,17 @@ impl Executor {
                 }
 
                 // Reject is opposite of filter
-                match &args[0] {
-                    Value::Symbol(predicate_name) => {
+                match &args[0].kind {
+                    ValueKind::Symbol(predicate_name) => {
                         let mut results = Vec::new();
                         for element in &elements {
                             if !self.apply_named_predicate(element, predicate_name)? {
                                 results.push(element.clone());
                             }
                         }
-                        Ok(Value::List(List::from_vec(results)))
+                        Ok(Value::list(List::from_vec(results)))
                     }
-                    Value::Function(func) => {
+                    ValueKind::Function(func) => {
                         let mut results = Vec::new();
                         for element in &elements {
                             let result = self.call_function(func, &[element.clone()])?;
@@ -1497,12 +1497,12 @@ impl Executor {
                                 results.push(element.clone());
                             }
                         }
-                        Ok(Value::List(List::from_vec(results)))
+                        Ok(Value::list(List::from_vec(results)))
                     }
                     other => {
                         return Err(GraphoidError::runtime(format!(
                             "Method 'reject' expects function or symbol, got {}",
-                            other.type_name()
+                            args[0].type_name()
                         )));
                     }
                 }
@@ -1518,10 +1518,10 @@ impl Executor {
                 // Remove all none values
                 let compacted: Vec<Value> = elements
                     .iter()
-                    .filter(|v| !matches!(v, Value::None))
+                    .filter(|v| !matches!(&v.kind, ValueKind::None))
                     .cloned()
                     .collect();
-                Ok(Value::List(List::from_vec(compacted)))
+                Ok(Value::list(List::from_vec(compacted)))
             }
             "select" => {
                 // select is an alias for filter
@@ -1532,17 +1532,17 @@ impl Executor {
                     )));
                 }
 
-                match &args[0] {
-                    Value::Symbol(predicate_name) => {
+                match &args[0].kind {
+                    ValueKind::Symbol(predicate_name) => {
                         let mut results = Vec::new();
                         for element in &elements {
                             if self.apply_named_predicate(element, predicate_name)? {
                                 results.push(element.clone());
                             }
                         }
-                        Ok(Value::List(List::from_vec(results)))
+                        Ok(Value::list(List::from_vec(results)))
                     }
-                    Value::Function(func) => {
+                    ValueKind::Function(func) => {
                         let mut results = Vec::new();
                         for element in &elements {
                             let result = self.call_function(func, &[element.clone()])?;
@@ -1550,12 +1550,12 @@ impl Executor {
                                 results.push(element.clone());
                             }
                         }
-                        Ok(Value::List(List::from_vec(results)))
+                        Ok(Value::list(List::from_vec(results)))
                     }
                     other => {
                         return Err(GraphoidError::runtime(format!(
                             "Method 'select' expects function or symbol, got {}",
-                            other.type_name()
+                            args[0].type_name()
                         )));
                     }
                 }
@@ -1576,7 +1576,7 @@ impl Executor {
 
                 // Append without re-applying behaviors (already done above)
                 new_list.append_raw(transformed_value)?;
-                Ok(Value::List(new_list))
+                Ok(Value::list(new_list))
             }
             "index_of" => {
                 if args.len() != 1 {
@@ -1588,11 +1588,11 @@ impl Executor {
                 let search_value = &args[0];
                 for (idx, element) in elements.iter().enumerate() {
                     if element == search_value {
-                        return Ok(Value::Number(idx as f64));
+                        return Ok(Value::number(idx as f64));
                     }
                 }
                 // Not found, return -1
-                Ok(Value::Number(-1.0))
+                Ok(Value::number(-1.0))
             }
             "prepend" => {
                 if args.len() != 1 {
@@ -1604,7 +1604,7 @@ impl Executor {
                 let mut new_list = list.clone();
                 let transformed_value = self.apply_transformation_rules_with_context(args[0].clone(), &new_list.graph.rules)?;
                 new_list.prepend_raw(transformed_value)?;
-                Ok(Value::List(new_list))
+                Ok(Value::list(new_list))
             }
             "insert" => {
                 if args.len() != 2 {
@@ -1613,16 +1613,16 @@ impl Executor {
                         args.len()
                     )));
                 }
-                let index = match &args[0] {
-                    Value::Number(n) => *n as usize,
+                let index = match &args[0].kind {
+                    ValueKind::Number(n) => *n as usize,
                     other => {
-                        return Err(GraphoidError::type_error("number", other.type_name()));
+                        return Err(GraphoidError::type_error("number", args[0].type_name()));
                     }
                 };
                 let mut new_list = list.clone();
                 let transformed_value = self.apply_transformation_rules_with_context(args[1].clone(), &new_list.graph.rules)?;
                 new_list.insert_at_raw(index, transformed_value)?;
-                Ok(Value::List(new_list))
+                Ok(Value::list(new_list))
             }
             "remove" => {
                 if args.len() != 1 {
@@ -1633,7 +1633,7 @@ impl Executor {
                 }
                 let mut new_list = list.clone();
                 new_list.remove_value(&args[0])?;
-                Ok(Value::List(new_list))
+                Ok(Value::list(new_list))
             }
             "remove_at_index" => {
                 if args.len() != 1 {
@@ -1642,15 +1642,15 @@ impl Executor {
                         args.len()
                     )));
                 }
-                let index = match &args[0] {
-                    Value::Number(n) => *n as usize,
+                let index = match &args[0].kind {
+                    ValueKind::Number(n) => *n as usize,
                     other => {
-                        return Err(GraphoidError::type_error("number", other.type_name()));
+                        return Err(GraphoidError::type_error("number", args[0].type_name()));
                     }
                 };
                 let mut new_list = list.clone();
                 new_list.remove_at_index(index)?;
-                Ok(Value::List(new_list))
+                Ok(Value::list(new_list))
             }
             "pop" => {
                 if !args.is_empty() {
@@ -1675,7 +1675,7 @@ impl Executor {
                 }
                 let mut new_list = list.clone();
                 new_list.clear();
-                Ok(Value::List(new_list))
+                Ok(Value::list(new_list))
             }
             "reduce" => {
                 if args.len() != 2 {
@@ -1685,10 +1685,10 @@ impl Executor {
                     )));
                 }
                 let mut accumulator = args[0].clone();
-                let func = match &args[1] {
-                    Value::Function(f) => f,
+                let func = match &args[1].kind {
+                    ValueKind::Function(f) => f,
                     other => {
-                        return Err(GraphoidError::type_error("function", other.type_name()));
+                        return Err(GraphoidError::type_error("function", args[1].type_name()));
                     }
                 };
 
@@ -1717,9 +1717,9 @@ impl Executor {
                 }
                 let keys: Vec<Value> = hash.keys()
                     .iter()
-                    .map(|k| Value::String(k.clone()))
+                    .map(|k| Value::string(k.clone()))
                     .collect();
-                Ok(Value::List(List::from_vec(keys)))
+                Ok(Value::list(List::from_vec(keys)))
             }
             "values" => {
                 // Return list of all values
@@ -1729,7 +1729,7 @@ impl Executor {
                     ));
                 }
                 let values: Vec<Value> = hash.values();
-                Ok(Value::List(List::from_vec(values)))
+                Ok(Value::list(List::from_vec(values)))
             }
             "has_key" => {
                 // Check if key exists
@@ -1738,13 +1738,13 @@ impl Executor {
                         "has_key() requires exactly one argument".to_string()
                     ));
                 }
-                let key = match &args[0] {
-                    Value::String(s) => s,
+                let key = match &args[0].kind {
+                    ValueKind::String(s) => s,
                     _ => return Err(GraphoidError::runtime(
                         "has_key() requires a string argument".to_string()
                     )),
                 };
-                Ok(Value::Boolean(hash.contains_key(key)))
+                Ok(Value::boolean(hash.contains_key(key)))
             }
             "size" => {
                 // Return number of entries
@@ -1753,7 +1753,7 @@ impl Executor {
                         "size() takes no arguments".to_string()
                     ));
                 }
-                Ok(Value::Number(hash.len() as f64))
+                Ok(Value::number(hash.len() as f64))
             }
             "add_rule" => {
                 // add_rule(rule_symbol) or add_rule(rule_symbol, param)
@@ -1766,12 +1766,12 @@ impl Executor {
                 }
 
                 // Get rule symbol
-                let rule_symbol = match &args[0] {
-                    Value::Symbol(name) => name.as_str(),
+                let rule_symbol = match &args[0].kind {
+                    ValueKind::Symbol(name) => name.as_str(),
                     other => {
                         return Err(GraphoidError::runtime(format!(
                             "add_rule() expects a symbol, got {}",
-                            other.type_name()
+                            args[0].type_name()
                         )));
                     }
                 };
@@ -1782,12 +1782,12 @@ impl Executor {
                 // Try to parse rule from symbol (handles both validation and transformation rules)
                 // Get optional parameter
                 let param = if args.len() == 2 {
-                    match &args[1] {
-                        Value::Number(n) => Some(*n),
+                    match &args[1].kind {
+                        ValueKind::Number(n) => Some(*n),
                         other => {
                             return Err(GraphoidError::runtime(format!(
                                 "add_rule() parameter must be a number, got {}",
-                                other.type_name()
+                                args[1].type_name()
                             )));
                         }
                     }
@@ -1800,7 +1800,7 @@ impl Executor {
 
                 // Add validation rule, return
                 new_hash.add_rule(RuleInstance::new(rule_spec))?;
-                Ok(Value::Map(new_hash))
+                Ok(Value::map(new_hash))
             }
             "remove_rule" => {
                 // remove_rule(rule_symbol) or remove_rule(rule_symbol, param)
@@ -1812,24 +1812,24 @@ impl Executor {
                 }
 
                 // Get rule symbol
-                let rule_symbol = match &args[0] {
-                    Value::Symbol(name) => name.as_str(),
+                let rule_symbol = match &args[0].kind {
+                    ValueKind::Symbol(name) => name.as_str(),
                     other => {
                         return Err(GraphoidError::runtime(format!(
                             "remove_rule() expects a symbol, got {}",
-                            other.type_name()
+                            args[0].type_name()
                         )));
                     }
                 };
 
                 // Get optional parameter
                 let param = if args.len() == 2 {
-                    match &args[1] {
-                        Value::Number(n) => Some(*n),
+                    match &args[1].kind {
+                        ValueKind::Number(n) => Some(*n),
                         other => {
                             return Err(GraphoidError::runtime(format!(
                                 "remove_rule() parameter must be a number, got {}",
-                                other.type_name()
+                                args[1].type_name()
                             )));
                         }
                     }
@@ -1843,7 +1843,7 @@ impl Executor {
                 // Clone hash, remove rule, return
                 let mut new_hash = hash.clone();
                 new_hash.remove_rule(&rule_spec);
-                Ok(Value::Map(new_hash))
+                Ok(Value::map(new_hash))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Map does not have method '{}'",
@@ -1863,7 +1863,7 @@ impl Executor {
                         args.len()
                     )));
                 }
-                Ok(Value::Number(s.len() as f64))
+                Ok(Value::number(s.len() as f64))
             }
             "upper" => {
                 if !args.is_empty() {
@@ -1872,7 +1872,7 @@ impl Executor {
                         args.len()
                     )));
                 }
-                Ok(Value::String(s.to_uppercase()))
+                Ok(Value::string(s.to_uppercase()))
             }
             "lower" => {
                 if !args.is_empty() {
@@ -1881,7 +1881,7 @@ impl Executor {
                         args.len()
                     )));
                 }
-                Ok(Value::String(s.to_lowercase()))
+                Ok(Value::string(s.to_lowercase()))
             }
             "trim" => {
                 if !args.is_empty() {
@@ -1890,7 +1890,7 @@ impl Executor {
                         args.len()
                     )));
                 }
-                Ok(Value::String(s.trim().to_string()))
+                Ok(Value::string(s.trim().to_string()))
             }
             "reverse" => {
                 if !args.is_empty() {
@@ -1899,7 +1899,7 @@ impl Executor {
                         args.len()
                     )));
                 }
-                Ok(Value::String(s.chars().rev().collect()))
+                Ok(Value::string(s.chars().rev().collect()))
             }
             "substring" => {
                 if args.len() != 2 {
@@ -1908,16 +1908,16 @@ impl Executor {
                         args.len()
                     )));
                 }
-                let start = match &args[0] {
-                    Value::Number(n) => *n as usize,
+                let start = match &args[0].kind {
+                    ValueKind::Number(n) => *n as usize,
                     other => {
-                        return Err(GraphoidError::type_error("number", other.type_name()));
+                        return Err(GraphoidError::type_error("number", args[0].type_name()));
                     }
                 };
-                let end = match &args[1] {
-                    Value::Number(n) => *n as usize,
+                let end = match &args[1].kind {
+                    ValueKind::Number(n) => *n as usize,
                     other => {
-                        return Err(GraphoidError::type_error("number", other.type_name()));
+                        return Err(GraphoidError::type_error("number", args[1].type_name()));
                     }
                 };
 
@@ -1926,10 +1926,10 @@ impl Executor {
                 let end = end.min(chars.len());
 
                 if start > end {
-                    return Ok(Value::String(String::new()));
+                    return Ok(Value::string(String::new()));
                 }
 
-                Ok(Value::String(chars[start..end].iter().collect()))
+                Ok(Value::string(chars[start..end].iter().collect()))
             }
             "split" => {
                 if args.len() != 1 {
@@ -1938,18 +1938,18 @@ impl Executor {
                         args.len()
                     )));
                 }
-                let delimiter = match &args[0] {
-                    Value::String(d) => d,
+                let delimiter = match &args[0].kind {
+                    ValueKind::String(d) => d,
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
                     }
                 };
 
                 let parts: Vec<Value> = s.split(delimiter.as_str())
-                    .map(|part| Value::String(part.to_string()))
+                    .map(|part| Value::string(part.to_string()))
                     .collect();
 
-                Ok(Value::List(crate::values::List::from_vec(parts)))
+                Ok(Value::list(crate::values::List::from_vec(parts)))
             }
             "starts_with" => {
                 if args.len() != 1 {
@@ -1958,14 +1958,14 @@ impl Executor {
                         args.len()
                     )));
                 }
-                let prefix = match &args[0] {
-                    Value::String(p) => p,
+                let prefix = match &args[0].kind {
+                    ValueKind::String(p) => p,
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
                     }
                 };
 
-                Ok(Value::Boolean(s.starts_with(prefix)))
+                Ok(Value::boolean(s.starts_with(prefix)))
             }
             "ends_with" => {
                 if args.len() != 1 {
@@ -1974,14 +1974,14 @@ impl Executor {
                         args.len()
                     )));
                 }
-                let suffix = match &args[0] {
-                    Value::String(suf) => suf,
+                let suffix = match &args[0].kind {
+                    ValueKind::String(suf) => suf,
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
                     }
                 };
 
-                Ok(Value::Boolean(s.ends_with(suffix)))
+                Ok(Value::boolean(s.ends_with(suffix)))
             }
             "contains" => {
                 if args.len() != 1 {
@@ -1990,14 +1990,14 @@ impl Executor {
                         args.len()
                     )));
                 }
-                let substring = match &args[0] {
-                    Value::String(sub) => sub,
+                let substring = match &args[0].kind {
+                    ValueKind::String(sub) => sub,
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
                     }
                 };
 
-                Ok(Value::Boolean(s.contains(substring.as_str())))
+                Ok(Value::boolean(s.contains(substring.as_str())))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "String does not have method '{}'",
@@ -2015,7 +2015,7 @@ impl Executor {
                         "Error.type() takes no arguments, but got {}", args.len()
                     )));
                 }
-                Ok(Value::String(err.error_type.clone()))
+                Ok(Value::string(err.error_type.clone()))
             }
             "message" => {
                 if !args.is_empty() {
@@ -2023,7 +2023,7 @@ impl Executor {
                         "Error.message() takes no arguments, but got {}", args.len()
                     )));
                 }
-                Ok(Value::String(err.message.clone()))
+                Ok(Value::string(err.message.clone()))
             }
             "file" => {
                 if !args.is_empty() {
@@ -2031,7 +2031,7 @@ impl Executor {
                         "Error.file() takes no arguments, but got {}", args.len()
                     )));
                 }
-                Ok(err.file.as_ref().map(|f| Value::String(f.clone())).unwrap_or(Value::None))
+                Ok(err.file.as_ref().map(|f| Value::string(f.clone())).unwrap_or(Value::none()))
             }
             "line" => {
                 if !args.is_empty() {
@@ -2039,7 +2039,7 @@ impl Executor {
                         "Error.line() takes no arguments, but got {}", args.len()
                     )));
                 }
-                Ok(Value::Number(err.line as f64))
+                Ok(Value::number(err.line as f64))
             }
             "column" => {
                 if !args.is_empty() {
@@ -2047,7 +2047,7 @@ impl Executor {
                         "Error.column() takes no arguments, but got {}", args.len()
                     )));
                 }
-                Ok(Value::Number(err.column as f64))
+                Ok(Value::number(err.column as f64))
             }
             "stack_trace" => {
                 if !args.is_empty() {
@@ -2055,7 +2055,7 @@ impl Executor {
                         "Error.stack_trace() takes no arguments, but got {}", args.len()
                     )));
                 }
-                Ok(Value::String(err.formatted_stack_trace()))
+                Ok(Value::string(err.formatted_stack_trace()))
             }
             "full_chain" => {
                 if !args.is_empty() {
@@ -2063,7 +2063,7 @@ impl Executor {
                         "Error.full_chain() takes no arguments, but got {}", args.len()
                     )));
                 }
-                Ok(Value::String(err.full_chain()))
+                Ok(Value::string(err.full_chain()))
             }
             "cause" => {
                 if !args.is_empty() {
@@ -2071,7 +2071,7 @@ impl Executor {
                         "Error.cause() takes no arguments, but got {}", args.len()
                     )));
                 }
-                Ok(err.cause.as_ref().map(|c| Value::Error((**c).clone())).unwrap_or(Value::None))
+                Ok(err.cause.as_ref().map(|c| Value::error((**c).clone())).unwrap_or(Value::none()))
             }
             "caused_by" => {
                 // caused_by(other_error) - chain errors
@@ -2080,14 +2080,14 @@ impl Executor {
                         "Error.caused_by() expects 1 argument (error), got {}", args.len()
                     )));
                 }
-                match &args[0] {
-                    Value::Error(cause) => {
+                match &args[0].kind {
+                    ValueKind::Error(cause) => {
                         let mut new_err = err.clone();
                         new_err.cause = Some(Box::new(cause.clone()));
-                        Ok(Value::Error(new_err))
+                        Ok(Value::error(new_err))
                     }
                     other => Err(GraphoidError::runtime(format!(
-                        "Error.caused_by() expects an error argument, got {}", other.type_name()
+                        "Error.caused_by() expects an error argument, got {}", args[0].type_name()
                     )))
                 }
             }
@@ -2111,10 +2111,10 @@ impl Executor {
                 }
 
                 // Get node ID (must be string)
-                let node_id = match &args[0] {
-                    Value::String(s) => s.clone(),
+                let node_id = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
                     }
                 };
 
@@ -2126,10 +2126,10 @@ impl Executor {
 
                 // Update graph in environment
                 if let Expr::Variable { name, .. } = object_expr {
-                    self.env.set(name, Value::Graph(graph))?;
+                    self.env.set(name, Value::graph(graph))?;
                 }
 
-                Ok(Value::None)
+                Ok(Value::none())
             }
             "add_edge" => {
                 // Add an edge between two nodes
@@ -2141,27 +2141,27 @@ impl Executor {
                 }
 
                 // Get from node ID
-                let from = match &args[0] {
-                    Value::String(s) => s.as_str(),
+                let from = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
                     }
                 };
 
                 // Get to node ID
-                let to = match &args[1] {
-                    Value::String(s) => s.as_str(),
+                let to = match &args[1].kind {
+                    ValueKind::String(s) => s.as_str(),
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[1].type_name()));
                     }
                 };
 
                 // Get optional edge type (default to "edge")
                 let edge_type = if args.len() == 3 {
-                    match &args[2] {
-                        Value::String(s) => s.clone(),
+                    match &args[2].kind {
+                        ValueKind::String(s) => s.clone(),
                         other => {
-                            return Err(GraphoidError::type_error("string", other.type_name()));
+                            return Err(GraphoidError::type_error("string", args[2].type_name()));
                         }
                     }
                 } else {
@@ -2175,10 +2175,10 @@ impl Executor {
 
                 // Update graph in environment
                 if let Expr::Variable { name, .. } = object_expr {
-                    self.env.set(name, Value::Graph(graph))?;
+                    self.env.set(name, Value::graph(graph))?;
                 }
 
-                Ok(Value::None)
+                Ok(Value::none())
             }
             "remove_node" => {
                 // Remove a node from the graph
@@ -2190,10 +2190,10 @@ impl Executor {
                 }
 
                 // Get node ID
-                let node_id = match &args[0] {
-                    Value::String(s) => s.as_str(),
+                let node_id = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
                     }
                 };
 
@@ -2202,10 +2202,10 @@ impl Executor {
 
                 // Update graph in environment
                 if let Expr::Variable { name, .. } = object_expr {
-                    self.env.set(name, Value::Graph(graph))?;
+                    self.env.set(name, Value::graph(graph))?;
                 }
 
-                Ok(Value::None)
+                Ok(Value::none())
             }
             "remove_edge" => {
                 // Remove an edge from the graph
@@ -2217,18 +2217,18 @@ impl Executor {
                 }
 
                 // Get from node ID
-                let from = match &args[0] {
-                    Value::String(s) => s.as_str(),
+                let from = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
                     }
                 };
 
                 // Get to node ID
-                let to = match &args[1] {
-                    Value::String(s) => s.as_str(),
+                let to = match &args[1].kind {
+                    ValueKind::String(s) => s.as_str(),
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[1].type_name()));
                     }
                 };
 
@@ -2237,10 +2237,10 @@ impl Executor {
 
                 // Update graph in environment
                 if let Expr::Variable { name, .. } = object_expr {
-                    self.env.set(name, Value::Graph(graph))?;
+                    self.env.set(name, Value::graph(graph))?;
                 }
 
-                Ok(Value::None)
+                Ok(Value::none())
             }
             "with_ruleset" => {
                 // Apply a ruleset to the graph
@@ -2252,19 +2252,19 @@ impl Executor {
                 }
 
                 // Get the ruleset name from symbol argument
-                let ruleset_name = match &args[0] {
-                    Value::Symbol(name) => name.clone(),
+                let ruleset_name = match &args[0].kind {
+                    ValueKind::Symbol(name) => name.clone(),
                     other => {
                         return Err(GraphoidError::runtime(format!(
                             "with_ruleset() expects a symbol argument, got {}",
-                            other.type_name()
+                            args[0].type_name()
                         )));
                     }
                 };
 
                 // Apply the ruleset (currently just stores the name)
                 graph = graph.with_ruleset(ruleset_name);
-                Ok(Value::Graph(graph))
+                Ok(Value::graph(graph))
             }
             "has_ruleset" => {
                 // Check if graph has a specific ruleset
@@ -2275,17 +2275,17 @@ impl Executor {
                     )));
                 }
 
-                let ruleset_name = match &args[0] {
-                    Value::Symbol(name) => name.as_str(),
+                let ruleset_name = match &args[0].kind {
+                    ValueKind::Symbol(name) => name.as_str(),
                     other => {
                         return Err(GraphoidError::runtime(format!(
                             "has_ruleset() expects a symbol argument, got {}",
-                            other.type_name()
+                            args[0].type_name()
                         )));
                     }
                 };
 
-                Ok(Value::Boolean(graph.has_ruleset(ruleset_name)))
+                Ok(Value::boolean(graph.has_ruleset(ruleset_name)))
             }
             "has_path" => {
                 // Check if a path exists between two nodes
@@ -2297,24 +2297,24 @@ impl Executor {
                 }
 
                 // Get from node ID
-                let from = match &args[0] {
-                    Value::String(s) => s.as_str(),
+                let from = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
                     }
                 };
 
                 // Get to node ID
-                let to = match &args[1] {
-                    Value::String(s) => s.as_str(),
+                let to = match &args[1].kind {
+                    ValueKind::String(s) => s.as_str(),
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[1].type_name()));
                     }
                 };
 
                 // Check if path exists
                 let has_path = graph.has_path(from, to);
-                Ok(Value::Boolean(has_path))
+                Ok(Value::boolean(has_path))
             }
             "distance" => {
                 // Get shortest path distance between two nodes
@@ -2326,24 +2326,24 @@ impl Executor {
                 }
 
                 // Get from node ID
-                let from = match &args[0] {
-                    Value::String(s) => s.as_str(),
+                let from = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
                     }
                 };
 
                 // Get to node ID
-                let to = match &args[1] {
-                    Value::String(s) => s.as_str(),
+                let to = match &args[1].kind {
+                    ValueKind::String(s) => s.as_str(),
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[1].type_name()));
                     }
                 };
 
                 // Get distance
                 let dist = graph.distance(from, to);
-                Ok(Value::Number(dist as f64))
+                Ok(Value::number(dist as f64))
             }
             "all_paths" => {
                 // Find all paths between two nodes up to max length
@@ -2355,46 +2355,46 @@ impl Executor {
                 }
 
                 // Get from node ID
-                let from = match &args[0] {
-                    Value::String(s) => s.as_str(),
+                let from = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
                     }
                 };
 
                 // Get to node ID
-                let to = match &args[1] {
-                    Value::String(s) => s.as_str(),
+                let to = match &args[1].kind {
+                    ValueKind::String(s) => s.as_str(),
                     other => {
-                        return Err(GraphoidError::type_error("string", other.type_name()));
+                        return Err(GraphoidError::type_error("string", args[1].type_name()));
                     }
                 };
 
                 // Get max length
-                let max_len = match &args[2] {
-                    Value::Number(n) => *n as usize,
+                let max_len = match &args[2].kind {
+                    ValueKind::Number(n) => *n as usize,
                     other => {
-                        return Err(GraphoidError::type_error("number", other.type_name()));
+                        return Err(GraphoidError::type_error("number", args[2].type_name()));
                     }
                 };
 
                 // Find all paths
                 let paths = graph.all_paths(from, to, max_len);
 
-                // Convert Vec<Vec<String>> to Value::List(List of Lists)
+                // Convert Vec<Vec<String>> to ValueKind::List(List of Lists)
                 use crate::values::List;
                 let path_values: Vec<Value> = paths
                     .into_iter()
                     .map(|path| {
                         let string_values: Vec<Value> = path
                             .into_iter()
-                            .map(|s| Value::String(s))
+                            .map(|s| Value::string(s))
                             .collect();
-                        Value::List(List::from_vec(string_values))
+                        Value::list(List::from_vec(string_values))
                     })
                     .collect();
 
-                Ok(Value::List(List::from_vec(path_values)))
+                Ok(Value::list(List::from_vec(path_values)))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Graph does not have method '{}'",
@@ -2438,7 +2438,7 @@ impl Executor {
                         0,    // column (not available at call site)
                         self.call_stack.clone(),
                     );
-                    return Ok(Value::Error(error_obj));
+                    return Ok(Value::error(error_obj));
                 }
                 "get_errors" => {
                     // get_errors() - returns list of collected errors
@@ -2456,7 +2456,7 @@ impl Executor {
                     let error_values: Vec<Value> = errors
                         .iter()
                         .map(|collected_err| {
-                            Value::Error(ErrorObject::new(
+                            Value::error(ErrorObject::new(
                                 "RuntimeError".to_string(), // TODO: preserve actual error type
                                 collected_err.error.to_string(),
                                 collected_err.file.clone(),
@@ -2466,7 +2466,7 @@ impl Executor {
                         })
                         .collect();
 
-                    return Ok(Value::List(List::from_vec(error_values)));
+                    return Ok(Value::list(List::from_vec(error_values)));
                 }
                 "clear_errors" => {
                     // clear_errors() - clears the error collection
@@ -2478,7 +2478,7 @@ impl Executor {
                     }
 
                     self.error_collector.clear();
-                    return Ok(Value::None);
+                    return Ok(Value::none());
                 }
                 _ => {}
             }
@@ -2488,12 +2488,12 @@ impl Executor {
         let callee_value = self.eval_expr(callee)?;
 
         // Check if it's a function
-        let func = match callee_value {
-            Value::Function(f) => f,
-            other => {
+        let func = match &callee_value.kind {
+            ValueKind::Function(f) => f,
+            _other => {
                 return Err(GraphoidError::type_error(
                     "function",
-                    other.type_name(),
+                    callee_value.type_name(),
                 ));
             }
         };
@@ -2594,7 +2594,7 @@ impl Executor {
         for (i, param) in func.parameters.iter().enumerate() {
             if param.is_variadic {
                 // Assign collected variadic values as a list
-                result.push(Value::List(List::from_vec(variadic_values.clone())));
+                result.push(Value::list(List::from_vec(variadic_values.clone())));
             } else if let Some(val) = assigned[i].take() {
                 result.push(val);
             } else if let Some(default_expr) = &param.default_value {
@@ -2669,7 +2669,7 @@ impl Executor {
         let saved_env = std::mem::replace(&mut self.env, call_env);
 
         // Execute function body - either pattern matching or traditional
-        let mut return_value = Value::None;
+        let mut return_value = Value::none();
         let execution_result: Result<()> = (|| {
             // Check if this is a pattern matching function
             if let Some(ref pattern_clauses) = func.pattern_clauses {
@@ -2689,7 +2689,7 @@ impl Executor {
                     return_value = self.eval_expr(&matched_clause.body)?;
                 } else {
                     // No pattern matched - return none
-                    return_value = Value::None;
+                    return_value = Value::none();
                 }
             } else {
                 // Traditional function with parameter binding and statement body
@@ -2778,8 +2778,8 @@ impl Executor {
             match &rule_instance.spec {
                 RuleSpec::CustomFunction { function } => {
                     // Extract function from Value
-                    match function {
-                        Value::Function(func) => {
+                    match &function.kind {
+                        ValueKind::Function(func) => {
                             // Call function with executor context
                             current = self.call_function(func, &[current])?;
                         }
@@ -2792,8 +2792,8 @@ impl Executor {
                 }
                 RuleSpec::Conditional { condition, transform, fallback } => {
                     // Call condition predicate
-                    let condition_func = match condition {
-                        Value::Function(f) => f,
+                    let condition_func = match &condition.kind {
+                        ValueKind::Function(f) => f,
                         _ => {
                             return Err(GraphoidError::runtime(
                                 "Conditional behavior condition must be a function".to_string()
@@ -2804,17 +2804,17 @@ impl Executor {
                     let condition_result = self.call_function(condition_func, &[current.clone()])?;
 
                     // Check if condition is truthy
-                    let is_truthy = match condition_result {
-                        Value::Boolean(b) => b,
-                        Value::None => false,
-                        Value::Number(n) => n != 0.0,
+                    let is_truthy = match &condition_result.kind {
+                        ValueKind::Boolean(b) => *b,
+                        ValueKind::None => false,
+                        ValueKind::Number(n) => *n != 0.0,
                         _ => true, // Non-false, non-none values are truthy
                     };
 
                     if is_truthy {
                         // Apply transform function
-                        let transform_func = match transform {
-                            Value::Function(f) => f,
+                        let transform_func = match &transform.kind {
+                            ValueKind::Function(f) => f,
                             _ => {
                                 return Err(GraphoidError::runtime(
                                     "Conditional behavior transform must be a function".to_string()
@@ -2824,8 +2824,8 @@ impl Executor {
                         current = self.call_function(transform_func, &[current])?;
                     } else if let Some(fallback_val) = fallback {
                         // Apply fallback function
-                        let fallback_func = match fallback_val {
-                            Value::Function(f) => f,
+                        let fallback_func = match &fallback_val.kind {
+                            ValueKind::Function(f) => f,
                             _ => {
                                 return Err(GraphoidError::runtime(
                                     "Conditional behavior fallback must be a function".to_string()
@@ -2857,11 +2857,11 @@ impl Executor {
     pub fn compare_values(&self, a: &Value, b: &Value) -> Result<std::cmp::Ordering> {
         use std::cmp::Ordering;
 
-        match (a, b) {
+        match (&a.kind, &b.kind) {
             // Same types - compare naturally
-            (Value::None, Value::None) => Ok(Ordering::Equal),
-            (Value::Boolean(a), Value::Boolean(b)) => Ok(a.cmp(b)),
-            (Value::Number(a), Value::Number(b)) => {
+            (ValueKind::None, ValueKind::None) => Ok(Ordering::Equal),
+            (ValueKind::Boolean(a), ValueKind::Boolean(b)) => Ok(a.cmp(b)),
+            (ValueKind::Number(a), ValueKind::Number(b)) => {
                 // Handle NaN and infinities
                 if a.is_nan() && b.is_nan() {
                     Ok(Ordering::Equal)
@@ -2873,22 +2873,22 @@ impl Executor {
                     Ok(a.partial_cmp(b).unwrap_or(Ordering::Equal))
                 }
             }
-            (Value::String(a), Value::String(b)) => Ok(a.cmp(b)),
-            (Value::Symbol(a), Value::Symbol(b)) => Ok(a.cmp(b)),
+            (ValueKind::String(a), ValueKind::String(b)) => Ok(a.cmp(b)),
+            (ValueKind::Symbol(a), ValueKind::Symbol(b)) => Ok(a.cmp(b)),
 
             // Different types - use type ordering
-            (Value::None, _) => Ok(Ordering::Less),
-            (_, Value::None) => Ok(Ordering::Greater),
-            (Value::Boolean(_), Value::Number(_)) => Ok(Ordering::Less),
-            (Value::Number(_), Value::Boolean(_)) => Ok(Ordering::Greater),
-            (Value::Boolean(_), Value::String(_)) => Ok(Ordering::Less),
-            (Value::String(_), Value::Boolean(_)) => Ok(Ordering::Greater),
-            (Value::Number(_), Value::String(_)) => Ok(Ordering::Less),
-            (Value::String(_), Value::Number(_)) => Ok(Ordering::Greater),
-            (Value::Number(_), Value::Symbol(_)) => Ok(Ordering::Less),
-            (Value::Symbol(_), Value::Number(_)) => Ok(Ordering::Greater),
-            (Value::String(_), Value::Symbol(_)) => Ok(Ordering::Less),
-            (Value::Symbol(_), Value::String(_)) => Ok(Ordering::Greater),
+            (ValueKind::None, _) => Ok(Ordering::Less),
+            (_, ValueKind::None) => Ok(Ordering::Greater),
+            (ValueKind::Boolean(_), ValueKind::Number(_)) => Ok(Ordering::Less),
+            (ValueKind::Number(_), ValueKind::Boolean(_)) => Ok(Ordering::Greater),
+            (ValueKind::Boolean(_), ValueKind::String(_)) => Ok(Ordering::Less),
+            (ValueKind::String(_), ValueKind::Boolean(_)) => Ok(Ordering::Greater),
+            (ValueKind::Number(_), ValueKind::String(_)) => Ok(Ordering::Less),
+            (ValueKind::String(_), ValueKind::Number(_)) => Ok(Ordering::Greater),
+            (ValueKind::Number(_), ValueKind::Symbol(_)) => Ok(Ordering::Less),
+            (ValueKind::Symbol(_), ValueKind::Number(_)) => Ok(Ordering::Greater),
+            (ValueKind::String(_), ValueKind::Symbol(_)) => Ok(Ordering::Less),
+            (ValueKind::Symbol(_), ValueKind::String(_)) => Ok(Ordering::Greater),
 
             // Collections and complex types
             _ => Ok(Ordering::Equal),  // For now, complex types are equal
@@ -2910,11 +2910,11 @@ impl Executor {
         let result = self.call_function(func, &[a.clone(), b.clone()])?;
 
         // Convert result to Ordering
-        match result {
-            Value::Number(n) => {
-                if n < 0.0 {
+        match &result.kind {
+            ValueKind::Number(n) => {
+                if *n < 0.0 {
                     Ok(Ordering::Less)
-                } else if n > 0.0 {
+                } else if *n > 0.0 {
                     Ok(Ordering::Greater)
                 } else {
                     Ok(Ordering::Equal)
@@ -2954,8 +2954,8 @@ impl Executor {
         while left < right {
             let mid = left + (right - left) / 2;
 
-            let ordering = match compare_fn {
-                Some(Value::Function(func)) => {
+            let ordering = match compare_fn.as_ref().map(|v| &v.kind) {
+                Some(ValueKind::Function(func)) => {
                     self.compare_with_function(&values[mid], new_value, func)?
                 }
                 _ => self.compare_values(&values[mid], new_value)?,
@@ -2975,8 +2975,8 @@ impl Executor {
     fn apply_named_transformation(&self, value: &Value, transform_name: &str) -> Result<Value> {
         match transform_name {
             "double" => {
-                match value {
-                    Value::Number(n) => Ok(Value::Number(n * 2.0)),
+                match &value.kind {
+                    ValueKind::Number(n) => Ok(Value::number(n * 2.0)),
                     _ => Err(GraphoidError::runtime(format!(
                         "Transformation 'double' requires a number, got {}",
                         value.type_name()
@@ -2984,8 +2984,8 @@ impl Executor {
                 }
             }
             "square" => {
-                match value {
-                    Value::Number(n) => Ok(Value::Number(n * n)),
+                match &value.kind {
+                    ValueKind::Number(n) => Ok(Value::number(n * n)),
                     _ => Err(GraphoidError::runtime(format!(
                         "Transformation 'square' requires a number, got {}",
                         value.type_name()
@@ -2993,8 +2993,8 @@ impl Executor {
                 }
             }
             "negate" => {
-                match value {
-                    Value::Number(n) => Ok(Value::Number(-n)),
+                match &value.kind {
+                    ValueKind::Number(n) => Ok(Value::number(-n)),
                     _ => Err(GraphoidError::runtime(format!(
                         "Transformation 'negate' requires a number, got {}",
                         value.type_name()
@@ -3002,8 +3002,8 @@ impl Executor {
                 }
             }
             "increment" | "inc" => {
-                match value {
-                    Value::Number(n) => Ok(Value::Number(n + 1.0)),
+                match &value.kind {
+                    ValueKind::Number(n) => Ok(Value::number(n + 1.0)),
                     _ => Err(GraphoidError::runtime(format!(
                         "Transformation 'increment' requires a number, got {}",
                         value.type_name()
@@ -3011,8 +3011,8 @@ impl Executor {
                 }
             }
             "decrement" | "dec" => {
-                match value {
-                    Value::Number(n) => Ok(Value::Number(n - 1.0)),
+                match &value.kind {
+                    ValueKind::Number(n) => Ok(Value::number(n - 1.0)),
                     _ => Err(GraphoidError::runtime(format!(
                         "Transformation 'decrement' requires a number, got {}",
                         value.type_name()
@@ -3031,8 +3031,8 @@ impl Executor {
     fn apply_named_predicate(&self, value: &Value, predicate_name: &str) -> Result<bool> {
         match predicate_name {
             "even" => {
-                match value {
-                    Value::Number(n) => Ok((n % 2.0).abs() < 0.0001), // Handle floating point comparison
+                match &value.kind {
+                    ValueKind::Number(n) => Ok((n % 2.0).abs() < 0.0001), // Handle floating point comparison
                     _ => Err(GraphoidError::runtime(format!(
                         "Predicate 'even' requires a number, got {}",
                         value.type_name()
@@ -3040,8 +3040,8 @@ impl Executor {
                 }
             }
             "odd" => {
-                match value {
-                    Value::Number(n) => Ok((n % 2.0).abs() > 0.0001), // Handle floating point comparison
+                match &value.kind {
+                    ValueKind::Number(n) => Ok((n % 2.0).abs() > 0.0001), // Handle floating point comparison
                     _ => Err(GraphoidError::runtime(format!(
                         "Predicate 'odd' requires a number, got {}",
                         value.type_name()
@@ -3049,8 +3049,8 @@ impl Executor {
                 }
             }
             "positive" | "pos" => {
-                match value {
-                    Value::Number(n) => Ok(*n > 0.0),
+                match &value.kind {
+                    ValueKind::Number(n) => Ok(*n > 0.0),
                     _ => Err(GraphoidError::runtime(format!(
                         "Predicate 'positive' requires a number, got {}",
                         value.type_name()
@@ -3058,8 +3058,8 @@ impl Executor {
                 }
             }
             "negative" | "neg" => {
-                match value {
-                    Value::Number(n) => Ok(*n < 0.0),
+                match &value.kind {
+                    ValueKind::Number(n) => Ok(*n < 0.0),
                     _ => Err(GraphoidError::runtime(format!(
                         "Predicate 'negative' requires a number, got {}",
                         value.type_name()
@@ -3067,8 +3067,8 @@ impl Executor {
                 }
             }
             "zero" => {
-                match value {
-                    Value::Number(n) => Ok(n.abs() < 0.0001), // Handle floating point comparison
+                match &value.kind {
+                    ValueKind::Number(n) => Ok(n.abs() < 0.0001), // Handle floating point comparison
                     _ => Err(GraphoidError::runtime(format!(
                         "Predicate 'zero' requires a number, got {}",
                         value.type_name()
@@ -3085,9 +3085,9 @@ impl Executor {
     /// Applies an element-wise operation to lists or scalars.
     /// Supports list-list and list-scalar operations (broadcasting).
     fn eval_element_wise(&mut self, left: Value, right: Value, base_op: BinaryOp) -> Result<Value> {
-        match (left, right) {
+        match (&left.kind, &right.kind) {
             // List-List element-wise operation (zips to shorter length)
-            (Value::List(left_list), Value::List(right_list)) => {
+            (ValueKind::List(left_list), ValueKind::List(right_list)) => {
                 let left_elements = left_list.to_vec();
                 let right_elements = right_list.to_vec();
 
@@ -3097,30 +3097,30 @@ impl Executor {
                     let result = self.apply_scalar_op(left_elem.clone(), right_elem.clone(), &base_op)?;
                     results.push(result);
                 }
-                Ok(Value::List(List::from_vec(results)))
+                Ok(Value::list(List::from_vec(results)))
             }
             // List-Scalar element-wise operation (broadcast scalar)
-            (Value::List(list), scalar) => {
+            (ValueKind::List(list), _scalar) => {
                 let elements = list.to_vec();
                 let mut results = Vec::new();
                 for elem in elements.iter() {
-                    let result = self.apply_scalar_op(elem.clone(), scalar.clone(), &base_op)?;
+                    let result = self.apply_scalar_op(elem.clone(), right.clone(), &base_op)?;
                     results.push(result);
                 }
-                Ok(Value::List(List::from_vec(results)))
+                Ok(Value::list(List::from_vec(results)))
             }
             // Scalar-List element-wise operation (broadcast scalar)
-            (scalar, Value::List(list)) => {
+            (_scalar, ValueKind::List(list)) => {
                 let elements = list.to_vec();
                 let mut results = Vec::new();
                 for elem in elements.iter() {
-                    let result = self.apply_scalar_op(scalar.clone(), elem.clone(), &base_op)?;
+                    let result = self.apply_scalar_op(left.clone(), elem.clone(), &base_op)?;
                     results.push(result);
                 }
-                Ok(Value::List(List::from_vec(results)))
+                Ok(Value::list(List::from_vec(results)))
             }
             // Scalar-Scalar: not element-wise, error
-            (left, right) => Err(GraphoidError::runtime(format!(
+            (_, _) => Err(GraphoidError::runtime(format!(
                 "Element-wise operations require at least one list, got {} and {}",
                 left.type_name(),
                 right.type_name()
@@ -3140,8 +3140,8 @@ impl Executor {
             BinaryOp::Modulo => self.eval_modulo(left, right),
             BinaryOp::Power => self.eval_power(left, right),
             // Comparison operators
-            BinaryOp::Equal => Ok(Value::Boolean(left == right)),
-            BinaryOp::NotEqual => Ok(Value::Boolean(left != right)),
+            BinaryOp::Equal => Ok(Value::boolean(left == right)),
+            BinaryOp::NotEqual => Ok(Value::boolean(left != right)),
             BinaryOp::Less => self.eval_less(left, right),
             BinaryOp::LessEqual => self.eval_less_equal(left, right),
             BinaryOp::Greater => self.eval_greater(left, right),
@@ -3155,50 +3155,50 @@ impl Executor {
 
     // Arithmetic helpers
     fn eval_add(&self, left: Value, right: Value) -> Result<Value> {
-        match (&left, &right) {
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
-            (Value::String(_), _) | (_, Value::String(_)) => {
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::number(l + r)),
+            (ValueKind::String(_), _) | (_, ValueKind::String(_)) => {
                 // If either operand is a string, convert both to strings and concatenate
                 let left_str = left.to_string_value();
                 let right_str = right.to_string_value();
-                Ok(Value::String(format!("{}{}", left_str, right_str)))
+                Ok(Value::string(format!("{}{}", left_str, right_str)))
             }
             (l, r) => Err(GraphoidError::type_error(
                 "number or string",
-                &format!("{} and {}", l.type_name(), r.type_name()),
+                &format!("{} and {}", left.type_name(), right.type_name()),
             )),
         }
     }
 
     fn eval_subtract(&self, left: Value, right: Value) -> Result<Value> {
-        match (left, right) {
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l - r)),
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::number(l - r)),
             (l, r) => Err(GraphoidError::type_error(
                 "number",
-                &format!("{} and {}", l.type_name(), r.type_name()),
+                &format!("{} and {}", left.type_name(), right.type_name()),
             )),
         }
     }
 
     fn eval_multiply(&self, left: Value, right: Value) -> Result<Value> {
-        match (left, right) {
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l * r)),
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::number(l * r)),
             (l, r) => Err(GraphoidError::type_error(
                 "number",
-                &format!("{} and {}", l.type_name(), r.type_name()),
+                &format!("{} and {}", left.type_name(), right.type_name()),
             )),
         }
     }
 
     fn eval_divide(&mut self, left: Value, right: Value) -> Result<Value> {
-        match (left, right) {
-            (Value::Number(l), Value::Number(r)) => {
-                if r == 0.0 {
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => {
+                if *r == 0.0 {
                     // Check error mode
                     match self.config_stack.current().error_mode {
                         ErrorMode::Lenient => {
                             // Return none in lenient mode
-                            return Ok(Value::None);
+                            return Ok(Value::none());
                         }
                         ErrorMode::Collect => {
                             // Collect error and return none
@@ -3208,7 +3208,7 @@ impl Executor {
                                 self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
                                 SourcePosition::unknown(),
                             );
-                            return Ok(Value::None);
+                            return Ok(Value::none());
                         }
                         ErrorMode::Strict => {
                             // Default behavior - raise error
@@ -3216,24 +3216,24 @@ impl Executor {
                         }
                     }
                 } else {
-                    Ok(Value::Number(l / r))
+                    Ok(Value::number(l / r))
                 }
             }
             (l, r) => Err(GraphoidError::type_error(
                 "number",
-                &format!("{} and {}", l.type_name(), r.type_name()),
+                &format!("{} and {}", left.type_name(), right.type_name()),
             )),
         }
     }
 
     fn eval_int_div(&mut self, left: Value, right: Value) -> Result<Value> {
-        match (left, right) {
-            (Value::Number(l), Value::Number(r)) => {
-                if r == 0.0 {
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => {
+                if *r == 0.0 {
                     // Check error mode
                     match self.config_stack.current().error_mode {
                         ErrorMode::Lenient => {
-                            return Ok(Value::None);
+                            return Ok(Value::none());
                         }
                         ErrorMode::Collect => {
                             let error = GraphoidError::division_by_zero();
@@ -3242,7 +3242,7 @@ impl Executor {
                                 self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
                                 SourcePosition::unknown(),
                             );
-                            return Ok(Value::None);
+                            return Ok(Value::none());
                         }
                         ErrorMode::Strict => {
                             return Err(GraphoidError::division_by_zero());
@@ -3250,24 +3250,24 @@ impl Executor {
                     }
                 } else {
                     // Truncate toward zero (not floor)
-                    Ok(Value::Number((l / r).trunc()))
+                    Ok(Value::number((l / r).trunc()))
                 }
             }
             (l, r) => Err(GraphoidError::type_error(
                 "number",
-                &format!("{} and {}", l.type_name(), r.type_name()),
+                &format!("{} and {}", left.type_name(), right.type_name()),
             )),
         }
     }
 
     fn eval_modulo(&mut self, left: Value, right: Value) -> Result<Value> {
-        match (left, right) {
-            (Value::Number(l), Value::Number(r)) => {
-                if r == 0.0 {
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => {
+                if *r == 0.0 {
                     // Check error mode for modulo by zero
                     match self.config_stack.current().error_mode {
                         ErrorMode::Lenient => {
-                            return Ok(Value::None);
+                            return Ok(Value::none());
                         }
                         ErrorMode::Collect => {
                             let error = GraphoidError::runtime("Modulo by zero".to_string());
@@ -3276,74 +3276,74 @@ impl Executor {
                                 self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
                                 SourcePosition::unknown(),
                             );
-                            return Ok(Value::None);
+                            return Ok(Value::none());
                         }
                         ErrorMode::Strict => {
                             return Err(GraphoidError::runtime("Modulo by zero".to_string()));
                         }
                     }
                 } else {
-                    Ok(Value::Number(l % r))
+                    Ok(Value::number(l % r))
                 }
             }
             (l, r) => Err(GraphoidError::type_error(
                 "number",
-                &format!("{} and {}", l.type_name(), r.type_name()),
+                &format!("{} and {}", left.type_name(), right.type_name()),
             )),
         }
     }
 
     fn eval_power(&self, left: Value, right: Value) -> Result<Value> {
-        match (left, right) {
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l.powf(r))),
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::number(l.powf(*r))),
             (l, r) => Err(GraphoidError::type_error(
                 "number",
-                &format!("{} and {}", l.type_name(), r.type_name()),
+                &format!("{} and {}", left.type_name(), right.type_name()),
             )),
         }
     }
 
     // Comparison helpers
     fn eval_less(&self, left: Value, right: Value) -> Result<Value> {
-        match (left, right) {
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l < r)),
-            (Value::String(l), Value::String(r)) => Ok(Value::Boolean(l < r)),
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::boolean(l < r)),
+            (ValueKind::String(l), ValueKind::String(r)) => Ok(Value::boolean(l < r)),
             (l, r) => Err(GraphoidError::type_error(
                 "number or string",
-                &format!("{} and {}", l.type_name(), r.type_name()),
+                &format!("{} and {}", left.type_name(), right.type_name()),
             )),
         }
     }
 
     fn eval_less_equal(&self, left: Value, right: Value) -> Result<Value> {
-        match (left, right) {
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l <= r)),
-            (Value::String(l), Value::String(r)) => Ok(Value::Boolean(l <= r)),
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::boolean(l <= r)),
+            (ValueKind::String(l), ValueKind::String(r)) => Ok(Value::boolean(l <= r)),
             (l, r) => Err(GraphoidError::type_error(
                 "number or string",
-                &format!("{} and {}", l.type_name(), r.type_name()),
+                &format!("{} and {}", left.type_name(), right.type_name()),
             )),
         }
     }
 
     fn eval_greater(&self, left: Value, right: Value) -> Result<Value> {
-        match (left, right) {
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l > r)),
-            (Value::String(l), Value::String(r)) => Ok(Value::Boolean(l > r)),
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::boolean(l > r)),
+            (ValueKind::String(l), ValueKind::String(r)) => Ok(Value::boolean(l > r)),
             (l, r) => Err(GraphoidError::type_error(
                 "number or string",
-                &format!("{} and {}", l.type_name(), r.type_name()),
+                &format!("{} and {}", left.type_name(), right.type_name()),
             )),
         }
     }
 
     fn eval_greater_equal(&self, left: Value, right: Value) -> Result<Value> {
-        match (left, right) {
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l >= r)),
-            (Value::String(l), Value::String(r)) => Ok(Value::Boolean(l >= r)),
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::boolean(l >= r)),
+            (ValueKind::String(l), ValueKind::String(r)) => Ok(Value::boolean(l >= r)),
             (l, r) => Err(GraphoidError::type_error(
                 "number or string",
-                &format!("{} and {}", l.type_name(), r.type_name()),
+                &format!("{} and {}", left.type_name(), right.type_name()),
             )),
         }
     }
@@ -3377,7 +3377,7 @@ impl Executor {
 
         // Check if already loaded (cached)
         if let Some(module) = self.module_manager.get_module(&resolved_path.to_string_lossy().to_string()) {
-            return Ok(Value::Module(module.clone()));
+            return Ok(Value::module(module.clone()));
         }
 
         // Check for circular dependency
@@ -3398,8 +3398,16 @@ impl Executor {
         module_executor.execute_source(&source)?;
 
         // Extract module name and alias (from module declarations or filename)
-        let module_name = if let Some(Value::String(name)) = module_executor.get_variable("__module_name__") {
-            name
+        let module_name = if let Some(v) = module_executor.get_variable("__module_name__") {
+            if let ValueKind::String(name) = &v.kind {
+                name.clone()
+            } else {
+                resolved_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unnamed")
+                    .to_string()
+            }
         } else {
             // Use filename without extension as module name
             resolved_path
@@ -3409,8 +3417,12 @@ impl Executor {
                 .to_string()
         };
 
-        let module_alias = if let Some(Value::String(alias)) = module_executor.get_variable("__module_alias__") {
-            Some(alias)
+        let module_alias = if let Some(v) = module_executor.get_variable("__module_alias__") {
+            if let ValueKind::String(alias) = &v.kind {
+                Some(alias.clone())
+            } else {
+                None
+            }
         } else {
             None
         };
@@ -3430,7 +3442,7 @@ impl Executor {
         // End loading
         self.module_manager.end_loading(&resolved_path);
 
-        Ok(Value::Module(module))
+        Ok(Value::module(module))
     }
 
     /// Executes a try/catch/finally statement
@@ -3563,7 +3575,7 @@ impl Executor {
                         0,    // TODO: Extract from GraphoidError position
                         self.call_stack.clone(),
                     );
-                    self.env.define(var_name.clone(), Value::Error(error_obj));
+                    self.env.define(var_name.clone(), Value::error(error_obj));
                 }
 
                 // Execute catch body in the child scope

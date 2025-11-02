@@ -1,7 +1,7 @@
 use graphoid::ast::{Argument, AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Stmt, UnaryOp};
 use graphoid::error::SourcePosition;
 use graphoid::execution::{Executor, ErrorMode};
-use graphoid::values::{Hash, List, Value};
+use graphoid::values::{Hash, List, Value, ValueKind};
 use std::collections::HashMap;
 
 // Helper function to create a dummy source position
@@ -26,7 +26,7 @@ fn test_eval_number_literal() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(42.0));
+    assert_eq!(result, Value::number(42.0));
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn test_eval_float_literal() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(3.14159));
+    assert_eq!(result, Value::number(3.14159));
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn test_eval_string_literal() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::String("hello world".to_string()));
+    assert_eq!(result, Value::string("hello world".to_string()));
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn test_eval_boolean_true() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 #[test]
@@ -74,7 +74,7 @@ fn test_eval_boolean_false() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(false));
+    assert_eq!(result, Value::boolean(false));
 }
 
 #[test]
@@ -86,7 +86,7 @@ fn test_eval_none_literal() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::None);
+    assert_eq!(result, Value::none());
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn test_eval_symbol_literal() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Symbol("test_symbol".to_string()));
+    assert_eq!(result, Value::symbol("test_symbol".to_string()));
 }
 
 // ============================================================================
@@ -122,7 +122,7 @@ fn test_eval_addition() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(5.0));
+    assert_eq!(result, Value::number(5.0));
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn test_eval_subtraction() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(6.0));
+    assert_eq!(result, Value::number(6.0));
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn test_eval_multiplication() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(42.0));
+    assert_eq!(result, Value::number(42.0));
 }
 
 #[test]
@@ -182,7 +182,7 @@ fn test_eval_division() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(5.0));
+    assert_eq!(result, Value::number(5.0));
 }
 
 #[test]
@@ -202,7 +202,7 @@ fn test_eval_integer_division() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(3.0));
+    assert_eq!(result, Value::number(3.0));
 }
 
 #[test]
@@ -222,7 +222,7 @@ fn test_eval_modulo() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(1.0));
+    assert_eq!(result, Value::number(1.0));
 }
 
 #[test]
@@ -242,7 +242,7 @@ fn test_eval_power() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(256.0));
+    assert_eq!(result, Value::number(256.0));
 }
 
 #[test]
@@ -291,7 +291,7 @@ fn test_eval_operator_precedence() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(14.0));
+    assert_eq!(result, Value::number(14.0));
 }
 
 // ============================================================================
@@ -315,7 +315,7 @@ fn test_eval_greater_than_true() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 #[test]
@@ -335,7 +335,7 @@ fn test_eval_greater_than_false() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(false));
+    assert_eq!(result, Value::boolean(false));
 }
 
 #[test]
@@ -355,7 +355,7 @@ fn test_eval_less_than() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 #[test]
@@ -375,7 +375,7 @@ fn test_eval_equal() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 #[test]
@@ -395,7 +395,7 @@ fn test_eval_not_equal() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 #[test]
@@ -415,7 +415,7 @@ fn test_eval_greater_or_equal() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 #[test]
@@ -435,7 +435,7 @@ fn test_eval_less_or_equal() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 // ============================================================================
@@ -459,7 +459,7 @@ fn test_eval_and_true() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 #[test]
@@ -479,7 +479,7 @@ fn test_eval_and_false() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(false));
+    assert_eq!(result, Value::boolean(false));
 }
 
 #[test]
@@ -499,7 +499,7 @@ fn test_eval_or_true() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 #[test]
@@ -519,7 +519,7 @@ fn test_eval_or_false() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(false));
+    assert_eq!(result, Value::boolean(false));
 }
 
 #[test]
@@ -535,7 +535,7 @@ fn test_eval_not_true() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(false));
+    assert_eq!(result, Value::boolean(false));
 }
 
 #[test]
@@ -551,7 +551,7 @@ fn test_eval_not_false() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 #[test]
@@ -567,7 +567,7 @@ fn test_eval_negation() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(-42.0));
+    assert_eq!(result, Value::number(-42.0));
 }
 
 // ============================================================================
@@ -591,7 +591,7 @@ fn test_eval_variable_declaration() {
 
     // Verify variable was defined
     let value = executor.env().get("x").unwrap();
-    assert_eq!(value, Value::Number(42.0));
+    assert_eq!(value, Value::number(42.0));
 }
 
 #[test]
@@ -617,7 +617,7 @@ fn test_eval_variable_reference() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(42.0));
+    assert_eq!(result, Value::number(42.0));
 }
 
 #[test]
@@ -649,7 +649,7 @@ fn test_eval_variable_assignment() {
 
     // Verify new value
     let value = executor.env().get("x").unwrap();
-    assert_eq!(value, Value::Number(20.0));
+    assert_eq!(value, Value::number(20.0));
 }
 
 #[test]
@@ -695,7 +695,7 @@ fn test_eval_variable_in_expression() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(15.0));
+    assert_eq!(result, Value::number(15.0));
 }
 
 // ============================================================================
@@ -711,7 +711,7 @@ fn test_eval_empty_list() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::List(List::from_vec(vec![])));
+    assert_eq!(result, Value::list(List::from_vec(vec![])));
 }
 
 #[test]
@@ -738,10 +738,10 @@ fn test_eval_list_with_elements() {
     let result = executor.eval_expr(&expr).unwrap();
     assert_eq!(
         result,
-        Value::List(List::from_vec(vec![
-            Value::Number(1.0),
-            Value::Number(2.0),
-            Value::Number(3.0)
+        Value::list(List::from_vec(vec![
+            Value::number(1.0),
+            Value::number(2.0),
+            Value::number(3.0)
         ]))
     );
 }
@@ -755,7 +755,7 @@ fn test_eval_empty_map() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Map(Hash::from_hashmap(HashMap::new())));
+    assert_eq!(result, Value::map(Hash::from_hashmap(HashMap::new())));
 }
 
 #[test]
@@ -783,13 +783,13 @@ fn test_eval_map_with_entries() {
 
     let result = executor.eval_expr(&expr).unwrap();
 
-    if let Value::Map(map) = result {
+    if let ValueKind::Map(map) = &result.kind {
         assert_eq!(map.len(), 2);
         assert_eq!(
             map.get("name"),
-            Some(&Value::String("Alice".to_string()))
+            Some(&Value::string("Alice".to_string()))
         );
-        assert_eq!(map.get("age"), Some(&Value::Number(30.0)));
+        assert_eq!(map.get("age"), Some(&Value::number(30.0)));
     } else {
         panic!("Expected Map value");
     }
@@ -816,7 +816,7 @@ fn test_eval_string_concatenation() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::String("hello world".to_string()));
+    assert_eq!(result, Value::string("hello world".to_string()));
 }
 
 #[test]
@@ -845,7 +845,7 @@ fn test_eval_string_concatenation_multiple() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::String("hello world".to_string()));
+    assert_eq!(result, Value::string("hello world".to_string()));
 }
 
 #[test]
@@ -865,7 +865,7 @@ fn test_eval_string_less_than() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 #[test]
@@ -885,7 +885,7 @@ fn test_eval_string_greater_than() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 #[test]
@@ -905,7 +905,7 @@ fn test_eval_string_equal() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 }
 
 // ============================================================================
@@ -930,7 +930,7 @@ fn test_eval_string_number_concatenation() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::String("hello5".to_string()));
+    assert_eq!(result, Value::string("hello5".to_string()));
 }
 
 #[test]
@@ -1011,7 +1011,7 @@ fn test_eval_power_zero_to_zero() {
 
     let result = executor.eval_expr(&expr).unwrap();
     // 0^0 is 1 in Rust's powf (mathematical convention varies)
-    assert_eq!(result, Value::Number(1.0));
+    assert_eq!(result, Value::number(1.0));
 }
 
 #[test]
@@ -1031,7 +1031,7 @@ fn test_eval_power_negative_exponent() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Number(0.25));
+    assert_eq!(result, Value::number(0.25));
 }
 
 #[test]
@@ -1069,7 +1069,7 @@ fn test_eval_empty_string_is_falsy() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    assert_eq!(result, Value::Boolean(true)); // not "" => true
+    assert_eq!(result, Value::boolean(true)); // not "" => true
 }
 
 #[test]
@@ -1205,7 +1205,7 @@ fn test_function_call_simple() {
     };
 
     let result = executor.eval_expr(&call_expr).unwrap();
-    assert_eq!(result, Value::Number(5.0));
+    assert_eq!(result, Value::number(5.0));
 }
 
 #[test]
@@ -1240,7 +1240,7 @@ fn test_function_no_params() {
     };
 
     let result = executor.eval_expr(&call_expr).unwrap();
-    assert_eq!(result, Value::String("Hello".to_string()));
+    assert_eq!(result, Value::string("Hello".to_string()));
 }
 
 #[test]
@@ -1290,7 +1290,7 @@ fn test_function_with_expression_body() {
     };
 
     let result = executor.eval_expr(&call_expr).unwrap();
-    assert_eq!(result, Value::Number(10.0));
+    assert_eq!(result, Value::number(10.0));
 }
 
 #[test]
@@ -1401,7 +1401,7 @@ fn test_function_nested_calls() {
     };
 
     let result = executor.eval_expr(&call_expr).unwrap();
-    assert_eq!(result, Value::Number(10.0));
+    assert_eq!(result, Value::number(10.0));
 }
 
 #[test]
@@ -1409,7 +1409,7 @@ fn test_function_closure() {
     let mut executor = Executor::new();
 
     // Set up: x = 10
-    executor.env_mut().define("x".to_string(), Value::Number(10.0));
+    executor.env_mut().define("x".to_string(), Value::number(10.0));
 
     // Define: func add_x(y) { return x + y }  (captures x)
     let func_decl = Stmt::FunctionDecl {
@@ -1454,7 +1454,7 @@ fn test_function_closure() {
     };
 
     let result = executor.eval_expr(&call_expr).unwrap();
-    assert_eq!(result, Value::Number(15.0));
+    assert_eq!(result, Value::number(15.0));
 }
 
 #[test]
@@ -1486,7 +1486,7 @@ fn test_function_return_none() {
     };
 
     let result = executor.eval_expr(&call_expr).unwrap();
-    assert_eq!(result, Value::None);
+    assert_eq!(result, Value::none());
 }
 
 #[test]
@@ -1551,7 +1551,7 @@ fn test_function_call_non_function() {
     let mut executor = Executor::new();
 
     // Define a variable, not a function
-    executor.env_mut().define("x".to_string(), Value::Number(42.0));
+    executor.env_mut().define("x".to_string(), Value::number(42.0));
 
     // Try to call it: x()
     let call_expr = Expr::Call {
@@ -1611,8 +1611,8 @@ fn test_lambda_simple() {
     let func_value = executor.eval_expr(&lambda).unwrap();
 
     // Should be a function
-    match func_value {
-        Value::Function(f) => {
+    match &func_value.kind {
+        ValueKind::Function(f) => {
             assert_eq!(f.name, None); // Anonymous
             assert_eq!(f.params, vec!["x"]);
         }
@@ -1653,7 +1653,7 @@ fn test_lambda_call() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(10.0));
+    assert_eq!(result, Value::number(10.0));
 }
 
 #[test]
@@ -1661,7 +1661,7 @@ fn test_lambda_closure() {
     let mut executor = Executor::new();
 
     // x = 10
-    executor.env_mut().define("x".to_string(), Value::Number(10.0));
+    executor.env_mut().define("x".to_string(), Value::number(10.0));
 
     // Lambda captures x: y => x + y
     let lambda = Expr::Lambda {
@@ -1692,7 +1692,7 @@ fn test_lambda_closure() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(15.0)); // 10 + 5
+    assert_eq!(result, Value::number(15.0)); // 10 + 5
 }
 
 #[test]
@@ -1717,7 +1717,7 @@ fn test_lambda_no_params() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(42.0));
+    assert_eq!(result, Value::number(42.0));
 }
 
 #[test]
@@ -1755,7 +1755,7 @@ fn test_function_as_value() {
 
     // Get function as a value
     let func_value = executor.env().get("double").unwrap();
-    assert!(matches!(func_value, Value::Function(_)));
+    assert!(matches!(&func_value.kind, ValueKind::Function(_)));
 }
 
 #[test]
@@ -1835,7 +1835,7 @@ fn test_function_multiple_params() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(20.0));
+    assert_eq!(result, Value::number(20.0));
 }
 
 #[test]
@@ -1886,7 +1886,7 @@ fn test_recursive_function() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(5.0));
+    assert_eq!(result, Value::number(5.0));
 }
 
 #[test]
@@ -1935,7 +1935,7 @@ fn test_function_with_string_return() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::String("Hello, Alice".to_string()));
+    assert_eq!(result, Value::string("Hello, Alice".to_string()));
 }
 
 #[test]
@@ -1943,7 +1943,7 @@ fn test_function_modifying_closure_var() {
     let mut executor = Executor::new();
 
     // x = 5
-    executor.env_mut().define("x".to_string(), Value::Number(5.0));
+    executor.env_mut().define("x".to_string(), Value::number(5.0));
 
     // func get_x() { return x }
     let func_decl = Stmt::FunctionDecl {
@@ -1973,10 +1973,10 @@ fn test_function_modifying_closure_var() {
     };
 
     let result1 = executor.eval_expr(&call1).unwrap();
-    assert_eq!(result1, Value::Number(5.0));
+    assert_eq!(result1, Value::number(5.0));
 
     // Modify x in outer scope
-    executor.env_mut().set("x", Value::Number(10.0)).unwrap();
+    executor.env_mut().set("x", Value::number(10.0)).unwrap();
 
     // Call get_x() again
     // With our Rc<Environment> implementation, the closure captured a clone of the environment
@@ -1984,7 +1984,7 @@ fn test_function_modifying_closure_var() {
     // This is snapshot semantics, which is one valid closure model
     let result2 = executor.eval_expr(&call1).unwrap();
     // Closure captured environment at function definition time
-    assert_eq!(result2, Value::Number(5.0));
+    assert_eq!(result2, Value::number(5.0));
 }
 
 #[test]
@@ -2037,7 +2037,7 @@ fn test_lambda_multiple_params() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(6.0));
+    assert_eq!(result, Value::number(6.0));
 }
 
 #[test]
@@ -2086,7 +2086,7 @@ fn test_lambda_with_string_concat() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::String("John Doe".to_string()));
+    assert_eq!(result, Value::string("John Doe".to_string()));
 }
 
 #[test]
@@ -2135,7 +2135,7 @@ fn test_function_returning_boolean() {
     };
 
     let result1 = executor.eval_expr(&call1).unwrap();
-    assert_eq!(result1, Value::Boolean(true));
+    assert_eq!(result1, Value::boolean(true));
 
     let call2 = Expr::Call {
         callee: Box::new(Expr::Variable {
@@ -2150,7 +2150,7 @@ fn test_function_returning_boolean() {
     };
 
     let result2 = executor.eval_expr(&call2).unwrap();
-    assert_eq!(result2, Value::Boolean(false));
+    assert_eq!(result2, Value::boolean(false));
 }
 
 #[test]
@@ -2215,7 +2215,7 @@ fn test_function_returning_list() {
     let result = executor.eval_expr(&call).unwrap();
     assert_eq!(
         result,
-        Value::List(List::from_vec(vec![Value::Number(1.0), Value::Number(2.0)]))
+        Value::list(List::from_vec(vec![Value::number(1.0), Value::number(2.0)]))
     );
 }
 
@@ -2280,7 +2280,7 @@ fn test_deeply_nested_calls() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(8.0));
+    assert_eq!(result, Value::number(8.0));
 }
 
 #[test]
@@ -2308,7 +2308,7 @@ fn test_function_with_no_return_statement() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::None); // Should return none
+    assert_eq!(result, Value::none()); // Should return none
 }
 
 #[test]
@@ -2351,7 +2351,7 @@ fn test_function_early_return() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(1.0)); // Should return first value
+    assert_eq!(result, Value::number(1.0)); // Should return first value
 }
 
 #[test]
@@ -2392,7 +2392,7 @@ fn test_function_with_side_effects() {
     let mut executor = Executor::new();
 
     // x = 0
-    executor.env_mut().define("x".to_string(), Value::Number(0.0));
+    executor.env_mut().define("x".to_string(), Value::number(0.0));
 
     // func set_x(val) { x = val; return x }
     let func_decl = Stmt::FunctionDecl {
@@ -2439,12 +2439,12 @@ fn test_function_with_side_effects() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(42.0));
+    assert_eq!(result, Value::number(42.0));
 
     // Verify x was modified (in closure's captured environment)
     // Due to our snapshot semantics, outer x won't change
     let x_value = executor.env().get("x").unwrap();
-    assert_eq!(x_value, Value::Number(0.0)); // Still 0, not modified
+    assert_eq!(x_value, Value::number(0.0)); // Still 0, not modified
 }
 
 #[test]
@@ -2452,7 +2452,7 @@ fn test_nested_closures() {
     let mut executor = Executor::new();
 
     // x = 5
-    executor.env_mut().define("x".to_string(), Value::Number(5.0));
+    executor.env_mut().define("x".to_string(), Value::number(5.0));
 
     // func outer() { return x }
     let outer_decl = Stmt::FunctionDecl {
@@ -2481,7 +2481,7 @@ fn test_nested_closures() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(5.0));
+    assert_eq!(result, Value::number(5.0));
 }
 
 #[test]
@@ -2489,7 +2489,7 @@ fn test_function_parameter_shadowing() {
     let mut executor = Executor::new();
 
     // x = 10
-    executor.env_mut().define("x".to_string(), Value::Number(10.0));
+    executor.env_mut().define("x".to_string(), Value::number(10.0));
 
     // func use_param(x) { return x * 2 }
     let func_decl = Stmt::FunctionDecl {
@@ -2534,7 +2534,7 @@ fn test_function_parameter_shadowing() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(10.0)); // 5 * 2, not 10 * 2
+    assert_eq!(result, Value::number(10.0)); // 5 * 2, not 10 * 2
 }
 
 #[test]
@@ -2596,7 +2596,7 @@ fn test_function_returning_function_value() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(6.0));
+    assert_eq!(result, Value::number(6.0));
 }
 
 #[test]
@@ -2637,7 +2637,7 @@ fn test_lambda_with_logical_operations() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Boolean(false));
+    assert_eq!(result, Value::boolean(false));
 }
 
 #[test]
@@ -2699,7 +2699,7 @@ fn test_function_with_comparison() {
     };
 
     let result1 = executor.eval_expr(&call1).unwrap();
-    assert_eq!(result1, Value::Boolean(true));
+    assert_eq!(result1, Value::boolean(true));
 }
 
 #[test]
@@ -2755,10 +2755,10 @@ fn test_lambda_returning_list() {
     let result = executor.eval_expr(&call).unwrap();
     assert_eq!(
         result,
-        Value::List(List::from_vec(vec![
-            Value::Number(3.0),
-            Value::Number(4.0),
-            Value::Number(7.0)
+        Value::list(List::from_vec(vec![
+            Value::number(3.0),
+            Value::number(4.0),
+            Value::number(7.0)
         ]))
     );
 }
@@ -2805,7 +2805,7 @@ fn test_function_with_unary_ops() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(-5.0));
+    assert_eq!(result, Value::number(-5.0));
 }
 
 #[test]
@@ -2850,7 +2850,7 @@ fn test_function_with_not_op() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Boolean(false));
+    assert_eq!(result, Value::boolean(false));
 }
 
 #[test]
@@ -2954,7 +2954,7 @@ fn test_function_four_params() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(25.0));
+    assert_eq!(result, Value::number(25.0));
 }
 
 #[test]
@@ -2978,7 +2978,7 @@ fn test_lambda_with_symbol_return() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Symbol("success".to_string()));
+    assert_eq!(result, Value::symbol("success".to_string()));
 }
 
 #[test]
@@ -3057,7 +3057,7 @@ fn test_function_call_with_expression_args() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(12.0));
+    assert_eq!(result, Value::number(12.0));
 }
 
 // ============================================================================
@@ -3069,7 +3069,7 @@ fn test_if_statement_true() {
     let mut executor = Executor::new();
 
     // x = 0
-    executor.env_mut().define("x".to_string(), Value::Number(0.0));
+    executor.env_mut().define("x".to_string(), Value::number(0.0));
 
     // if true { x = 1 }
     let if_stmt = Stmt::If {
@@ -3092,7 +3092,7 @@ fn test_if_statement_true() {
     executor.eval_stmt(&if_stmt).unwrap();
 
     let x = executor.env().get("x").unwrap();
-    assert_eq!(x, Value::Number(1.0));
+    assert_eq!(x, Value::number(1.0));
 }
 
 #[test]
@@ -3100,7 +3100,7 @@ fn test_if_statement_false() {
     let mut executor = Executor::new();
 
     // x = 0
-    executor.env_mut().define("x".to_string(), Value::Number(0.0));
+    executor.env_mut().define("x".to_string(), Value::number(0.0));
 
     // if false { x = 1 }
     let if_stmt = Stmt::If {
@@ -3123,7 +3123,7 @@ fn test_if_statement_false() {
     executor.eval_stmt(&if_stmt).unwrap();
 
     let x = executor.env().get("x").unwrap();
-    assert_eq!(x, Value::Number(0.0)); // Should still be 0
+    assert_eq!(x, Value::number(0.0)); // Should still be 0
 }
 
 #[test]
@@ -3131,7 +3131,7 @@ fn test_if_else_true() {
     let mut executor = Executor::new();
 
     // x = 0
-    executor.env_mut().define("x".to_string(), Value::Number(0.0));
+    executor.env_mut().define("x".to_string(), Value::number(0.0));
 
     // if true { x = 1 } else { x = 2 }
     let if_stmt = Stmt::If {
@@ -3161,7 +3161,7 @@ fn test_if_else_true() {
     executor.eval_stmt(&if_stmt).unwrap();
 
     let x = executor.env().get("x").unwrap();
-    assert_eq!(x, Value::Number(1.0));
+    assert_eq!(x, Value::number(1.0));
 }
 
 #[test]
@@ -3169,7 +3169,7 @@ fn test_if_else_false() {
     let mut executor = Executor::new();
 
     // x = 0
-    executor.env_mut().define("x".to_string(), Value::Number(0.0));
+    executor.env_mut().define("x".to_string(), Value::number(0.0));
 
     // if false { x = 1 } else { x = 2 }
     let if_stmt = Stmt::If {
@@ -3199,7 +3199,7 @@ fn test_if_else_false() {
     executor.eval_stmt(&if_stmt).unwrap();
 
     let x = executor.env().get("x").unwrap();
-    assert_eq!(x, Value::Number(2.0));
+    assert_eq!(x, Value::number(2.0));
 }
 
 #[test]
@@ -3207,9 +3207,9 @@ fn test_if_with_comparison() {
     let mut executor = Executor::new();
 
     // x = 10
-    executor.env_mut().define("x".to_string(), Value::Number(10.0));
+    executor.env_mut().define("x".to_string(), Value::number(10.0));
     // result = 0
-    executor.env_mut().define("result".to_string(), Value::Number(0.0));
+    executor.env_mut().define("result".to_string(), Value::number(0.0));
 
     // if x > 5 { result = 1 }
     let if_stmt = Stmt::If {
@@ -3240,7 +3240,7 @@ fn test_if_with_comparison() {
     executor.eval_stmt(&if_stmt).unwrap();
 
     let result = executor.env().get("result").unwrap();
-    assert_eq!(result, Value::Number(1.0));
+    assert_eq!(result, Value::number(1.0));
 }
 
 #[test]
@@ -3307,7 +3307,7 @@ fn test_if_return_in_function() {
     };
 
     let result1 = executor.eval_expr(&call1).unwrap();
-    assert_eq!(result1, Value::Number(1.0));
+    assert_eq!(result1, Value::number(1.0));
 
     // check(-5) should return 0
     let call2 = Expr::Call {
@@ -3323,7 +3323,7 @@ fn test_if_return_in_function() {
     };
 
     let result2 = executor.eval_expr(&call2).unwrap();
-    assert_eq!(result2, Value::Number(0.0));
+    assert_eq!(result2, Value::number(0.0));
 }
 
 #[test]
@@ -3454,7 +3454,7 @@ fn test_while_loop_simple_counter() {
     executor.eval_stmt(&while_stmt).unwrap();
 
     let count_value = executor.env().get("count").unwrap();
-    assert_eq!(count_value, Value::Number(3.0));
+    assert_eq!(count_value, Value::number(3.0));
 }
 
 #[test]
@@ -3511,7 +3511,7 @@ fn test_while_loop_never_executes() {
 
     // x should still be 10 since loop never executed
     let x_value = executor.env().get("x").unwrap();
-    assert_eq!(x_value, Value::Number(10.0));
+    assert_eq!(x_value, Value::number(10.0));
 }
 
 #[test]
@@ -3602,11 +3602,11 @@ fn test_while_loop_with_multiple_statements() {
 
     // sum should be 1+2+3+4+5 = 15
     let sum_value = executor.env().get("sum").unwrap();
-    assert_eq!(sum_value, Value::Number(15.0));
+    assert_eq!(sum_value, Value::number(15.0));
 
     // i should be 6
     let i_value = executor.env().get("i").unwrap();
-    assert_eq!(i_value, Value::Number(6.0));
+    assert_eq!(i_value, Value::number(6.0));
 }
 
 #[test]
@@ -3725,7 +3725,7 @@ fn test_while_loop_in_function() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(120.0));
+    assert_eq!(result, Value::number(120.0));
 }
 
 #[test]
@@ -3864,7 +3864,7 @@ fn test_nested_while_loops() {
 
     // sum should be 6 (3 outer iterations * 2 inner iterations)
     let sum_value = executor.env().get("sum").unwrap();
-    assert_eq!(sum_value, Value::Number(6.0));
+    assert_eq!(sum_value, Value::number(6.0));
 }
 
 // ============================================================================
@@ -3930,7 +3930,7 @@ fn test_for_loop_simple() {
 
     // sum should be 1 + 2 + 3 = 6
     let sum_value = executor.env().get("sum").unwrap();
-    assert_eq!(sum_value, Value::Number(6.0));
+    assert_eq!(sum_value, Value::number(6.0));
 }
 
 #[test]
@@ -3980,7 +3980,7 @@ fn test_for_loop_empty_list() {
 
     // x should still be 0 since loop never executed
     let x_value = executor.env().get("x").unwrap();
-    assert_eq!(x_value, Value::Number(0.0));
+    assert_eq!(x_value, Value::number(0.0));
 }
 
 #[test]
@@ -4043,7 +4043,7 @@ fn test_for_loop_with_strings() {
 
     // result should be "abc"
     let result_value = executor.env().get("result").unwrap();
-    assert_eq!(result_value, Value::String("abc".to_string()));
+    assert_eq!(result_value, Value::string("abc".to_string()));
 }
 
 #[test]
@@ -4139,7 +4139,7 @@ fn test_for_loop_in_function() {
     };
 
     let result = executor.eval_expr(&call).unwrap();
-    assert_eq!(result, Value::Number(60.0));
+    assert_eq!(result, Value::number(60.0));
 }
 
 #[test]
@@ -4225,7 +4225,7 @@ fn test_nested_for_loops() {
 
     // count should be 6 (2 outer * 3 inner)
     let count_value = executor.env().get("count").unwrap();
-    assert_eq!(count_value, Value::Number(6.0));
+    assert_eq!(count_value, Value::number(6.0));
 }
 
 // ============================================================================
@@ -4258,7 +4258,7 @@ fn test_list_index_positive() {
         position: pos(),
     };
     let result = executor.eval_expr(&index_expr).unwrap();
-    assert_eq!(result, Value::Number(10.0));
+    assert_eq!(result, Value::number(10.0));
 
     // items[1] should be 20
     let index_expr = Expr::Index {
@@ -4267,7 +4267,7 @@ fn test_list_index_positive() {
         position: pos(),
     };
     let result = executor.eval_expr(&index_expr).unwrap();
-    assert_eq!(result, Value::Number(20.0));
+    assert_eq!(result, Value::number(20.0));
 
     // items[2] should be 30
     let index_expr = Expr::Index {
@@ -4276,7 +4276,7 @@ fn test_list_index_positive() {
         position: pos(),
     };
     let result = executor.eval_expr(&index_expr).unwrap();
-    assert_eq!(result, Value::Number(30.0));
+    assert_eq!(result, Value::number(30.0));
 }
 
 #[test]
@@ -4305,7 +4305,7 @@ fn test_list_index_negative() {
         position: pos(),
     };
     let result = executor.eval_expr(&index_expr).unwrap();
-    assert_eq!(result, Value::Number(30.0));
+    assert_eq!(result, Value::number(30.0));
 
     // items[-2] should be 20
     let index_expr = Expr::Index {
@@ -4314,7 +4314,7 @@ fn test_list_index_negative() {
         position: pos(),
     };
     let result = executor.eval_expr(&index_expr).unwrap();
-    assert_eq!(result, Value::Number(20.0));
+    assert_eq!(result, Value::number(20.0));
 
     // items[-3] should be 10 (first element)
     let index_expr = Expr::Index {
@@ -4323,7 +4323,7 @@ fn test_list_index_negative() {
         position: pos(),
     };
     let result = executor.eval_expr(&index_expr).unwrap();
-    assert_eq!(result, Value::Number(10.0));
+    assert_eq!(result, Value::number(10.0));
 }
 
 #[test]
@@ -4388,7 +4388,7 @@ fn test_list_index_with_strings() {
         position: pos(),
     };
     let result = executor.eval_expr(&index_expr).unwrap();
-    assert_eq!(result, Value::String("hello".to_string()));
+    assert_eq!(result, Value::string("hello".to_string()));
 }
 
 #[test]
@@ -4416,7 +4416,7 @@ fn test_map_index_string_key() {
         position: pos(),
     };
     let result = executor.eval_expr(&index_expr).unwrap();
-    assert_eq!(result, Value::String("Alice".to_string()));
+    assert_eq!(result, Value::string("Alice".to_string()));
 
     // config["age"] should be 30
     let index_expr = Expr::Index {
@@ -4425,7 +4425,7 @@ fn test_map_index_string_key() {
         position: pos(),
     };
     let result = executor.eval_expr(&index_expr).unwrap();
-    assert_eq!(result, Value::Number(30.0));
+    assert_eq!(result, Value::number(30.0));
 }
 
 #[test]
@@ -4486,7 +4486,7 @@ fn test_list_method_size() {
         position: pos(),
     };
     let result = executor.eval_expr(&method_call).unwrap();
-    assert_eq!(result, Value::Number(3.0));
+    assert_eq!(result, Value::number(3.0));
 }
 
 #[test]
@@ -4516,7 +4516,7 @@ fn test_list_method_first() {
         position: pos(),
     };
     let result = executor.eval_expr(&method_call).unwrap();
-    assert_eq!(result, Value::Number(10.0));
+    assert_eq!(result, Value::number(10.0));
 }
 
 #[test]
@@ -4546,7 +4546,7 @@ fn test_list_method_last() {
         position: pos(),
     };
     let result = executor.eval_expr(&method_call).unwrap();
-    assert_eq!(result, Value::Number(30.0));
+    assert_eq!(result, Value::number(30.0));
 }
 
 #[test]
@@ -4576,7 +4576,7 @@ fn test_list_method_contains() {
         position: pos(),
     };
     let result = executor.eval_expr(&method_call).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 
     // items.contains(99) should be false
     let method_call = Expr::MethodCall {
@@ -4586,7 +4586,7 @@ fn test_list_method_contains() {
         position: pos(),
     };
     let result = executor.eval_expr(&method_call).unwrap();
-    assert_eq!(result, Value::Boolean(false));
+    assert_eq!(result, Value::boolean(false));
 }
 
 #[test]
@@ -4612,7 +4612,7 @@ fn test_list_method_is_empty() {
         position: pos(),
     };
     let result = executor.eval_expr(&method_call).unwrap();
-    assert_eq!(result, Value::Boolean(true));
+    assert_eq!(result, Value::boolean(true));
 
     // items = [1]
     let assign = Stmt::Assignment {
@@ -4633,7 +4633,7 @@ fn test_list_method_is_empty() {
         position: pos(),
     };
     let result = executor.eval_expr(&method_call).unwrap();
-    assert_eq!(result, Value::Boolean(false));
+    assert_eq!(result, Value::boolean(false));
 }
 
 // ============================================================================
@@ -4679,12 +4679,12 @@ fn test_list_method_map() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(2.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(4.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(6.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(2.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(4.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(6.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4736,11 +4736,11 @@ fn test_list_method_filter() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 2);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(2.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(4.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(2.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(4.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4786,12 +4786,12 @@ fn test_list_method_each() {
 
     // each() should return the original list
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(1.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(2.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(3.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(1.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(2.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(3.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4835,11 +4835,11 @@ fn test_list_method_map_with_strings() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 2);
-            assert_eq!(*elements.get(0).unwrap(), Value::String("hello!".to_string()));
-            assert_eq!(*elements.get(1).unwrap(), Value::String("world!".to_string()));
+            assert_eq!(*elements.get(0).unwrap(), Value::string("hello!".to_string()));
+            assert_eq!(*elements.get(1).unwrap(), Value::string("world!".to_string()));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4886,11 +4886,11 @@ fn test_list_method_filter_greater_than() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 2);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(15.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(20.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(15.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(20.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4928,12 +4928,12 @@ fn test_list_method_map_with_named_transform_double() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(2.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(4.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(6.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(2.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(4.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(6.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -4967,12 +4967,12 @@ fn test_list_method_map_with_named_transform_square() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(4.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(9.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(16.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(4.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(9.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(16.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5006,12 +5006,12 @@ fn test_list_method_map_with_named_transform_negate() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(-1.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(2.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(-3.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(-1.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(2.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(-3.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5052,12 +5052,12 @@ fn test_list_method_filter_with_named_predicate_even() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(2.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(4.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(6.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(2.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(4.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(6.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5093,11 +5093,11 @@ fn test_list_method_filter_with_named_predicate_positive() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 2);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(1.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(2.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(1.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(2.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5133,12 +5133,12 @@ fn test_list_method_filter_with_named_predicate_odd() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(1.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(3.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(5.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(1.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(3.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(5.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5191,12 +5191,12 @@ fn test_element_wise_add() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(5.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(7.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(9.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(5.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(7.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(9.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5245,12 +5245,12 @@ fn test_element_wise_multiply() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(20.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(60.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(120.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(20.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(60.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(120.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5284,12 +5284,12 @@ fn test_element_wise_scalar_broadcast() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(10.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(20.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(30.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(10.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(20.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(30.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5338,12 +5338,12 @@ fn test_element_wise_subtract() {
     };
 
     let result = executor.eval_expr(&expr).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(9.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(18.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(27.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(9.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(18.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(27.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5386,11 +5386,11 @@ fn test_list_method_slice_basic() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 2);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(20.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(30.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(20.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(30.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5429,12 +5429,12 @@ fn test_list_method_slice_from_start() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(10.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(20.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(30.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(10.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(20.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(30.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5473,12 +5473,12 @@ fn test_list_method_slice_to_end() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 3);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(30.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(40.0));
-            assert_eq!(*elements.get(2).unwrap(), Value::Number(50.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(30.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(40.0));
+            assert_eq!(*elements.get(2).unwrap(), Value::number(50.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5517,11 +5517,11 @@ fn test_list_method_slice_negative_indices() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 2);
-            assert_eq!(*elements.get(0).unwrap(), Value::Number(30.0));
-            assert_eq!(*elements.get(1).unwrap(), Value::Number(40.0));
+            assert_eq!(*elements.get(0).unwrap(), Value::number(30.0));
+            assert_eq!(*elements.get(1).unwrap(), Value::number(40.0));
         }
         _ => panic!("Expected list, got {:?}", result),
     }
@@ -5564,12 +5564,12 @@ fn test_map_method_keys() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 2);
             // Keys may be in any order, so check both are present
             let keys: Vec<String> = elements.to_vec().iter().filter_map(|v| {
-                if let Value::String(s) = v {
+                if let ValueKind::String(s) = &v.kind {
                     Some(s.clone())
                 } else {
                     None
@@ -5615,12 +5615,12 @@ fn test_map_method_values() {
     };
 
     let result = executor.eval_expr(&method_call).unwrap();
-    match result {
-        Value::List(elements) => {
+    match &result.kind {
+        ValueKind::List(elements) => {
             assert_eq!(elements.len(), 2);
             // Values may be in any order, so check both are present
             let values: Vec<f64> = elements.to_vec().iter().filter_map(|v| {
-                if let Value::Number(n) = v {
+                if let ValueKind::Number(n) = &v.kind {
                     Some(*n)
                 } else {
                     None
@@ -5668,7 +5668,7 @@ fn test_map_method_has_key() {
     };
 
     let result1 = executor.eval_expr(&method_call1).unwrap();
-    assert_eq!(result1, Value::Boolean(true));
+    assert_eq!(result1, Value::boolean(true));
 
     // data.has_key("missing") should return false
     let method_call2 = Expr::MethodCall {
@@ -5681,7 +5681,7 @@ fn test_map_method_has_key() {
     };
 
     let result2 = executor.eval_expr(&method_call2).unwrap();
-    assert_eq!(result2, Value::Boolean(false));
+    assert_eq!(result2, Value::boolean(false));
 }
 
 #[test]
@@ -5707,7 +5707,7 @@ fn test_map_method_size() {
     };
 
     let result1 = executor.eval_expr(&method_call1).unwrap();
-    assert_eq!(result1, Value::Number(0.0));
+    assert_eq!(result1, Value::number(0.0));
 
     // Map with 3 entries
     let assign2 = Stmt::Assignment {
@@ -5741,7 +5741,7 @@ fn test_map_method_size() {
     };
 
     let result2 = executor.eval_expr(&method_call2).unwrap();
-    assert_eq!(result2, Value::Number(3.0));
+    assert_eq!(result2, Value::number(3.0));
 }
 
 // ============================================================================
@@ -5780,7 +5780,7 @@ x = 1
         name: "y".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(y, Value::Number(2.0));
+    assert_eq!(y, Value::number(2.0));
 }
 
 #[test]
@@ -6034,7 +6034,7 @@ configure { skip_none: true } {
         name: "x".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(x, Value::Number(10.0));
+    assert_eq!(x, Value::number(10.0));
 }
 
 #[test]
@@ -6053,7 +6053,7 @@ precision 1 {
         position: pos(),
     }).unwrap();
     // Result should be calculated (precision will be applied in future milestones)
-    assert_eq!(result, Value::Number(6.2));
+    assert_eq!(result, Value::number(6.2));
 }
 
 // ============================================================================
@@ -6082,7 +6082,7 @@ catch {
         name: "x".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(x, Value::Number(10.0));
+    assert_eq!(x, Value::number(10.0));
 }
 
 #[test]
@@ -6104,7 +6104,7 @@ catch {
         name: "x".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(x, Value::Number(20.0));
+    assert_eq!(x, Value::number(20.0));
 }
 
 #[test]
@@ -6125,7 +6125,7 @@ catch as e {
         name: "error_msg".to_string(),
         position: pos(),
     }).unwrap();
-    assert!(matches!(error_msg, Value::String(s) if s.contains("something went wrong")));
+    assert!(matches!(&error_msg.kind, ValueKind::String(s) if s.contains("something went wrong")));
 }
 
 #[test]
@@ -6146,7 +6146,7 @@ catch RuntimeError {
         name: "caught".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(caught, Value::Boolean(true));
+    assert_eq!(caught, Value::boolean(true));
 }
 
 #[test]
@@ -6167,7 +6167,7 @@ catch RuntimeError as e {
         name: "error_msg".to_string(),
         position: pos(),
     }).unwrap();
-    assert!(matches!(error_msg, Value::String(s) if s.contains("Division by zero")));
+    assert!(matches!(&error_msg.kind, ValueKind::String(s) if s.contains("Division by zero")));
 }
 
 #[test]
@@ -6194,7 +6194,7 @@ catch {
         name: "which_caught".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(which_caught, Value::Number(2.0));
+    assert_eq!(which_caught, Value::number(2.0));
 }
 
 #[test]
@@ -6218,7 +6218,7 @@ catch {
         name: "caught".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(caught, Value::Boolean(true));
+    assert_eq!(caught, Value::boolean(true));
 }
 
 #[test]
@@ -6239,7 +6239,7 @@ finally {
         name: "finally_ran".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(finally_ran, Value::Boolean(true));
+    assert_eq!(finally_ran, Value::boolean(true));
 }
 
 #[test]
@@ -6263,7 +6263,7 @@ finally {
         name: "finally_ran".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(finally_ran, Value::Boolean(true));
+    assert_eq!(finally_ran, Value::boolean(true));
 }
 
 #[test]
@@ -6289,7 +6289,7 @@ finally {
         name: "finally_ran".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(finally_ran, Value::Boolean(true));
+    assert_eq!(finally_ran, Value::boolean(true));
 }
 
 #[test]
@@ -6311,13 +6311,13 @@ finally {
         name: "x".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(x, Value::Number(10.0));
+    assert_eq!(x, Value::number(10.0));
 
     let finally_ran = executor.eval_expr(&Expr::Variable {
         name: "finally_ran".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(finally_ran, Value::Boolean(true));
+    assert_eq!(finally_ran, Value::boolean(true));
 }
 
 #[test]
@@ -6344,13 +6344,13 @@ catch {
         name: "inner_caught".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(inner_caught, Value::Boolean(true));
+    assert_eq!(inner_caught, Value::boolean(true));
 
     let outer_caught = executor.eval_expr(&Expr::Variable {
         name: "outer_caught".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(outer_caught, Value::Boolean(false));
+    assert_eq!(outer_caught, Value::boolean(false));
 }
 
 #[test]
@@ -6377,13 +6377,13 @@ catch {
         name: "inner_caught".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(inner_caught, Value::Boolean(false));
+    assert_eq!(inner_caught, Value::boolean(false));
 
     let outer_caught = executor.eval_expr(&Expr::Variable {
         name: "outer_caught".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(outer_caught, Value::Boolean(true));
+    assert_eq!(outer_caught, Value::boolean(true));
 }
 
 #[test]
@@ -6409,7 +6409,7 @@ catch {
         name: "final_caught".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(final_caught, Value::Boolean(true));
+    assert_eq!(final_caught, Value::boolean(true));
 }
 
 #[test]
@@ -6458,7 +6458,7 @@ catch {
         name: "result".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(result, Value::Number(999.0));
+    assert_eq!(result, Value::number(999.0));
 }
 
 #[test]
@@ -6479,7 +6479,7 @@ catch {
         name: "result".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(result, Value::Number(888.0));
+    assert_eq!(result, Value::number(888.0));
 }
 
 #[test]
@@ -6500,7 +6500,7 @@ catch as e {
         name: "caught".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(caught, Value::Boolean(true));
+    assert_eq!(caught, Value::boolean(true));
 }
 
 #[test]
@@ -6522,7 +6522,7 @@ catch as e {
         name: "error_msg".to_string(),
         position: pos(),
     }).unwrap();
-    assert!(matches!(error_msg, Value::String(s) if s.contains("error") && s.contains("42")));
+    assert!(matches!(&error_msg.kind, ValueKind::String(s) if s.contains("error") && s.contains("42")));
 }
 
 #[test]
@@ -6548,7 +6548,7 @@ catch {
         name: "result".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(result, Value::Number(999.0));
+    assert_eq!(result, Value::number(999.0));
 }
 
 #[test]
@@ -6569,7 +6569,7 @@ catch {
         name: "counter".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(counter, Value::Number(1.0));
+    assert_eq!(counter, Value::number(1.0));
 }
 
 #[test]
@@ -6590,7 +6590,7 @@ finally {
         name: "counter".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(counter, Value::Number(1.0));
+    assert_eq!(counter, Value::number(1.0));
 }
 
 #[test]
@@ -6618,19 +6618,19 @@ finally {
         name: "tried".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(tried, Value::Boolean(true));
+    assert_eq!(tried, Value::boolean(true));
 
     let caught = executor.eval_expr(&Expr::Variable {
         name: "caught".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(caught, Value::Boolean(true));
+    assert_eq!(caught, Value::boolean(true));
 
     let finalized = executor.eval_expr(&Expr::Variable {
         name: "finalized".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(finalized, Value::Boolean(true));
+    assert_eq!(finalized, Value::boolean(true));
 }
 
 #[test]
@@ -6651,7 +6651,7 @@ x = 10
         name: "x".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(x, Value::Number(10.0));
+    assert_eq!(x, Value::number(10.0));
 }
 
 #[test]
@@ -6672,7 +6672,7 @@ x = 10
         name: "x".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(x, Value::Number(10.0));
+    assert_eq!(x, Value::number(10.0));
 }
 
 #[test]
@@ -6692,7 +6692,7 @@ finally {
         name: "x".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(x, Value::Number(10.0));
+    assert_eq!(x, Value::number(10.0));
 }
 
 #[test]
@@ -6716,7 +6716,7 @@ result = test()
         name: "result".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(result, Value::Number(42.0));
+    assert_eq!(result, Value::number(42.0));
 }
 
 #[test]
@@ -6741,7 +6741,7 @@ result = test()
         name: "result".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(result, Value::Number(999.0));
+    assert_eq!(result, Value::number(999.0));
 }
 
 #[test]
@@ -6766,13 +6766,13 @@ catch {
         name: "x".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(x, Value::Number(11.0));
+    assert_eq!(x, Value::number(11.0));
 
     let y = executor.eval_expr(&Expr::Variable {
         name: "y".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(y, Value::Number(20.0));
+    assert_eq!(y, Value::number(20.0));
 }
 
 #[test]
@@ -6795,13 +6795,13 @@ catch {
         name: "x".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(x, Value::Number(10.0));
+    assert_eq!(x, Value::number(10.0));
 
     let y = executor.eval_expr(&Expr::Variable {
         name: "y".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(y, Value::Number(20.0));
+    assert_eq!(y, Value::number(20.0));
 }
 
 #[test]
@@ -6824,13 +6824,13 @@ finally {
         name: "x".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(x, Value::Number(11.0));
+    assert_eq!(x, Value::number(11.0));
 
     let y = executor.eval_expr(&Expr::Variable {
         name: "y".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(y, Value::Number(20.0));
+    assert_eq!(y, Value::number(20.0));
 }
 
 #[test]
@@ -6852,7 +6852,7 @@ catch {
         name: "result".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(result, Value::Number(999.0));
+    assert_eq!(result, Value::number(999.0));
 }
 
 #[test]
@@ -6874,7 +6874,7 @@ catch {
         name: "result".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(result, Value::Number(999.0));
+    assert_eq!(result, Value::number(999.0));
 }
 
 #[test]
@@ -6908,7 +6908,7 @@ catch {
         name: "level".to_string(),
         position: pos(),
     }).unwrap();
-    assert_eq!(level, Value::Number(13.0));
+    assert_eq!(level, Value::number(13.0));
 }
 
 #[test]
@@ -6951,7 +6951,7 @@ configure { error_mode: :collect } {
 
     // Execution should continue despite errors
     let result = executor.get_variable("result").unwrap();
-    assert_eq!(result, Value::Number(42.0));
+    assert_eq!(result, Value::number(42.0));
 
     // Errors should be collected
     let errors_source = r#"
@@ -6960,7 +6960,7 @@ count = errors.length()
 "#;
     executor.execute_source(errors_source).unwrap();
     let count = executor.get_variable("count").unwrap();
-    assert_eq!(count, Value::Number(2.0));
+    assert_eq!(count, Value::number(2.0));
 }
 
 #[test]
@@ -6980,13 +6980,13 @@ second_msg = errors[1].message()
     executor.execute_source(source).unwrap();
 
     let count = executor.get_variable("count").unwrap();
-    assert_eq!(count, Value::Number(2.0));
+    assert_eq!(count, Value::number(2.0));
 
     let first_msg = executor.get_variable("first_msg").unwrap();
-    assert_eq!(first_msg, Value::String("Runtime error: ValueError: bad value".to_string()));
+    assert_eq!(first_msg, Value::string("Runtime error: ValueError: bad value".to_string()));
 
     let second_msg = executor.get_variable("second_msg").unwrap();
-    assert_eq!(second_msg, Value::String("Runtime error: TypeError: bad type".to_string()));
+    assert_eq!(second_msg, Value::string("Runtime error: TypeError: bad type".to_string()));
 }
 
 #[test]
@@ -7005,10 +7005,10 @@ count_after = get_errors().length()
     executor.execute_source(source).unwrap();
 
     let count_before = executor.get_variable("count_before").unwrap();
-    assert_eq!(count_before, Value::Number(2.0));
+    assert_eq!(count_before, Value::number(2.0));
 
     let count_after = executor.get_variable("count_after").unwrap();
-    assert_eq!(count_after, Value::Number(0.0));
+    assert_eq!(count_after, Value::number(0.0));
 }
 
 #[test]
@@ -7044,13 +7044,13 @@ collected_count = get_errors().length()
     executor.execute_source(source).unwrap();
 
     let outer_error = executor.get_variable("outer_error").unwrap();
-    assert_eq!(outer_error, Value::Boolean(true));
+    assert_eq!(outer_error, Value::boolean(true));
 
     let outer_error_2 = executor.get_variable("outer_error_2").unwrap();
-    assert_eq!(outer_error_2, Value::Boolean(true));
+    assert_eq!(outer_error_2, Value::boolean(true));
 
     let collected_count = executor.get_variable("collected_count").unwrap();
-    assert_eq!(collected_count, Value::Number(2.0));
+    assert_eq!(collected_count, Value::number(2.0));
 }
 
 #[test]
@@ -7070,13 +7070,13 @@ configure { error_mode: :collect } {
 
     // All statements should execute despite errors
     let x = executor.get_variable("x").unwrap();
-    assert_eq!(x, Value::Number(3.0));
+    assert_eq!(x, Value::number(3.0));
 
     // Both errors should be collected
     let errors_source = "count = get_errors().length()";
     executor.execute_source(errors_source).unwrap();
     let count = executor.get_variable("count").unwrap();
-    assert_eq!(count, Value::Number(2.0));
+    assert_eq!(count, Value::number(2.0));
 }
 
 #[test]
@@ -7100,7 +7100,7 @@ count = get_errors().length()
 
     // All errors should be collected
     let count = executor.get_variable("count").unwrap();
-    assert_eq!(count, Value::Number(3.0));
+    assert_eq!(count, Value::number(3.0));
 }
 
 #[test]
@@ -7138,7 +7138,7 @@ count = errors.length()
     executor.execute_source(source).unwrap();
 
     let count = executor.get_variable("count").unwrap();
-    assert_eq!(count, Value::Number(0.0));
+    assert_eq!(count, Value::number(0.0));
 }
 
 #[test]
@@ -7152,7 +7152,7 @@ result = 42
     executor.execute_source(source).unwrap();
 
     let result = executor.get_variable("result").unwrap();
-    assert_eq!(result, Value::Number(42.0));
+    assert_eq!(result, Value::number(42.0));
 }
 
 // ============================================================================
@@ -7218,8 +7218,8 @@ has_cause = top_error.cause()
 
     let has_cause = executor.get_variable("has_cause").unwrap();
     // Should have a cause
-    match has_cause {
-        Value::Error(e) => {
+    match &has_cause.kind {
+        ValueKind::Error(e) => {
             assert_eq!(e.error_type, "RuntimeError");
             assert_eq!(e.message, "save failed");
         }
@@ -7237,7 +7237,7 @@ cause = error.cause()
     executor.execute_source(source).unwrap();
 
     let cause = executor.get_variable("cause").unwrap();
-    assert_eq!(cause, Value::None);
+    assert_eq!(cause, Value::none());
 }
 
 #[test]
@@ -7295,13 +7295,13 @@ ca = error.cause()
     executor.execute_source(source).unwrap();
 
     let t = executor.get_variable("t").unwrap();
-    assert_eq!(t, Value::String("ValueError".to_string()));
+    assert_eq!(t, Value::string("ValueError".to_string()));
 
     let m = executor.get_variable("m").unwrap();
-    assert_eq!(m, Value::String("test".to_string()));
+    assert_eq!(m, Value::string("test".to_string()));
 
     let ca = executor.get_variable("ca").unwrap();
-    assert_eq!(ca, Value::None);
+    assert_eq!(ca, Value::none());
 }
 
 #[test]
@@ -7320,10 +7320,10 @@ cause_msg = cause.message()
     executor.execute_source(source).unwrap();
 
     let error_msg = executor.get_variable("error_msg").unwrap();
-    assert_eq!(error_msg, Value::String("operation failed".to_string()));
+    assert_eq!(error_msg, Value::string("operation failed".to_string()));
 
     let cause_msg = executor.get_variable("cause_msg").unwrap();
-    assert_eq!(cause_msg, Value::String("network failure".to_string()));
+    assert_eq!(cause_msg, Value::string("network failure".to_string()));
 }
 
 #[test]
@@ -7386,7 +7386,7 @@ configure { error_mode: :lenient } {
     executor.execute_source(source).unwrap();
 
     let result = executor.get_variable("result").unwrap();
-    assert_eq!(result, Value::None);
+    assert_eq!(result, Value::none());
 }
 
 #[test]
@@ -7401,7 +7401,7 @@ configure { error_mode: :lenient } {
     executor.execute_source(source).unwrap();
 
     let result = executor.get_variable("result").unwrap();
-    assert_eq!(result, Value::None);
+    assert_eq!(result, Value::none());
 }
 
 #[test]
@@ -7416,7 +7416,7 @@ configure { error_mode: :lenient } {
     executor.execute_source(source).unwrap();
 
     let result = executor.get_variable("result").unwrap();
-    assert_eq!(result, Value::None);
+    assert_eq!(result, Value::none());
 }
 
 #[test]
@@ -7432,7 +7432,7 @@ configure { error_mode: :lenient } {
     executor.execute_source(source).unwrap();
 
     let result = executor.get_variable("result").unwrap();
-    assert_eq!(result, Value::None);
+    assert_eq!(result, Value::none());
 }
 
 #[test]
@@ -7448,7 +7448,7 @@ configure { error_mode: :lenient } {
     executor.execute_source(source).unwrap();
 
     let result = executor.get_variable("result").unwrap();
-    assert_eq!(result, Value::None);
+    assert_eq!(result, Value::none());
 }
 
 #[test]
@@ -7466,7 +7466,7 @@ errors = get_errors()
     executor.execute_source(source).unwrap();
 
     let errors = executor.get_variable("errors").unwrap();
-    if let Value::List(err_list) = errors {
+    if let ValueKind::List(err_list) = &errors.kind {
         assert_eq!(err_list.len(), 2, "Should have collected 2 division by zero errors");
     } else {
         panic!("Expected list of errors");
@@ -7497,10 +7497,10 @@ configure { error_mode: :lenient } {
     executor.execute_source(source).unwrap();
 
     let outer_result = executor.get_variable("outer_result").unwrap();
-    assert_eq!(outer_result, Value::None);  // Lenient mode returned none
+    assert_eq!(outer_result, Value::none());  // Lenient mode returned none
 
     let inner_result = executor.get_variable("inner_result").unwrap();
-    assert_eq!(inner_result, Value::Number(777.0));  // Strict mode raised, was caught
+    assert_eq!(inner_result, Value::number(777.0));  // Strict mode raised, was caught
 }
 
 // ============================================================================

@@ -1,5 +1,5 @@
 use graphoid::execution::Executor;
-use graphoid::values::Value;
+use graphoid::values::{Value, ValueKind};
 use std::path::PathBuf;
 
 #[test]
@@ -47,8 +47,8 @@ fn test_access_module_function() {
     executor.execute_source(source).unwrap();
 
     let result = executor.get_variable("result").unwrap();
-    match result {
-        Value::Number(n) => assert_eq!(n, 10.0),
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 10.0),
         _ => panic!("Expected number result, got {:?}", result),
     }
 }
@@ -67,8 +67,8 @@ fn test_access_module_variable() {
     executor.execute_source(source).unwrap();
 
     let value = executor.get_variable("value").unwrap();
-    match value {
-        Value::Number(n) => assert_eq!(n, 42.0),
+    match &value.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 42.0),
         _ => panic!("Expected number value, got {:?}", value),
     }
 }

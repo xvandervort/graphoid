@@ -3,7 +3,7 @@
 use graphoid::execution::Executor;
 use graphoid::lexer::Lexer;
 use graphoid::parser::Parser;
-use graphoid::values::List;
+use graphoid::values::{List, Value, ValueKind};
 
 /// Helper function to execute source code
 fn execute(source: &str) -> Result<(), String> {
@@ -71,7 +71,7 @@ fn test_string_operations() {
     "#;
 
     let result = execute_and_get(source, "message").unwrap();
-    assert_eq!(result, graphoid::values::Value::String("Hello World".to_string()));
+    assert_eq!(result, graphoid::values::Value::string("Hello World".to_string()));
 }
 
 #[test]
@@ -83,7 +83,7 @@ fn test_variable_shadowing() {
     "#;
 
     let result = execute_and_get(source, "x").unwrap();
-    assert_eq!(result, graphoid::values::Value::Number(30.0));
+    assert_eq!(result, graphoid::values::Value::number(30.0));
 }
 
 #[test]
@@ -108,9 +108,9 @@ fn test_boolean_logic() {
     let b = execute_and_get(source, "b").unwrap();
     let c = execute_and_get(source, "c").unwrap();
 
-    assert_eq!(a, graphoid::values::Value::Boolean(false));
-    assert_eq!(b, graphoid::values::Value::Boolean(true));
-    assert_eq!(c, graphoid::values::Value::Boolean(true));
+    assert_eq!(a, graphoid::values::Value::boolean(false));
+    assert_eq!(b, graphoid::values::Value::boolean(true));
+    assert_eq!(c, graphoid::values::Value::boolean(true));
 }
 
 #[test]
@@ -125,9 +125,9 @@ fn test_comparisons() {
     let r2 = execute_and_get(source, "result2").unwrap();
     let r3 = execute_and_get(source, "result3").unwrap();
 
-    assert_eq!(r1, graphoid::values::Value::Boolean(true));
-    assert_eq!(r2, graphoid::values::Value::Boolean(true));
-    assert_eq!(r3, graphoid::values::Value::Boolean(true));
+    assert_eq!(r1, graphoid::values::Value::boolean(true));
+    assert_eq!(r2, graphoid::values::Value::boolean(true));
+    assert_eq!(r3, graphoid::values::Value::boolean(true));
 }
 
 // ============================================================================
@@ -146,8 +146,8 @@ fn test_lambda_assignment_and_call() {
     let r1 = execute_and_get(source, "result1").unwrap();
     let r2 = execute_and_get(source, "result2").unwrap();
 
-    assert_eq!(r1, graphoid::values::Value::Number(10.0));
-    assert_eq!(r2, graphoid::values::Value::Number(12.0));
+    assert_eq!(r1, graphoid::values::Value::number(10.0));
+    assert_eq!(r2, graphoid::values::Value::number(12.0));
 }
 
 #[test]
@@ -162,8 +162,8 @@ fn test_multi_param_lambda() {
     let r1 = execute_and_get(source, "result1").unwrap();
     let r2 = execute_and_get(source, "result2").unwrap();
 
-    assert_eq!(r1, graphoid::values::Value::Number(10.0));
-    assert_eq!(r2, graphoid::values::Value::Number(20.0));
+    assert_eq!(r1, graphoid::values::Value::number(10.0));
+    assert_eq!(r2, graphoid::values::Value::number(20.0));
 }
 
 #[test]
@@ -178,8 +178,8 @@ fn test_zero_param_lambda() {
     let msg = execute_and_get(source, "msg").unwrap();
     let result = execute_and_get(source, "result").unwrap();
 
-    assert_eq!(msg, graphoid::values::Value::String("Hello World".to_string()));
-    assert_eq!(result, graphoid::values::Value::Number(42.0));
+    assert_eq!(msg, graphoid::values::Value::string("Hello World".to_string()));
+    assert_eq!(result, graphoid::values::Value::number(42.0));
 }
 
 // ============================================================================
@@ -201,10 +201,10 @@ fn test_list_indexing() {
     let last = execute_and_get(source, "last").unwrap();
     let second_last = execute_and_get(source, "second_last").unwrap();
 
-    assert_eq!(first, graphoid::values::Value::Number(10.0));
-    assert_eq!(second, graphoid::values::Value::Number(20.0));
-    assert_eq!(last, graphoid::values::Value::Number(50.0));
-    assert_eq!(second_last, graphoid::values::Value::Number(40.0));
+    assert_eq!(first, graphoid::values::Value::number(10.0));
+    assert_eq!(second, graphoid::values::Value::number(20.0));
+    assert_eq!(last, graphoid::values::Value::number(50.0));
+    assert_eq!(second_last, graphoid::values::Value::number(40.0));
 }
 
 #[test]
@@ -220,9 +220,9 @@ fn test_map_access() {
     let p = execute_and_get(source, "p").unwrap();
     let d = execute_and_get(source, "d").unwrap();
 
-    assert_eq!(h, graphoid::values::Value::String("localhost".to_string()));
-    assert_eq!(p, graphoid::values::Value::Number(8080.0));
-    assert_eq!(d, graphoid::values::Value::Boolean(true));
+    assert_eq!(h, graphoid::values::Value::string("localhost".to_string()));
+    assert_eq!(p, graphoid::values::Value::number(8080.0));
+    assert_eq!(d, graphoid::values::Value::boolean(true));
 }
 
 #[test]
@@ -245,12 +245,12 @@ fn test_list_methods() {
     let has_99 = execute_and_get(source, "has_99").unwrap();
     let is_empty = execute_and_get(source, "is_empty").unwrap();
 
-    assert_eq!(s, graphoid::values::Value::Number(5.0));
-    assert_eq!(f, graphoid::values::Value::Number(10.0));
-    assert_eq!(l, graphoid::values::Value::Number(50.0));
-    assert_eq!(has_30, graphoid::values::Value::Boolean(true));
-    assert_eq!(has_99, graphoid::values::Value::Boolean(false));
-    assert_eq!(is_empty, graphoid::values::Value::Boolean(true));
+    assert_eq!(s, graphoid::values::Value::number(5.0));
+    assert_eq!(f, graphoid::values::Value::number(10.0));
+    assert_eq!(l, graphoid::values::Value::number(50.0));
+    assert_eq!(has_30, graphoid::values::Value::boolean(true));
+    assert_eq!(has_99, graphoid::values::Value::boolean(false));
+    assert_eq!(is_empty, graphoid::values::Value::boolean(true));
 }
 
 #[test]
@@ -266,23 +266,23 @@ fn test_map_with_lambda() {
 
     assert_eq!(
         doubled,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(2.0),
-            graphoid::values::Value::Number(4.0),
-            graphoid::values::Value::Number(6.0),
-            graphoid::values::Value::Number(8.0),
-            graphoid::values::Value::Number(10.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(2.0),
+            graphoid::values::Value::number(4.0),
+            graphoid::values::Value::number(6.0),
+            graphoid::values::Value::number(8.0),
+            graphoid::values::Value::number(10.0),
         ]))
     );
 
     assert_eq!(
         squared,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(1.0),
-            graphoid::values::Value::Number(4.0),
-            graphoid::values::Value::Number(9.0),
-            graphoid::values::Value::Number(16.0),
-            graphoid::values::Value::Number(25.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(1.0),
+            graphoid::values::Value::number(4.0),
+            graphoid::values::Value::number(9.0),
+            graphoid::values::Value::number(16.0),
+            graphoid::values::Value::number(25.0),
         ]))
     );
 }
@@ -300,23 +300,23 @@ fn test_filter_with_lambda() {
 
     assert_eq!(
         evens,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(2.0),
-            graphoid::values::Value::Number(4.0),
-            graphoid::values::Value::Number(6.0),
-            graphoid::values::Value::Number(8.0),
-            graphoid::values::Value::Number(10.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(2.0),
+            graphoid::values::Value::number(4.0),
+            graphoid::values::Value::number(6.0),
+            graphoid::values::Value::number(8.0),
+            graphoid::values::Value::number(10.0),
         ]))
     );
 
     assert_eq!(
         gt_five,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(6.0),
-            graphoid::values::Value::Number(7.0),
-            graphoid::values::Value::Number(8.0),
-            graphoid::values::Value::Number(9.0),
-            graphoid::values::Value::Number(10.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(6.0),
+            graphoid::values::Value::number(7.0),
+            graphoid::values::Value::number(8.0),
+            graphoid::values::Value::number(9.0),
+            graphoid::values::Value::number(10.0),
         ]))
     );
 }
@@ -334,23 +334,23 @@ fn test_named_transformations() {
 
     assert_eq!(
         doubled,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(2.0),
-            graphoid::values::Value::Number(4.0),
-            graphoid::values::Value::Number(6.0),
-            graphoid::values::Value::Number(8.0),
-            graphoid::values::Value::Number(10.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(2.0),
+            graphoid::values::Value::number(4.0),
+            graphoid::values::Value::number(6.0),
+            graphoid::values::Value::number(8.0),
+            graphoid::values::Value::number(10.0),
         ]))
     );
 
     assert_eq!(
         squared,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(1.0),
-            graphoid::values::Value::Number(4.0),
-            graphoid::values::Value::Number(9.0),
-            graphoid::values::Value::Number(16.0),
-            graphoid::values::Value::Number(25.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(1.0),
+            graphoid::values::Value::number(4.0),
+            graphoid::values::Value::number(9.0),
+            graphoid::values::Value::number(16.0),
+            graphoid::values::Value::number(25.0),
         ]))
     );
 }
@@ -368,22 +368,22 @@ fn test_named_predicates() {
 
     assert_eq!(
         evens,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(2.0),
-            graphoid::values::Value::Number(4.0),
-            graphoid::values::Value::Number(6.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(2.0),
+            graphoid::values::Value::number(4.0),
+            graphoid::values::Value::number(6.0),
         ]))
     );
 
     assert_eq!(
         positives,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(1.0),
-            graphoid::values::Value::Number(2.0),
-            graphoid::values::Value::Number(3.0),
-            graphoid::values::Value::Number(4.0),
-            graphoid::values::Value::Number(5.0),
-            graphoid::values::Value::Number(6.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(1.0),
+            graphoid::values::Value::number(2.0),
+            graphoid::values::Value::number(3.0),
+            graphoid::values::Value::number(4.0),
+            graphoid::values::Value::number(5.0),
+            graphoid::values::Value::number(6.0),
         ]))
     );
 }
@@ -404,28 +404,28 @@ fn test_element_wise_operators() {
 
     assert_eq!(
         sums,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(11.0),
-            graphoid::values::Value::Number(22.0),
-            graphoid::values::Value::Number(33.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(11.0),
+            graphoid::values::Value::number(22.0),
+            graphoid::values::Value::number(33.0),
         ]))
     );
 
     assert_eq!(
         products,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(10.0),
-            graphoid::values::Value::Number(40.0),
-            graphoid::values::Value::Number(90.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(10.0),
+            graphoid::values::Value::number(40.0),
+            graphoid::values::Value::number(90.0),
         ]))
     );
 
     assert_eq!(
         scaled,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(10.0),
-            graphoid::values::Value::Number(20.0),
-            graphoid::values::Value::Number(30.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(10.0),
+            graphoid::values::Value::number(20.0),
+            graphoid::values::Value::number(30.0),
         ]))
     );
 }
@@ -445,26 +445,26 @@ fn test_list_slicing() {
 
     assert_eq!(
         middle,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(20.0),
-            graphoid::values::Value::Number(30.0),
-            graphoid::values::Value::Number(40.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(20.0),
+            graphoid::values::Value::number(30.0),
+            graphoid::values::Value::number(40.0),
         ]))
     );
 
     assert_eq!(
         from_start,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(10.0),
-            graphoid::values::Value::Number(20.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(10.0),
+            graphoid::values::Value::number(20.0),
         ]))
     );
 
     assert_eq!(
         to_end,
-        graphoid::values::Value::List(List::from_vec(vec![
-            graphoid::values::Value::Number(40.0),
-            graphoid::values::Value::Number(50.0),
+        Value::list(List::from_vec(vec![
+            graphoid::values::Value::number(40.0),
+            graphoid::values::Value::number(50.0),
         ]))
     );
 }
@@ -486,15 +486,15 @@ fn test_map_methods() {
     let map_size = execute_and_get(source, "map_size").unwrap();
 
     // Keys should be a list with 3 string elements (order may vary)
-    if let graphoid::values::Value::List(keys) = all_keys {
+    if let ValueKind::List(keys) = &all_keys.kind {
         assert_eq!(keys.len(), 3);
     } else {
         panic!("Expected list for keys");
     }
 
-    assert_eq!(has_host, graphoid::values::Value::Boolean(true));
-    assert_eq!(has_missing, graphoid::values::Value::Boolean(false));
-    assert_eq!(map_size, graphoid::values::Value::Number(3.0));
+    assert_eq!(has_host, graphoid::values::Value::boolean(true));
+    assert_eq!(has_missing, graphoid::values::Value::boolean(false));
+    assert_eq!(map_size, graphoid::values::Value::number(3.0));
 }
 
 // ============================================================================

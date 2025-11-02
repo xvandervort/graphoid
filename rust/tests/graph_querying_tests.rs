@@ -5,7 +5,7 @@ use graphoid::ast;
 use graphoid::execution::Executor;
 use graphoid::lexer::Lexer;
 use graphoid::parser::Parser;
-use graphoid::values::{Value, List};
+use graphoid::values::{Value, List, ValueKind};
 
 fn eval(code: &str) -> Value {
     let mut lexer = Lexer::new(code);
@@ -23,12 +23,12 @@ fn eval(code: &str) -> Value {
         executor.eval_stmt(stmt).unwrap();
     }
 
-    Value::None
+    Value::none()
 }
 
 fn list_strings(strs: Vec<&str>) -> Value {
-    Value::List(List::from_vec(
-        strs.into_iter().map(|s| Value::String(s.to_string())).collect()
+    Value::list(List::from_vec(
+        strs.into_iter().map(|s| Value::string(s.to_string())).collect()
     ))
 }
 
@@ -45,7 +45,7 @@ fn test_has_path_direct_edge() {
         g.add_edge("A", "B")
         g.has_path("A", "B")
     "#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn test_has_path_indirect() {
         g.add_edge("B", "C")
         g.has_path("A", "C")
     "#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn test_has_path_no_path() {
         g.has_path("B", "A")
     "#;
     // Directed graph - no path from B to A
-    assert_eq!(eval(code), Value::Boolean(false));
+    assert_eq!(eval(code), Value::boolean(false));
 }
 
 #[test]
@@ -84,7 +84,7 @@ fn test_has_path_self() {
         g.has_path("A", "A")
     "#;
     // Path from node to itself (zero edges)
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 // ============================================================================
@@ -100,7 +100,7 @@ fn test_distance_direct_edge() {
         g.add_edge("A", "B")
         g.distance("A", "B")
     "#;
-    assert_eq!(eval(code), Value::Number(1.0));
+    assert_eq!(eval(code), Value::number(1.0));
 }
 
 #[test]
@@ -114,7 +114,7 @@ fn test_distance_two_hops() {
         g.add_edge("B", "C")
         g.distance("A", "C")
     "#;
-    assert_eq!(eval(code), Value::Number(2.0));
+    assert_eq!(eval(code), Value::number(2.0));
 }
 
 #[test]
@@ -132,7 +132,7 @@ fn test_distance_shortest_when_multiple_paths() {
         g.distance("A", "D")
     "#;
     // Direct path A->D is 1, indirect A->B->C->D is 3
-    assert_eq!(eval(code), Value::Number(1.0));
+    assert_eq!(eval(code), Value::number(1.0));
 }
 
 #[test]
@@ -144,7 +144,7 @@ fn test_distance_no_path() {
         g.distance("A", "B")
     "#;
     // No path exists - should return -1 or none
-    assert_eq!(eval(code), Value::Number(-1.0));
+    assert_eq!(eval(code), Value::number(-1.0));
 }
 
 // ============================================================================
@@ -164,7 +164,7 @@ fn test_all_paths_single_path() {
     let result = eval(code);
 
     // Check it's a list with one element
-    if let Value::List(paths) = result {
+    if let ValueKind::List(paths) = &result.kind {
         assert_eq!(paths.len(), 1);
 
         // First path should be ["A", "B"]
@@ -190,7 +190,7 @@ fn test_all_paths_multiple_paths() {
     // Should return: [["A", "C"], ["A", "B", "C"]]
     let result = eval(code);
 
-    if let Value::List(paths) = result {
+    if let ValueKind::List(paths) = &result.kind {
         assert_eq!(paths.len(), 2);
     } else {
         panic!("Expected list of paths");
@@ -212,7 +212,7 @@ fn test_all_paths_respects_max_length() {
     // A->B->C has 2 edges, so shouldn't be included
     let result = eval(code);
 
-    if let Value::List(paths) = result {
+    if let ValueKind::List(paths) = &result.kind {
         assert_eq!(paths.len(), 0); // No paths with length <= 1
     } else {
         panic!("Expected list of paths");
@@ -230,7 +230,7 @@ fn test_all_paths_no_paths() {
     // No edges, so no paths
     let result = eval(code);
 
-    if let Value::List(paths) = result {
+    if let ValueKind::List(paths) = &result.kind {
         assert_eq!(paths.len(), 0);
     } else {
         panic!("Expected list of paths");

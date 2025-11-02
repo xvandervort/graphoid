@@ -76,11 +76,11 @@ fn test_behavior_instance_with_policy() {
 #[test]
 fn test_apply_behaviors_empty_list() {
     // No behaviors = no change
-    let value = Value::Number(42.5);
+    let value = Value::number(42.5);
     let behaviors: Vec<BehaviorInstance> = vec![];
 
     let result = apply_behaviors(value.clone(), &behaviors).unwrap();
-    assert_eq!(result, Value::Number(42.5));
+    assert_eq!(result, Value::number(42.5));
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn test_apply_behaviors_sequence() {
     // Multiple behaviors applied in order
     // Note: We'll implement actual transformations in Sub-Phase 7.2
     // For now, we're just testing the framework can apply behaviors sequentially
-    let value = Value::None;
+    let value = Value::none();
     let behaviors = vec![
         BehaviorInstance::new(BehaviorSpec::NoneToZero),
     ];
@@ -103,14 +103,14 @@ fn test_apply_behaviors_sequence() {
 fn test_apply_behaviors_skip_non_applicable() {
     // Skip behaviors that don't apply to the value type
     // Uppercase only applies to strings, so it should skip numbers
-    let value = Value::Number(42.0);
+    let value = Value::number(42.0);
     let behaviors = vec![
         BehaviorInstance::new(BehaviorSpec::Uppercase),
     ];
 
     let result = apply_behaviors(value.clone(), &behaviors).unwrap();
     // Number should be unchanged (uppercase doesn't apply)
-    assert_eq!(result, Value::Number(42.0));
+    assert_eq!(result, Value::number(42.0));
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn test_behavior_transform_returns_value() {
     let spec = BehaviorSpec::NoneToZero;
     let behavior = spec.instantiate();
 
-    let value = Value::None;
+    let value = Value::none();
     let result = behavior.transform(&value);
 
     // Should return a Result<Value, GraphoidError>
@@ -133,11 +133,11 @@ fn test_behavior_applies_to_filters_types() {
     let behavior = spec.instantiate();
 
     // Uppercase applies to strings
-    let string_value = Value::String("hello".to_string());
+    let string_value = Value::string("hello".to_string());
     assert!(behavior.applies_to(&string_value));
 
     // Uppercase should NOT apply to numbers
-    let number_value = Value::Number(42.0);
+    let number_value = Value::number(42.0);
     assert!(!behavior.applies_to(&number_value));
 }
 
@@ -145,7 +145,7 @@ fn test_behavior_applies_to_filters_types() {
 fn test_behavior_application_order_matters() {
     // First added = first applied
     // We'll verify this more thoroughly in Sub-Phase 7.2 with actual transformations
-    let value = Value::None;
+    let value = Value::none();
 
     // Create behaviors in specific order
     let behaviors = vec![
@@ -206,9 +206,9 @@ fn test_retroactive_policy_clean() {
     use graphoid::graph::behaviors::apply_retroactive_to_list;
 
     let mut list = List::new();
-    list.append(Value::None).unwrap();
-    list.append(Value::None).unwrap();
-    list.append(Value::Number(42.0)).unwrap();
+    list.append(Value::none()).unwrap();
+    list.append(Value::none()).unwrap();
+    list.append(Value::number(42.0)).unwrap();
 
     // Add behavior with Clean policy (default)
     let behavior = BehaviorInstance::new(BehaviorSpec::NoneToZero);
@@ -227,8 +227,8 @@ fn test_retroactive_policy_warn() {
     use graphoid::graph::behaviors::apply_retroactive_to_list;
 
     let mut list = List::new();
-    list.append(Value::None).unwrap();
-    list.append(Value::Number(42.0)).unwrap();
+    list.append(Value::none()).unwrap();
+    list.append(Value::number(42.0)).unwrap();
 
     // Add behavior with Warn policy
     let behavior = BehaviorInstance::with_policy(
@@ -241,7 +241,7 @@ fn test_retroactive_policy_warn() {
     assert!(result.is_ok());
 
     // Values should be unchanged
-    assert_eq!(list.get(0).unwrap(), &Value::None);
+    assert_eq!(list.get(0).unwrap(), &Value::none());
 }
 
 #[test]
@@ -250,8 +250,8 @@ fn test_retroactive_policy_enforce() {
     use graphoid::graph::behaviors::apply_retroactive_to_list;
 
     let mut list = List::new();
-    list.append(Value::None).unwrap();
-    list.append(Value::Number(42.0)).unwrap();
+    list.append(Value::none()).unwrap();
+    list.append(Value::number(42.0)).unwrap();
 
     // Add behavior with Enforce policy
     let behavior = BehaviorInstance::with_policy(
@@ -275,8 +275,8 @@ fn test_retroactive_policy_ignore() {
     use graphoid::graph::behaviors::apply_retroactive_to_list;
 
     let mut list = List::new();
-    list.append(Value::None).unwrap();
-    list.append(Value::Number(42.0)).unwrap();
+    list.append(Value::none()).unwrap();
+    list.append(Value::number(42.0)).unwrap();
 
     // Add behavior with Ignore policy
     let behavior = BehaviorInstance::with_policy(
@@ -289,7 +289,7 @@ fn test_retroactive_policy_ignore() {
     assert!(result.is_ok());
 
     // Values should be unchanged
-    assert_eq!(list.get(0).unwrap(), &Value::None);
+    assert_eq!(list.get(0).unwrap(), &Value::none());
 }
 
 // ============================================================================
@@ -307,8 +307,8 @@ fn test_proactive_application_to_new_values() {
     // For now, just verify we can create a list
     // In 7.2, we'll add:
     // list.add_behavior(BehaviorInstance::new(BehaviorSpec::NoneToZero));
-    // list.append(Value::None).unwrap();
-    // assert_eq!(list.get(0).unwrap(), &Value::Number(0.0));
+    // list.append(Value::none()).unwrap();
+    // assert_eq!(list.get(0).unwrap(), &Value::number(0.0));
 
     assert_eq!(list.len(), 0);
 }

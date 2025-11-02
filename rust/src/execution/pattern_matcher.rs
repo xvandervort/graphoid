@@ -25,7 +25,7 @@
 //! ```
 
 use crate::ast::{Pattern, LiteralValue, PatternClause};
-use crate::values::Value;
+use crate::values::{Value, ValueKind};
 use crate::error::{GraphoidError, Result};
 use std::collections::HashMap;
 
@@ -53,8 +53,8 @@ impl PatternMatcher {
     ///     value: LiteralValue::Number(0.0),
     ///     position: SourcePosition { line: 1, column: 1, file: None },
     /// };
-    /// assert!(matcher.matches(&pattern, &Value::Number(0.0)));
-    /// assert!(!matcher.matches(&pattern, &Value::Number(42.0)));
+    /// assert!(matcher.matches(&pattern, &Value::number(0.0)));
+    /// assert!(!matcher.matches(&pattern, &Value::number(42.0)));
     /// ```
     pub fn matches(&self, pattern: &Pattern, value: &Value) -> bool {
         match pattern {
@@ -70,14 +70,14 @@ impl PatternMatcher {
 
     /// Check if a literal pattern matches a value
     fn literal_matches(&self, literal: &LiteralValue, value: &Value) -> bool {
-        match (literal, value) {
-            (LiteralValue::Number(n1), Value::Number(n2)) => {
+        match (literal, &value.kind) {
+            (LiteralValue::Number(n1), ValueKind::Number(n2)) => {
                 // Use epsilon comparison for floating point
                 (n1 - n2).abs() < f64::EPSILON
             }
-            (LiteralValue::String(s1), Value::String(s2)) => s1 == s2,
-            (LiteralValue::Boolean(b1), Value::Boolean(b2)) => b1 == b2,
-            (LiteralValue::None, Value::None) => true,
+            (LiteralValue::String(s1), ValueKind::String(s2)) => s1 == s2,
+            (LiteralValue::Boolean(b1), ValueKind::Boolean(b2)) => b1 == b2,
+            (LiteralValue::None, ValueKind::None) => true,
             _ => false, // Type mismatch
         }
     }
@@ -100,8 +100,9 @@ impl PatternMatcher {
     ///     name: "x".to_string(),
     ///     position: SourcePosition { line: 1, column: 1, file: None },
     /// };
-    /// let bindings = matcher.bind(&pattern, &Value::Number(42.0)).unwrap();
-    /// assert_eq!(bindings.get("x"), Some(&Value::Number(42.0)));
+    /// let val = Value::number(42.0);
+    /// let bindings = matcher.bind(&pattern, &val).unwrap();
+    /// assert_eq!(bindings.get("x"), Some(&val));
     /// ```
     pub fn bind(&self, pattern: &Pattern, value: &Value)
         -> Result<HashMap<String, Value>>
@@ -162,7 +163,7 @@ impl PatternMatcher {
     ///     },
     /// ];
     ///
-    /// let args = vec![Value::Number(0.0)];
+    /// let args = vec![Value::number(0.0)];
     /// let result = matcher.find_match(&clauses, &args).unwrap();
     /// assert!(result.is_some());
     /// ```
@@ -221,8 +222,8 @@ mod tests {
             position: pos(),
         };
 
-        assert!(matcher.matches(&pattern, &Value::Number(42.0)));
-        assert!(!matcher.matches(&pattern, &Value::Number(0.0)));
+        assert!(matcher.matches(&pattern, &Value::number(42.0)));
+        assert!(!matcher.matches(&pattern, &Value::number(0.0)));
     }
 
     #[test]
@@ -233,7 +234,7 @@ mod tests {
             position: pos(),
         };
 
-        let bindings = matcher.bind(&pattern, &Value::Number(99.0)).unwrap();
-        assert_eq!(bindings.get("x"), Some(&Value::Number(99.0)));
+        let bindings = matcher.bind(&pattern, &Value::number(99.0)).unwrap();
+        assert_eq!(bindings.get("x"), Some(&Value::number(99.0)));
     }
 }

@@ -32,7 +32,7 @@ fn test_simple_if_then_else_true() {
     }
 
     let result = executor.env().get("result").unwrap();
-    assert_eq!(result, Value::String("big".to_string()));
+    assert_eq!(result, Value::string("big".to_string()));
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn test_simple_if_then_else_false() {
     }
 
     let result = executor.env().get("result").unwrap();
-    assert_eq!(result, Value::String("small".to_string()));
+    assert_eq!(result, Value::string("small".to_string()));
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn test_if_then_else_with_expressions() {
     }
 
     let result = executor.env().get("result").unwrap();
-    assert_eq!(result, Value::Number(300.0)); // 150 * 2
+    assert_eq!(result, Value::number(300.0)); // 150 * 2
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn test_nested_if_then_else() {
     }
 
     let result = executor.env().get("result").unwrap();
-    assert_eq!(result, Value::String("medium".to_string()));
+    assert_eq!(result, Value::string("medium".to_string()));
 }
 
 #[test]
@@ -116,7 +116,7 @@ fn test_if_then_else_with_boolean_literals() {
     }
 
     let result = executor.env().get("result").unwrap();
-    assert_eq!(result, Value::String("yes".to_string()));
+    assert_eq!(result, Value::string("yes".to_string()));
 }
 
 // ============================================================================
@@ -141,7 +141,7 @@ fn test_suffix_if_true() {
     }
 
     let result = executor.env().get("result").unwrap();
-    assert_eq!(result, Value::String("go".to_string()));
+    assert_eq!(result, Value::string("go".to_string()));
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn test_suffix_if_false() {
     }
 
     let result = executor.env().get("result").unwrap();
-    assert_eq!(result, Value::None);
+    assert_eq!(result, Value::none());
 }
 
 #[test]
@@ -184,7 +184,7 @@ fn test_suffix_if_with_comparison() {
     }
 
     let result = executor.env().get("result").unwrap();
-    assert_eq!(result, Value::Number(20.0));
+    assert_eq!(result, Value::number(20.0));
 }
 
 // ============================================================================
@@ -209,7 +209,7 @@ fn test_suffix_unless_false() {
     }
 
     let message = executor.env().get("message").unwrap();
-    assert_eq!(message, Value::String("OK".to_string()));
+    assert_eq!(message, Value::string("OK".to_string()));
 }
 
 #[test]
@@ -230,7 +230,7 @@ fn test_suffix_unless_true() {
     }
 
     let message = executor.env().get("message").unwrap();
-    assert_eq!(message, Value::None);
+    assert_eq!(message, Value::none());
 }
 
 #[test]
@@ -251,7 +251,7 @@ fn test_suffix_unless_with_comparison() {
     }
 
     let status = executor.env().get("status").unwrap();
-    assert_eq!(status, Value::String("active".to_string()));
+    assert_eq!(status, Value::string("active".to_string()));
 }
 
 // ============================================================================
@@ -277,7 +277,7 @@ fn test_if_then_else_with_none_values() {
 
     let result = executor.env().get("result").unwrap();
     // none is falsy, so should take else branch
-    assert_eq!(result, Value::String("nothing".to_string()));
+    assert_eq!(result, Value::string("nothing".to_string()));
 }
 
 #[test]
@@ -299,5 +299,5 @@ fn test_if_then_else_with_numeric_condition() {
 
     let result = executor.env().get("result").unwrap();
     // 0 is falsy in most languages
-    assert_eq!(result, Value::String("falsy".to_string()));
+    assert_eq!(result, Value::string("falsy".to_string()));
 }

@@ -5,7 +5,7 @@ use graphoid::ast;
 use graphoid::execution::Executor;
 use graphoid::lexer::Lexer;
 use graphoid::parser::Parser;
-use graphoid::values::{Value, List};
+use graphoid::values::{Value, List, ValueKind};
 
 fn eval(code: &str) -> Value {
     let mut lexer = Lexer::new(code);
@@ -23,11 +23,11 @@ fn eval(code: &str) -> Value {
         executor.eval_stmt(stmt).unwrap();
     }
 
-    Value::None
+    Value::none()
 }
 
 fn list_nums(nums: Vec<f64>) -> Value {
-    Value::List(List::from_vec(nums.into_iter().map(Value::Number).collect()))
+    Value::list(List::from_vec(nums.into_iter().map(Value::number).collect()))
 }
 
 // ============================================================================
@@ -206,61 +206,61 @@ fn test_transformation_decrement() {
 #[test]
 fn test_list_size() {
     let code = "[1, 2, 3, 4, 5].size()";
-    assert_eq!(eval(code), Value::Number(5.0));
+    assert_eq!(eval(code), Value::number(5.0));
 }
 
 #[test]
 fn test_list_size_empty() {
     let code = "[].size()";
-    assert_eq!(eval(code), Value::Number(0.0));
+    assert_eq!(eval(code), Value::number(0.0));
 }
 
 #[test]
 fn test_list_first() {
     let code = "[10, 20, 30].first()";
-    assert_eq!(eval(code), Value::Number(10.0));
+    assert_eq!(eval(code), Value::number(10.0));
 }
 
 #[test]
 fn test_list_last() {
     let code = "[10, 20, 30].last()";
-    assert_eq!(eval(code), Value::Number(30.0));
+    assert_eq!(eval(code), Value::number(30.0));
 }
 
 #[test]
 fn test_list_is_empty_false() {
     let code = "[1, 2, 3].is_empty()";
-    assert_eq!(eval(code), Value::Boolean(false));
+    assert_eq!(eval(code), Value::boolean(false));
 }
 
 #[test]
 fn test_list_is_empty_true() {
     let code = "[].is_empty()";
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
 fn test_list_contains_true() {
     let code = "[1, 2, 3, 4, 5].contains(3)";
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
 fn test_list_contains_false() {
     let code = "[1, 2, 3, 4, 5].contains(10)";
-    assert_eq!(eval(code), Value::Boolean(false));
+    assert_eq!(eval(code), Value::boolean(false));
 }
 
 #[test]
 fn test_list_index_of_found() {
     let code = "[10, 20, 30, 40].index_of(30)";
-    assert_eq!(eval(code), Value::Number(2.0));
+    assert_eq!(eval(code), Value::number(2.0));
 }
 
 #[test]
 fn test_list_index_of_not_found() {
     let code = "[10, 20, 30, 40].index_of(99)";
-    assert_eq!(eval(code), Value::Number(-1.0));
+    assert_eq!(eval(code), Value::number(-1.0));
 }
 
 // ============================================================================
@@ -281,13 +281,13 @@ result
 #[test]
 fn test_list_reduce_sum() {
     let code = "[1, 2, 3, 4, 5].reduce(0, (acc, x) => acc + x)";
-    assert_eq!(eval(code), Value::Number(15.0));
+    assert_eq!(eval(code), Value::number(15.0));
 }
 
 #[test]
 fn test_list_reduce_product() {
     let code = "[1, 2, 3, 4].reduce(1, (acc, x) => acc * x)";
-    assert_eq!(eval(code), Value::Number(24.0));
+    assert_eq!(eval(code), Value::number(24.0));
 }
 
 #[test]
@@ -392,7 +392,7 @@ items
 fn test_list_pop_immutable() {
     let code = "[1, 2, 3].pop()";
     // pop() without ! returns the popped value
-    assert_eq!(eval(code), Value::Number(3.0));
+    assert_eq!(eval(code), Value::number(3.0));
 }
 
 #[test]
@@ -403,7 +403,7 @@ popped = items.pop!()
 popped
 "#;
     // pop!() returns the popped value
-    assert_eq!(eval(code), Value::Number(3.0));
+    assert_eq!(eval(code), Value::number(3.0));
 }
 
 #[test]
@@ -497,7 +497,7 @@ items
 #[test]
 fn test_string_upper() {
     let code = r#""hello world".upper()"#;
-    assert_eq!(eval(code), Value::String("HELLO WORLD".to_string()));
+    assert_eq!(eval(code), Value::string("HELLO WORLD".to_string()));
 }
 
 #[test]
@@ -507,37 +507,37 @@ s = "hello"
 s.upper()
 s
 "#;
-    assert_eq!(eval(code), Value::String("hello".to_string()));
+    assert_eq!(eval(code), Value::string("hello".to_string()));
 }
 
 #[test]
 fn test_string_upper_empty() {
     let code = r#""".upper()"#;
-    assert_eq!(eval(code), Value::String("".to_string()));
+    assert_eq!(eval(code), Value::string("".to_string()));
 }
 
 #[test]
 fn test_string_upper_mixed_case() {
     let code = r#""HeLLo WoRLd".upper()"#;
-    assert_eq!(eval(code), Value::String("HELLO WORLD".to_string()));
+    assert_eq!(eval(code), Value::string("HELLO WORLD".to_string()));
 }
 
 #[test]
 fn test_string_lower() {
     let code = r#""HELLO WORLD".lower()"#;
-    assert_eq!(eval(code), Value::String("hello world".to_string()));
+    assert_eq!(eval(code), Value::string("hello world".to_string()));
 }
 
 #[test]
 fn test_string_lower_empty() {
     let code = r#""".lower()"#;
-    assert_eq!(eval(code), Value::String("".to_string()));
+    assert_eq!(eval(code), Value::string("".to_string()));
 }
 
 #[test]
 fn test_string_lower_mixed_case() {
     let code = r#""HeLLo WoRLd".lower()"#;
-    assert_eq!(eval(code), Value::String("hello world".to_string()));
+    assert_eq!(eval(code), Value::string("hello world".to_string()));
 }
 
 // ============================================================================
@@ -547,37 +547,37 @@ fn test_string_lower_mixed_case() {
 #[test]
 fn test_string_trim() {
     let code = r#""  hello world  ".trim()"#;
-    assert_eq!(eval(code), Value::String("hello world".to_string()));
+    assert_eq!(eval(code), Value::string("hello world".to_string()));
 }
 
 #[test]
 fn test_string_trim_leading_only() {
     let code = r#""  hello world".trim()"#;
-    assert_eq!(eval(code), Value::String("hello world".to_string()));
+    assert_eq!(eval(code), Value::string("hello world".to_string()));
 }
 
 #[test]
 fn test_string_trim_trailing_only() {
     let code = r#""hello world  ".trim()"#;
-    assert_eq!(eval(code), Value::String("hello world".to_string()));
+    assert_eq!(eval(code), Value::string("hello world".to_string()));
 }
 
 #[test]
 fn test_string_trim_no_whitespace() {
     let code = r#""hello".trim()"#;
-    assert_eq!(eval(code), Value::String("hello".to_string()));
+    assert_eq!(eval(code), Value::string("hello".to_string()));
 }
 
 #[test]
 fn test_string_trim_empty() {
     let code = r#""".trim()"#;
-    assert_eq!(eval(code), Value::String("".to_string()));
+    assert_eq!(eval(code), Value::string("".to_string()));
 }
 
 #[test]
 fn test_string_trim_all_whitespace() {
     let code = r#""   ".trim()"#;
-    assert_eq!(eval(code), Value::String("".to_string()));
+    assert_eq!(eval(code), Value::string("".to_string()));
 }
 
 // ============================================================================
@@ -587,25 +587,25 @@ fn test_string_trim_all_whitespace() {
 #[test]
 fn test_string_reverse() {
     let code = r#""hello".reverse()"#;
-    assert_eq!(eval(code), Value::String("olleh".to_string()));
+    assert_eq!(eval(code), Value::string("olleh".to_string()));
 }
 
 #[test]
 fn test_string_reverse_empty() {
     let code = r#""".reverse()"#;
-    assert_eq!(eval(code), Value::String("".to_string()));
+    assert_eq!(eval(code), Value::string("".to_string()));
 }
 
 #[test]
 fn test_string_reverse_single_char() {
     let code = r#""a".reverse()"#;
-    assert_eq!(eval(code), Value::String("a".to_string()));
+    assert_eq!(eval(code), Value::string("a".to_string()));
 }
 
 #[test]
 fn test_string_reverse_with_spaces() {
     let code = r#""hello world".reverse()"#;
-    assert_eq!(eval(code), Value::String("dlrow olleh".to_string()));
+    assert_eq!(eval(code), Value::string("dlrow olleh".to_string()));
 }
 
 // ============================================================================
@@ -615,37 +615,37 @@ fn test_string_reverse_with_spaces() {
 #[test]
 fn test_string_substring_basic() {
     let code = r#""hello world".substring(0, 5)"#;
-    assert_eq!(eval(code), Value::String("hello".to_string()));
+    assert_eq!(eval(code), Value::string("hello".to_string()));
 }
 
 #[test]
 fn test_string_substring_middle() {
     let code = r#""hello world".substring(6, 11)"#;
-    assert_eq!(eval(code), Value::String("world".to_string()));
+    assert_eq!(eval(code), Value::string("world".to_string()));
 }
 
 #[test]
 fn test_string_substring_single_char() {
     let code = r#""hello".substring(1, 2)"#;
-    assert_eq!(eval(code), Value::String("e".to_string()));
+    assert_eq!(eval(code), Value::string("e".to_string()));
 }
 
 #[test]
 fn test_string_substring_full_string() {
     let code = r#""hello".substring(0, 5)"#;
-    assert_eq!(eval(code), Value::String("hello".to_string()));
+    assert_eq!(eval(code), Value::string("hello".to_string()));
 }
 
 #[test]
 fn test_string_substring_empty_range() {
     let code = r#""hello".substring(2, 2)"#;
-    assert_eq!(eval(code), Value::String("".to_string()));
+    assert_eq!(eval(code), Value::string("".to_string()));
 }
 
 #[test]
 fn test_string_substring_to_end() {
     let code = r#""hello world".substring(6, 20)"#;
-    assert_eq!(eval(code), Value::String("world".to_string()));
+    assert_eq!(eval(code), Value::string("world".to_string()));
 }
 
 // ============================================================================
@@ -655,10 +655,10 @@ fn test_string_substring_to_end() {
 #[test]
 fn test_string_split_basic() {
     let code = r#""a,b,c".split(",")"#;
-    let expected = Value::List(List::from_vec(vec![
-        Value::String("a".to_string()),
-        Value::String("b".to_string()),
-        Value::String("c".to_string()),
+    let expected = Value::list(List::from_vec(vec![
+        Value::string("a".to_string()),
+        Value::string("b".to_string()),
+        Value::string("c".to_string()),
     ]));
     assert_eq!(eval(code), expected);
 }
@@ -666,10 +666,10 @@ fn test_string_split_basic() {
 #[test]
 fn test_string_split_spaces() {
     let code = r#""hello world test".split(" ")"#;
-    let expected = Value::List(List::from_vec(vec![
-        Value::String("hello".to_string()),
-        Value::String("world".to_string()),
-        Value::String("test".to_string()),
+    let expected = Value::list(List::from_vec(vec![
+        Value::string("hello".to_string()),
+        Value::string("world".to_string()),
+        Value::string("test".to_string()),
     ]));
     assert_eq!(eval(code), expected);
 }
@@ -677,8 +677,8 @@ fn test_string_split_spaces() {
 #[test]
 fn test_string_split_no_delimiter() {
     let code = r#""hello".split(",")"#;
-    let expected = Value::List(List::from_vec(vec![
-        Value::String("hello".to_string()),
+    let expected = Value::list(List::from_vec(vec![
+        Value::string("hello".to_string()),
     ]));
     assert_eq!(eval(code), expected);
 }
@@ -686,8 +686,8 @@ fn test_string_split_no_delimiter() {
 #[test]
 fn test_string_split_empty_string() {
     let code = r#""".split(",")"#;
-    let expected = Value::List(List::from_vec(vec![
-        Value::String("".to_string()),
+    let expected = Value::list(List::from_vec(vec![
+        Value::string("".to_string()),
     ]));
     assert_eq!(eval(code), expected);
 }
@@ -695,10 +695,10 @@ fn test_string_split_empty_string() {
 #[test]
 fn test_string_split_consecutive_delimiters() {
     let code = r#""a,,b".split(",")"#;
-    let expected = Value::List(List::from_vec(vec![
-        Value::String("a".to_string()),
-        Value::String("".to_string()),
-        Value::String("b".to_string()),
+    let expected = Value::list(List::from_vec(vec![
+        Value::string("a".to_string()),
+        Value::string("".to_string()),
+        Value::string("b".to_string()),
     ]));
     assert_eq!(eval(code), expected);
 }
@@ -710,97 +710,97 @@ fn test_string_split_consecutive_delimiters() {
 #[test]
 fn test_string_starts_with_true() {
     let code = r#""hello world".starts_with("hello")"#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
 fn test_string_starts_with_false() {
     let code = r#""hello world".starts_with("world")"#;
-    assert_eq!(eval(code), Value::Boolean(false));
+    assert_eq!(eval(code), Value::boolean(false));
 }
 
 #[test]
 fn test_string_starts_with_empty_prefix() {
     let code = r#""hello".starts_with("")"#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
 fn test_string_starts_with_same_string() {
     let code = r#""hello".starts_with("hello")"#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
 fn test_string_starts_with_longer_prefix() {
     let code = r#""hi".starts_with("hello")"#;
-    assert_eq!(eval(code), Value::Boolean(false));
+    assert_eq!(eval(code), Value::boolean(false));
 }
 
 #[test]
 fn test_string_ends_with_true() {
     let code = r#""hello world".ends_with("world")"#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
 fn test_string_ends_with_false() {
     let code = r#""hello world".ends_with("hello")"#;
-    assert_eq!(eval(code), Value::Boolean(false));
+    assert_eq!(eval(code), Value::boolean(false));
 }
 
 #[test]
 fn test_string_ends_with_empty_suffix() {
     let code = r#""hello".ends_with("")"#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
 fn test_string_ends_with_same_string() {
     let code = r#""hello".ends_with("hello")"#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
 fn test_string_ends_with_longer_suffix() {
     let code = r#""hi".ends_with("hello")"#;
-    assert_eq!(eval(code), Value::Boolean(false));
+    assert_eq!(eval(code), Value::boolean(false));
 }
 
 #[test]
 fn test_string_contains_true() {
     let code = r#""hello world".contains("lo wo")"#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
 fn test_string_contains_false() {
     let code = r#""hello world".contains("xyz")"#;
-    assert_eq!(eval(code), Value::Boolean(false));
+    assert_eq!(eval(code), Value::boolean(false));
 }
 
 #[test]
 fn test_string_contains_empty_substring() {
     let code = r#""hello".contains("")"#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
 fn test_string_contains_at_start() {
     let code = r#""hello world".contains("hello")"#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
 fn test_string_contains_at_end() {
     let code = r#""hello world".contains("world")"#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
 fn test_string_contains_same_string() {
     let code = r#""hello".contains("hello")"#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 // ============================================================================
@@ -814,7 +814,7 @@ s = "hello world"
 s.upper!()
 s
 "#;
-    assert_eq!(eval(code), Value::String("HELLO WORLD".to_string()));
+    assert_eq!(eval(code), Value::string("HELLO WORLD".to_string()));
 }
 
 #[test]
@@ -823,7 +823,7 @@ fn test_string_upper_mutable_returns_none() {
 s = "hello"
 s.upper!()
 "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }
 
 #[test]
@@ -833,7 +833,7 @@ s = "HELLO WORLD"
 s.lower!()
 s
 "#;
-    assert_eq!(eval(code), Value::String("hello world".to_string()));
+    assert_eq!(eval(code), Value::string("hello world".to_string()));
 }
 
 #[test]
@@ -842,7 +842,7 @@ fn test_string_lower_mutable_returns_none() {
 s = "HELLO"
 s.lower!()
 "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }
 
 #[test]
@@ -852,7 +852,7 @@ s = "  hello world  "
 s.trim!()
 s
 "#;
-    assert_eq!(eval(code), Value::String("hello world".to_string()));
+    assert_eq!(eval(code), Value::string("hello world".to_string()));
 }
 
 #[test]
@@ -861,7 +861,7 @@ fn test_string_trim_mutable_returns_none() {
 s = "  hello  "
 s.trim!()
 "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }
 
 #[test]
@@ -871,7 +871,7 @@ s = "hello"
 s.reverse!()
 s
 "#;
-    assert_eq!(eval(code), Value::String("olleh".to_string()));
+    assert_eq!(eval(code), Value::string("olleh".to_string()));
 }
 
 #[test]
@@ -880,7 +880,7 @@ fn test_string_reverse_mutable_returns_none() {
 s = "abc"
 s.reverse!()
 "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }
 
 #[test]
@@ -891,7 +891,7 @@ s.trim!()
 s.lower!()
 s
 "#;
-    assert_eq!(eval(code), Value::String("hello world".to_string()));
+    assert_eq!(eval(code), Value::string("hello world".to_string()));
 }
 
 #[test]
@@ -902,7 +902,7 @@ upper_s = s.upper()
 s.reverse!()
 s
 "#;
-    assert_eq!(eval(code), Value::String("olleh".to_string()));
+    assert_eq!(eval(code), Value::string("olleh".to_string()));
 }
 
 #[test]
@@ -913,7 +913,7 @@ upper_s = s.upper()
 s.reverse!()
 upper_s
 "#;
-    assert_eq!(eval(code), Value::String("HELLO".to_string()));
+    assert_eq!(eval(code), Value::string("HELLO".to_string()));
 }
 
 // ============================================================================
@@ -927,11 +927,11 @@ m = {"name": "Alice", "age": 30, "city": "NYC"}
 m.keys()
 "#;
     let result = eval(code);
-    if let Value::List(list) = result {
+    if let ValueKind::List(list) = &result.kind {
         let keys: Vec<String> = list.to_vec()
             .into_iter()
-            .map(|v| match v {
-                Value::String(s) => s,
+            .map(|v| match &v.kind {
+                ValueKind::String(s) => s.clone(),
                 _ => panic!("Expected strings"),
             })
             .collect();
@@ -951,7 +951,7 @@ fn test_map_keys_empty() {
 m = {}
 m.keys()
 "#;
-    assert_eq!(eval(code), Value::List(List::from_vec(vec![])));
+    assert_eq!(eval(code), Value::list(List::from_vec(vec![])));
 }
 
 #[test]
@@ -961,11 +961,11 @@ m = {"a": 1, "b": 2, "c": 3}
 m.values()
 "#;
     let result = eval(code);
-    if let Value::List(list) = result {
+    if let ValueKind::List(list) = &result.kind {
         let values: Vec<f64> = list.to_vec()
             .into_iter()
-            .map(|v| match v {
-                Value::Number(n) => n,
+            .map(|v| match &v.kind {
+                ValueKind::Number(n) => *n,
                 _ => panic!("Expected numbers"),
             })
             .collect();
@@ -985,7 +985,7 @@ fn test_map_values_empty() {
 m = {}
 m.values()
 "#;
-    assert_eq!(eval(code), Value::List(List::from_vec(vec![])));
+    assert_eq!(eval(code), Value::list(List::from_vec(vec![])));
 }
 
 #[test]
@@ -994,7 +994,7 @@ fn test_map_has_key_true() {
 m = {"name": "Alice", "age": 30}
 m.has_key("name")
 "#;
-    assert_eq!(eval(code), Value::Boolean(true));
+    assert_eq!(eval(code), Value::boolean(true));
 }
 
 #[test]
@@ -1003,7 +1003,7 @@ fn test_map_has_key_false() {
 m = {"name": "Alice", "age": 30}
 m.has_key("city")
 "#;
-    assert_eq!(eval(code), Value::Boolean(false));
+    assert_eq!(eval(code), Value::boolean(false));
 }
 
 #[test]
@@ -1012,7 +1012,7 @@ fn test_map_has_key_empty_map() {
 m = {}
 m.has_key("anything")
 "#;
-    assert_eq!(eval(code), Value::Boolean(false));
+    assert_eq!(eval(code), Value::boolean(false));
 }
 
 #[test]
@@ -1021,7 +1021,7 @@ fn test_map_size() {
 m = {"a": 1, "b": 2, "c": 3}
 m.size()
 "#;
-    assert_eq!(eval(code), Value::Number(3.0));
+    assert_eq!(eval(code), Value::number(3.0));
 }
 
 #[test]
@@ -1030,7 +1030,7 @@ fn test_map_size_empty() {
 m = {}
 m.size()
 "#;
-    assert_eq!(eval(code), Value::Number(0.0));
+    assert_eq!(eval(code), Value::number(0.0));
 }
 
 #[test]
@@ -1041,7 +1041,7 @@ m["b"] = 2
 m["c"] = 3
 m.size()
 "#;
-    assert_eq!(eval(code), Value::Number(3.0));
+    assert_eq!(eval(code), Value::number(3.0));
 }
 
 // ============================================================================
@@ -1054,7 +1054,7 @@ fn test_map_index_get() {
 m = {"name": "Alice", "age": 30}
 m["name"]
 "#;
-    assert_eq!(eval(code), Value::String("Alice".to_string()));
+    assert_eq!(eval(code), Value::string("Alice".to_string()));
 }
 
 #[test]
@@ -1063,7 +1063,7 @@ fn test_map_index_get_number() {
 m = {"age": 30}
 m["age"]
 "#;
-    assert_eq!(eval(code), Value::Number(30.0));
+    assert_eq!(eval(code), Value::number(30.0));
 }
 
 #[test]
@@ -1074,7 +1074,7 @@ configure { error_mode: :lenient } {
     m["city"]
 }
 "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }
 
 #[test]
@@ -1084,7 +1084,7 @@ m = {"name": "Alice"}
 m["age"] = 30
 m["age"]
 "#;
-    assert_eq!(eval(code), Value::Number(30.0));
+    assert_eq!(eval(code), Value::number(30.0));
 }
 
 #[test]
@@ -1094,7 +1094,7 @@ m = {"name": "Alice", "age": 25}
 m["age"] = 30
 m["age"]
 "#;
-    assert_eq!(eval(code), Value::Number(30.0));
+    assert_eq!(eval(code), Value::number(30.0));
 }
 
 #[test]
@@ -1106,7 +1106,7 @@ m["b"] = 2
 m["c"] = 3
 m.size()
 "#;
-    assert_eq!(eval(code), Value::Number(3.0));
+    assert_eq!(eval(code), Value::number(3.0));
 }
 
 // ============================================================================
@@ -1119,7 +1119,7 @@ fn test_map_mixed_value_types() {
 m = {"name": "Alice", "age": 30, "active": true}
 m["name"]
 "#;
-    assert_eq!(eval(code), Value::String("Alice".to_string()));
+    assert_eq!(eval(code), Value::string("Alice".to_string()));
 }
 
 #[test]
@@ -1137,5 +1137,5 @@ fn test_map_none_value() {
 m = {"value": none}
 m["value"]
 "#;
-    assert_eq!(eval(code), Value::None);
+    assert_eq!(eval(code), Value::none());
 }

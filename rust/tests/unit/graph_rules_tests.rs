@@ -15,8 +15,8 @@ use std::collections::HashMap;
 #[test]
 fn test_no_cycles_rule_allows_acyclic_edge() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
 
     let rule = NoCyclesRule::new();
     let context = RuleContext::new(GraphOperation::AddEdge {
@@ -33,8 +33,8 @@ fn test_no_cycles_rule_allows_acyclic_edge() {
 #[test]
 fn test_no_cycles_rule_detects_cycle() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     let rule = NoCyclesRule::new();
@@ -59,14 +59,14 @@ fn test_no_cycles_rule_detects_cycle() {
 #[test]
 fn test_single_root_rule_allows_single_root() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("root".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("child".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("root".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("child".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("root", "child", "edge".to_string(), None, HashMap::new()).unwrap();
 
     let rule = SingleRootRule::new();
     let context = RuleContext::new(GraphOperation::AddNode {
         id: "another_child".to_string(),
-        value: Value::Number(3.0),
+        value: Value::number(3.0),
     });
 
     assert!(rule.validate(&graph, &context).is_ok());
@@ -75,14 +75,14 @@ fn test_single_root_rule_allows_single_root() {
 #[test]
 fn test_single_root_rule_detects_multiple_roots() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("root1".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("root2".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("child".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("root1".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("root2".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("child".to_string(), Value::number(3.0)).unwrap();
 
     let rule = SingleRootRule::new();
     let context = RuleContext::new(GraphOperation::AddNode {
         id: "test".to_string(),
-        value: Value::Number(4.0),
+        value: Value::number(4.0),
     });
 
     let result = rule.validate(&graph, &context);
@@ -96,9 +96,9 @@ fn test_single_root_rule_detects_multiple_roots() {
 #[test]
 fn test_max_degree_rule() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     let rule = MaxDegreeRule::new(1);
@@ -121,9 +121,9 @@ fn test_max_degree_rule() {
 #[test]
 fn test_binary_tree_rule_allows_two_children() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("root".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("left".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("right".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("root".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("left".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("right".to_string(), Value::number(3.0)).unwrap();
     graph.add_edge("root", "left", "edge".to_string(), None, HashMap::new()).unwrap();
 
     let rule = BinaryTreeRule::new();
@@ -141,10 +141,10 @@ fn test_binary_tree_rule_allows_two_children() {
 #[test]
 fn test_binary_tree_rule_rejects_three_children() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("root".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("child1".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("child2".to_string(), Value::Number(3.0)).unwrap();
-    graph.add_node("child3".to_string(), Value::Number(4.0)).unwrap();
+    graph.add_node("root".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("child1".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("child2".to_string(), Value::number(3.0)).unwrap();
+    graph.add_node("child3".to_string(), Value::number(4.0)).unwrap();
     graph.add_edge("root", "child1", "edge".to_string(), None, HashMap::new()).unwrap();
     graph.add_edge("root", "child2", "edge".to_string(), None, HashMap::new()).unwrap();
 
@@ -168,8 +168,8 @@ fn test_binary_tree_rule_rejects_three_children() {
 #[test]
 fn test_weighted_edges_rule_allows_weighted_edge() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
 
     let rule = WeightedEdgesRule::new();
     let context = RuleContext::new(GraphOperation::AddEdge {
@@ -186,8 +186,8 @@ fn test_weighted_edges_rule_allows_weighted_edge() {
 #[test]
 fn test_weighted_edges_rule_rejects_unweighted_edge() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
 
     let rule = WeightedEdgesRule::new();
     let context = RuleContext::new(GraphOperation::AddEdge {
@@ -209,9 +209,9 @@ fn test_weighted_edges_rule_rejects_unweighted_edge() {
 #[test]
 fn test_weighted_edges_rule_clean_removes_unweighted() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     // Add one weighted and one unweighted edge
     graph.add_edge("A", "B", "edge".to_string(), Some(5.0), HashMap::new()).unwrap();
@@ -231,8 +231,8 @@ fn test_weighted_edges_rule_clean_removes_unweighted() {
 #[test]
 fn test_unweighted_edges_rule_allows_unweighted_edge() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
 
     let rule = UnweightedEdgesRule::new();
     let context = RuleContext::new(GraphOperation::AddEdge {
@@ -249,8 +249,8 @@ fn test_unweighted_edges_rule_allows_unweighted_edge() {
 #[test]
 fn test_unweighted_edges_rule_rejects_weighted_edge() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
 
     let rule = UnweightedEdgesRule::new();
     let context = RuleContext::new(GraphOperation::AddEdge {
@@ -272,9 +272,9 @@ fn test_unweighted_edges_rule_rejects_weighted_edge() {
 #[test]
 fn test_unweighted_edges_rule_clean_removes_weights() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     // Add weighted edges
     graph.add_edge("A", "B", "edge".to_string(), Some(5.0), HashMap::new()).unwrap();

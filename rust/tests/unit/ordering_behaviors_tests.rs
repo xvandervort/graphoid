@@ -28,11 +28,11 @@ fn pos() -> SourcePosition {
 fn test_ordering_numbers_default() {
     // Create a list with unsorted numbers
     let mut list = List::new();
-    list.append(Value::Number(3.0)).unwrap();
-    list.append(Value::Number(1.0)).unwrap();
-    list.append(Value::Number(4.0)).unwrap();
-    list.append(Value::Number(1.0)).unwrap();
-    list.append(Value::Number(5.0)).unwrap();
+    list.append(Value::number(3.0)).unwrap();
+    list.append(Value::number(1.0)).unwrap();
+    list.append(Value::number(4.0)).unwrap();
+    list.append(Value::number(1.0)).unwrap();
+    list.append(Value::number(5.0)).unwrap();
 
     // Add ordering behavior (default = ascending)
     let rule = RuleInstance::new(RuleSpec::Ordering {
@@ -54,21 +54,21 @@ fn test_ordering_numbers_default() {
     new_list.graph.rules.push(rule);
 
     // Verify sorted: [1, 1, 3, 4, 5]
-    assert_eq!(new_list.get(0), Some(&Value::Number(1.0)));
-    assert_eq!(new_list.get(1), Some(&Value::Number(1.0)));
-    assert_eq!(new_list.get(2), Some(&Value::Number(3.0)));
-    assert_eq!(new_list.get(3), Some(&Value::Number(4.0)));
-    assert_eq!(new_list.get(4), Some(&Value::Number(5.0)));
+    assert_eq!(new_list.get(0), Some(&Value::number(1.0)));
+    assert_eq!(new_list.get(1), Some(&Value::number(1.0)));
+    assert_eq!(new_list.get(2), Some(&Value::number(3.0)));
+    assert_eq!(new_list.get(3), Some(&Value::number(4.0)));
+    assert_eq!(new_list.get(4), Some(&Value::number(5.0)));
 }
 
 #[test]
 fn test_ordering_strings_default() {
     // Create a list with unsorted strings
     let mut list = List::new();
-    list.append(Value::String("dog".to_string())).unwrap();
-    list.append(Value::String("cat".to_string())).unwrap();
-    list.append(Value::String("elephant".to_string())).unwrap();
-    list.append(Value::String("ant".to_string())).unwrap();
+    list.append(Value::string("dog".to_string())).unwrap();
+    list.append(Value::string("cat".to_string())).unwrap();
+    list.append(Value::string("elephant".to_string())).unwrap();
+    list.append(Value::string("ant".to_string())).unwrap();
 
     // Add ordering behavior
     let rule = RuleInstance::new(RuleSpec::Ordering {
@@ -90,20 +90,20 @@ fn test_ordering_strings_default() {
     new_list.graph.rules.push(rule);
 
     // Verify sorted: ["ant", "cat", "dog", "elephant"]
-    assert_eq!(new_list.get(0), Some(&Value::String("ant".to_string())));
-    assert_eq!(new_list.get(1), Some(&Value::String("cat".to_string())));
-    assert_eq!(new_list.get(2), Some(&Value::String("dog".to_string())));
-    assert_eq!(new_list.get(3), Some(&Value::String("elephant".to_string())));
+    assert_eq!(new_list.get(0), Some(&Value::string("ant".to_string())));
+    assert_eq!(new_list.get(1), Some(&Value::string("cat".to_string())));
+    assert_eq!(new_list.get(2), Some(&Value::string("dog".to_string())));
+    assert_eq!(new_list.get(3), Some(&Value::string("elephant".to_string())));
 }
 
 #[test]
 fn test_ordering_retroactive() {
     // Test that existing values are sorted when ordering behavior is added
     let mut list = List::new();
-    list.append(Value::Number(5.0)).unwrap();
-    list.append(Value::Number(2.0)).unwrap();
-    list.append(Value::Number(8.0)).unwrap();
-    list.append(Value::Number(1.0)).unwrap();
+    list.append(Value::number(5.0)).unwrap();
+    list.append(Value::number(2.0)).unwrap();
+    list.append(Value::number(8.0)).unwrap();
+    list.append(Value::number(1.0)).unwrap();
 
     // Add ordering behavior retroactively
     let rule = RuleInstance::new(RuleSpec::Ordering {
@@ -125,10 +125,10 @@ fn test_ordering_retroactive() {
     new_list.graph.rules.push(rule);
 
     // Verify sorted
-    assert_eq!(new_list.get(0), Some(&Value::Number(1.0)));
-    assert_eq!(new_list.get(1), Some(&Value::Number(2.0)));
-    assert_eq!(new_list.get(2), Some(&Value::Number(5.0)));
-    assert_eq!(new_list.get(3), Some(&Value::Number(8.0)));
+    assert_eq!(new_list.get(0), Some(&Value::number(1.0)));
+    assert_eq!(new_list.get(1), Some(&Value::number(2.0)));
+    assert_eq!(new_list.get(2), Some(&Value::number(5.0)));
+    assert_eq!(new_list.get(3), Some(&Value::number(8.0)));
 }
 
 #[test]
@@ -137,10 +137,10 @@ fn test_ordering_proactive() {
     let mut list = List::new();
 
     // Start with sorted list
-    list.append(Value::Number(1.0)).unwrap();
-    list.append(Value::Number(3.0)).unwrap();
-    list.append(Value::Number(5.0)).unwrap();
-    list.append(Value::Number(7.0)).unwrap();
+    list.append(Value::number(1.0)).unwrap();
+    list.append(Value::number(3.0)).unwrap();
+    list.append(Value::number(5.0)).unwrap();
+    list.append(Value::number(7.0)).unwrap();
 
     // Add ordering behavior
     let rule = RuleInstance::new(RuleSpec::Ordering {
@@ -151,7 +151,7 @@ fn test_ordering_proactive() {
     let mut executor = Executor::new();
 
     // Add new value that should be inserted in middle
-    let new_value = Value::Number(4.0);
+    let new_value = Value::number(4.0);
 
     // Find insertion point
     let values = list.to_vec();
@@ -161,11 +161,11 @@ fn test_ordering_proactive() {
     list.insert_at_raw(insert_pos, new_value).unwrap();
 
     // Verify: [1, 3, 4, 5, 7]
-    assert_eq!(list.get(0), Some(&Value::Number(1.0)));
-    assert_eq!(list.get(1), Some(&Value::Number(3.0)));
-    assert_eq!(list.get(2), Some(&Value::Number(4.0)));
-    assert_eq!(list.get(3), Some(&Value::Number(5.0)));
-    assert_eq!(list.get(4), Some(&Value::Number(7.0)));
+    assert_eq!(list.get(0), Some(&Value::number(1.0)));
+    assert_eq!(list.get(1), Some(&Value::number(3.0)));
+    assert_eq!(list.get(2), Some(&Value::number(4.0)));
+    assert_eq!(list.get(3), Some(&Value::number(5.0)));
+    assert_eq!(list.get(4), Some(&Value::number(7.0)));
 }
 
 // ============================================================================
@@ -212,13 +212,13 @@ fn test_ordering_custom_function() {
     };
 
     let mut list = List::new();
-    list.append(Value::String("cat".to_string())).unwrap();
-    list.append(Value::String("elephant".to_string())).unwrap();
-    list.append(Value::String("dog".to_string())).unwrap();
-    list.append(Value::String("a".to_string())).unwrap();
+    list.append(Value::string("cat".to_string())).unwrap();
+    list.append(Value::string("elephant".to_string())).unwrap();
+    list.append(Value::string("dog".to_string())).unwrap();
+    list.append(Value::string("a".to_string())).unwrap();
 
     let rule = RuleInstance::new(RuleSpec::Ordering {
-            compare_fn: Some(Value::Function(compare_fn.clone())),
+            compare_fn: Some(Value::function(compare_fn.clone())),
         });
 
     let mut executor = Executor::new();
@@ -236,10 +236,10 @@ fn test_ordering_custom_function() {
     new_list.graph.rules.push(rule);
 
     // Verify sorted by length: ["a", "cat", "dog", "elephant"]
-    assert_eq!(new_list.get(0), Some(&Value::String("a".to_string())));
-    assert_eq!(new_list.get(1), Some(&Value::String("cat".to_string())));
-    assert_eq!(new_list.get(2), Some(&Value::String("dog".to_string())));
-    assert_eq!(new_list.get(3), Some(&Value::String("elephant".to_string())));
+    assert_eq!(new_list.get(0), Some(&Value::string("a".to_string())));
+    assert_eq!(new_list.get(1), Some(&Value::string("cat".to_string())));
+    assert_eq!(new_list.get(2), Some(&Value::string("dog".to_string())));
+    assert_eq!(new_list.get(3), Some(&Value::string("elephant".to_string())));
 }
 
 #[test]
@@ -272,13 +272,13 @@ fn test_ordering_reverse() {
     };
 
     let mut list = List::new();
-    list.append(Value::Number(3.0)).unwrap();
-    list.append(Value::Number(1.0)).unwrap();
-    list.append(Value::Number(4.0)).unwrap();
-    list.append(Value::Number(2.0)).unwrap();
+    list.append(Value::number(3.0)).unwrap();
+    list.append(Value::number(1.0)).unwrap();
+    list.append(Value::number(4.0)).unwrap();
+    list.append(Value::number(2.0)).unwrap();
 
     let rule = RuleInstance::new(RuleSpec::Ordering {
-            compare_fn: Some(Value::Function(reverse_fn.clone())),
+            compare_fn: Some(Value::function(reverse_fn.clone())),
         });
 
     let mut executor = Executor::new();
@@ -296,10 +296,10 @@ fn test_ordering_reverse() {
     new_list.graph.rules.push(rule);
 
     // Verify reverse sorted: [4, 3, 2, 1]
-    assert_eq!(new_list.get(0), Some(&Value::Number(4.0)));
-    assert_eq!(new_list.get(1), Some(&Value::Number(3.0)));
-    assert_eq!(new_list.get(2), Some(&Value::Number(2.0)));
-    assert_eq!(new_list.get(3), Some(&Value::Number(1.0)));
+    assert_eq!(new_list.get(0), Some(&Value::number(4.0)));
+    assert_eq!(new_list.get(1), Some(&Value::number(3.0)));
+    assert_eq!(new_list.get(2), Some(&Value::number(2.0)));
+    assert_eq!(new_list.get(3), Some(&Value::number(1.0)));
 }
 
 #[test]
@@ -310,9 +310,9 @@ fn test_ordering_by_field() {
 
     // Placeholder: just verify ordering works with mixed types
     let mut list = List::new();
-    list.append(Value::Number(5.0)).unwrap();
-    list.append(Value::Number(2.0)).unwrap();
-    list.append(Value::Number(8.0)).unwrap();
+    list.append(Value::number(5.0)).unwrap();
+    list.append(Value::number(2.0)).unwrap();
+    list.append(Value::number(8.0)).unwrap();
 
     let rule = RuleInstance::new(RuleSpec::Ordering {
             compare_fn: None,
@@ -331,9 +331,9 @@ fn test_ordering_by_field() {
     }
     new_list.graph.rules.push(rule);
 
-    assert_eq!(new_list.get(0), Some(&Value::Number(2.0)));
-    assert_eq!(new_list.get(1), Some(&Value::Number(5.0)));
-    assert_eq!(new_list.get(2), Some(&Value::Number(8.0)));
+    assert_eq!(new_list.get(0), Some(&Value::number(2.0)));
+    assert_eq!(new_list.get(1), Some(&Value::number(5.0)));
+    assert_eq!(new_list.get(2), Some(&Value::number(8.0)));
 }
 
 #[test]
@@ -342,10 +342,10 @@ fn test_ordering_stability() {
     // Using strings with same length to test stability
 
     let mut list = List::new();
-    list.append(Value::String("cat".to_string())).unwrap();
-    list.append(Value::String("dog".to_string())).unwrap();
-    list.append(Value::String("bat".to_string())).unwrap();
-    list.append(Value::String("ant".to_string())).unwrap();
+    list.append(Value::string("cat".to_string())).unwrap();
+    list.append(Value::string("dog".to_string())).unwrap();
+    list.append(Value::string("bat".to_string())).unwrap();
+    list.append(Value::string("ant".to_string())).unwrap();
 
     let rule = RuleInstance::new(RuleSpec::Ordering {
             compare_fn: None,
@@ -366,10 +366,10 @@ fn test_ordering_stability() {
     new_list.graph.rules.push(rule);
 
     // Verify alphabetical order (stable)
-    assert_eq!(new_list.get(0), Some(&Value::String("ant".to_string())));
-    assert_eq!(new_list.get(1), Some(&Value::String("bat".to_string())));
-    assert_eq!(new_list.get(2), Some(&Value::String("cat".to_string())));
-    assert_eq!(new_list.get(3), Some(&Value::String("dog".to_string())));
+    assert_eq!(new_list.get(0), Some(&Value::string("ant".to_string())));
+    assert_eq!(new_list.get(1), Some(&Value::string("bat".to_string())));
+    assert_eq!(new_list.get(2), Some(&Value::string("cat".to_string())));
+    assert_eq!(new_list.get(3), Some(&Value::string("dog".to_string())));
 }
 
 // ============================================================================
@@ -392,19 +392,19 @@ fn test_list_maintains_order() {
     let values_to_insert = vec![5.0, 2.0, 8.0, 1.0, 9.0, 3.0];
 
     for val in values_to_insert {
-        let new_value = Value::Number(val);
+        let new_value = Value::number(val);
         let current_values = list.to_vec();
         let insert_pos = executor.find_insertion_point(&current_values, &new_value, &None).unwrap();
         list.insert_at_raw(insert_pos, new_value).unwrap();
     }
 
     // Verify final sorted order: [1, 2, 3, 5, 8, 9]
-    assert_eq!(list.get(0), Some(&Value::Number(1.0)));
-    assert_eq!(list.get(1), Some(&Value::Number(2.0)));
-    assert_eq!(list.get(2), Some(&Value::Number(3.0)));
-    assert_eq!(list.get(3), Some(&Value::Number(5.0)));
-    assert_eq!(list.get(4), Some(&Value::Number(8.0)));
-    assert_eq!(list.get(5), Some(&Value::Number(9.0)));
+    assert_eq!(list.get(0), Some(&Value::number(1.0)));
+    assert_eq!(list.get(1), Some(&Value::number(2.0)));
+    assert_eq!(list.get(2), Some(&Value::number(3.0)));
+    assert_eq!(list.get(3), Some(&Value::number(5.0)));
+    assert_eq!(list.get(4), Some(&Value::number(8.0)));
+    assert_eq!(list.get(5), Some(&Value::number(9.0)));
 }
 
 #[test]
@@ -426,11 +426,11 @@ fn test_ordering_with_other_behaviors() {
 
     // Add values including None
     let values = vec![
-        Value::Number(5.0),
-        Value::None,
-        Value::Number(3.0),
-        Value::None,
-        Value::Number(1.0),
+        Value::number(5.0),
+        Value::none(),
+        Value::number(3.0),
+        Value::none(),
+        Value::number(1.0),
     ];
 
     for val in values {
@@ -444,11 +444,11 @@ fn test_ordering_with_other_behaviors() {
     }
 
     // Verify: None -> 0, so result is [0, 0, 1, 3, 5]
-    assert_eq!(list.get(0), Some(&Value::Number(0.0)));
-    assert_eq!(list.get(1), Some(&Value::Number(0.0)));
-    assert_eq!(list.get(2), Some(&Value::Number(1.0)));
-    assert_eq!(list.get(3), Some(&Value::Number(3.0)));
-    assert_eq!(list.get(4), Some(&Value::Number(5.0)));
+    assert_eq!(list.get(0), Some(&Value::number(0.0)));
+    assert_eq!(list.get(1), Some(&Value::number(0.0)));
+    assert_eq!(list.get(2), Some(&Value::number(1.0)));
+    assert_eq!(list.get(3), Some(&Value::number(3.0)));
+    assert_eq!(list.get(4), Some(&Value::number(5.0)));
 }
 
 #[test]
@@ -466,28 +466,28 @@ fn test_ordering_edge_cases() {
 
     // Add first element
     let values = empty_list.to_vec();
-    let insert_pos = executor.find_insertion_point(&values, &Value::Number(5.0), &None).unwrap();
-    empty_list.insert_at_raw(insert_pos, Value::Number(5.0)).unwrap();
-    assert_eq!(empty_list.get(0), Some(&Value::Number(5.0)));
+    let insert_pos = executor.find_insertion_point(&values, &Value::number(5.0), &None).unwrap();
+    empty_list.insert_at_raw(insert_pos, Value::number(5.0)).unwrap();
+    assert_eq!(empty_list.get(0), Some(&Value::number(5.0)));
 
     // Test 2: Single element list
     let mut single_list = List::new();
-    single_list.append(Value::Number(42.0)).unwrap();
+    single_list.append(Value::number(42.0)).unwrap();
     single_list.graph.rules.push(rule);
 
     assert_eq!(single_list.len(), 1);
-    assert_eq!(single_list.get(0), Some(&Value::Number(42.0)));
+    assert_eq!(single_list.get(0), Some(&Value::number(42.0)));
 }
 
 #[test]
 fn test_ordering_duplicate_values() {
     // Test that duplicate values are handled correctly
     let mut list = List::new();
-    list.append(Value::Number(3.0)).unwrap();
-    list.append(Value::Number(1.0)).unwrap();
-    list.append(Value::Number(3.0)).unwrap();
-    list.append(Value::Number(1.0)).unwrap();
-    list.append(Value::Number(2.0)).unwrap();
+    list.append(Value::number(3.0)).unwrap();
+    list.append(Value::number(1.0)).unwrap();
+    list.append(Value::number(3.0)).unwrap();
+    list.append(Value::number(1.0)).unwrap();
+    list.append(Value::number(2.0)).unwrap();
 
     let rule = RuleInstance::new(RuleSpec::Ordering {
             compare_fn: None,
@@ -507,9 +507,9 @@ fn test_ordering_duplicate_values() {
     new_list.graph.rules.push(rule);
 
     // Verify duplicates are sorted: [1, 1, 2, 3, 3]
-    assert_eq!(new_list.get(0), Some(&Value::Number(1.0)));
-    assert_eq!(new_list.get(1), Some(&Value::Number(1.0)));
-    assert_eq!(new_list.get(2), Some(&Value::Number(2.0)));
-    assert_eq!(new_list.get(3), Some(&Value::Number(3.0)));
-    assert_eq!(new_list.get(4), Some(&Value::Number(3.0)));
+    assert_eq!(new_list.get(0), Some(&Value::number(1.0)));
+    assert_eq!(new_list.get(1), Some(&Value::number(1.0)));
+    assert_eq!(new_list.get(2), Some(&Value::number(2.0)));
+    assert_eq!(new_list.get(3), Some(&Value::number(3.0)));
+    assert_eq!(new_list.get(4), Some(&Value::number(3.0)));
 }

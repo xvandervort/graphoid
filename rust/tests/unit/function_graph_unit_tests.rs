@@ -37,12 +37,12 @@ fn test_push_pop_call() {
     let func_id = graph.register_function(func);
 
     // Push call
-    graph.push_call(func_id.clone(), vec![Value::Number(42.0)]);
+    graph.push_call(func_id.clone(), vec![Value::number(42.0)]);
     assert_eq!(graph.call_depth(), 1);
     assert_eq!(graph.current_path(), vec!["test".to_string()]);
 
     // Pop call
-    graph.pop_call(Value::Number(84.0));
+    graph.pop_call(Value::number(84.0));
     assert_eq!(graph.call_depth(), 0);
 
     // Call count updated
@@ -83,8 +83,8 @@ fn test_recursion_detection() {
     let func_id = graph.register_function(func);
 
     // Simulate recursion: factorial calls factorial
-    graph.push_call(func_id.clone(), vec![Value::Number(5.0)]);
-    graph.push_call(func_id.clone(), vec![Value::Number(4.0)]);
+    graph.push_call(func_id.clone(), vec![Value::number(5.0)]);
+    graph.push_call(func_id.clone(), vec![Value::number(4.0)]);
 
     // Should detect recursion
     assert!(graph.is_recursive(&func_id));
@@ -102,7 +102,7 @@ fn test_profiling() {
     // Simulate call
     graph.push_call(func_id.clone(), vec![]);
     std::thread::sleep(std::time::Duration::from_millis(10));
-    graph.pop_call(Value::None);
+    graph.pop_call(Value::none());
 
     // Check timing
     let node = graph.get_function(&func_id).unwrap();

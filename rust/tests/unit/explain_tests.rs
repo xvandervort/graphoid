@@ -26,7 +26,7 @@ fn test_explain_find_property_with_index() {
 
     // Trigger auto-indexing
     for _ in 0..10 {
-        graph.find_nodes_by_property("email", &Value::String("test@example.com".to_string()));
+        graph.find_nodes_by_property("email", &Value::string("test@example.com".to_string()));
     }
 
     let plan = graph.explain_find_property("email");
@@ -42,8 +42,8 @@ fn test_explain_shortest_path_with_no_cycles() {
     let mut graph = Graph::new(GraphType::Directed);
     graph.add_rule(RuleInstance::new(RuleSpec::NoCycles)).unwrap();
 
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
 
     let plan = graph.explain_shortest_path("A", "B");
 
@@ -57,8 +57,8 @@ fn test_explain_shortest_path_with_no_cycles() {
 fn test_explain_shortest_path_without_rules() {
     let mut graph = Graph::new(GraphType::Directed);
 
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
 
     let plan = graph.explain_shortest_path("A", "B");
 
@@ -72,7 +72,7 @@ fn test_explain_bfs_with_connected_rule() {
     let mut graph = Graph::new(GraphType::Directed);
     graph.add_rule(RuleInstance::new(RuleSpec::Connected)).unwrap();
 
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
 
     let plan = graph.explain_bfs("A");
 
@@ -84,7 +84,7 @@ fn test_explain_bfs_with_connected_rule() {
 #[test]
 fn test_explain_bfs_basic() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
 
     let plan = graph.explain_bfs("A");
 
@@ -133,7 +133,7 @@ fn test_explain_shows_access_count() {
 
     // Do a few lookups (below threshold)
     for _ in 0..5 {
-        graph.find_nodes_by_property("age", &Value::Number(25.0));
+        graph.find_nodes_by_property("age", &Value::number(25.0));
     }
 
     let plan = graph.explain_find_property("age");

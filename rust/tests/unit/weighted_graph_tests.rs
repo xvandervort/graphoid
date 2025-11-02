@@ -94,7 +94,7 @@ fn test_edgeinfo_is_weighted_true_for_weighted() {
 fn test_edgeinfo_preserves_properties_with_weight() {
     use graphoid::values::graph::EdgeInfo;
     let mut props = HashMap::new();
-    props.insert("label".to_string(), Value::String("important".to_string()));
+    props.insert("label".to_string(), Value::string("important".to_string()));
 
     let edge = EdgeInfo::new_weighted("test".to_string(), 3.0, props.clone());
     assert_eq!(edge.weight(), Some(3.0));
@@ -108,8 +108,8 @@ fn test_edgeinfo_preserves_properties_with_weight() {
 #[test]
 fn test_graph_get_edge_weight_unweighted() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     assert_eq!(graph.get_edge_weight("A", "B"), None);
@@ -118,8 +118,8 @@ fn test_graph_get_edge_weight_unweighted() {
 #[test]
 fn test_graph_get_edge_weight_weighted() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), Some(5.5), HashMap::new()).unwrap();
 
     assert_eq!(graph.get_edge_weight("A", "B"), Some(5.5));
@@ -134,8 +134,8 @@ fn test_graph_get_edge_weight_nonexistent_edge() {
 #[test]
 fn test_graph_set_edge_weight_on_unweighted_edge() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     assert_eq!(graph.get_edge_weight("A", "B"), None);
@@ -147,8 +147,8 @@ fn test_graph_set_edge_weight_on_unweighted_edge() {
 #[test]
 fn test_graph_set_edge_weight_updates_existing_weight() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), Some(3.0), HashMap::new()).unwrap();
 
     assert_eq!(graph.get_edge_weight("A", "B"), Some(3.0));
@@ -160,7 +160,7 @@ fn test_graph_set_edge_weight_updates_existing_weight() {
 #[test]
 fn test_graph_set_edge_weight_nonexistent_edge_fails() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
 
     let result = graph.set_edge_weight("A", "B", 5.0);
     assert!(result.is_err());
@@ -169,8 +169,8 @@ fn test_graph_set_edge_weight_nonexistent_edge_fails() {
 #[test]
 fn test_graph_set_edge_weight_undirected_updates_both() {
     let mut graph = Graph::new(GraphType::Undirected);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     graph.set_edge_weight("A", "B", 7.5).unwrap();
@@ -183,8 +183,8 @@ fn test_graph_set_edge_weight_undirected_updates_both() {
 #[test]
 fn test_graph_remove_edge_weight_from_weighted_edge() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), Some(12.0), HashMap::new()).unwrap();
 
     assert_eq!(graph.get_edge_weight("A", "B"), Some(12.0));
@@ -197,8 +197,8 @@ fn test_graph_remove_edge_weight_from_weighted_edge() {
 #[test]
 fn test_graph_remove_edge_weight_from_unweighted_edge() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     // Should succeed even though edge is already unweighted
@@ -209,7 +209,7 @@ fn test_graph_remove_edge_weight_from_unweighted_edge() {
 #[test]
 fn test_graph_remove_edge_weight_nonexistent_edge_fails() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
 
     let result = graph.remove_edge_weight("A", "B");
     assert!(result.is_err());
@@ -218,8 +218,8 @@ fn test_graph_remove_edge_weight_nonexistent_edge_fails() {
 #[test]
 fn test_graph_remove_edge_weight_undirected_updates_both() {
     let mut graph = Graph::new(GraphType::Undirected);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), Some(15.0), HashMap::new()).unwrap();
 
     graph.remove_edge_weight("A", "B").unwrap();
@@ -232,8 +232,8 @@ fn test_graph_remove_edge_weight_undirected_updates_both() {
 #[test]
 fn test_graph_is_edge_weighted_true_for_weighted() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), Some(20.0), HashMap::new()).unwrap();
 
     assert!(graph.is_edge_weighted("A", "B"));
@@ -242,8 +242,8 @@ fn test_graph_is_edge_weighted_true_for_weighted() {
 #[test]
 fn test_graph_is_edge_weighted_false_for_unweighted() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "edge".to_string(), None, HashMap::new()).unwrap();
 
     assert!(!graph.is_edge_weighted("A", "B"));
@@ -258,11 +258,11 @@ fn test_graph_is_edge_weighted_false_for_nonexistent() {
 #[test]
 fn test_graph_weight_mutation_preserves_properties() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
 
     let mut props = HashMap::new();
-    props.insert("color".to_string(), Value::String("red".to_string()));
+    props.insert("color".to_string(), Value::string("red".to_string()));
 
     graph.add_edge("A", "B", "edge".to_string(), Some(1.0), props).unwrap();
 
@@ -282,9 +282,9 @@ fn test_graph_weight_mutation_preserves_properties() {
 fn test_dijkstra_simple_weighted_path() {
     // A -5-> B -3-> C
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
     graph.add_edge("A", "B", "road".to_string(), Some(5.0), HashMap::new()).unwrap();
     graph.add_edge("B", "C", "road".to_string(), Some(3.0), HashMap::new()).unwrap();
 
@@ -298,9 +298,9 @@ fn test_dijkstra_chooses_lighter_path() {
     // A -10-> C (weight 10)
     // Should choose A->B->C
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
     graph.add_edge("A", "B", "road".to_string(), Some(1.0), HashMap::new()).unwrap();
     graph.add_edge("B", "C", "road".to_string(), Some(1.0), HashMap::new()).unwrap();
     graph.add_edge("A", "C", "road".to_string(), Some(10.0), HashMap::new()).unwrap();
@@ -323,10 +323,10 @@ fn test_dijkstra_complex_graph() {
     //     D
     // A->B->D should be shortest (2), not A->C->D (6)
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-    graph.add_node("D".to_string(), Value::Number(4.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    graph.add_node("D".to_string(), Value::number(4.0)).unwrap();
 
     graph.add_edge("A", "B", "road".to_string(), Some(1.0), HashMap::new()).unwrap();
     graph.add_edge("A", "C", "road".to_string(), Some(5.0), HashMap::new()).unwrap();
@@ -341,8 +341,8 @@ fn test_dijkstra_complex_graph() {
 #[test]
 fn test_dijkstra_no_path_returns_none() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     // No edge between A and B
 
     assert_eq!(graph.shortest_path("A", "B", None, true), None);
@@ -354,10 +354,10 @@ fn test_dijkstra_with_edge_type_filter() {
     // A -road(2)-> D -road(2)-> C
     // With edge_type "road", should choose A->D->C (4), not A->B->C (rail blocked)
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-    graph.add_node("D".to_string(), Value::Number(4.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    graph.add_node("D".to_string(), Value::number(4.0)).unwrap();
 
     graph.add_edge("A", "B", "road".to_string(), Some(5.0), HashMap::new()).unwrap();
     graph.add_edge("B", "C", "rail".to_string(), Some(3.0), HashMap::new()).unwrap();
@@ -372,8 +372,8 @@ fn test_dijkstra_with_edge_type_filter() {
 fn test_dijkstra_rejects_unweighted_edges() {
     // Graph has unweighted edge - should return None
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
 
     // Should return None because unweighted edge can't be used in weighted pathfinding
@@ -384,9 +384,9 @@ fn test_dijkstra_rejects_unweighted_edges() {
 fn test_shortest_path_with_weighted_option() {
     // Test the updated shortest_path() method with weighted parameter
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     graph.add_edge("A", "B", "road".to_string(), Some(10.0), HashMap::new()).unwrap();
     graph.add_edge("B", "C", "road".to_string(), Some(10.0), HashMap::new()).unwrap();
@@ -401,9 +401,9 @@ fn test_shortest_path_with_weighted_option() {
 fn test_shortest_path_unweighted_uses_bfs() {
     // Test that weighted=false uses BFS (shortest by hops, not weight)
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     graph.add_edge("A", "B", "road".to_string(), Some(10.0), HashMap::new()).unwrap();
     graph.add_edge("B", "C", "road".to_string(), Some(10.0), HashMap::new()).unwrap();
@@ -419,9 +419,9 @@ fn test_shortest_path_unweighted_uses_bfs() {
 fn test_shortest_path_with_edge_type_filter() {
     // Test edge_type parameter in shortest_path()
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
     graph.add_edge("B", "C", "rail".to_string(), None, HashMap::new()).unwrap();
@@ -435,7 +435,7 @@ fn test_shortest_path_with_edge_type_filter() {
 #[test]
 fn test_dijkstra_self_path() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
 
     let path = graph.shortest_path("A", "A", None, true).unwrap();
     assert_eq!(path, vec!["A".to_string()]);
@@ -445,8 +445,8 @@ fn test_dijkstra_self_path() {
 fn test_dijkstra_undirected_graph() {
     // Undirected graph - both directions available
     let mut graph = Graph::new(GraphType::Undirected);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "road".to_string(), Some(5.0), HashMap::new()).unwrap();
 
     // Should work in both directions
@@ -462,8 +462,8 @@ fn test_dijkstra_negative_weights_not_supported() {
     // Dijkstra doesn't support negative weights - should still find a path
     // but may not be optimal (this is a known limitation)
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "road".to_string(), Some(-5.0), HashMap::new()).unwrap();
 
     // Should find the path (even with negative weight)
@@ -475,8 +475,8 @@ fn test_dijkstra_negative_weights_not_supported() {
 fn test_shortest_path_default_parameters() {
     // Test that existing code still works (backward compatibility)
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
 
     // Old signature should still work: shortest_path(from, to, None, false)
@@ -491,7 +491,7 @@ fn test_dijkstra_large_graph_performance() {
 
     // Create 10 nodes in a chain with varying weights
     for i in 0..10 {
-        graph.add_node(format!("N{}", i), Value::Number(i as f64)).unwrap();
+        graph.add_node(format!("N{}", i), Value::number(i as f64)).unwrap();
     }
 
     // Create edges with weights
@@ -516,9 +516,9 @@ fn test_dijkstra_mixed_weighted_unweighted_graph() {
     // Graph with both weighted and unweighted edges
     // Only weighted edges should be used in weighted pathfinding
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     // Weighted path: A -5-> B -3-> C
     graph.add_edge("A", "B", "road".to_string(), Some(5.0), HashMap::new()).unwrap();
@@ -539,8 +539,8 @@ fn test_dijkstra_mixed_weighted_unweighted_graph() {
 #[test]
 fn test_nodes_within_zero_hops() {
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
     graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
 
     let nodes = graph.nodes_within("A", 0, None);
@@ -551,9 +551,9 @@ fn test_nodes_within_zero_hops() {
 fn test_nodes_within_one_hop() {
     // A -> B -> C
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
     graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
     graph.add_edge("B", "C", "road".to_string(), None, HashMap::new()).unwrap();
 
@@ -566,9 +566,9 @@ fn test_nodes_within_one_hop() {
 fn test_nodes_within_two_hops() {
     // A -> B -> C
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
     graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
     graph.add_edge("B", "C", "road".to_string(), None, HashMap::new()).unwrap();
 
@@ -585,10 +585,10 @@ fn test_nodes_within_diamond_graph() {
     //    \ /
     //     D
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-    graph.add_node("D".to_string(), Value::Number(4.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    graph.add_node("D".to_string(), Value::number(4.0)).unwrap();
 
     graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
     graph.add_edge("A", "C", "road".to_string(), None, HashMap::new()).unwrap();
@@ -610,10 +610,10 @@ fn test_nodes_within_diamond_graph() {
 fn test_nodes_within_with_edge_type_filter() {
     // A -road-> B -rail-> C -road-> D
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-    graph.add_node("D".to_string(), Value::Number(4.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    graph.add_node("D".to_string(), Value::number(4.0)).unwrap();
 
     graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
     graph.add_edge("B", "C", "rail".to_string(), None, HashMap::new()).unwrap();
@@ -629,9 +629,9 @@ fn test_nodes_within_with_edge_type_filter() {
 fn test_nodes_within_undirected_graph() {
     // A - B - C (undirected)
     let mut graph = Graph::new(GraphType::Undirected);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
     graph.add_edge("B", "C", "road".to_string(), None, HashMap::new()).unwrap();
@@ -646,10 +646,10 @@ fn test_nodes_within_undirected_graph() {
 fn test_nodes_within_disconnected_graph() {
     // A -> B    C -> D (disconnected)
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
-    graph.add_node("D".to_string(), Value::Number(4.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    graph.add_node("D".to_string(), Value::number(4.0)).unwrap();
 
     graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
     graph.add_edge("C", "D", "road".to_string(), None, HashMap::new()).unwrap();
@@ -664,9 +664,9 @@ fn test_nodes_within_disconnected_graph() {
 fn test_nodes_within_cycle() {
     // A -> B -> C -> A (cycle)
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
     graph.add_edge("B", "C", "road".to_string(), None, HashMap::new()).unwrap();
@@ -682,9 +682,9 @@ fn test_nodes_within_cycle() {
 fn test_nodes_within_large_hops() {
     // A -> B -> C with hops=10 (more than needed)
     let mut graph = Graph::new(GraphType::Directed);
-    graph.add_node("A".to_string(), Value::Number(1.0)).unwrap();
-    graph.add_node("B".to_string(), Value::Number(2.0)).unwrap();
-    graph.add_node("C".to_string(), Value::Number(3.0)).unwrap();
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
 
     graph.add_edge("A", "B", "road".to_string(), None, HashMap::new()).unwrap();
     graph.add_edge("B", "C", "road".to_string(), None, HashMap::new()).unwrap();
