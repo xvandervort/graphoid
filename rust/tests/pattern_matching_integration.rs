@@ -163,6 +163,116 @@ fn test_string_pattern_no_match_returns_none() {
 }
 
 // ============================================================================
+// PATTERN GUARD TESTS (Phase 7 - TDD RED)
+// ============================================================================
+
+#[test]
+fn test_pattern_guard_with_less_than() {
+    let code = r#"
+fn classify(n) {
+    |x| if x < 0 => "negative"
+    |0| => "zero"
+    |x| if x > 0 => "positive"
+}
+classify(-5)
+"#;
+
+    let result = execute_and_return(code).unwrap();
+    assert_eq!(result, Value::string("negative".to_string()));
+}
+
+#[test]
+fn test_pattern_guard_with_zero() {
+    let code = r#"
+fn classify(n) {
+    |x| if x < 0 => "negative"
+    |0| => "zero"
+    |x| if x > 0 => "positive"
+}
+classify(0)
+"#;
+
+    let result = execute_and_return(code).unwrap();
+    assert_eq!(result, Value::string("zero".to_string()));
+}
+
+#[test]
+fn test_pattern_guard_with_greater_than() {
+    let code = r#"
+fn classify(n) {
+    |x| if x < 0 => "negative"
+    |0| => "zero"
+    |x| if x > 0 => "positive"
+}
+classify(10)
+"#;
+
+    let result = execute_and_return(code).unwrap();
+    assert_eq!(result, Value::string("positive".to_string()));
+}
+
+#[test]
+fn test_pattern_guard_fallthrough_when_false() {
+    let code = r#"
+fn check(n) {
+    |x| if x > 100 => "big"
+    |x| if x > 10 => "medium"
+    |x| => "small"
+}
+check(5)
+"#;
+
+    let result = execute_and_return(code).unwrap();
+    assert_eq!(result, Value::string("small".to_string()));
+}
+
+#[test]
+fn test_pattern_guard_with_equality() {
+    let code = r#"
+fn check(s) {
+    |x| if x == "hello" => "greeting"
+    |x| if x == "bye" => "farewell"
+    |x| => "unknown"
+}
+check("hello")
+"#;
+
+    let result = execute_and_return(code).unwrap();
+    assert_eq!(result, Value::string("greeting".to_string()));
+}
+
+#[test]
+fn test_pattern_guard_multiple_conditions() {
+    let code = r#"
+fn check_range(n) {
+    |x| if x >= 0 and x <= 10 => "low"
+    |x| if x > 10 and x <= 100 => "medium"
+    |x| if x > 100 => "high"
+    |x| => "out of range"
+}
+check_range(50)
+"#;
+
+    let result = execute_and_return(code).unwrap();
+    assert_eq!(result, Value::string("medium".to_string()));
+}
+
+#[test]
+fn test_pattern_guard_with_none_fallthrough() {
+    let code = r#"
+fn check(n) {
+    |x| if x > 0 => "positive"
+    |x| if x < 0 => "negative"
+}
+check(0)
+"#;
+
+    // 0 doesn't match any guard, should fallthrough to none
+    let result = execute_and_return(code).unwrap();
+    assert_eq!(result, Value::none());
+}
+
+// ============================================================================
 // Boolean Pattern Matching Tests
 // ============================================================================
 

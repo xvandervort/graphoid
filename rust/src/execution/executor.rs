@@ -976,13 +976,48 @@ impl Executor {
 
     /// Applies a method to a value (helper to avoid duplication).
     fn apply_method_to_value(&mut self, value: Value, method: &str, args: &[Value], object_expr: &Expr) -> Result<Value> {
+        // Handle generic freeze-related methods that work on all value types
+        match method {
+            "freeze" => {
+                // Returns frozen copy
+                let mut frozen_copy = value.clone();
+                frozen_copy.freeze();
+                return Ok(frozen_copy);
+            }
+            "is_frozen" => {
+                // Returns boolean indicating if value is frozen
+                return Ok(Value::boolean(value.is_frozen()));
+            }
+            "has_frozen" => {
+                // Check for :count symbol argument (for detailed stats)
+                let wants_count = args.get(0).map_or(false, |arg| {
+                    matches!(&arg.kind, ValueKind::Symbol(s) if s == "count")
+                });
+
+                // Check for :deep symbol argument (for recursive counting)
+                let deep = args.get(1).map_or(false, |arg| {
+                    matches!(&arg.kind, ValueKind::Symbol(s) if s == "deep")
+                });
+
+                if wants_count {
+                    // Return detailed hash with counts
+                    return self.eval_has_frozen_count(&value, deep);
+                } else {
+                    // Return boolean - check if any elements are frozen (always recursive)
+                    return Ok(Value::boolean(self.check_has_frozen(&value)));
+                }
+            }
+            _ => {}
+        }
+
+        // Dispatch to type-specific methods
         match &value.kind {
             ValueKind::List(list) => self.eval_list_method(&list, method, args),
             ValueKind::Map(hash) => self.eval_map_method(&hash, method, args),
             ValueKind::Graph(graph) => self.eval_graph_method(graph.clone(), method, args, object_expr),
             ValueKind::String(ref s) => self.eval_string_method(s, method, args),
             ValueKind::Error(ref err) => self.eval_error_method(err, method, args),
-            other => Err(GraphoidError::runtime(format!(
+            _other => Err(GraphoidError::runtime(format!(
                 "Type '{}' does not have method '{}'",
                 value.type_name(),
                 method
@@ -2677,7 +2712,29 @@ impl Executor {
                 use crate::execution::PatternMatcher;
 
                 let matcher = PatternMatcher::new();
-                let match_result = matcher.find_match(pattern_clauses, arg_values)?;
+
+                // Create a closure to evaluate guard expressions with temporary bindings
+                let eval_guard = |guard_expr: &crate::ast::Expr, bindings: &std::collections::HashMap<String, Value>| -> Result<bool> {
+                    // Create temporary scope with current environment as parent
+                    let temp_env = Environment::with_parent(self.env.clone());
+                    let saved_env = std::mem::replace(&mut self.env, temp_env);
+
+                    // Bind pattern variables in temporary scope
+                    for (var_name, value) in bindings {
+                        self.env.define(var_name.clone(), value.clone());
+                    }
+
+                    // Evaluate guard expression
+                    let guard_value = self.eval_expr(guard_expr);
+
+                    // Restore original environment
+                    self.env = saved_env;
+
+                    // Return whether guard is truthy
+                    guard_value.map(|v| v.is_truthy())
+                };
+
+                let match_result = matcher.find_match(pattern_clauses, arg_values, eval_guard)?;
 
                 if let Some((matched_clause, bindings)) = match_result {
                     // Bind pattern variables to environment
@@ -3602,6 +3659,126 @@ impl Executor {
 
         // No matching catch clause found - re-throw the error
         Err(error.clone())
+    }
+
+    /// Check if a value or any of its nested elements are frozen
+    fn check_has_frozen(&self, value: &Value) -> bool {
+        // If the value itself is frozen, return true
+        if value.is_frozen() {
+            return true;
+        }
+
+        // Check nested elements
+        match &value.kind {
+            ValueKind::List(list) => {
+                // Check if any list element is frozen
+                for i in 0..list.len() {
+                    if let Some(elem) = list.get(i) {
+                        if self.check_has_frozen(elem) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            ValueKind::Map(hash) => {
+                // Check if any map value is frozen
+                for key in hash.keys() {
+                    if let Some(val) = hash.get(&key) {
+                        if self.check_has_frozen(&val) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            _ => false, // Primitives don't have nested elements
+        }
+    }
+
+    /// Generate detailed freeze count information for a value
+    ///
+    /// # Arguments
+    /// * `value` - The value to analyze
+    /// * `deep` - If true, recursively counts through entire tree; if false, counts immediate children only
+    ///
+    /// # Returns
+    /// Hash with keys:
+    /// - "has_frozen": boolean indicating if any frozen elements exist
+    /// - "frozen_count": total number of frozen elements
+    /// - "frozen_collections": number of frozen collections (lists, maps, graphs)
+    /// - "frozen_primitives": number of frozen primitives (numbers, strings, etc.)
+    fn eval_has_frozen_count(&self, value: &Value, deep: bool) -> Result<Value> {
+        let mut frozen_count = 0;
+        let mut frozen_collections = 0;
+        let mut frozen_primitives = 0;
+
+        // Count with specified mode (shallow by default, deep if requested)
+        self.count_frozen(value, &mut frozen_count, &mut frozen_collections, &mut frozen_primitives, deep);
+
+        // Create result hash
+        let mut result = Hash::new();
+        result.insert("has_frozen".to_string(), Value::boolean(frozen_count > 0)).unwrap();
+        result.insert("frozen_count".to_string(), Value::number(frozen_count as f64)).unwrap();
+        result.insert("frozen_collections".to_string(), Value::number(frozen_collections as f64)).unwrap();
+        result.insert("frozen_primitives".to_string(), Value::number(frozen_primitives as f64)).unwrap();
+
+        Ok(Value::map(result))
+    }
+
+    /// Count frozen elements with optional recursive mode
+    ///
+    /// By default, counts immediate children only (shallow mode).
+    /// This is usually what you want: "how many of my direct children are frozen?"
+    ///
+    /// With recursive=true, counts all descendants at any depth.
+    /// Useful when you need total count across entire tree.
+    fn count_frozen(&self, value: &Value, total: &mut usize, collections: &mut usize, primitives: &mut usize, recursive: bool) {
+        match &value.kind {
+            ValueKind::List(list) => {
+                for i in 0..list.len() {
+                    if let Some(elem) = list.get(i) {
+                        if elem.is_frozen() {
+                            *total += 1;
+                            match &elem.kind {
+                                ValueKind::List(_) | ValueKind::Map(_) | ValueKind::Graph(_) => {
+                                    *collections += 1;
+                                }
+                                _ => {
+                                    *primitives += 1;
+                                }
+                            }
+                        }
+                        // Recursively count in child elements if requested
+                        if recursive {
+                            self.count_frozen(elem, total, collections, primitives, recursive);
+                        }
+                    }
+                }
+            }
+            ValueKind::Map(hash) => {
+                for key in hash.keys() {
+                    if let Some(val) = hash.get(&key) {
+                        if val.is_frozen() {
+                            *total += 1;
+                            match &val.kind {
+                                ValueKind::List(_) | ValueKind::Map(_) | ValueKind::Graph(_) => {
+                                    *collections += 1;
+                                }
+                                _ => {
+                                    *primitives += 1;
+                                }
+                            }
+                        }
+                        // Recursively count in child values if requested
+                        if recursive {
+                            self.count_frozen(&val, total, collections, primitives, recursive);
+                        }
+                    }
+                }
+            }
+            _ => {} // Primitives don't have children
+        }
     }
 }
 

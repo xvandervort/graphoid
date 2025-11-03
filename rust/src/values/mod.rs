@@ -409,11 +409,41 @@ impl Value {
     /// All values can be frozen, including primitives.
     pub fn freeze(&mut self) {
         self.frozen = true;
-        // Also freeze backing graph for collections
+        // Deep freeze: also freeze nested elements in collections
         match &mut self.kind {
-            ValueKind::List(list) => list.graph.freeze(),
-            ValueKind::Map(map) => map.graph.freeze(),
-            ValueKind::Graph(graph) => graph.freeze(),
+            ValueKind::List(list) => {
+                // Freeze each element BEFORE freezing the backing graph
+                let len = list.len();
+                for i in 0..len {
+                    if let Some(node_id) = list.graph.nodes.keys().nth(i) {
+                        let node_id = node_id.clone();
+                        if let Some(node) = list.graph.nodes.get_mut(&node_id) {
+                            node.value.freeze(); // Recursive freeze
+                        }
+                    }
+                }
+                list.graph.freeze();
+            }
+            ValueKind::Map(map) => {
+                // Freeze each value BEFORE freezing the backing graph
+                let keys: Vec<_> = map.keys();
+                for key in keys {
+                    let node_id = format!("key_{}", key);
+                    if let Some(node) = map.graph.nodes.get_mut(&node_id) {
+                        node.value.freeze(); // Recursive freeze
+                    }
+                }
+                map.graph.freeze();
+            }
+            ValueKind::Graph(graph) => {
+                // Freeze all node values in the graph
+                for node_id in graph.nodes.keys().cloned().collect::<Vec<_>>() {
+                    if let Some(node) = graph.nodes.get_mut(&node_id) {
+                        node.value.freeze();
+                    }
+                }
+                graph.freeze();
+            }
             _ => {},
         }
     }

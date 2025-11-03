@@ -2382,7 +2382,7 @@ fn get_sound(animal) {
     # Automatic fallthrough returns none
 }
 
-# Multiple conditions (future)
+# Multiple conditions with guards
 fn classify(n) {
     |x| if x < 0 => "negative"
     |0| => "zero"
@@ -2392,9 +2392,10 @@ fn classify(n) {
 
 **Key Features**:
 - Pipe syntax `|pattern| =>` clearly distinguishes pattern matching from lambdas
+- Pattern guards with `if` conditions: `|x| if x > 0 => ...`
 - Automatic fallthrough to `none` if no pattern matches
 - Perfect for recursive functions
-- functional elegance with imperative practicality
+- Functional elegance with imperative practicality
 
 **Disambiguation**: The `|pattern| =>` syntax distinguishes pattern matching from lambda expressions (`x => x * 2`), preventing parser ambiguity.
 
@@ -3219,7 +3220,7 @@ configure { none_handling: :skip } {
     value = a.method1().method2()  # Stops at first none
 }
 
-# ✅ GOOD - Use pattern matching (future)
+# ✅ GOOD - Use pattern matching
 value = match a {
     |none| => default_value
     |obj| => obj.method1().method2()

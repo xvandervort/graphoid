@@ -16,6 +16,11 @@ fn pos() -> SourcePosition {
     }
 }
 
+// Helper function for guard evaluation - always returns true (no guards in basic tests)
+fn no_guard_eval(_: &Expr, _: &std::collections::HashMap<String, Value>) -> graphoid::error::Result<bool> {
+    Ok(true)
+}
+
 // ============================================================================
 // Pattern Matching Tests
 // ============================================================================
@@ -244,7 +249,7 @@ fn test_find_match_first_clause() {
     ];
 
     let args = vec![Value::number(0.0)];
-    let result = matcher.find_match(&clauses, &args).unwrap();
+    let result = matcher.find_match(&clauses, &args, no_guard_eval).unwrap();
 
     assert!(result.is_some());
     let (clause, bindings) = result.unwrap();
@@ -286,7 +291,7 @@ fn test_find_match_second_clause() {
     ];
 
     let args = vec![Value::number(42.0)];
-    let result = matcher.find_match(&clauses, &args).unwrap();
+    let result = matcher.find_match(&clauses, &args, no_guard_eval).unwrap();
 
     assert!(result.is_some());
     let (clause, bindings) = result.unwrap();
@@ -318,7 +323,7 @@ fn test_find_match_no_match() {
     ];
 
     let args = vec![Value::number(42.0)];
-    let result = matcher.find_match(&clauses, &args).unwrap();
+    let result = matcher.find_match(&clauses, &args, no_guard_eval).unwrap();
 
     // No match should return None
     assert!(result.is_none());
@@ -357,7 +362,7 @@ fn test_find_match_order_matters() {
     ];
 
     let args = vec![Value::number(0.0)];
-    let result = matcher.find_match(&clauses, &args).unwrap();
+    let result = matcher.find_match(&clauses, &args, no_guard_eval).unwrap();
 
     assert!(result.is_some());
     let (clause, _) = result.unwrap();
@@ -387,7 +392,7 @@ fn test_find_match_wrong_arg_count() {
 
     // Pattern matching requires exactly 1 argument
     let args = vec![Value::number(1.0), Value::number(2.0)];
-    let result = matcher.find_match(&clauses, &args);
+    let result = matcher.find_match(&clauses, &args, no_guard_eval);
 
     // Should return error for wrong argument count
     assert!(result.is_err());
@@ -399,7 +404,7 @@ fn test_find_match_empty_clauses() {
 
     let clauses = vec![];
     let args = vec![Value::number(42.0)];
-    let result = matcher.find_match(&clauses, &args).unwrap();
+    let result = matcher.find_match(&clauses, &args, no_guard_eval).unwrap();
 
     // Empty clauses should return None (no match)
     assert!(result.is_none());

@@ -2185,6 +2185,13 @@ impl Parser {
 
         let pattern = self.parse_pattern()?;
 
+        // Parse optional guard: if <expr>
+        let guard = if self.match_token(&TokenType::If) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+
         // Expect '=>'
         if !self.match_token(&TokenType::Arrow) {
             return Err(GraphoidError::SyntaxError {
@@ -2198,7 +2205,7 @@ impl Parser {
 
         Ok(PatternClause {
             pattern,
-            guard: None, // Future: guards
+            guard,
             body,
             position,
         })

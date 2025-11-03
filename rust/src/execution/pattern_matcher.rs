@@ -164,14 +164,20 @@ impl PatternMatcher {
     /// ];
     ///
     /// let args = vec![Value::number(0.0)];
-    /// let result = matcher.find_match(&clauses, &args).unwrap();
+    /// // Guard evaluator (not used in this example since guard is None)
+    /// let eval_guard = |_: &Expr, _: &std::collections::HashMap<String, Value>| Ok(true);
+    /// let result = matcher.find_match(&clauses, &args, eval_guard).unwrap();
     /// assert!(result.is_some());
     /// ```
-    pub fn find_match<'a>(
+    pub fn find_match<'a, F>(
         &self,
         clauses: &'a [PatternClause],
-        args: &[Value]
-    ) -> Result<Option<(&'a PatternClause, HashMap<String, Value>)>> {
+        args: &[Value],
+        mut eval_guard: F
+    ) -> Result<Option<(&'a PatternClause, HashMap<String, Value>)>>
+    where
+        F: FnMut(&crate::ast::Expr, &HashMap<String, Value>) -> Result<bool>
+    {
         // For now, pattern matching requires exactly 1 argument
         // Future: support multiple-parameter patterns
         if args.len() != 1 {
@@ -186,6 +192,18 @@ impl PatternMatcher {
         for clause in clauses {
             if self.matches(&clause.pattern, arg) {
                 let bindings = self.bind(&clause.pattern, arg)?;
+
+                // Check guard if present
+                if let Some(ref guard_expr) = clause.guard {
+                    // Evaluate guard with pattern bindings
+                    let guard_result = eval_guard(guard_expr, &bindings)?;
+                    if !guard_result {
+                        // Guard failed, try next clause
+                        continue;
+                    }
+                }
+
+                // Pattern matched and guard passed (or no guard)
                 return Ok(Some((clause, bindings)));
             }
         }
