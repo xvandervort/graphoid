@@ -1,6 +1,6 @@
 # Phase 10: Complete Module System - Detailed Implementation Plan
 
-**Duration**: 3-4 days (reduced from 4-6 days - already 40% complete)
+**Duration**: 4-5 days (includes `priv` keyword implementation + completion of existing work)
 **Status**: Partially implemented (31 tests passing)
 **Goal**: Complete multi-file project support with robust module system
 
@@ -10,16 +10,22 @@
 
 The Module System enables code organization across multiple files, reusable libraries, and clean namespace management. It's essential for building real-world Graphoid applications.
 
-**Current Status**:
+**Current Status (Based on Assessment)**:
 - ✅ Module manager exists (`src/execution/module_manager.rs`, 250 lines)
-- ✅ 31 module tests passing (~40% complete)
-- ✅ Basic import/load functionality works
-- ⏳ Missing: Module declaration syntax (`module name`)
-- ⏳ Missing: Module aliases
-- ⏳ Missing: Standard library modules
-- ⏳ Missing: Project structure support (graphoid.toml)
-- ⏳ Missing: Module loading from .gr files
-- ⏳ Missing: Namespace management and scoping
+- ✅ AST nodes: `Import`, `Load`, `ModuleDecl` (all exist)
+- ✅ Parser: `import_statement()`, `load_statement()`, `module_declaration()` (all implemented)
+- ✅ `import` statement fully working (caching, circular detection, path resolution)
+- ✅ Module path resolution (relative, absolute, stdlib search paths)
+- ✅ Circular dependency detection with import stack
+- ✅ Module caching working
+- ✅ 7 module manager tests passing
+- ❌ `load` statement: Parser exists, executor returns "not implemented" error
+- ❌ No `export` keyword (DESIGN DECISION: Not needed - everything is public by default)
+- ⏳ Standard library modules (infrastructure ready, modules not created)
+- ⏳ Project structure support (graphoid.toml parsing)
+- ⏳ Integration tests for complete workflows
+
+**Completion Status**: ~40% complete (basic imports work, need load, stdlib, integration tests)
 
 **Dependencies**:
 - Needs to be complete before stdlib work (Phases 11-12)
@@ -54,88 +60,300 @@ The Module System enables code organization across multiple files, reusable libr
 
 ---
 
-## Day 1: Module Declaration Syntax
+## Design Decisions: Public by Default
+
+### Decision 1: No `export` Keyword
+
+**Decision**: Everything in a module is **public by default**. There is NO `export` keyword.
+
+**Rationale**:
+- **KISS Principle**: Graphoid despises unnecessary verbiage
+- `export` statements are just boilerplate when everything should be public
+- Reduces cognitive overhead for developers
+- Simplifies module system implementation
+- 80/20 rule: Most things should be accessible, only exceptions need privacy
+
+**Examples**:
+
+```graphoid
+# math.gr - Everything is automatically accessible
+fn sqrt(x) {
+    # ... implementation
+}
+
+fn abs(x) {
+    # ... implementation
+}
+
+PI = 3.14159
+
+# When imported, ALL of these are accessible:
+# import "math"
+# math.sqrt(16)  ✅
+# math.abs(-5)   ✅
+# math.PI        ✅
+```
+
+**Contrast with Other Languages**:
+- ❌ JavaScript: `export function foo() { ... }` - unnecessary boilerplate
+- ❌ Python: `__all__` lists - more ceremony
+- ❌ Rust: `pub fn foo()` - every function needs marking
+- ✅ Graphoid: Just write your code - it's public
+
+### Decision 2: Privacy with `priv` Keyword
+
+**Decision**: **Option B - Implement `priv` keyword in Phase 10**
+
+**Rationale**:
+- Privacy is essential for proper encapsulation
+- Cannot be added later without breaking changes
+- Private symbols are for internal implementation details
+- Must be part of the module system from day one
+
+**Syntax**:
+
+```graphoid
+# helpers.gr
+priv fn internal_helper() {
+    # Not accessible from imports
+    # BUT callable by other functions in helpers.gr
+}
+
+fn public_api() {
+    # Accessible from imports (default)
+    return internal_helper()  # ✅ Can call private function within same module
+}
+```
+
+```graphoid
+# main.gr
+import "helpers"
+
+helpers.public_api()      # ✅ Works
+helpers.internal_helper() # ❌ Error: 'internal_helper' is private
+```
+
+**Scoping Rules**:
+1. **`priv` function/variable**: Only accessible within the same module file
+2. **Public (default)**: Accessible from imports
+3. **Within same module**: Private symbols ARE accessible to all code in that file
+4. **From imports**: Private symbols are NOT accessible
+
+**Implementation Requirements**:
+- Add `priv` keyword to lexer/parser
+- Track which symbols are private (in Module or Environment)
+- During member access (`module.symbol`), check if symbol is private
+- Error: "Cannot access private symbol 'internal_helper' from module 'helpers'"
+- Within same module: Allow access to private symbols (no restriction)
+
+### Decision 3: Import vs Load Semantics
+
+**`import`** - Creates namespace (already implemented):
+- Module executes in isolated environment
+- Cached (won't reload on subsequent imports)
+- Access via namespace: `module.symbol` or `alias.symbol`
+- Circular dependencies detected
+
+**`load`** - Inlines code (needs implementation):
+- Executes in current environment (no isolation)
+- No caching (executes every time)
+- No namespace - symbols go directly into current scope
+- Useful for configuration files, test helpers
+
+**Example**:
+```graphoid
+# Using import
+import "math"
+math.sqrt(16)  # Access via namespace
+
+# Using load
+load "config.gr"
+print(debug_mode)  # Direct access to variables from config.gr
+```
+
+---
+
+## Day 1: Privacy with `priv` Keyword
+
+**NOTE**: Module declaration is ALREADY IMPLEMENTED! This day is repurposed for implementing the `priv` keyword for privacy.
 
 ### Goal
-Support `module name` and `alias` declarations in .gr files.
+Implement `priv` keyword for private functions and variables within modules.
 
 ### Tasks
 
-#### 1.1 AST Nodes
+#### 1.1 Add `priv` Keyword to Lexer
+**File**: `src/lexer/mod.rs`
+
+Add `Priv` to keywords:
+```rust
+// In keyword matching
+"priv" => TokenType::Priv,
+"private" => TokenType::Priv,  // Allow both spellings
+```
+
+#### 1.2 Track Privacy in AST
 **File**: `src/ast/mod.rs`
 
-Add module declaration statement:
+Add `is_private` flag to declarations:
 ```rust
 pub enum Stmt {
-    // ... existing ...
-    ModuleDeclaration {
+    VariableDecl {
         name: String,
-        alias: Option<String>,
+        type_annotation: Option<TypeAnnotation>,
+        value: Expr,
+        is_private: bool,  // NEW
+        position: SourcePosition,
+    },
+    FunctionDecl {
+        name: String,
+        params: Vec<Parameter>,
+        body: Vec<Stmt>,
+        pattern_clauses: Option<Vec<PatternClause>>,
+        is_private: bool,  // NEW
         position: SourcePosition,
     },
     // ... existing ...
 }
 ```
 
-#### 1.2 Parser Support
+#### 1.3 Parser Support for `priv`
 **File**: `src/parser/mod.rs`
 
-Parse this syntax:
-```graphoid
-module my_utilities
-alias utils
-
-# Module contents below
-helper_value = 42
-fn process(data) { return data * 2 }
-```
-
-**Implementation**:
+Parse `priv` prefix on declarations:
 ```rust
-fn parse_module_declaration(&mut self) -> Result<Stmt> {
-    // Expect: module <name>
-    let name = self.expect_identifier()?;
+fn statement(&mut self) -> Result<Stmt> {
+    // Check for priv keyword
+    let is_private = self.match_token(&TokenType::Priv);
 
-    // Check for optional alias
-    let alias = if self.check_keyword("alias") {
-        self.advance();
-        Some(self.expect_identifier()?)
-    } else {
-        None
-    };
+    // Then parse function or variable
+    if self.match_token(&TokenType::Fn) {
+        self.function_declaration(is_private)
+    } else if /* variable declaration */ {
+        self.variable_declaration(is_private)
+    }
+    // ...
+}
 
-    Ok(Stmt::ModuleDeclaration { name, alias, position })
+fn function_declaration(&mut self, is_private: bool) -> Result<Stmt> {
+    // ... existing parsing ...
+    Ok(Stmt::FunctionDecl {
+        name,
+        params,
+        body,
+        pattern_clauses,
+        is_private,  // Pass through
+        position,
+    })
 }
 ```
 
-#### 1.3 Executor Integration
+#### 1.4 Track Private Symbols in Environment
+**File**: `src/execution/environment.rs`
+
+Track which symbols are private:
+```rust
+pub struct Environment {
+    values: HashMap<String, Value>,
+    private_symbols: HashSet<String>,  // NEW
+    parent: Option<Box<Environment>>,
+}
+
+impl Environment {
+    pub fn define_private(&mut self, name: String, value: Value) {
+        self.values.insert(name.clone(), value);
+        self.private_symbols.insert(name);
+    }
+
+    pub fn is_private(&self, name: &str) -> bool {
+        self.private_symbols.contains(name)
+    }
+}
+```
+
+#### 1.5 Executor: Store Private Symbols
 **File**: `src/execution/executor.rs`
 
-When executing a module file:
-1. Create module namespace
-2. Register alias if provided
-3. Execute module contents in module scope
-4. Return Module value
+When executing declarations, mark private symbols:
+```rust
+Stmt::FunctionDecl { name, is_private, .. } => {
+    let func = /* create function value */;
 
-**Tests**: 8 tests
-- Basic module declaration
-- Module with alias
-- Module without alias
-- Multiple modules (error - only one allowed)
-- Module in wrong location (must be at top)
-- Invalid module names
-- Duplicate aliases
-- Module exports
+    if *is_private {
+        self.env.define_private(name.clone(), func);
+    } else {
+        self.env.define(name.clone(), func);
+    }
+}
+
+Stmt::VariableDecl { name, is_private, .. } => {
+    let value = self.eval_expr(value_expr)?;
+
+    if *is_private {
+        self.env.define_private(name.clone(), value);
+    } else {
+        self.env.define(name.clone(), value);
+    }
+}
+```
+
+#### 1.6 Check Privacy on Member Access
+**File**: `src/execution/executor.rs`
+
+When accessing `module.symbol`, check if symbol is private:
+```rust
+Expr::MemberAccess { object, member, .. } => {
+    let obj_value = self.eval_expr(object)?;
+
+    match obj_value {
+        Value::Module(module) => {
+            // Check if symbol is private
+            if module.namespace.is_private(member) {
+                return Err(GraphoidError::runtime(format!(
+                    "Cannot access private symbol '{}' from module '{}'",
+                    member, module.name
+                )));
+            }
+
+            // Access allowed
+            module.namespace.get(member).cloned()
+                .ok_or_else(|| GraphoidError::runtime(format!(
+                    "Module '{}' has no member '{}'",
+                    module.name, member
+                )))
+        }
+        // ... other cases ...
+    }
+}
+```
+
+**Tests**: 12 tests
+- Parse `priv fn foo()`
+- Parse `priv x = 42`
+- Private function callable within same module
+- Private variable accessible within same module
+- Private function NOT accessible from import
+- Private variable NOT accessible from import
+- Public function accessible from import (default)
+- Error message for accessing private symbol
+- Mix of private and public in same module
+- `private` and `priv` both work (synonyms)
+- Cannot mark same symbol private twice
+- Private symbols in module exports list (should not appear)
 
 **Acceptance Criteria**:
-- ✅ `module name` syntax works
-- ✅ `alias name` syntax works
-- ✅ Module creates proper namespace
-- ✅ 8+ tests passing
+- ✅ `priv` keyword works in lexer/parser
+- ✅ Private symbols tracked in environment
+- ✅ Private symbols accessible within module
+- ✅ Private symbols NOT accessible from imports
+- ✅ Clear error messages
+- ✅ 12+ tests passing
 
 ---
 
 ## Day 2: Import Syntax Enhancements
+
+**NOTE**: Import syntax is ALREADY IMPLEMENTED! Parser handles all import variations, module resolution works (relative, absolute, stdlib), caching and circular detection both work. This day may be SKIPPED or used for testing edge cases only.
 
 ### Goal
 Complete import syntax with all variations from spec.
@@ -367,6 +585,8 @@ statistics.mean([1, 2, 3])
 ---
 
 ## Day 4: Load vs Import
+
+**⚠️ CRITICAL**: This is the MAIN missing piece! `load` statement parser exists but executor returns "not yet implemented" error. This is the primary work needed for Phase 10.
 
 ### Goal
 Clarify and complete `load` vs `import` semantics.
@@ -737,12 +957,20 @@ Comprehensive scenarios:
 
 ---
 
-## Complete Phase 8 Acceptance Criteria
+## Complete Phase 10 Acceptance Criteria
+
+**Privacy (`priv` keyword)**:
+- ✅ `priv` keyword works in lexer/parser
+- ✅ Private symbols tracked in environment
+- ✅ Private symbols accessible within same module
+- ✅ Private symbols NOT accessible from imports
+- ✅ Clear error messages for privacy violations
+- ✅ 12+ tests passing
 
 **Module Declaration**:
-- ✅ `module name` syntax works
-- ✅ `alias` declaration works
-- ✅ 8+ tests passing
+- ✅ `module name` syntax works (already implemented)
+- ✅ `alias` declaration works (already implemented)
+- ✅ Verification tests passing
 
 **Import System**:
 - ✅ All import variations work
@@ -777,10 +1005,19 @@ Comprehensive scenarios:
 - ✅ Real-world scenarios work
 
 **Totals**:
-- ✅ **91+ new tests** (current: 31, target: 122+)
+- ✅ **103+ new tests** (current: 7, target: 110+)
+  - 12 privacy tests
+  - 12 import tests
+  - 25 stdlib tests
+  - 8 load tests
+  - 10 project structure tests
+  - 8 manifest tests
+  - 20+ integration tests
+  - 8+ verification tests
 - ✅ Zero compiler warnings
 - ✅ Documentation complete
 - ✅ All spec examples work
+- ✅ Privacy enforcement working
 
 ---
 
