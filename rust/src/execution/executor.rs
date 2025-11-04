@@ -2845,6 +2845,7 @@ impl Executor {
                 // Validate pattern objects
                 let mut nodes = Vec::new();
                 let mut edges = Vec::new();
+                let mut paths = Vec::new(); // Track which edges are variable-length paths
 
                 for (i, arg) in args.iter().enumerate() {
                     if i % 2 == 0 {
@@ -2861,19 +2862,20 @@ impl Executor {
                             }
                         }
                     } else {
-                        // Odd positions should be edges
+                        // Odd positions should be edges or paths
                         match &arg.kind {
                             ValueKind::PatternEdge(pe) => {
                                 edges.push(pe.clone());
+                                paths.push(None); // Not a variable-length path
                             }
                             ValueKind::PatternPath(pp) => {
-                                // Convert PatternPath to PatternEdge for now
-                                // (variable-length paths need special handling later)
+                                // Store PatternPath info for later
                                 let pe = crate::values::PatternEdge {
                                     edge_type: Some(pp.edge_type.clone()),
                                     direction: pp.direction.clone(),
                                 };
                                 edges.push(pe);
+                                paths.push(Some((pp.min, pp.max))); // Track min/max for variable-length
                             }
                             _ => {
                                 return Err(GraphoidError::runtime(format!(
@@ -2902,17 +2904,26 @@ impl Executor {
                 let ast_edges: Vec<PatternEdge> = edges
                     .iter()
                     .enumerate()
-                    .map(|(i, pe)| PatternEdge {
-                        from: ast_nodes[i].variable.clone(),
-                        to: ast_nodes[i + 1].variable.clone(),
-                        edge_type: pe.edge_type.clone(),
-                        direction: match pe.direction.as_str() {
-                            "outgoing" => EdgeDirection::Directed,
-                            "both" => EdgeDirection::Bidirectional,
-                            _ => EdgeDirection::Directed,
-                        },
-                        length: EdgeLength::Fixed,  // Variable-length paths not yet supported
-                        position: dummy_pos.clone(),
+                    .map(|(i, pe)| {
+                        // Check if this edge is a variable-length path
+                        let length = if let Some(Some((min, max))) = paths.get(i) {
+                            EdgeLength::Variable { min: *min, max: *max }
+                        } else {
+                            EdgeLength::Fixed
+                        };
+
+                        PatternEdge {
+                            from: ast_nodes[i].variable.clone(),
+                            to: ast_nodes[i + 1].variable.clone(),
+                            edge_type: pe.edge_type.clone(),
+                            direction: match pe.direction.as_str() {
+                                "outgoing" => EdgeDirection::Directed,
+                                "both" => EdgeDirection::Bidirectional,
+                                _ => EdgeDirection::Directed,
+                            },
+                            length,
+                            position: dummy_pos.clone(),
+                        }
                     })
                     .collect();
 
@@ -4491,6 +4502,70 @@ impl Executor {
         Ok(all_matches)
     }
 
+    /// Find all paths from a node within a given hop range (for variable-length paths).
+    /// Returns a vector of (destination_node_id, path_length) tuples.
+    fn find_variable_length_paths(
+        &self,
+        graph: &crate::values::Graph,
+        from_id: &str,
+        edge_type: Option<&str>,
+        min_hops: usize,
+        max_hops: usize,
+    ) -> Vec<(String, usize)> {
+        use std::collections::{VecDeque, HashSet};
+
+        let mut results = Vec::new();
+        let mut queue = VecDeque::new();
+        let mut visited = HashSet::new();
+
+        // BFS: queue contains (current_node_id, current_depth)
+        queue.push_back((from_id.to_string(), 0));
+
+        while let Some((current_id, depth)) = queue.pop_front() {
+            // If we've exceeded max hops, stop exploring this path
+            if depth >= max_hops {
+                // Check if we're at exactly max_hops and should record this node
+                if depth == max_hops && depth >= min_hops {
+                    results.push((current_id.clone(), depth));
+                }
+                continue;
+            }
+
+            // Get the current node
+            let current_node = match graph.nodes.get(&current_id) {
+                Some(node) => node,
+                None => continue,
+            };
+
+            // Explore neighbors
+            for (neighbor_id, edge_info) in &current_node.neighbors {
+                // Check edge type if specified
+                if let Some(required_type) = edge_type {
+                    if edge_info.edge_type != required_type {
+                        continue;
+                    }
+                }
+
+                let new_depth = depth + 1;
+
+                // Record this node if it's within the valid hop range
+                if new_depth >= min_hops && new_depth <= max_hops {
+                    results.push((neighbor_id.clone(), new_depth));
+                }
+
+                // Continue exploring if we haven't exceeded max_hops
+                // Use a state key that includes path to allow multiple visits at different depths
+                let state_key = (neighbor_id.clone(), new_depth);
+                if !visited.contains(&state_key) && new_depth < max_hops {
+                    visited.insert(state_key);
+                    queue.push_back((neighbor_id.clone(), new_depth));
+                }
+            }
+        }
+
+        results
+    }
+
     /// Recursively extend a partial pattern match, collecting ALL possible matches.
     /// This version collects all matches instead of returning after finding the first one.
     fn extend_pattern_match_all(
@@ -4515,6 +4590,49 @@ impl Executor {
             .ok_or_else(|| GraphoidError::runtime(
                 "Internal error: missing node binding in pattern match".to_string()
             ))?;
+
+        // Check if this is a variable-length path
+        use crate::ast::EdgeLength;
+        match &edge_pattern.length {
+            EdgeLength::Variable { min, max } => {
+                // Find all nodes reachable within min..max hops
+                let reachable = self.find_variable_length_paths(
+                    graph,
+                    from_id,
+                    edge_pattern.edge_type.as_deref(),
+                    *min,
+                    *max,
+                );
+
+                // For each reachable node, try to continue the pattern match
+                for (to_id, _path_length) in reachable {
+                    // Check if target node matches the pattern's type constraint
+                    if !self.node_matches_type(graph, &to_id, next_node_pattern)? {
+                        continue;
+                    }
+
+                    // Check if we've already bound this variable
+                    if let Some(existing_binding) = bindings.get(&next_node_pattern.variable) {
+                        // Variable already bound - check if it matches
+                        if existing_binding != &to_id {
+                            continue;  // Doesn't match, try next path
+                        }
+                        // Matches existing binding - continue with same bindings
+                        self.extend_pattern_match_all(graph, pattern, bindings.clone(), edge_index + 1, all_matches)?;
+                    } else {
+                        // Bind this variable and continue
+                        let mut new_bindings = bindings.clone();
+                        new_bindings.insert(next_node_pattern.variable.clone(), to_id.clone());
+                        self.extend_pattern_match_all(graph, pattern, new_bindings, edge_index + 1, all_matches)?;
+                    }
+                }
+
+                return Ok(());
+            }
+            EdgeLength::Fixed => {
+                // Original fixed-length edge logic
+            }
+        }
 
         // Get the source node
         let from_node = graph.nodes.get(from_id)

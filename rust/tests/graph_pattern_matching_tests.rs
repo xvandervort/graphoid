@@ -262,7 +262,6 @@ fn test_return_clause_with_multiple_matches() {
     assert_eq!(result.unwrap(), Value::number(2.0));  // Two matches: Alice->Bob and Alice->Carol
 }
 
-/*
 #[test]
 fn test_variable_length_path() {
     let code = r#"
@@ -273,7 +272,8 @@ fn test_variable_length_path() {
         g.add_edge("A", "B", "FOLLOWS")
         g.add_edge("B", "C", "FOLLOWS")
 
-        results = g.match((user) -[:FOLLOWS*1..2]-> (other))
+        # Variable-length path: find paths of 1-2 hops
+        results = g.match(node("user"), path(edge_type: "FOLLOWS", min: 1, max: 2), node("other"))
         results.size()
     "#;
 
@@ -284,27 +284,33 @@ fn test_variable_length_path() {
 }
 
 #[test]
-fn test_bidirectional_pattern() {
+fn test_variable_length_path_exact_distance() {
     let code = r#"
         g = graph{}
         g.add_node("A", 1)
         g.add_node("B", 2)
-        g.add_edge("A", "B", "FRIEND")
-        # Note: for bidirectional, should match even though edge is only A->B
+        g.add_node("C", 3)
+        g.add_node("D", 4)
+        g.add_edge("A", "B", "FOLLOWS")
+        g.add_edge("B", "C", "FOLLOWS")
+        g.add_edge("C", "D", "FOLLOWS")
 
-        results = g.match((a) -[:FRIEND]- (b))
+        # Find paths of exactly 2 hops
+        results = g.match(node("start"), path(edge_type: "FOLLOWS", min: 2, max: 2), node("end"))
         results.size()
     "#;
 
     let result = execute_and_return(code);
     assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
-    assert_eq!(result.unwrap(), Value::number(1.0));
+    // Should find: A->B->C, B->C->D = 2 paths
+    assert_eq!(result.unwrap(), Value::number(2.0));
 }
 
 // ============================================================================
 // Subgraph Operations Tests - Day 6-8 (TDD RED)
 // ============================================================================
 
+/*
 #[test]
 fn test_extract_by_node_filter() {
     let code = r#"
