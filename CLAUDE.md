@@ -8,17 +8,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Graphoid** is a revolutionary graph-theoretic programming language where **everything is a graph**. Unlike traditional languages that bolt graphs onto the side, Graphoid makes graphs the fundamental abstraction at every level: data structures, variable storage, and even the runtime environment itself.
 
-### Current Status (January 2025)
+### Current Status (November 2025)
 
-**FRESH START - RUST IMPLEMENTATION UNDERWAY**
+**RUST IMPLEMENTATION - 7+ PHASES COMPLETE, 50% OF ROADMAP DONE**
 
-The project is undergoing a **clean-slate Rust implementation** to build a production-ready, high-performance language from the ground up.
+The Rust implementation has made substantial progress with 7+ complete phases and Phase 8 nearly done.
 
-- ✅ **Phase 0 Complete** - Project structure, dependencies, error types, CLI/REPL skeleton
-- ✅ **Phase 1 Complete** - Lexer (tokenization) - 54 tests passing
-- ✅ **Phase 2 Complete** - Parser & AST - 31 tests passing
-- 🔜 **Phase 3 Next** - Value System & Basic Execution
-- 📋 **14-Phase Roadmap** - Complete path to production-ready language with professional tooling
+- ✅ **Phases 0-7 Complete** - Foundation through behavior system (October 2025)
+- ✅ **Phase 6.5 Complete** - Foundational gaps & verification (132+ tests):
+  - Architecture verification (graph-backed collections)
+  - Parser completeness (inline conditionals, element-wise ops, integer division)
+  - Mutation operators (sort!/reverse! convention)
+  - Graph querying Levels 1-2
+  - Subgraph operations (orphan management, extraction, insertion)
+- ✅ **Phase 7 Complete** - Function Pattern Matching & Behavior System (186+ tests):
+  - Behavior system (91 tests): framework, standard, mapping, custom, ordering, freeze
+  - Pattern matching (77 tests): pipe syntax, parser, matcher, integration
+  - Implementation files: behaviors.rs, pattern_matcher.rs
+- ⚠️ **Phase 8 ~75% Complete** - Module System (31 tests, 2-3 days remaining):
+  - Module manager implemented
+  - Circular dependency detection working
+  - Import/export system incomplete
+- 🔜 **Phase 9 Next** - Graph Pattern Matching & Advanced Querying
+- 📊 **1,609 Tests Passing** - Comprehensive test coverage, zero regressions
+- 📋 **14-Phase Roadmap** - 50% complete (7 of 14 phases done)
 - 📚 **Comprehensive Specifications** - Language spec, architecture design, production tooling all documented
 
 **Python Implementation**: The Python implementation in `python/` serves as a **reference prototype** demonstrating language concepts. The Rust implementation in `rust/` is the **production target**.
@@ -432,15 +445,16 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 14-phase plan:
 | 0 | Project Setup | 1-2 days | ✅ COMPLETE |
 | 1 | Lexer | 3-5 days | ✅ COMPLETE (54 tests) |
 | 2 | Parser & AST | 5-7 days | ✅ COMPLETE (31 tests) |
-| 3 | Value System & Basic Execution | 5-7 days | 🔜 NEXT |
-| 4 | Functions & Lambdas | 4-6 days | 🔲 Pending |
-| 5 | Collections & Methods | 7-10 days | 🔲 Pending |
-| 6 | Graph Types & Rules | 10-14 days | 🔲 Pending |
-| 7 | Behavior System | 5-7 days | 🔲 Pending |
-| 8 | Module System | 4-6 days | 🔲 Pending |
-| 9 | Native Stdlib Modules | 14-21 days | 🔲 Pending |
-| 10 | Pure Graphoid Stdlib | 10-14 days | 🔲 Pending |
-| 11 | Advanced Features | 14-21 days | 🔲 Pending |
+| 3 | Value System & Basic Execution | 5-7 days | ✅ COMPLETE |
+| 4 | Functions & Lambdas | 4-6 days | ✅ COMPLETE |
+| 5 | Collections & Methods | 7-10 days | ✅ COMPLETE |
+| 6 | Graph Types & Rules | 10-14 days | ✅ COMPLETE |
+| 6.5 | Foundational Gaps & Verification | 5-7 days | ✅ COMPLETE (132+ tests) |
+| 7 | Function Pattern Matching & Behaviors | 5-7 days | ✅ COMPLETE (186+ tests) |
+| 8 | Module System | 4-6 days | ⚠️ ~75% COMPLETE (31 tests) |
+| 9 | Graph Pattern Matching & Advanced Querying | 7-10 days | 🔜 NEXT |
+| 10 | Advanced Module Features | 3-5 days | 🔲 Pending |
+| 11 | Native Stdlib Modules | 14-21 days | 🔲 Pending |
 | 12 | Testing Framework | 7-10 days | 🔲 Pending |
 | 13 | Debugger | 10-14 days | 🔲 Pending |
 | 14 | Package Manager | 14-21 days | 🔲 Pending |
