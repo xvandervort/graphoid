@@ -233,12 +233,9 @@ fn test_explicit_syntax_reusable_patterns() {
 }
 
 // ============================================================================
-// Pattern Matching Execution Tests - Day 3-5 (TDD RED)
+// Pattern Matching Execution Tests - Day 3-5 (TDD RED -> GREEN -> REFACTOR)
 // ============================================================================
-// NOTE: These tests are commented out until implementation.
-// Will be uncommented one at a time following proper TDD (RED-GREEN-REFACTOR)
 
-/*
 #[test]
 fn test_simple_pattern_match() {
     let code = r#"
@@ -251,11 +248,16 @@ fn test_simple_pattern_match() {
         results.size()
     "#;
 
-    // This will fail until pattern matching is implemented
     let result = execute_and_return(code);
     assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
-    assert_eq!(result.unwrap(), Value::number(1.0));
+    let value = result.unwrap();
+    match value.kind {
+        graphoid::values::ValueKind::Number(n) => assert_eq!(n, 1.0),
+        _ => panic!("Expected number, got: {:?}", value.type_name()),
+    }
 }
+
+/*
 
 #[test]
 fn test_pattern_with_node_type() {

@@ -182,6 +182,7 @@ pub enum Expr {
         position: SourcePosition,
     },
     GraphMatch {
+        graph: Box<Expr>,  // The graph expression to match against
         pattern: GraphPattern,
         position: SourcePosition,
     },

@@ -201,11 +201,38 @@ impl Executor {
                     Err(graphoid_error)
                 }
             }
-            Expr::GraphMatch { pattern, .. } => {
-                // Phase 9: Graph pattern matching - to be implemented in Day 5
-                Err(GraphoidError::runtime(
-                    "Graph pattern matching not yet implemented".to_string()
-                ))
+            Expr::GraphMatch { graph, pattern, .. } => {
+                // Phase 9: Graph pattern matching with compact syntax
+                // Evaluate the graph expression
+                let graph_value = self.eval_expr(graph)?;
+
+                // Extract the graph
+                let graph_data = match &graph_value.kind {
+                    ValueKind::Graph(g) => g,
+                    _ => {
+                        return Err(GraphoidError::runtime(format!(
+                            "Expected graph value, got {}",
+                            graph_value.type_name()
+                        )));
+                    }
+                };
+
+                // Perform pattern matching
+                let matches = self.match_pattern(graph_data, pattern)?;
+
+                // Convert matches to list of hashes
+                let result_list: Vec<Value> = matches
+                    .iter()
+                    .map(|bindings| {
+                        let mut hash = crate::values::Hash::new();
+                        for (var, node_id) in bindings {
+                            let _ = hash.insert(var.clone(), Value::string(node_id.clone()));
+                        }
+                        Value::map(hash)
+                    })
+                    .collect();
+
+                Ok(Value::list(crate::values::List::from_vec(result_list)))
             }
         }
     }
@@ -4157,6 +4184,116 @@ impl Executor {
             }
             _ => {} // Primitives don't have children
         }
+    }
+
+    /// Match a graph pattern against a graph and return all matches.
+    /// Returns a vector of variable bindings where each binding maps variable names to node IDs.
+    fn match_pattern(
+        &self,
+        graph: &crate::values::Graph,
+        pattern: &crate::ast::GraphPattern,
+    ) -> Result<Vec<std::collections::HashMap<String, String>>> {
+        use std::collections::HashMap;
+
+        let mut all_matches = Vec::new();
+
+        // Pattern must have at least one node
+        if pattern.nodes.is_empty() {
+            return Ok(all_matches);
+        }
+
+        // Start matching from the first node in the pattern
+        let first_pattern_node = &pattern.nodes[0];
+
+        // Try each node in the graph as a potential match for the first pattern node
+        for node_id in graph.nodes.keys() {
+            let mut bindings = HashMap::new();
+            bindings.insert(first_pattern_node.variable.clone(), node_id.clone());
+
+            // Try to extend this match through the pattern
+            if self.extend_pattern_match(graph, pattern, &mut bindings, 0)? {
+                all_matches.push(bindings);
+            }
+        }
+
+        Ok(all_matches)
+    }
+
+    /// Recursively extend a partial pattern match.
+    /// edge_index indicates which edge we're trying to match next.
+    fn extend_pattern_match(
+        &self,
+        graph: &crate::values::Graph,
+        pattern: &crate::ast::GraphPattern,
+        bindings: &mut std::collections::HashMap<String, String>,
+        edge_index: usize,
+    ) -> Result<bool> {
+        // If we've matched all edges, we have a complete match
+        if edge_index >= pattern.edges.len() {
+            return Ok(true);
+        }
+
+        let edge_pattern = &pattern.edges[edge_index];
+        let next_node_pattern = &pattern.nodes[edge_index + 1];
+
+        // Get the source node from bindings
+        let from_id = bindings.get(&pattern.nodes[edge_index].variable)
+            .ok_or_else(|| GraphoidError::runtime(
+                "Internal error: missing node binding in pattern match".to_string()
+            ))?;
+
+        // Get the source node
+        let from_node = graph.nodes.get(from_id)
+            .ok_or_else(|| GraphoidError::runtime(
+                "Internal error: node not found in graph".to_string()
+            ))?;
+
+        // Find all edges from this node by iterating through neighbors
+        for (to_id, edge_info) in &from_node.neighbors {
+            // Check if edge type matches (if specified in pattern)
+            if let Some(ref pattern_edge_type) = edge_pattern.edge_type {
+                if edge_info.edge_type != *pattern_edge_type {
+                    continue;
+                }
+            }
+
+            // Check direction
+            use crate::ast::EdgeDirection;
+            match &edge_pattern.direction {
+                EdgeDirection::Directed => {
+                    // Edge must go in the correct direction (already satisfied by neighbors structure)
+                }
+                EdgeDirection::Bidirectional => {
+                    // Would match edges in either direction, but for now only forward
+                    // TODO: Also check reverse edges
+                }
+            }
+
+            // This edge matches! Try to match the target node
+
+            // Check if we've already bound this variable
+            if let Some(existing_binding) = bindings.get(&next_node_pattern.variable) {
+                // Variable already bound - check if it matches
+                if existing_binding != to_id {
+                    continue;  // Doesn't match, try next edge
+                }
+            } else {
+                // Bind this variable
+                bindings.insert(next_node_pattern.variable.clone(), to_id.clone());
+            }
+
+            // Try to extend the match further
+            if self.extend_pattern_match(graph, pattern, bindings, edge_index + 1)? {
+                return Ok(true);  // Found a complete match
+            }
+
+            // Backtrack: remove the binding if it wasn't already there
+            if !bindings.contains_key(&next_node_pattern.variable) {
+                bindings.remove(&next_node_pattern.variable);
+            }
+        }
+
+        Ok(false)  // No match found
     }
 }
 

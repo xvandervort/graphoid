@@ -1476,8 +1476,9 @@ impl Parser {
                                 });
                             }
 
-                            // Return GraphMatch expression
+                            // Return GraphMatch expression with graph reference
                             expr = Expr::GraphMatch {
+                                graph: Box::new(expr),  // The graph object (e.g., g)
                                 pattern,
                                 position,
                             };
