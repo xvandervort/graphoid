@@ -1023,6 +1023,9 @@ impl Executor {
             ValueKind::Graph(graph) => self.eval_graph_method(graph.clone(), method, args, object_expr),
             ValueKind::String(ref s) => self.eval_string_method(s, method, args),
             ValueKind::Error(ref err) => self.eval_error_method(err, method, args),
+            ValueKind::PatternNode(pn) => self.eval_pattern_node_method(pn, method, args),
+            ValueKind::PatternEdge(pe) => self.eval_pattern_edge_method(pe, method, args),
+            ValueKind::PatternPath(pp) => self.eval_pattern_path_method(pp, method, args),
             _other => Err(GraphoidError::runtime(format!(
                 "Type '{}' does not have method '{}'",
                 value.type_name(),
@@ -2139,6 +2142,157 @@ impl Executor {
         }
     }
 
+    /// Evaluates a method call on a pattern node object.
+    fn eval_pattern_node_method(&self, pn: &crate::values::PatternNode, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "bind" => {
+                // node_obj.bind("new_var") - returns new PatternNode with updated variable
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternNode.bind() expects 1 argument (variable name), got {}",
+                        args.len()
+                    )));
+                }
+                let new_variable = args[0].to_string_value();
+                Ok(Value::pattern_node(Some(new_variable), pn.node_type.clone()))
+            }
+            "variable" => {
+                // Property access - returns the variable name
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternNode.variable is a property, not a method (got {} arguments)",
+                        args.len()
+                    )));
+                }
+                Ok(pn.variable.as_ref().map(|v| Value::string(v.clone())).unwrap_or(Value::none()))
+            }
+            "type" => {
+                // Property access - returns the node type
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternNode.type is a property, not a method (got {} arguments)",
+                        args.len()
+                    )));
+                }
+                Ok(pn.node_type.as_ref().map(|t| Value::string(t.clone())).unwrap_or(Value::none()))
+            }
+            "pattern_type" => {
+                // Returns symbol :node
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternNode.pattern_type is a property, not a method (got {} arguments)",
+                        args.len()
+                    )));
+                }
+                Ok(Value::symbol("node".to_string()))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "PatternNode does not have method '{}'",
+                method
+            ))),
+        }
+    }
+
+    /// Evaluates a method call on a pattern edge object.
+    fn eval_pattern_edge_method(&self, pe: &crate::values::PatternEdge, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "edge_type" => {
+                // Property access - returns the edge type
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternEdge.edge_type is a property, not a method (got {} arguments)",
+                        args.len()
+                    )));
+                }
+                Ok(pe.edge_type.as_ref().map(|t| Value::string(t.clone())).unwrap_or(Value::none()))
+            }
+            "direction" => {
+                // Property access - returns the direction symbol
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternEdge.direction is a property, not a method (got {} arguments)",
+                        args.len()
+                    )));
+                }
+                Ok(Value::symbol(pe.direction.clone()))
+            }
+            "pattern_type" => {
+                // Returns symbol :edge
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternEdge.pattern_type is a property, not a method (got {} arguments)",
+                        args.len()
+                    )));
+                }
+                Ok(Value::symbol("edge".to_string()))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "PatternEdge does not have method '{}'",
+                method
+            ))),
+        }
+    }
+
+    /// Evaluates a method call on a pattern path object.
+    fn eval_pattern_path_method(&self, pp: &crate::values::PatternPath, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "edge_type" => {
+                // Property access - returns the edge type
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternPath.edge_type is a property, not a method (got {} arguments)",
+                        args.len()
+                    )));
+                }
+                Ok(Value::string(pp.edge_type.clone()))
+            }
+            "min" => {
+                // Property access - returns the minimum path length
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternPath.min is a property, not a method (got {} arguments)",
+                        args.len()
+                    )));
+                }
+                Ok(Value::number(pp.min as f64))
+            }
+            "max" => {
+                // Property access - returns the maximum path length
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternPath.max is a property, not a method (got {} arguments)",
+                        args.len()
+                    )));
+                }
+                Ok(Value::number(pp.max as f64))
+            }
+            "direction" => {
+                // Property access - returns the direction symbol
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternPath.direction is a property, not a method (got {} arguments)",
+                        args.len()
+                    )));
+                }
+                Ok(Value::symbol(pp.direction.clone()))
+            }
+            "pattern_type" => {
+                // Returns symbol :path
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternPath.pattern_type is a property, not a method (got {} arguments)",
+                        args.len()
+                    )));
+                }
+                Ok(Value::symbol("path".to_string()))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "PatternPath does not have method '{}'",
+                method
+            ))),
+        }
+    }
+
     /// Evaluates a method call on a graph.
     fn eval_graph_method(&mut self, mut graph: crate::values::Graph, method: &str, args: &[Value], object_expr: &Expr) -> Result<Value> {
         match method {
@@ -2520,6 +2674,166 @@ impl Executor {
 
                     self.error_collector.clear();
                     return Ok(Value::none());
+                }
+                "node" => {
+                    // node(variable, type: optional) - creates a pattern node object
+                    // First positional arg is variable (optional)
+                    // Named arg "type" is node type (optional)
+
+                    let mut variable: Option<String> = None;
+                    let mut node_type: Option<String> = None;
+
+                    for arg in args {
+                        match arg {
+                            Argument::Positional(expr) => {
+                                if variable.is_some() {
+                                    return Err(GraphoidError::runtime(
+                                        "node() accepts at most one positional argument (variable)".to_string()
+                                    ));
+                                }
+                                let val = self.eval_expr(expr)?;
+                                variable = Some(val.to_string_value());
+                            }
+                            Argument::Named { name: param_name, value } => {
+                                if param_name == "type" {
+                                    let val = self.eval_expr(value)?;
+                                    node_type = Some(val.to_string_value());
+                                } else {
+                                    return Err(GraphoidError::runtime(format!(
+                                        "node() does not accept parameter '{}'", param_name
+                                    )));
+                                }
+                            }
+                        }
+                    }
+
+                    return Ok(Value::pattern_node(variable, node_type));
+                }
+                "edge" => {
+                    // edge(type: optional, direction: optional) - creates a pattern edge object
+                    // Both args are named parameters
+
+                    let mut edge_type: Option<String> = None;
+                    let mut direction: String = "outgoing".to_string(); // default
+
+                    for arg in args {
+                        match arg {
+                            Argument::Positional(_) => {
+                                return Err(GraphoidError::runtime(
+                                    "edge() does not accept positional arguments, use named parameters: type, direction".to_string()
+                                ));
+                            }
+                            Argument::Named { name: param_name, value } => {
+                                let val = self.eval_expr(value)?;
+                                match param_name.as_str() {
+                                    "type" => {
+                                        edge_type = Some(val.to_string_value());
+                                    }
+                                    "direction" => {
+                                        // Should be a symbol like :outgoing
+                                        if let ValueKind::Symbol(s) = &val.kind {
+                                            direction = s.clone();
+                                        } else {
+                                            return Err(GraphoidError::runtime(format!(
+                                                "edge() direction must be a symbol (:outgoing, :incoming, or :both), got {}",
+                                                val.type_name()
+                                            )));
+                                        }
+                                    }
+                                    _ => {
+                                        return Err(GraphoidError::runtime(format!(
+                                            "edge() does not accept parameter '{}'", param_name
+                                        )));
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    return Ok(Value::pattern_edge(edge_type, direction));
+                }
+                "path" => {
+                    // path(edge_type: string, min: num, max: num, direction: optional)
+                    // All named parameters
+
+                    let mut edge_type: Option<String> = None;
+                    let mut min: Option<usize> = None;
+                    let mut max: Option<usize> = None;
+                    let mut direction: String = "outgoing".to_string(); // default
+
+                    for arg in args {
+                        match arg {
+                            Argument::Positional(_) => {
+                                return Err(GraphoidError::runtime(
+                                    "path() does not accept positional arguments, use named parameters: edge_type, min, max, direction".to_string()
+                                ));
+                            }
+                            Argument::Named { name: param_name, value } => {
+                                let val = self.eval_expr(value)?;
+                                match param_name.as_str() {
+                                    "edge_type" => {
+                                        edge_type = Some(val.to_string_value());
+                                    }
+                                    "min" => {
+                                        if let ValueKind::Number(n) = val.kind {
+                                            min = Some(n as usize);
+                                        } else {
+                                            return Err(GraphoidError::runtime(format!(
+                                                "path() min must be a number, got {}",
+                                                val.type_name()
+                                            )));
+                                        }
+                                    }
+                                    "max" => {
+                                        if let ValueKind::Number(n) = val.kind {
+                                            max = Some(n as usize);
+                                        } else {
+                                            return Err(GraphoidError::runtime(format!(
+                                                "path() max must be a number, got {}",
+                                                val.type_name()
+                                            )));
+                                        }
+                                    }
+                                    "direction" => {
+                                        if let ValueKind::Symbol(s) = &val.kind {
+                                            direction = s.clone();
+                                        } else {
+                                            return Err(GraphoidError::runtime(format!(
+                                                "path() direction must be a symbol (:outgoing, :incoming, or :both), got {}",
+                                                val.type_name()
+                                            )));
+                                        }
+                                    }
+                                    _ => {
+                                        return Err(GraphoidError::runtime(format!(
+                                            "path() does not accept parameter '{}'", param_name
+                                        )));
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Validate required parameters
+                    let edge_type = edge_type.ok_or_else(|| {
+                        GraphoidError::runtime("path() requires 'edge_type' parameter".to_string())
+                    })?;
+                    let min = min.ok_or_else(|| {
+                        GraphoidError::runtime("path() requires 'min' parameter".to_string())
+                    })?;
+                    let max = max.ok_or_else(|| {
+                        GraphoidError::runtime("path() requires 'max' parameter".to_string())
+                    })?;
+
+                    // Validate min <= max
+                    if min > max {
+                        return Err(GraphoidError::runtime(format!(
+                            "path() min ({}) must be <= max ({})",
+                            min, max
+                        )));
+                    }
+
+                    return Ok(Value::pattern_path(edge_type, min, max, direction));
                 }
                 _ => {}
             }

@@ -1,8 +1,8 @@
 # Phase 9: Graph Pattern Matching & Advanced Querying - Detailed Implementation Plan
 
 **Duration**: 7-10 days
-**Status**: Not started - NEW phase
-**Goal**: Implement Cypher-style graph pattern matching - the "make or break" feature for a graph language
+**Status**: 🔄 IN PROGRESS - Days 1-2 complete
+**Goal**: Implement declarative graph pattern matching with explicit, readable syntax
 
 ---
 
@@ -12,16 +12,33 @@ This phase implements **Level 3 (Pattern-Based Querying)** and **Level 5 (Subgra
 
 **Why This is Critical**:
 - Makes Graphoid credible as a graph-theoretic language
-- Enables declarative graph querying (Cypher-style)
+- Enables declarative graph querying with readable syntax
 - Provides powerful subgraph manipulation
 - "Make or break" feature per language specification §452
 
 **Current Status**:
 - ✅ Level 1: Basic navigation (neighbors, has_node) - COMPLETE
 - ✅ Level 2: Filtering/traversal (bfs, dfs, filter) - COMPLETE
-- ❌ Level 3: Pattern-based querying - **MISSING** (this phase)
+- 🔄 Level 3: Pattern-based querying - **IN PROGRESS** (this phase)
 - ✅ Level 4: Path algorithms (shortest_path, distance) - COMPLETE
-- ❌ Level 5: Subgraph operations - **MISSING** (this phase)
+- ❌ Level 5: Subgraph operations - **PENDING** (this phase)
+
+**Implementation Progress**:
+- ✅ AST types (GraphPattern, PatternNode, PatternEdge, EdgeDirection, EdgeLength)
+- ✅ Parser for compact syntax `(node:Type) -[:EDGE]-> (other:Type)`
+- ✅ Pattern value types (PatternNode, PatternEdge, PatternPath)
+- ✅ Built-in functions (node(), edge(), path())
+- ✅ Documentation in LANGUAGE_SPECIFICATION.md
+- 🔄 Pattern object methods (.bind(), property access)
+- ⏳ Parser for explicit syntax
+- ⏳ Pattern matching execution engine
+- ⏳ Subgraph operations
+
+**Major Design Decisions**:
+1. **Explicit Syntax PRIMARY**: Readable `node("var", type: "Type")` syntax is recommended
+2. **Compact Syntax OPTIONAL**: Cypher-style `(var:Type)` syntax supported for power users
+3. **Pattern Objects as First-Class Values**: Can be stored, passed, inspected, and composed
+4. **No Range Literals**: Variable-length paths use `*{min: N, max: M}` explicit syntax
 
 **Dependencies**:
 - Phase 7 (Function Pattern Matching) - shares parser/engine
@@ -39,7 +56,7 @@ Pattern syntax inspired by Cypher graph query language:
 - `(node:Type)` - Node with type
 - `-[:EDGE_TYPE]->` - Directed edge
 - `-[:EDGE_TYPE]-` - Bidirectional edge
-- `-[:EDGE*min..max]->` - Variable-length path
+- `-[:EDGE*{min: N, max: M}]->` - Variable-length path
 - `.where()` - Filter predicates
 - `.return()` - Select specific fields
 
@@ -209,7 +226,7 @@ impl Parser {
         })
     }
 
-    /// Parse pattern edge: -[:TYPE]-> or -[:TYPE*min..max]->
+    /// Parse pattern edge: -[:TYPE]-> or -[:TYPE*{min: N, max: M}]->
     fn parse_pattern_edge(&mut self) -> Result<PatternEdge, GraphoidError> {
         self.expect(Token::Minus)?;
 
@@ -218,12 +235,20 @@ impl Parser {
             self.expect(Token::Colon)?;
             let edge_type = self.expect_symbol()?;
 
-            // Check for variable length: *min..max
+            // Check for variable length: *{min: N, max: M}
             let length = if self.check(Token::Star) {
                 self.advance();
+                self.expect(Token::LeftBrace)?;
+                // Parse min: N
+                self.expect_identifier("min")?;
+                self.expect(Token::Colon)?;
                 let min = self.expect_number()? as usize;
-                self.expect(Token::DotDot)?;
+                self.expect(Token::Comma)?;
+                // Parse max: M
+                self.expect_identifier("max")?;
+                self.expect(Token::Colon)?;
                 let max = self.expect_number()? as usize;
+                self.expect(Token::RightBrace)?;
                 EdgeLength::Variable { min, max }
             } else {
                 EdgeLength::Fixed
@@ -277,7 +302,7 @@ fn test_parse_pattern_with_where() {
 
 #[test]
 fn test_parse_variable_length_path() {
-    let code = "graph.match((user:User) -[:FOLLOWS*1..3]-> (influencer:User))";
+    let code = "graph.match((user:User) -[:FOLLOWS*{min: 1, max: 3}]-> (influencer:User))";
     let ast = parse(code).unwrap();
     // Assert variable-length edge
 }
@@ -607,7 +632,7 @@ fn test_variable_length_path() {
         g.add_edge("A", "B", "FOLLOWS", {})
         g.add_edge("B", "C", "FOLLOWS", {})
 
-        results = g.match((user) -[:FOLLOWS*1..2]-> (other))
+        results = g.match((user) -[:FOLLOWS*{min: 1, max: 2}]-> (other))
         results.size()
     "#;
     assert_eq!(eval(code), Value::Number(3.0));  // A->B, B->C, A->B->C
@@ -821,7 +846,7 @@ fn test_add_subgraph() {
 - [ ] ✅ Node type constraints work: `(person:User)`
 - [ ] ✅ Edge type constraints work: `-[:FRIEND]->`
 - [ ] ✅ Bidirectional patterns work: `-[:TYPE]-`
-- [ ] ✅ Variable-length paths work: `-[:TYPE*1..3]->`
+- [ ] ✅ Variable-length paths work: `-[:TYPE*{min: 1, max: 3}]->`
 - [ ] ✅ Where clauses filter correctly
 - [ ] ✅ Return clauses project fields
 - [ ] ✅ Multiple patterns in single query work

@@ -212,6 +212,37 @@ impl std::hash::Hash for Function {
     }
 }
 
+/// Pattern node object for graph pattern matching
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PatternNode {
+    /// Variable name for this node in the pattern
+    pub variable: Option<String>,
+    /// Node type constraint (e.g., "User"), or None for any type
+    pub node_type: Option<String>,
+}
+
+/// Pattern edge object for graph pattern matching
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PatternEdge {
+    /// Edge type constraint (e.g., "FRIEND"), or None for any type
+    pub edge_type: Option<String>,
+    /// Edge direction: :outgoing, :incoming, or :both
+    pub direction: String, // Symbol as string
+}
+
+/// Pattern path object for variable-length graph pattern matching
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PatternPath {
+    /// Edge type for the path
+    pub edge_type: String,
+    /// Minimum path length
+    pub min: usize,
+    /// Maximum path length
+    pub max: usize,
+    /// Path direction: :outgoing, :incoming, or :both
+    pub direction: String, // Symbol as string
+}
+
 /// The actual data/kind of a value
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueKind {
@@ -237,6 +268,12 @@ pub enum ValueKind {
     Module(Module),
     /// Error object (Phase 9) - raised errors with type and location info
     Error(ErrorObject),
+    /// Pattern node object (Phase 9) - for graph pattern matching
+    PatternNode(PatternNode),
+    /// Pattern edge object (Phase 9) - for graph pattern matching
+    PatternEdge(PatternEdge),
+    /// Pattern path object (Phase 9) - for variable-length pattern matching
+    PatternPath(PatternPath),
 }
 
 /// A value with freeze tracking
@@ -310,6 +347,27 @@ impl Value {
         Value { kind: ValueKind::Error(e), frozen: false }
     }
 
+    pub fn pattern_node(variable: Option<String>, node_type: Option<String>) -> Self {
+        Value {
+            kind: ValueKind::PatternNode(PatternNode { variable, node_type }),
+            frozen: false
+        }
+    }
+
+    pub fn pattern_edge(edge_type: Option<String>, direction: String) -> Self {
+        Value {
+            kind: ValueKind::PatternEdge(PatternEdge { edge_type, direction }),
+            frozen: false
+        }
+    }
+
+    pub fn pattern_path(edge_type: String, min: usize, max: usize, direction: String) -> Self {
+        Value {
+            kind: ValueKind::PatternPath(PatternPath { edge_type, min, max, direction }),
+            frozen: false
+        }
+    }
+
     /// Returns true if the value is "truthy" in Graphoid.
     /// Falsy values: `false`, `none`, `0`, empty strings, and empty collections.
     pub fn is_truthy(&self) -> bool {
@@ -325,6 +383,9 @@ impl Value {
             ValueKind::Graph(g) => g.node_count() > 0,
             ValueKind::Module(_) => true, // Modules are always truthy
             ValueKind::Error(_) => true, // Errors are always truthy
+            ValueKind::PatternNode(_) => true, // Pattern objects are always truthy
+            ValueKind::PatternEdge(_) => true,
+            ValueKind::PatternPath(_) => true,
         }
     }
 
@@ -380,6 +441,24 @@ impl Value {
                 format!("<module {}>", m.name)
             }
             ValueKind::Error(e) => e.full_message(),
+            ValueKind::PatternNode(pn) => {
+                match (&pn.variable, &pn.node_type) {
+                    (Some(var), Some(typ)) => format!("<pattern node({}, type: \"{}\")>", var, typ),
+                    (Some(var), None) => format!("<pattern node(\"{}\")>", var),
+                    (None, Some(typ)) => format!("<pattern node(type: \"{}\")>", typ),
+                    (None, None) => "<pattern node()>".to_string(),
+                }
+            }
+            ValueKind::PatternEdge(pe) => {
+                match &pe.edge_type {
+                    Some(et) => format!("<pattern edge(type: \"{}\", direction: :{})>", et, pe.direction),
+                    None => format!("<pattern edge(direction: :{})>", pe.direction),
+                }
+            }
+            ValueKind::PatternPath(pp) => {
+                format!("<pattern path(edge_type: \"{}\", min: {}, max: {}, direction: :{})>",
+                    pp.edge_type, pp.min, pp.max, pp.direction)
+            }
         }
     }
 
@@ -397,6 +476,9 @@ impl Value {
             ValueKind::Graph(_) => "graph",
             ValueKind::Module(_) => "module",
             ValueKind::Error(_) => "error",
+            ValueKind::PatternNode(_) => "pattern_node",
+            ValueKind::PatternEdge(_) => "pattern_edge",
+            ValueKind::PatternPath(_) => "pattern_path",
         }
     }
 

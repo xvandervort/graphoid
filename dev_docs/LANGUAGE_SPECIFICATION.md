@@ -508,49 +508,228 @@ active_adult_users = graph.nodes()
 
 ### Level 3: Pattern-Based Querying
 
-Declarative pattern matching inspired by Cypher (graph query language):
+Declarative pattern matching with **explicit, readable syntax** (recommended):
 
 ```Graphoid
 # Simple pattern: user with friends
 results = graph.match(
-    (person:User) -[:FRIEND]-> (friend:User)
+    node("person", type: "User"),
+    edge(type: "FRIEND", direction: :outgoing),
+    node("friend", type: "User")
 )
 
-# With predicates
-adult_friendships = graph.match(
-    (person:User) -[:FRIEND]-> (friend:User)
-).where(person.age > 18, friend.age > 18)
+# Without type constraints
+results = graph.match(
+    node("person"),
+    edge(type: "FRIEND"),
+    node("friend")
+)
+
+# Bidirectional edges
+mutual_friends = graph.match(
+    node("a", type: "User"),
+    edge(type: "FRIEND", direction: :both),
+    node("b", type: "User")
+).where(a.id != b.id)
 
 # Variable-length paths
 influencers = graph.match(
-    (user:User) -[:FOLLOWS*1..3]-> (influencer:User)
+    node("user", type: "User"),
+    path(edge_type: "FOLLOWS", min: 1, max: 3, direction: :outgoing),
+    node("influencer", type: "User")
 ).where(influencer.follower_count > 1000)
 
-# Bidirectional patterns
-mutual_friends = graph.match(
-    (a:User) -[:FRIEND]- (b:User)
-).where(a.id != b.id)
+# With predicates
+adult_friendships = graph.match(
+    node("person", type: "User"),
+    edge(type: "FRIEND"),
+    node("friend", type: "User")
+).where(person.age > 18, friend.age > 18)
 
 # Complex patterns with multiple relationships
 results = graph.match(
-    (buyer:User) -[:PURCHASED]-> (product:Product),
-    (product) -[:CATEGORY]-> (cat:Category)
+    node("buyer", type: "User"),
+    edge(type: "PURCHASED"),
+    node("product", type: "Product"),
+    edge(type: "CATEGORY"),
+    node("cat", type: "Category")
 ).where(cat.name == "Electronics")
 
 # Return specific fields
 purchases = graph.match(
-    (user:User) -[:PURCHASED]-> (product:Product)
+    node("user", type: "User"),
+    edge(type: "PURCHASED"),
+    node("product", type: "Product")
 ).where(user.id == "user_123")
  .return(product.name, product.price)
 ```
 
-**Pattern Syntax**:
-- `(node:Type)` - Node with type
-- `-[:EDGE_TYPE]->` - Directed edge
-- `-[:EDGE_TYPE]-` - Bidirectional edge
-- `-[:EDGE*min..max]->` - Variable-length path
+**Compact Syntax** (optional, for power users):
+
+```Graphoid
+# Cypher-inspired syntax is also supported
+results = graph.match((person:User) -[:FRIEND]-> (friend:User))
+
+# Note: In compact syntax, :FRIEND is a symbol that matches
+# against the string edge type "FRIEND" (symbols convert to strings)
+```
+
+**Explicit Pattern Syntax**:
+- `node(variable_name)` - Node with any type
+- `node(variable_name, type: "Type")` - Node with specific type
+- `edge(type: "TYPE")` - Edge with type, default outgoing direction
+- `edge(type: "TYPE", direction: :outgoing)` - Directed edge
+- `edge(type: "TYPE", direction: :both)` - Bidirectional edge
+- `edge()` - Any edge type, any direction
+- `path(edge_type: "TYPE", min: N, max: M)` - Variable-length path
+- `path(edge_type: "TYPE", min: N, max: M, direction: :outgoing)` - With direction
 - `.where()` - Filter predicates
 - `.return()` - Select specific fields
+
+**Compact Pattern Syntax** (optional):
+- `(node:Type)` - Node with type
+- `-[:EDGE_TYPE]->` - Directed edge (symbol :TYPE matches string "TYPE")
+- `-[:EDGE_TYPE]-` - Bidirectional edge
+- `-[:EDGE*{min: N, max: M}]->` - Variable-length path
+
+#### Pattern Objects as First-Class Values
+
+Pattern objects (`node()`, `edge()`, `path()`) are **first-class values** that can be stored, passed, inspected, and composed:
+
+**Creating Pattern Objects:**
+```Graphoid
+# Create pattern components
+user_node = node("person", type: "User")
+friend_edge = edge(type: "FRIEND", direction: :outgoing)
+any_edge = edge()  # Matches any edge type and direction
+
+# Inspect pattern properties
+print(user_node.variable)    # "person"
+print(user_node.type)         # "User"
+print(friend_edge.edge_type)  # "FRIEND"
+print(friend_edge.direction)  # :outgoing
+```
+
+**Reusable Patterns:**
+```Graphoid
+# Define once, use many times
+user_node = node(type: "User")
+friend_edge = edge(type: "FRIEND")
+
+# Use in multiple queries
+alice_friends = g.match(
+    user_node.bind("alice"),
+    friend_edge,
+    user_node.bind("friend")
+)
+
+bob_friends = g.match(
+    user_node.bind("bob"),
+    friend_edge,
+    user_node.bind("friend")
+)
+```
+
+**Programmatic Pattern Construction:**
+```Graphoid
+# Build patterns conditionally
+func build_social_pattern(include_type_filter) {
+    base = node("person")
+    edge_part = edge(type: "FRIEND")
+    target = include_type_filter ? node("friend", type: "User") : node("friend")
+
+    return [base, edge_part, target]
+}
+
+# Use in query
+pattern_parts = build_social_pattern(true)
+results = g.match(...pattern_parts)  # Spread array
+```
+
+**Pattern Templates:**
+```Graphoid
+# Define reusable pattern templates
+func connection_pattern(edge_type, node_type) {
+    return [
+        node(type: node_type),
+        edge(type: edge_type),
+        node(type: node_type)
+    ]
+}
+
+# Use templates
+friends = g.match(...connection_pattern("FRIEND", "User"))
+followers = g.match(...connection_pattern("FOLLOWS", "User"))
+purchases = g.match(...connection_pattern("PURCHASED", "Product"))
+```
+
+**Variable-Length Path Patterns:**
+```Graphoid
+# Store path patterns
+influencer_path = path(
+    edge_type: "FOLLOWS",
+    min: 1,
+    max: 3,
+    direction: :outgoing
+)
+
+# Use in queries
+results = g.match(
+    node("user", type: "User"),
+    influencer_path,
+    node("influencer", type: "User")
+)
+
+# Inspect path properties
+print(influencer_path.edge_type)  # "FOLLOWS"
+print(influencer_path.min)        # 1
+print(influencer_path.max)        # 3
+```
+
+**Pattern Validation:**
+```Graphoid
+# Validate patterns before using
+func validate_pattern(pattern_obj) {
+    if pattern_obj.type == "node" {
+        return pattern_obj.variable != none
+    } else if pattern_obj.type == "edge" {
+        return pattern_obj.edge_type != none
+    }
+    return true
+}
+
+my_node = node("person", type: "User")
+if validate_pattern(my_node) {
+    results = g.match(my_node, edge(type: "FRIEND"), node("friend"))
+}
+```
+
+**Pattern Object Reference:**
+
+`node(variable, type: optional)` - Returns a PatternNode object
+- Properties:
+  - `.variable` - Variable name (string)
+  - `.type` - Node type (string or none)
+  - `.pattern_type` - Always "node"
+- Methods:
+  - `.bind(name)` - Returns new node with variable binding
+
+`edge(type: optional, direction: optional)` - Returns a PatternEdge object
+- Properties:
+  - `.edge_type` - Edge type (string or none)
+  - `.direction` - Direction symbol (:outgoing, :incoming, :both)
+  - `.pattern_type` - Always "edge"
+- Defaults:
+  - `type`: none (matches any edge type)
+  - `direction`: :outgoing
+
+`path(edge_type: string, min: num, max: num, direction: optional)` - Returns a PatternPath object
+- Properties:
+  - `.edge_type` - Edge type for path (string)
+  - `.min` - Minimum path length (number)
+  - `.max` - Maximum path length (number)
+  - `.direction` - Direction symbol (default :outgoing)
+  - `.pattern_type` - Always "path"
 
 ### Level 4: Path Queries
 
