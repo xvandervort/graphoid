@@ -82,7 +82,7 @@ fn test_graph_remove_node() {
     assert_eq!(g.node_count(), 2);
     assert_eq!(g.edge_count(), 1);
 
-    g.remove_node("bob").unwrap();
+    g.remove_node("bob", None).unwrap();
     assert_eq!(g.node_count(), 1);
     assert_eq!(g.edge_count(), 0); // Edge to bob should be removed
     assert!(!g.has_node("bob"));

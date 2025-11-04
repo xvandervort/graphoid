@@ -2633,7 +2633,7 @@ impl Executor {
                 };
 
                 // Remove the node
-                graph.remove_node(node_id)?;
+                graph.remove_node(node_id, None)?;
 
                 // Update graph in environment
                 if let Expr::Variable { name, .. } = object_expr {

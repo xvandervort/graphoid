@@ -45,7 +45,7 @@ impl Hash {
 
         // Remove old node if it exists
         if old_value.is_some() {
-            self.graph.remove_node(&key)?;
+            self.graph.remove_node(&key, None)?;
         }
 
         // Add new node with key as ID and transformed value
@@ -71,7 +71,7 @@ impl Hash {
 
         // Remove old node if it exists
         if old_value.is_some() {
-            self.graph.remove_node(&key)?;
+            self.graph.remove_node(&key, None)?;
         }
 
         // Add new node with key as ID (no behavior application)
@@ -93,7 +93,7 @@ impl Hash {
     /// Remove a key-value pair
     pub fn remove(&mut self, key: &str) -> Result<Option<Value>, GraphoidError> {
         let value = self.graph.get_node(key).cloned();
-        self.graph.remove_node(key)?;
+        self.graph.remove_node(key, None)?;
         Ok(value)
     }
 

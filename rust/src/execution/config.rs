@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 use crate::error::{GraphoidError, Result};
 use crate::values::{Value, ValueKind};
+use crate::values::graph::{OrphanPolicy, ReconnectStrategy};
 
 /// Configuration settings for the Graphoid runtime
 #[derive(Debug, Clone)]
@@ -31,6 +32,11 @@ pub struct Config {
 
     // Skip none values in operations
     pub skip_none: bool,
+
+    // Graph orphan management
+    pub orphan_policy: Option<OrphanPolicy>,
+    pub reconnect_strategy: Option<ReconnectStrategy>,
+    pub allow_overrides: Option<bool>,
 }
 
 /// Error handling mode
@@ -76,6 +82,9 @@ impl Default for Config {
             strict_edge_rules: true,
             none_conversions: true,
             skip_none: false,
+            orphan_policy: None,
+            reconnect_strategy: None,
+            allow_overrides: None,
         }
     }
 }
@@ -159,6 +168,15 @@ impl ConfigStack {
                 }
                 "none_conversions" => {
                     new_config.none_conversions = value.is_truthy();
+                }
+                "orphan_policy" => {
+                    new_config.orphan_policy = Some(parse_orphan_policy(&value)?);
+                }
+                "reconnect_strategy" => {
+                    new_config.reconnect_strategy = Some(parse_reconnect_strategy(&value)?);
+                }
+                "allow_overrides" => {
+                    new_config.allow_overrides = Some(value.is_truthy());
                 }
                 _ => {
                     return Err(GraphoidError::ConfigError {
@@ -244,6 +262,38 @@ fn parse_none_handling_mode(value: &Value) -> Result<NoneHandlingMode> {
         },
         _ => Err(GraphoidError::ConfigError {
             message: format!("none_handling must be a symbol, got {}", value.type_name()),
+        }),
+    }
+}
+
+fn parse_orphan_policy(value: &Value) -> Result<OrphanPolicy> {
+    match &value.kind {
+        ValueKind::Symbol(s) => match s.as_str() {
+            "allow" => Ok(OrphanPolicy::Allow),
+            "reject" => Ok(OrphanPolicy::Reject),
+            "delete" => Ok(OrphanPolicy::Delete),
+            "reconnect" => Ok(OrphanPolicy::Reconnect),
+            _ => Err(GraphoidError::ConfigError {
+                message: format!("Invalid orphan_policy: :{}, expected :allow, :reject, :delete, or :reconnect", s),
+            }),
+        },
+        _ => Err(GraphoidError::ConfigError {
+            message: format!("orphan_policy must be a symbol, got {}", value.type_name()),
+        }),
+    }
+}
+
+fn parse_reconnect_strategy(value: &Value) -> Result<ReconnectStrategy> {
+    match &value.kind {
+        ValueKind::Symbol(s) => match s.as_str() {
+            "to_root" => Ok(ReconnectStrategy::ToRoot),
+            "to_parent_siblings" => Ok(ReconnectStrategy::ToParentSiblings),
+            _ => Err(GraphoidError::ConfigError {
+                message: format!("Invalid reconnect_strategy: :{}, expected :to_root or :to_parent_siblings", s),
+            }),
+        },
+        _ => Err(GraphoidError::ConfigError {
+            message: format!("reconnect_strategy must be a symbol, got {}", value.type_name()),
         }),
     }
 }

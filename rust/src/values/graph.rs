@@ -608,7 +608,71 @@ impl Graph {
     }
 
     /// Remove a node from the graph
-    pub fn remove_node(&mut self, id: &str) -> Result<Option<GraphNode>, GraphoidError> {
+    /// Remove a node with optional orphan handling policy override
+    pub fn remove_node(
+        &mut self,
+        id: &str,
+        orphan_handling: Option<OrphanPolicy>,
+    ) -> Result<Option<GraphNode>, GraphoidError> {
+        // Determine effective orphan policy
+        let effective_policy = if let Some(override_policy) = orphan_handling {
+            // Check if overrides are allowed
+            if self.config.allow_overrides {
+                override_policy
+            } else {
+                return Err(GraphoidError::runtime(
+                    "Orphan policy overrides are not allowed for this graph".to_string()
+                ));
+            }
+        } else {
+            self.config.orphan_policy.clone()
+        };
+
+        // For Reject policy, check if removal would create orphans BEFORE removing
+        if matches!(effective_policy, OrphanPolicy::Reject) {
+            let would_be_orphans = self.find_would_be_orphans(id);
+            if !would_be_orphans.is_empty() {
+                return Err(GraphoidError::runtime(format!(
+                    "Cannot remove node '{}': would create {} orphan(s) (policy: reject)",
+                    id,
+                    would_be_orphans.len()
+                )));
+            }
+        }
+
+        // Perform the actual removal
+        let removed = self.remove_node_internal(id)?;
+
+        // Handle orphans based on policy AFTER removal
+        match effective_policy {
+            OrphanPolicy::Allow => {
+                // Do nothing - orphans are allowed
+            }
+            OrphanPolicy::Reject => {
+                // Already checked above
+            }
+            OrphanPolicy::Delete => {
+                // Delete all orphans
+                self.delete_orphans()?;
+            }
+            OrphanPolicy::Reconnect => {
+                // Reconnect orphans using the configured strategy
+                if let Some(strategy) = &self.config.reconnect_strategy {
+                    self.reconnect_orphans(strategy.clone())?;
+                } else {
+                    return Err(GraphoidError::runtime(
+                        "Orphan policy is :reconnect but no reconnect_strategy is configured".to_string()
+                    ));
+                }
+            }
+        }
+
+        Ok(removed)
+    }
+
+    /// Internal method to remove a node without orphan handling
+    /// Used by delete_orphans to avoid infinite recursion
+    fn remove_node_internal(&mut self, id: &str) -> Result<Option<GraphNode>, GraphoidError> {
         // Check if graph is frozen
         if self.frozen {
             return Err(GraphoidError::runtime(
@@ -2038,13 +2102,56 @@ impl Graph {
         self.count_orphans() > 0
     }
 
+    /// Find nodes that would become orphans if the specified node was removed
+    fn find_would_be_orphans(&self, id: &str) -> Vec<String> {
+        let mut would_be_orphans = Vec::new();
+
+        // Get the node being removed
+        let node_to_remove = match self.nodes.get(id) {
+            Some(n) => n,
+            None => return would_be_orphans, // Node doesn't exist, no orphans
+        };
+
+        // Check each neighbor of the node being removed
+        for neighbor_id in node_to_remove.neighbors.keys() {
+            if let Some(neighbor) = self.nodes.get(neighbor_id) {
+                // After removal, would this neighbor have no edges?
+                let would_have_predecessors = neighbor.predecessors.len() > 1 ||
+                    (neighbor.predecessors.len() == 1 && !neighbor.predecessors.contains_key(id));
+                let would_have_successors = !neighbor.neighbors.is_empty();
+
+                if !would_have_predecessors && !would_have_successors {
+                    would_be_orphans.push(neighbor_id.clone());
+                }
+            }
+        }
+
+        // Also check nodes that have the removed node as their only predecessor
+        for (potential_orphan_id, potential_orphan) in &self.nodes {
+            if potential_orphan_id == id {
+                continue; // Skip the node being removed
+            }
+
+            // Would this node become an orphan?
+            let would_lose_only_predecessor = potential_orphan.predecessors.len() == 1
+                && potential_orphan.predecessors.contains_key(id);
+            let has_no_successors = potential_orphan.neighbors.is_empty();
+
+            if would_lose_only_predecessor && has_no_successors {
+                would_be_orphans.push(potential_orphan_id.clone());
+            }
+        }
+
+        would_be_orphans
+    }
+
     /// Delete ALL orphaned nodes (never selective!)
     /// Returns list of deleted node IDs
     pub fn delete_orphans(&mut self) -> Result<Vec<String>, GraphoidError> {
         let orphan_ids = self.find_orphans();
 
         for id in &orphan_ids {
-            self.remove_node(id)?;
+            self.remove_node_internal(id)?;
         }
 
         Ok(orphan_ids)

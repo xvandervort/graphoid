@@ -124,7 +124,7 @@ impl List {
         let node_id = format!("node_{}", index);
 
         // Remove old node and add new one with same ID
-        self.graph.remove_node(&node_id)?;
+        self.graph.remove_node(&node_id, None)?;
         self.graph.add_node(node_id.clone(), transformed)?;
 
         // Restore edges
@@ -162,7 +162,7 @@ impl List {
         let node_id = format!("node_{}", index);
 
         // Remove old node and add new one with same ID (no behavior application)
-        self.graph.remove_node(&node_id)?;
+        self.graph.remove_node(&node_id, None)?;
         self.graph.add_node(node_id.clone(), value)?;
 
         // Restore edges

@@ -821,7 +821,7 @@ impl Rule for NoDuplicatesRule {
 
         // Remove duplicate nodes
         for id in to_remove {
-            graph.remove_node(&id)?;
+            graph.remove_node(&id, None)?;
         }
 
         Ok(())
