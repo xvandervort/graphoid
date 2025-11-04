@@ -941,6 +941,11 @@ impl Executor {
             return self.eval_where_method(object_value, args);
         }
 
+        // Special handling for 'return' method - needs unevaluated expressions
+        if base_method == "return" && !args.is_empty() {
+            return self.eval_return_method(object_value, args);
+        }
+
         // Evaluate all argument expressions
         let arg_values = self.eval_arguments(args)?;
 
@@ -1060,6 +1065,115 @@ impl Executor {
         }
 
         Ok(Value::list(crate::values::List::from_vec(filtered)))
+    }
+
+    /// Evaluates the 'return' method for projecting specific fields from pattern matches.
+    /// The return method receives unevaluated expressions so they can be evaluated with
+    /// temporary variable bindings from each list element (typically pattern match results).
+    fn eval_return_method(&mut self, list_value: Value, args: &[crate::ast::Argument]) -> Result<Value> {
+        // return() must be called on a list
+        let list = match &list_value.kind {
+            ValueKind::List(l) => l,
+            _ => {
+                return Err(GraphoidError::runtime(format!(
+                    "return() can only be called on lists, got {}",
+                    list_value.type_name()
+                )));
+            }
+        };
+
+        // return() takes at least one argument (the fields to project)
+        if args.is_empty() {
+            return Err(GraphoidError::runtime(
+                "return() expects at least 1 argument".to_string()
+            ));
+        }
+
+        // Extract return expressions (NOT evaluated yet)
+        let return_exprs: Vec<&Expr> = args
+            .iter()
+            .map(|arg| match arg {
+                crate::ast::Argument::Positional(expr) => expr,
+                crate::ast::Argument::Named { value, .. } => value,
+            })
+            .collect();
+
+        // Project the list
+        let mut projected = Vec::new();
+        let elements = list.to_vec();
+
+        for element in elements {
+            // If element is a map (hash), bind its keys as temporary variables
+            if let ValueKind::Map(hash) = &element.kind {
+                // Save current environment state
+                let keys = hash.keys();
+                let saved_vars: Vec<(String, Option<Value>)> = keys
+                    .iter()
+                    .map(|key| {
+                        let saved = self.env.get(key).ok();
+                        (key.clone(), saved)
+                    })
+                    .collect();
+
+                // Bind hash keys as temporary variables
+                for key in &keys {
+                    if let Some(value) = hash.get(key) {
+                        self.env.define(key.clone(), value.clone());
+                    }
+                }
+
+                // Build new hash with only selected fields
+                let mut result_hash = crate::values::Hash::new();
+
+                for return_expr in &return_exprs {
+                    // Evaluate the expression with bindings
+                    let field_value = self.eval_expr(return_expr)?;
+
+                    // Generate intelligent key name from the expression
+                    // For property access like "person.name", use "person.name" as key
+                    let key = self.expr_to_field_name(return_expr);
+
+                    let _ = result_hash.insert(key, field_value);
+                }
+
+                // Restore previous environment
+                for (key, saved_value) in saved_vars {
+                    if let Some(val) = saved_value {
+                        self.env.define(key, val);
+                    } else {
+                        // Variable didn't exist before, remove it
+                        self.env.remove_variable(&key);
+                    }
+                }
+
+                projected.push(Value::map(result_hash));
+            } else {
+                // For non-hash elements, can't do field projection
+                return Err(GraphoidError::runtime(format!(
+                    "return() requires elements to be maps for field projection, got {}",
+                    element.type_name()
+                )));
+            }
+        }
+
+        Ok(Value::list(crate::values::List::from_vec(projected)))
+    }
+
+    /// Converts an expression to a field name for return clauses.
+    /// Examples: person.name -> "person.name", friend.age -> "friend.age"
+    fn expr_to_field_name(&self, expr: &Expr) -> String {
+        match expr {
+            // Property access: object.property
+            Expr::MethodCall { object, method, args, .. } if args.is_empty() => {
+                // Recursively build the name
+                let object_name = self.expr_to_field_name(object);
+                format!("{}.{}", object_name, method)
+            }
+            // Variable reference
+            Expr::Variable { name, .. } => name.clone(),
+            // For other expressions, generate a generic name
+            _ => "field".to_string(),
+        }
     }
 
     /// Applies a method to a value (helper to avoid duplication).

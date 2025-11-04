@@ -186,6 +186,82 @@ fn test_pattern_with_where_clause() {
     assert_eq!(result.unwrap(), Value::number(1.0));  // Only Carol
 }
 
+#[test]
+fn test_pattern_with_return_clause() {
+    let code = r#"
+        g = graph{}
+        g.add_node("Alice", {name: "Alice", age: 25, city: "NYC"})
+        g.add_node("Bob", {name: "Bob", age: 30, city: "LA"})
+        g.add_edge("Alice", "Bob", "FRIEND")
+
+        # Match pattern and return only specific fields
+        results = g.match(node("person"), edge(type: "FRIEND"), node("friend"))
+                   .return(person.name, friend.age)
+
+        results.size()
+    "#;
+
+    let result = execute_and_return(code);
+    assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
+    assert_eq!(result.unwrap(), Value::number(1.0));  // One match: Alice->Bob
+}
+
+#[test]
+fn test_return_clause_validates_fields() {
+    let code = r#"
+        g = graph{}
+        g.add_node("Alice", {name: "Alice", age: 25, city: "NYC"})
+        g.add_node("Bob", {name: "Bob", age: 30, city: "LA"})
+        g.add_edge("Alice", "Bob", "FRIEND")
+
+        # Match pattern and return only specific fields
+        results = g.match(node("person"), edge(type: "FRIEND"), node("friend"))
+                   .return(person.name, friend.age)
+
+        # Get the first result and validate it contains only the projected fields
+        first = results[0]
+
+        # Should have person.name field
+        has_person_name = first.has_key("person.name")
+
+        # Should have friend.age field
+        has_friend_age = first.has_key("friend.age")
+
+        # Should NOT have other fields like person.age or friend.city
+        has_person_age = first.has_key("person.age")
+
+        # Return validation: both required fields present, extra field absent
+        has_person_name and has_friend_age and not has_person_age
+    "#;
+
+    let result = execute_and_return(code);
+    assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
+    let value = result.unwrap();
+    assert_eq!(value, Value::boolean(true), "Expected return clause to project only specified fields");
+}
+
+#[test]
+fn test_return_clause_with_multiple_matches() {
+    let code = r#"
+        g = graph{}
+        g.add_node("Alice", {name: "Alice", age: 25})
+        g.add_node("Bob", {name: "Bob", age: 30})
+        g.add_node("Carol", {name: "Carol", age: 35})
+        g.add_edge("Alice", "Bob", "FRIEND")
+        g.add_edge("Alice", "Carol", "FRIEND")
+
+        # Match pattern and return only names
+        results = g.match(node("person"), edge(type: "FRIEND"), node("friend"))
+                   .return(friend.name)
+
+        results.size()
+    "#;
+
+    let result = execute_and_return(code);
+    assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
+    assert_eq!(result.unwrap(), Value::number(2.0));  // Two matches: Alice->Bob and Alice->Carol
+}
+
 /*
 #[test]
 fn test_variable_length_path() {
