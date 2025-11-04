@@ -16,6 +16,49 @@ pub enum GraphType {
     Undirected,
 }
 
+/// Policy for handling orphaned nodes (nodes with no edges)
+#[derive(Debug, Clone, PartialEq)]
+pub enum OrphanPolicy {
+    /// Orphans can exist - no special handling
+    Allow,
+    /// Reject operations that would create orphans
+    Reject,
+    /// Automatically delete all orphans after operation
+    Delete,
+    /// Automatically reconnect orphans using strategy
+    Reconnect,
+}
+
+/// Strategy for reconnecting orphaned nodes
+#[derive(Debug, Clone, PartialEq)]
+pub enum ReconnectStrategy {
+    /// Connect orphans to the root node
+    ToRoot,
+    /// Connect orphans to siblings of their deleted parent
+    ToParentSiblings,
+}
+
+/// Configuration for graph behavior
+#[derive(Debug, Clone, PartialEq)]
+pub struct GraphConfig {
+    /// How to handle orphaned nodes
+    pub orphan_policy: OrphanPolicy,
+    /// Strategy for reconnecting orphans (if policy is Reconnect)
+    pub reconnect_strategy: Option<ReconnectStrategy>,
+    /// Whether operations can override graph configuration
+    pub allow_overrides: bool,
+}
+
+impl Default for GraphConfig {
+    fn default() -> Self {
+        GraphConfig {
+            orphan_policy: OrphanPolicy::Allow,
+            reconnect_strategy: None,
+            allow_overrides: false,
+        }
+    }
+}
+
 /// A node in the graph
 #[derive(Debug, Clone, PartialEq)]
 pub struct GraphNode {
@@ -159,6 +202,8 @@ enum ValidationResult {
 pub struct Graph {
     /// Graph type (directed or undirected)
     pub graph_type: GraphType,
+    /// Graph configuration (orphan policies, etc.)
+    pub config: GraphConfig,
     /// Nodes by ID for O(1) lookup
     pub nodes: HashMap<String, GraphNode>,
     /// Active rulesets (e.g., "tree", "dag", "bst")
@@ -202,6 +247,7 @@ impl Graph {
     pub fn new(graph_type: GraphType) -> Self {
         Graph {
             graph_type,
+            config: GraphConfig::default(),
             nodes: HashMap::new(),
             rulesets: Vec::new(),
             rules: Vec::new(),
@@ -1965,6 +2011,129 @@ impl Graph {
         let mut copy = self.clone();
         copy.frozen = false;
         copy
+    }
+
+    // =========================================================================
+    // Orphan Management (Subgraph Operations)
+    // =========================================================================
+
+    /// Find all orphaned nodes (nodes with no edges)
+    /// An orphan has no predecessors AND no successors
+    pub fn find_orphans(&self) -> Vec<String> {
+        self.nodes.iter()
+            .filter(|(_, node)| {
+                node.neighbors.is_empty() && node.predecessors.is_empty()
+            })
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+
+    /// Count orphaned nodes
+    pub fn count_orphans(&self) -> usize {
+        self.find_orphans().len()
+    }
+
+    /// Check if graph has orphans
+    pub fn has_orphans(&self) -> bool {
+        self.count_orphans() > 0
+    }
+
+    /// Delete ALL orphaned nodes (never selective!)
+    /// Returns list of deleted node IDs
+    pub fn delete_orphans(&mut self) -> Result<Vec<String>, GraphoidError> {
+        let orphan_ids = self.find_orphans();
+
+        for id in &orphan_ids {
+            self.remove_node(id)?;
+        }
+
+        Ok(orphan_ids)
+    }
+
+    /// Reconnect a single orphan to a parent node
+    /// Creates a new edge from parent to orphan
+    pub fn reconnect_orphan(
+        &mut self,
+        orphan_id: &str,
+        parent_id: &str,
+        edge_type: String,
+    ) -> Result<(), GraphoidError> {
+        // Verify orphan exists and is actually an orphan
+        if !self.has_node(orphan_id) {
+            return Err(GraphoidError::runtime(format!(
+                "Node '{}' does not exist",
+                orphan_id
+            )));
+        }
+
+        let orphans = self.find_orphans();
+        if !orphans.contains(&orphan_id.to_string()) {
+            return Err(GraphoidError::runtime(format!(
+                "Node '{}' is not an orphan",
+                orphan_id
+            )));
+        }
+
+        // Verify parent exists
+        if !self.has_node(parent_id) {
+            return Err(GraphoidError::runtime(format!(
+                "Parent node '{}' does not exist",
+                parent_id
+            )));
+        }
+
+        // Create edge from parent to orphan
+        self.add_edge(parent_id, orphan_id, edge_type, None, std::collections::HashMap::new())?;
+
+        Ok(())
+    }
+
+    /// Reconnect all orphans using the specified strategy
+    /// Returns the number of orphans reconnected
+    pub fn reconnect_orphans(
+        &mut self,
+        strategy: ReconnectStrategy,
+    ) -> Result<usize, GraphoidError> {
+        let orphan_ids = self.find_orphans();
+        let orphan_count = orphan_ids.len();
+
+        if orphan_count == 0 {
+            return Ok(0);
+        }
+
+        match strategy {
+            ReconnectStrategy::ToRoot => {
+                // Find root node (node with no predecessors but has successors)
+                let root_id = self.nodes.iter()
+                    .find(|(_, node)| node.predecessors.is_empty() && !node.neighbors.is_empty())
+                    .map(|(id, _)| id.clone());
+
+                let root_id = root_id.ok_or_else(|| {
+                    GraphoidError::runtime("No root node found for reconnection".to_string())
+                })?;
+
+                // Reconnect each orphan to root
+                for orphan_id in &orphan_ids {
+                    self.add_edge(
+                        &root_id,
+                        orphan_id,
+                        "reconnected".to_string(),
+                        None,
+                        std::collections::HashMap::new(),
+                    )?;
+                }
+            }
+
+            ReconnectStrategy::ToParentSiblings => {
+                // This strategy would need to track which nodes were parents of orphans
+                // For now, we'll return an error indicating it needs more implementation
+                return Err(GraphoidError::runtime(
+                    "ToParentSiblings strategy not yet fully implemented".to_string()
+                ));
+            }
+        }
+
+        Ok(orphan_count)
     }
 }
 
