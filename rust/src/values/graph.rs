@@ -2242,5 +2242,171 @@ impl Graph {
 
         Ok(orphan_count)
     }
+
+    // =========================================================================
+    // Subgraph Operations
+    // =========================================================================
+
+    /// Extract a subgraph starting from a root node
+    ///
+    /// Creates a new graph containing the root node and all descendants
+    /// up to the specified depth.
+    ///
+    /// # Arguments
+    /// * `root` - The ID of the root node to start extraction
+    /// * `depth` - Maximum depth to traverse (None = infinite)
+    ///
+    /// # Returns
+    /// A new Graph containing the extracted subgraph with the same configuration
+    pub fn extract_subgraph(
+        &self,
+        root: &str,
+        depth: Option<usize>,
+    ) -> Result<Graph, GraphoidError> {
+        // Verify root exists
+        if !self.has_node(root) {
+            return Err(GraphoidError::runtime(format!(
+                "Root node '{}' does not exist",
+                root
+            )));
+        }
+
+        // Create new graph with same type and config
+        let mut subgraph = Graph::new(self.graph_type.clone());
+        subgraph.config = self.config.clone();
+
+        // BFS to collect nodes up to depth
+        use std::collections::{VecDeque, HashSet};
+        let mut queue = VecDeque::new();
+        let mut visited = HashSet::new();
+
+        queue.push_back((root.to_string(), 0));
+        visited.insert(root.to_string());
+
+        while let Some((node_id, current_depth)) = queue.pop_front() {
+            // Add this node to subgraph
+            if let Some(node) = self.nodes.get(&node_id) {
+                subgraph.add_node(node_id.clone(), node.value.clone())?;
+
+                // If we haven't reached max depth, add neighbors to queue
+                if depth.is_none() || current_depth < depth.unwrap() {
+                    for (neighbor_id, edge_info) in &node.neighbors {
+                        if !visited.contains(neighbor_id) {
+                            visited.insert(neighbor_id.clone());
+                            queue.push_back((neighbor_id.clone(), current_depth + 1));
+                        }
+
+                        // Add edge to subgraph (if both nodes are in visited set)
+                        if visited.contains(neighbor_id) {
+                            subgraph.add_edge(
+                                &node_id,
+                                neighbor_id,
+                                edge_info.edge_type.clone(),
+                                edge_info.weight,
+                                edge_info.properties.clone(),
+                            )?;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(subgraph)
+    }
+
+    /// Insert a subgraph into this graph at a specified node
+    ///
+    /// Merges another graph into this one, connecting it via an edge
+    /// from the attachment point to the subgraph's nodes.
+    ///
+    /// # Arguments
+    /// * `subgraph` - The graph to insert
+    /// * `at` - The node ID in this graph to attach to
+    /// * `edge_type` - The type of edge to create from attachment point
+    ///
+    /// # Returns
+    /// Ok(()) if successful, error if operation would violate graph rules
+    pub fn insert_subgraph(
+        &mut self,
+        subgraph: &Graph,
+        at: &str,
+        edge_type: String,
+    ) -> Result<(), GraphoidError> {
+        // Check if graph is frozen
+        if self.frozen {
+            return Err(GraphoidError::runtime(
+                "Cannot modify frozen graph".to_string()
+            ));
+        }
+
+        // Verify attachment point exists
+        if !self.has_node(at) {
+            return Err(GraphoidError::runtime(format!(
+                "Attachment node '{}' does not exist",
+                at
+            )));
+        }
+
+        // Check for node ID conflicts
+        for node_id in subgraph.nodes.keys() {
+            if self.has_node(node_id) {
+                return Err(GraphoidError::runtime(format!(
+                    "Cannot insert subgraph: node '{}' already exists in target graph",
+                    node_id
+                )));
+            }
+        }
+
+        // Copy all nodes from subgraph
+        for (node_id, node) in &subgraph.nodes {
+            self.add_node(node_id.clone(), node.value.clone())?;
+        }
+
+        // Copy all edges from subgraph
+        for (from_id, from_node) in &subgraph.nodes {
+            for (to_id, edge_info) in &from_node.neighbors {
+                self.add_edge(
+                    from_id,
+                    to_id,
+                    edge_info.edge_type.clone(),
+                    edge_info.weight,
+                    edge_info.properties.clone(),
+                )?;
+            }
+        }
+
+        // Find root nodes in subgraph (nodes with no predecessors)
+        let subgraph_roots: Vec<String> = subgraph.nodes.iter()
+            .filter(|(_, node)| node.predecessors.is_empty())
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        // If no clear root, connect to all nodes with no predecessors in the original subgraph
+        if subgraph_roots.is_empty() {
+            // If subgraph has no clear entry points, connect to first node
+            if let Some(first_id) = subgraph.nodes.keys().next() {
+                self.add_edge(
+                    at,
+                    first_id,
+                    edge_type.clone(),
+                    None,
+                    std::collections::HashMap::new(),
+                )?;
+            }
+        } else {
+            // Connect attachment point to all root nodes
+            for root_id in &subgraph_roots {
+                self.add_edge(
+                    at,
+                    root_id,
+                    edge_type.clone(),
+                    None,
+                    std::collections::HashMap::new(),
+                )?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
