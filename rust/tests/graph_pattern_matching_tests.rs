@@ -1,35 +1,15 @@
-//! Integration Tests for Graph Pattern Matching - Phase 9 (TDD RED phase)
+//! Integration Tests for Graph Pattern Matching - Phase 9
 //!
-//! These tests verify Cypher-style graph pattern matching:
-//! 1. Parser tests - parsing pattern syntax
-//! 2. Pattern matching tests - matching patterns against graphs
-//! 3. Subgraph operation tests - extract, delete, add
+//! These tests verify explicit syntax graph pattern matching using pattern objects:
+//! - g.match(node(...), edge(...), node(...))
+//! - Pattern matching tests - matching patterns against graphs
+//! - Subgraph operation tests - extract, delete, add (future)
 
 use graphoid::lexer::Lexer;
 use graphoid::parser::Parser;
 use graphoid::execution::Executor;
 use graphoid::values::Value;
-use graphoid::ast::{Stmt, Expr, GraphPattern, PatternNode, PatternEdge, EdgeDirection, EdgeLength};
-
-/// Helper to parse code and return AST
-fn parse(code: &str) -> Result<Expr, String> {
-    let mut lexer = Lexer::new(code);
-    let tokens = lexer
-        .tokenize()
-        .map_err(|e| format!("Lexer error: {}", e))?;
-
-    let mut parser = Parser::new(tokens);
-    let program = parser
-        .parse()
-        .map_err(|e| format!("Parser error: {}", e))?;
-
-    // Return the first expression statement
-    if let Some(Stmt::Expression { expr, .. }) = program.statements.first() {
-        Ok(expr.clone())
-    } else {
-        Err("No expression found".to_string())
-    }
-}
+use graphoid::ast::Stmt;
 
 /// Helper to execute code and return the value of the last expression
 fn execute_and_return(code: &str) -> Result<Value, String> {
@@ -73,100 +53,6 @@ fn execute_and_return(code: &str) -> Result<Value, String> {
     }
 }
 
-// ============================================================================
-// Parser Tests - Day 1-2 (TDD RED)
-// ============================================================================
-
-#[test]
-fn test_parse_simple_graph_pattern() {
-    let code = "g.match((person:User) -[:FRIEND]-> (friend:User))";
-    let result = parse(code);
-
-    assert!(result.is_ok(), "Expected parsing to succeed, got: {:?}", result.err());
-
-    let expr = result.unwrap();
-    match expr {
-        Expr::GraphMatch { pattern, .. } => {
-            // Should be a GraphMatch expression
-            assert_eq!(pattern.nodes.len(), 2);
-            assert_eq!(pattern.edges.len(), 1);
-            assert_eq!(pattern.nodes[0].variable, "person");
-            assert_eq!(pattern.nodes[0].node_type, Some("User".to_string()));
-            assert_eq!(pattern.nodes[1].variable, "friend");
-            assert_eq!(pattern.nodes[1].node_type, Some("User".to_string()));
-        }
-        other => panic!("Expected GraphMatch, got: {:?}", other),
-    }
-}
-
-#[test]
-fn test_parse_pattern_node_with_type() {
-    let code = "g.match((person:User))";
-    let result = parse(code);
-
-    assert!(result.is_ok(), "Expected parsing to succeed, got: {:?}", result.err());
-    // TODO: Verify node has variable="person" and type="User"
-}
-
-#[test]
-fn test_parse_pattern_node_without_type() {
-    let code = "g.match((person))";
-    let result = parse(code);
-
-    assert!(result.is_ok(), "Expected parsing to succeed, got: {:?}", result.err());
-    // TODO: Verify node has variable="person" and type=None
-}
-
-#[test]
-fn test_parse_directed_edge() {
-    let code = "g.match((a) -[:FRIEND]-> (b))";
-    let result = parse(code);
-
-    assert!(result.is_ok(), "Expected parsing to succeed, got: {:?}", result.err());
-    // TODO: Verify edge is directed with type="FRIEND"
-}
-
-#[test]
-fn test_parse_bidirectional_edge() {
-    let code = "g.match((a:User) -[:FRIEND]- (b:User))";
-    let result = parse(code);
-
-    assert!(result.is_ok(), "Expected parsing to succeed, got: {:?}", result.err());
-    // TODO: Verify edge is bidirectional
-}
-
-#[test]
-fn test_parse_variable_length_path() {
-    let code = "g.match((user:User) -[:FOLLOWS*{min: 1, max: 3}]-> (influencer:User))";
-    let result = parse(code);
-
-    assert!(result.is_ok(), "Expected parsing to succeed, got: {:?}", result.err());
-    // TODO: Verify edge length is Variable { min: 1, max: 3 }
-}
-
-#[test]
-fn test_parse_pattern_with_where_clause() {
-    let code = r#"
-        g.match((person:User) -[:FRIEND]-> (friend:User))
-            .where(person.age > 18, friend.age > 18)
-    "#;
-    let result = parse(code);
-
-    assert!(result.is_ok(), "Expected parsing to succeed, got: {:?}", result.err());
-    // TODO: Verify where clause contains 2 conditions
-}
-
-#[test]
-fn test_parse_pattern_with_return_clause() {
-    let code = r#"
-        g.match((person) -[:FRIEND]-> (friend))
-            .return(person, friend)
-    "#;
-    let result = parse(code);
-
-    assert!(result.is_ok(), "Expected parsing to succeed, got: {:?}", result.err());
-    // TODO: Verify return clause contains 2 fields
-}
 
 // ============================================================================
 // Explicit Pattern Syntax Tests (Pattern Objects in .match())
@@ -244,7 +130,7 @@ fn test_simple_pattern_match() {
         g.add_node("Bob", 2)
         g.add_edge("Alice", "Bob", "FRIEND")
 
-        results = g.match((person) -[:FRIEND]-> (friend))
+        results = g.match(node("person"), edge(type: "FRIEND"), node("friend"))
         results.size()
     "#;
 
@@ -267,7 +153,7 @@ fn test_pattern_with_node_type() {
         g.set_node_type("Bob", "User")
         g.add_edge("Alice", "Bob", "FRIEND")
 
-        results = g.match((person:User) -[:FRIEND]-> (friend:User))
+        results = g.match(node("person", type: "User"), edge(type: "FRIEND"), node("friend", type: "User"))
         results.size()
     "#;
 
@@ -290,7 +176,7 @@ fn test_pattern_with_where_clause() {
         g.add_edge("Alice", "Bob", "FRIEND")
         g.add_edge("Alice", "Carol", "FRIEND")
 
-        results = g.match((person) -[:FRIEND]-> (friend))
+        results = g.match(node("person"), edge(type: "FRIEND"), node("friend"))
                    .where(friend.age >= 18)
         results.size()
     "#;

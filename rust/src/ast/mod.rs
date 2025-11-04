@@ -181,11 +181,6 @@ pub enum Expr {
         error: Box<Expr>,  // Error value/message to raise
         position: SourcePosition,
     },
-    GraphMatch {
-        graph: Box<Expr>,  // The graph expression to match against
-        pattern: GraphPattern,
-        position: SourcePosition,
-    },
 }
 
 impl Expr {
@@ -205,7 +200,6 @@ impl Expr {
             Expr::Graph { position, .. } => position,
             Expr::Conditional { position, .. } => position,
             Expr::Raise { position, .. } => position,
-            Expr::GraphMatch { position, .. } => position,
         }
     }
 }

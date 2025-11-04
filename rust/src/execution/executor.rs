@@ -201,43 +201,6 @@ impl Executor {
                     Err(graphoid_error)
                 }
             }
-            Expr::GraphMatch { graph, pattern, .. } => {
-                // Phase 9: Graph pattern matching with compact syntax
-                // Evaluate the graph expression
-                let graph_value = self.eval_expr(graph)?;
-
-                // Extract the graph
-                let graph_data = match &graph_value.kind {
-                    ValueKind::Graph(g) => g,
-                    _ => {
-                        return Err(GraphoidError::runtime(format!(
-                            "Expected graph value, got {}",
-                            graph_value.type_name()
-                        )));
-                    }
-                };
-
-                // Perform pattern matching
-                let matches = self.match_pattern(graph_data, pattern)?;
-
-                // Convert matches to list of hashes
-                // Each hash maps pattern variables to node values (not IDs)
-                let result_list: Vec<Value> = matches
-                    .iter()
-                    .map(|bindings| {
-                        let mut hash = crate::values::Hash::new();
-                        for (var, node_id) in bindings {
-                            // Get the node's value from the graph
-                            if let Some(node) = graph_data.nodes.get(node_id) {
-                                let _ = hash.insert(var.clone(), node.value.clone());
-                            }
-                        }
-                        Value::map(hash)
-                    })
-                    .collect();
-
-                Ok(Value::list(crate::values::List::from_vec(result_list)))
-            }
         }
     }
 
@@ -2808,9 +2771,65 @@ impl Executor {
                     }
                 }
 
-                // TODO: Implement actual pattern matching engine (Day 3-5)
-                // For now, return empty list to make tests pass the parsing stage
-                Ok(Value::list(List::new()))
+                // Build GraphPattern AST from pattern objects
+                use crate::ast::{GraphPattern, PatternNode, PatternEdge, EdgeDirection, EdgeLength};
+
+                let dummy_pos = crate::error::SourcePosition::unknown();
+
+                let ast_nodes: Vec<PatternNode> = nodes
+                    .iter()
+                    .map(|pn| PatternNode {
+                        variable: pn.variable.clone().unwrap_or_else(|| "".to_string()),
+                        node_type: pn.node_type.clone(),
+                        position: dummy_pos.clone(),
+                    })
+                    .collect();
+
+                let ast_edges: Vec<PatternEdge> = edges
+                    .iter()
+                    .enumerate()
+                    .map(|(i, pe)| PatternEdge {
+                        from: ast_nodes[i].variable.clone(),
+                        to: ast_nodes[i + 1].variable.clone(),
+                        edge_type: pe.edge_type.clone(),
+                        direction: match pe.direction.as_str() {
+                            "outgoing" => EdgeDirection::Directed,
+                            "both" => EdgeDirection::Bidirectional,
+                            _ => EdgeDirection::Directed,
+                        },
+                        length: EdgeLength::Fixed,  // Variable-length paths not yet supported
+                        position: dummy_pos.clone(),
+                    })
+                    .collect();
+
+                let pattern = GraphPattern {
+                    nodes: ast_nodes,
+                    edges: ast_edges,
+                    where_clause: None,
+                    return_clause: None,
+                    position: dummy_pos,
+                };
+
+                // Perform pattern matching
+                let matches = self.match_pattern(&graph, &pattern)?;
+
+                // Convert matches to list of hashes
+                // Each hash maps pattern variables to node values (not IDs)
+                let result_list: Vec<Value> = matches
+                    .iter()
+                    .map(|bindings| {
+                        let mut hash = crate::values::Hash::new();
+                        for (var, node_id) in bindings {
+                            // Get the node's value from the graph
+                            if let Some(node) = graph.nodes.get(node_id) {
+                                let _ = hash.insert(var.clone(), node.value.clone());
+                            }
+                        }
+                        Value::map(hash)
+                    })
+                    .collect();
+
+                Ok(Value::list(crate::values::List::from_vec(result_list)))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Graph does not have method '{}'",
