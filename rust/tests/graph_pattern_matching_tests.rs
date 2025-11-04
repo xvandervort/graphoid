@@ -306,6 +306,49 @@ fn test_variable_length_path_exact_distance() {
     assert_eq!(result.unwrap(), Value::number(2.0));
 }
 
+#[test]
+fn test_bidirectional_pattern_matching() {
+    let code = r#"
+        g = graph{}
+        g.add_node("A", {name: "Alice"})
+        g.add_node("B", {name: "Bob"})
+        g.add_edge("A", "B", "FRIEND")  # Only one directed edge: A->B
+
+        # Match with direction: :both should find the edge in either direction
+        results = g.match(node("person"), edge(type: "FRIEND", direction: :both), node("friend"))
+        results.size()
+    "#;
+
+    let result = execute_and_return(code);
+    assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
+    // Should find: {person: A, friend: B} AND {person: B, friend: A}
+    assert_eq!(result.unwrap(), Value::number(2.0));
+}
+
+#[test]
+fn test_bidirectional_with_two_way_edges() {
+    let code = r#"
+        g = graph{}
+        g.add_node("A", {name: "Alice"})
+        g.add_node("B", {name: "Bob"})
+        g.add_edge("A", "B", "FRIEND")  # A->B
+        g.add_edge("B", "A", "FRIEND")  # B->A (explicit reverse edge)
+
+        # With direction: :both and two edges, each direction is found twice:
+        # From A: forward A->B, backward B->A (both give {person: A, friend: B})
+        # From B: forward B->A, backward A->B (both give {person: B, friend: A})
+        # Total: 4 matches (2 for each direction)
+        results = g.match(node("person"), edge(type: "FRIEND", direction: :both), node("friend"))
+        results.size()
+    "#;
+
+    let result = execute_and_return(code);
+    assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
+    // With 2 edges and bidirectional matching, we get 4 total matches
+    // (each direction found via forward and backward traversal)
+    assert_eq!(result.unwrap(), Value::number(4.0));
+}
+
 // ============================================================================
 // Subgraph Operations Tests - Day 6-8 (TDD RED)
 // ============================================================================

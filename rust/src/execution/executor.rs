@@ -4566,6 +4566,51 @@ impl Executor {
         results
     }
 
+    /// Process edges from a given edge collection, checking type and binding constraints.
+    /// This helper method eliminates duplication between forward and backward edge traversal.
+    fn process_edges_for_pattern(
+        &self,
+        graph: &crate::values::Graph,
+        pattern: &crate::ast::GraphPattern,
+        edges: &std::collections::HashMap<String, crate::values::graph::EdgeInfo>,
+        edge_pattern: &crate::ast::PatternEdge,
+        next_node_pattern: &crate::ast::PatternNode,
+        bindings: &std::collections::HashMap<String, String>,
+        edge_index: usize,
+        all_matches: &mut Vec<std::collections::HashMap<String, String>>,
+    ) -> Result<()> {
+        for (to_id, edge_info) in edges {
+            // Check if edge type matches (if specified in pattern)
+            if let Some(ref pattern_edge_type) = edge_pattern.edge_type {
+                if edge_info.edge_type != *pattern_edge_type {
+                    continue;
+                }
+            }
+
+            // Check if target node matches the pattern's type constraint
+            if !self.node_matches_type(graph, to_id, next_node_pattern)? {
+                continue;
+            }
+
+            // Check if we've already bound this variable
+            if let Some(existing_binding) = bindings.get(&next_node_pattern.variable) {
+                // Variable already bound - check if it matches
+                if existing_binding != to_id {
+                    continue;  // Doesn't match, try next edge
+                }
+                // Matches existing binding - continue with same bindings
+                self.extend_pattern_match_all(graph, pattern, bindings.clone(), edge_index + 1, all_matches)?;
+            } else {
+                // Bind this variable and continue
+                let mut new_bindings = bindings.clone();
+                new_bindings.insert(next_node_pattern.variable.clone(), to_id.to_string());
+                self.extend_pattern_match_all(graph, pattern, new_bindings, edge_index + 1, all_matches)?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Recursively extend a partial pattern match, collecting ALL possible matches.
     /// This version collects all matches instead of returning after finding the first one.
     fn extend_pattern_match_all(
@@ -4640,46 +4685,43 @@ impl Executor {
                 "Internal error: node not found in graph".to_string()
             ))?;
 
-        // Find all edges from this node by iterating through neighbors
-        for (to_id, edge_info) in &from_node.neighbors {
-            // Check if edge type matches (if specified in pattern)
-            if let Some(ref pattern_edge_type) = edge_pattern.edge_type {
-                if edge_info.edge_type != *pattern_edge_type {
-                    continue;
-                }
-            }
+        // Check direction to determine which edges to explore
+        use crate::ast::EdgeDirection;
+        let check_forward = match &edge_pattern.direction {
+            EdgeDirection::Directed => true,
+            EdgeDirection::Bidirectional => true,
+        };
+        let check_backward = match &edge_pattern.direction {
+            EdgeDirection::Directed => false,
+            EdgeDirection::Bidirectional => true,
+        };
 
-            // Check direction
-            use crate::ast::EdgeDirection;
-            match &edge_pattern.direction {
-                EdgeDirection::Directed => {
-                    // Edge must go in the correct direction (already satisfied by neighbors structure)
-                }
-                EdgeDirection::Bidirectional => {
-                    // Would match edges in either direction, but for now only forward
-                    // TODO: Also check reverse edges
-                }
-            }
+        // Process edges in forward direction
+        if check_forward {
+            self.process_edges_for_pattern(
+                graph,
+                pattern,
+                &from_node.neighbors,
+                edge_pattern,
+                next_node_pattern,
+                &bindings,
+                edge_index,
+                all_matches,
+            )?;
+        }
 
-            // Check if target node matches the pattern's type constraint
-            if !self.node_matches_type(graph, to_id, next_node_pattern)? {
-                continue;
-            }
-
-            // Check if we've already bound this variable
-            if let Some(existing_binding) = bindings.get(&next_node_pattern.variable) {
-                // Variable already bound - check if it matches
-                if existing_binding != to_id {
-                    continue;  // Doesn't match, try next edge
-                }
-                // Matches existing binding - continue with same bindings
-                self.extend_pattern_match_all(graph, pattern, bindings.clone(), edge_index + 1, all_matches)?;
-            } else {
-                // Bind this variable and continue
-                let mut new_bindings = bindings.clone();
-                new_bindings.insert(next_node_pattern.variable.clone(), to_id.clone());
-                self.extend_pattern_match_all(graph, pattern, new_bindings, edge_index + 1, all_matches)?;
-            }
+        // Process edges in backward direction
+        if check_backward {
+            self.process_edges_for_pattern(
+                graph,
+                pattern,
+                &from_node.predecessors,
+                edge_pattern,
+                next_node_pattern,
+                &bindings,
+                edge_index,
+                all_matches,
+            )?;
         }
 
         Ok(())

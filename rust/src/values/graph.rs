@@ -29,6 +29,9 @@ pub struct GraphNode {
     pub properties: HashMap<String, Value>,
     /// Outgoing edges (neighbor_id -> edge_info)
     pub neighbors: HashMap<String, EdgeInfo>,
+    /// Incoming edges (predecessor_id -> edge_info)
+    /// Maintained automatically when edges are added/removed
+    pub predecessors: HashMap<String, EdgeInfo>,
 }
 
 /// Information about an edge
@@ -288,6 +291,7 @@ impl Graph {
                         node_type: None,
                         properties: HashMap::new(),
                         neighbors: HashMap::new(),
+                        predecessors: HashMap::new(),
                     },
                 );
                 Ok(())
@@ -364,10 +368,18 @@ impl Graph {
                     EdgeInfo::new(edge_type.clone(), properties.clone())
                 };
 
-                // Add forward edge
+                // Add forward edge (from -> to)
                 if let Some(from_node) = self.nodes.get_mut(from) {
                     from_node.neighbors.insert(
                         to.to_string(),
+                        edge_info.clone(),
+                    );
+                }
+
+                // Add reverse index (to <- from)
+                if let Some(to_node) = self.nodes.get_mut(to) {
+                    to_node.predecessors.insert(
+                        from.to_string(),
                         edge_info.clone(),
                     );
                 }
@@ -380,9 +392,18 @@ impl Graph {
                         EdgeInfo::new(edge_type, properties)
                     };
 
+                    // Add reverse edge (to -> from) for undirected graphs
                     if let Some(to_node) = self.nodes.get_mut(to) {
                         to_node.neighbors.insert(
                             from.to_string(),
+                            reverse_edge_info.clone(),
+                        );
+                    }
+
+                    // Add reverse predecessor (from <- to) for undirected graphs
+                    if let Some(from_node) = self.nodes.get_mut(from) {
+                        from_node.predecessors.insert(
+                            to.to_string(),
                             reverse_edge_info,
                         );
                     }
@@ -560,9 +581,10 @@ impl Graph {
                 // Remove the node
                 let removed = self.nodes.remove(id);
 
-                // Remove all edges pointing to this node
+                // Remove all edges pointing to/from this node
                 for node in self.nodes.values_mut() {
-                    node.neighbors.remove(id);
+                    node.neighbors.remove(id);     // Remove outgoing edges to this node
+                    node.predecessors.remove(id);  // Remove incoming edges from this node
                 }
 
                 Ok(removed)
@@ -616,14 +638,26 @@ impl Graph {
                 // All rules passed - perform the operation
                 let mut removed = false;
 
+                // Remove forward edge (from -> to)
                 if let Some(from_node) = self.nodes.get_mut(from) {
                     removed = from_node.neighbors.remove(to).is_some();
                 }
 
+                // Remove reverse index (to <- from)
+                if let Some(to_node) = self.nodes.get_mut(to) {
+                    to_node.predecessors.remove(from);
+                }
+
                 // For undirected graphs, remove reverse edge
                 if self.graph_type == GraphType::Undirected {
+                    // Remove reverse edge (to -> from)
                     if let Some(to_node) = self.nodes.get_mut(to) {
                         to_node.neighbors.remove(from);
+                    }
+
+                    // Remove reverse predecessor (from <- to)
+                    if let Some(from_node) = self.nodes.get_mut(from) {
+                        from_node.predecessors.remove(to);
                     }
                 }
 
