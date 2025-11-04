@@ -201,6 +201,12 @@ impl Executor {
                     Err(graphoid_error)
                 }
             }
+            Expr::GraphMatch { pattern, .. } => {
+                // Phase 9: Graph pattern matching - to be implemented in Day 5
+                Err(GraphoidError::runtime(
+                    "Graph pattern matching not yet implemented".to_string()
+                ))
+            }
         }
     }
 

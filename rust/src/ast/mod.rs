@@ -181,6 +181,10 @@ pub enum Expr {
         error: Box<Expr>,  // Error value/message to raise
         position: SourcePosition,
     },
+    GraphMatch {
+        pattern: GraphPattern,
+        position: SourcePosition,
+    },
 }
 
 impl Expr {
@@ -200,6 +204,7 @@ impl Expr {
             Expr::Graph { position, .. } => position,
             Expr::Conditional { position, .. } => position,
             Expr::Raise { position, .. } => position,
+            Expr::GraphMatch { position, .. } => position,
         }
     }
 }
@@ -308,4 +313,52 @@ pub enum Pattern {
     Wildcard {
         position: SourcePosition,
     },
+}
+
+// ============================================================================
+// Phase 9: Graph Pattern Matching AST Nodes
+// ============================================================================
+
+/// Graph pattern match expression (Phase 9)
+/// Represents Cypher-style graph patterns: (node:Type) -[:EDGE]-> (other:Type)
+#[derive(Debug, Clone, PartialEq)]
+pub struct GraphPattern {
+    pub nodes: Vec<PatternNode>,
+    pub edges: Vec<PatternEdge>,
+    pub where_clause: Option<Vec<Expr>>,
+    pub return_clause: Option<Vec<Expr>>,
+    pub position: SourcePosition,
+}
+
+/// Node in a graph pattern: (variable:Type)
+#[derive(Debug, Clone, PartialEq)]
+pub struct PatternNode {
+    pub variable: String,           // Variable name (e.g., "person")
+    pub node_type: Option<String>,  // Optional type (e.g., "User")
+    pub position: SourcePosition,
+}
+
+/// Edge in a graph pattern: -[:TYPE]-> or -[:TYPE*min..max]->
+#[derive(Debug, Clone, PartialEq)]
+pub struct PatternEdge {
+    pub from: String,                      // Source node variable
+    pub to: String,                        // Target node variable
+    pub edge_type: Option<String>,         // Optional edge type
+    pub direction: EdgeDirection,          // Directed or bidirectional
+    pub length: EdgeLength,                // Fixed or variable-length
+    pub position: SourcePosition,
+}
+
+/// Edge direction in graph patterns
+#[derive(Debug, Clone, PartialEq)]
+pub enum EdgeDirection {
+    Directed,       // -> (one direction)
+    Bidirectional,  // - (both directions)
+}
+
+/// Edge length specification for graph patterns
+#[derive(Debug, Clone, PartialEq)]
+pub enum EdgeLength {
+    Fixed,                      // Single edge
+    Variable { min: usize, max: usize },  // Variable-length path
 }
