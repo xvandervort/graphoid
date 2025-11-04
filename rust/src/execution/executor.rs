@@ -221,12 +221,16 @@ impl Executor {
                 let matches = self.match_pattern(graph_data, pattern)?;
 
                 // Convert matches to list of hashes
+                // Each hash maps pattern variables to node values (not IDs)
                 let result_list: Vec<Value> = matches
                     .iter()
                     .map(|bindings| {
                         let mut hash = crate::values::Hash::new();
                         for (var, node_id) in bindings {
-                            let _ = hash.insert(var.clone(), Value::string(node_id.clone()));
+                            // Get the node's value from the graph
+                            if let Some(node) = graph_data.nodes.get(node_id) {
+                                let _ = hash.insert(var.clone(), node.value.clone());
+                            }
                         }
                         Value::map(hash)
                     })
@@ -969,6 +973,11 @@ impl Executor {
             method
         };
 
+        // Special handling for 'where' method - needs unevaluated expression
+        if base_method == "where" && !args.is_empty() {
+            return self.eval_where_method(object_value, args);
+        }
+
         // Evaluate all argument expressions
         let arg_values = self.eval_arguments(args)?;
 
@@ -1005,6 +1014,89 @@ impl Executor {
             // Immutable method - use the already-evaluated value
             self.apply_method_to_value(object_value, base_method, &arg_values, object)
         }
+    }
+
+    /// Evaluates the 'where' method for filtering lists with pattern variable bindings.
+    /// The where method receives unevaluated expressions so they can be evaluated with
+    /// temporary variable bindings from each list element (typically pattern match results).
+    fn eval_where_method(&mut self, list_value: Value, args: &[crate::ast::Argument]) -> Result<Value> {
+        // where() must be called on a list
+        let list = match &list_value.kind {
+            ValueKind::List(l) => l,
+            _ => {
+                return Err(GraphoidError::runtime(format!(
+                    "where() can only be called on lists, got {}",
+                    list_value.type_name()
+                )));
+            }
+        };
+
+        // where() takes exactly one argument (the predicate expression)
+        if args.len() != 1 {
+            return Err(GraphoidError::runtime(format!(
+                "where() expects 1 argument, but got {}",
+                args.len()
+            )));
+        }
+
+        // Get the predicate expression (NOT evaluated yet)
+        // Extract expression from Argument enum
+        let predicate_expr = match &args[0] {
+            crate::ast::Argument::Positional(expr) => expr,
+            crate::ast::Argument::Named { value, .. } => value,
+        };
+
+        // Filter the list
+        let mut filtered = Vec::new();
+        let elements = list.to_vec();
+
+        for element in elements {
+            // If element is a map (hash), bind its keys as temporary variables
+            if let ValueKind::Map(hash) = &element.kind {
+                // Save current environment state
+                let keys = hash.keys();
+                let saved_vars: Vec<(String, Option<Value>)> = keys
+                    .iter()
+                    .map(|key| {
+                        let saved = self.env.get(key).ok();
+                        (key.clone(), saved)
+                    })
+                    .collect();
+
+                // Bind hash keys as temporary variables
+                for key in &keys {
+                    if let Some(value) = hash.get(key) {
+                        self.env.define(key.clone(), value.clone());
+                    }
+                }
+
+                // Evaluate the predicate with these bindings
+                let result = self.eval_expr(predicate_expr)?;
+
+                // Restore previous environment
+                for (key, saved_value) in saved_vars {
+                    if let Some(val) = saved_value {
+                        self.env.define(key, val);
+                    } else {
+                        // Variable didn't exist before, remove it
+                        self.env.remove_variable(&key);
+                    }
+                }
+
+                // Keep element if predicate is truthy
+                if result.is_truthy() {
+                    filtered.push(element);
+                }
+            } else {
+                // For non-hash elements, evaluate predicate as-is
+                let result = self.eval_expr(predicate_expr)?;
+                if result.is_truthy() {
+                    filtered.push(element);
+                }
+            }
+        }
+
+        Ok(Value::list(crate::values::List::from_vec(filtered)))
     }
 
     /// Applies a method to a value (helper to avoid duplication).
@@ -1916,10 +2008,19 @@ impl Executor {
                 new_hash.remove_rule(&rule_spec);
                 Ok(Value::map(new_hash))
             }
-            _ => Err(GraphoidError::runtime(format!(
-                "Map does not have method '{}'",
-                method
-            ))),
+            _ => {
+                // Check if this is property-style access (no arguments, method name matches a key)
+                if args.is_empty() {
+                    if let Some(value) = hash.get(method) {
+                        return Ok(value.clone());
+                    }
+                }
+
+                Err(GraphoidError::runtime(format!(
+                    "Map does not have method '{}'",
+                    method
+                )))
+            }
         }
     }
 
@@ -4250,13 +4351,87 @@ impl Executor {
             let mut bindings = HashMap::new();
             bindings.insert(first_pattern_node.variable.clone(), node_id.clone());
 
-            // Try to extend this match through the pattern
-            if self.extend_pattern_match(graph, pattern, &mut bindings, 0)? {
-                all_matches.push(bindings);
-            }
+            // Collect ALL possible extensions from this starting node
+            self.extend_pattern_match_all(graph, pattern, bindings, 0, &mut all_matches)?;
         }
 
         Ok(all_matches)
+    }
+
+    /// Recursively extend a partial pattern match, collecting ALL possible matches.
+    /// This version collects all matches instead of returning after finding the first one.
+    fn extend_pattern_match_all(
+        &self,
+        graph: &crate::values::Graph,
+        pattern: &crate::ast::GraphPattern,
+        mut bindings: std::collections::HashMap<String, String>,
+        edge_index: usize,
+        all_matches: &mut Vec<std::collections::HashMap<String, String>>,
+    ) -> Result<()> {
+        // If we've matched all edges, we have a complete match
+        if edge_index >= pattern.edges.len() {
+            all_matches.push(bindings);
+            return Ok(());
+        }
+
+        let edge_pattern = &pattern.edges[edge_index];
+        let next_node_pattern = &pattern.nodes[edge_index + 1];
+
+        // Get the source node from bindings
+        let from_id = bindings.get(&pattern.nodes[edge_index].variable)
+            .ok_or_else(|| GraphoidError::runtime(
+                "Internal error: missing node binding in pattern match".to_string()
+            ))?;
+
+        // Get the source node
+        let from_node = graph.nodes.get(from_id)
+            .ok_or_else(|| GraphoidError::runtime(
+                "Internal error: node not found in graph".to_string()
+            ))?;
+
+        // Find all edges from this node by iterating through neighbors
+        for (to_id, edge_info) in &from_node.neighbors {
+            // Check if edge type matches (if specified in pattern)
+            if let Some(ref pattern_edge_type) = edge_pattern.edge_type {
+                if edge_info.edge_type != *pattern_edge_type {
+                    continue;
+                }
+            }
+
+            // Check direction
+            use crate::ast::EdgeDirection;
+            match &edge_pattern.direction {
+                EdgeDirection::Directed => {
+                    // Edge must go in the correct direction (already satisfied by neighbors structure)
+                }
+                EdgeDirection::Bidirectional => {
+                    // Would match edges in either direction, but for now only forward
+                    // TODO: Also check reverse edges
+                }
+            }
+
+            // Check if target node matches the pattern's type constraint
+            if !self.node_matches_type(graph, to_id, next_node_pattern)? {
+                continue;
+            }
+
+            // Check if we've already bound this variable
+            if let Some(existing_binding) = bindings.get(&next_node_pattern.variable) {
+                // Variable already bound - check if it matches
+                if existing_binding != to_id {
+                    continue;  // Doesn't match, try next edge
+                }
+                // Matches existing binding - continue with same bindings
+                self.extend_pattern_match_all(graph, pattern, bindings.clone(), edge_index + 1, all_matches)?;
+            } else {
+                // Bind this variable and continue
+                let mut new_bindings = bindings.clone();
+                new_bindings.insert(next_node_pattern.variable.clone(), to_id.clone());
+                self.extend_pattern_match_all(graph, pattern, new_bindings, edge_index + 1, all_matches)?;
+            }
+        }
+
+        Ok(())
     }
 
     /// Recursively extend a partial pattern match.
@@ -4317,6 +4492,8 @@ impl Executor {
             }
 
             // Check if we've already bound this variable
+            let was_bound = bindings.contains_key(&next_node_pattern.variable);
+
             if let Some(existing_binding) = bindings.get(&next_node_pattern.variable) {
                 // Variable already bound - check if it matches
                 if existing_binding != to_id {
@@ -4329,11 +4506,20 @@ impl Executor {
 
             // Try to extend the match further
             if self.extend_pattern_match(graph, pattern, bindings, edge_index + 1)? {
-                return Ok(true);  // Found a complete match
+                // Don't return yet! We need to continue looking for more matches.
+                // But we DO need to backtrack and try other possibilities.
+
+                // Backtrack: remove the binding if we just added it
+                if !was_bound {
+                    bindings.remove(&next_node_pattern.variable);
+                }
+
+                // Return true to indicate we found at least one match
+                return Ok(true);
             }
 
-            // Backtrack: remove the binding if it wasn't already there
-            if !bindings.contains_key(&next_node_pattern.variable) {
+            // Backtrack: remove the binding if we just added it
+            if !was_bound {
                 bindings.remove(&next_node_pattern.variable);
             }
         }

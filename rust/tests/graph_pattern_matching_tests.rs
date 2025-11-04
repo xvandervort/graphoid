@@ -280,8 +280,6 @@ fn test_pattern_with_node_type() {
     }
 }
 
-/*
-
 #[test]
 fn test_pattern_with_where_clause() {
     let code = r#"
@@ -302,6 +300,7 @@ fn test_pattern_with_where_clause() {
     assert_eq!(result.unwrap(), Value::number(1.0));  // Only Carol
 }
 
+/*
 #[test]
 fn test_variable_length_path() {
     let code = r#"
