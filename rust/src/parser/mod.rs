@@ -1460,21 +1460,51 @@ impl Parser {
                 if self.match_token(&TokenType::LeftParen) {
                     // Special handling for graph pattern matching: g.match(pattern)
                     if method == "match" {
-                        // Parse graph pattern instead of regular arguments
-                        let pattern = self.parse_graph_pattern()?;
+                        // Peek ahead to determine syntax:
+                        // - Compact syntax: starts with '(' immediately -> (person:User)
+                        // - Explicit syntax: starts with identifier/function call -> node(...)
+                        let is_compact_syntax = matches!(self.peek().token_type, TokenType::LeftParen);
 
-                        if !self.match_token(&TokenType::RightParen) {
-                            return Err(GraphoidError::SyntaxError {
-                                message: "Expected ')' after graph pattern".to_string(),
-                                position: self.peek().position(),
-                            });
+                        if is_compact_syntax {
+                            // Parse compact graph pattern: (node:Type) -[:EDGE]-> (node:Type)
+                            let pattern = self.parse_graph_pattern()?;
+
+                            if !self.match_token(&TokenType::RightParen) {
+                                return Err(GraphoidError::SyntaxError {
+                                    message: "Expected ')' after graph pattern".to_string(),
+                                    position: self.peek().position(),
+                                });
+                            }
+
+                            // Return GraphMatch expression
+                            expr = Expr::GraphMatch {
+                                pattern,
+                                position,
+                            };
+                        } else {
+                            // Parse explicit syntax: node(...), edge(...), node(...)
+                            // Treat as regular method call - executor will handle pattern objects
+                            let mut args = self.arguments()?;
+                            if !self.match_token(&TokenType::RightParen) {
+                                return Err(GraphoidError::SyntaxError {
+                                    message: "Expected ')' after arguments".to_string(),
+                                    position: self.peek().position(),
+                                });
+                            }
+
+                            // Check for trailing block
+                            if self.is_trailing_block() {
+                                let block_lambda = self.parse_trailing_block()?;
+                                args.push(Argument::Positional(block_lambda));
+                            }
+
+                            expr = Expr::MethodCall {
+                                object: Box::new(expr),
+                                method,
+                                args,
+                                position,
+                            };
                         }
-
-                        // Return GraphMatch expression
-                        expr = Expr::GraphMatch {
-                            pattern,
-                            position,
-                        };
                     } else {
                         // Regular method call
                         let mut args = self.arguments()?;

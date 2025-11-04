@@ -169,6 +169,70 @@ fn test_parse_pattern_with_return_clause() {
 }
 
 // ============================================================================
+// Explicit Pattern Syntax Tests (Pattern Objects in .match())
+// ============================================================================
+
+#[test]
+fn test_explicit_syntax_simple_pattern() {
+    let code = r#"
+        g = graph{}
+        g.add_node("Alice", 1)
+        g.add_node("Bob", 2)
+        g.add_edge("Alice", "Bob", "FRIEND")
+
+        results = g.match(node("person"), edge(type: "FRIEND"), node("friend"))
+        results
+    "#;
+
+    let result = execute_and_return(code);
+    assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
+    // Should return a list of matches
+    let value = result.unwrap();
+    assert_eq!(value.type_name(), "list");
+}
+
+#[test]
+fn test_explicit_syntax_with_node_types() {
+    let code = r#"
+        g = graph{}
+        g.add_node("Alice", 1)
+        g.add_node("Bob", 2)
+        g.add_edge("Alice", "Bob", "FRIEND")
+
+        # Pattern with node types (matching will be implemented later)
+        results = g.match(node("person", type: "User"), edge(type: "FRIEND"), node("friend", type: "User"))
+        results
+    "#;
+
+    let result = execute_and_return(code);
+    assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
+    let value = result.unwrap();
+    assert_eq!(value.type_name(), "list");
+}
+
+#[test]
+fn test_explicit_syntax_reusable_patterns() {
+    let code = r#"
+        g = graph{}
+        g.add_node("Alice", 1)
+        g.add_node("Bob", 2)
+        g.add_edge("Alice", "Bob", "FRIEND")
+
+        # Create reusable pattern
+        user_node = node("person", type: "User")
+
+        # Reuse pattern with .bind() method
+        results = g.match(user_node.bind("alice"), edge(type: "FRIEND"), user_node.bind("bob"))
+        results
+    "#;
+
+    let result = execute_and_return(code);
+    assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
+    let value = result.unwrap();
+    assert_eq!(value.type_name(), "list");
+}
+
+// ============================================================================
 // Pattern Matching Execution Tests - Day 3-5 (TDD RED)
 // ============================================================================
 // NOTE: These tests are commented out until implementation.
