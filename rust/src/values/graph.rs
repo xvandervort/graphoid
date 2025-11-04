@@ -23,6 +23,8 @@ pub struct GraphNode {
     pub id: String,
     /// Node value
     pub value: Value,
+    /// Node type (optional label like "User", "Product", etc.)
+    pub node_type: Option<String>,
     /// Node properties (for property-based indexing)
     pub properties: HashMap<String, Value>,
     /// Outgoing edges (neighbor_id -> edge_info)
@@ -283,6 +285,7 @@ impl Graph {
                     GraphNode {
                         id,
                         value,
+                        node_type: None,
                         properties: HashMap::new(),
                         neighbors: HashMap::new(),
                     },
@@ -316,6 +319,21 @@ impl Graph {
                 }
             }
         }
+    }
+
+    /// Set the type of a node (e.g., "User", "Product")
+    pub fn set_node_type(&mut self, id: &str, node_type: String) -> Result<(), GraphoidError> {
+        let node = self.nodes.get_mut(id).ok_or_else(|| {
+            GraphoidError::runtime(format!("Node '{}' not found", id))
+        })?;
+
+        node.node_type = Some(node_type);
+        Ok(())
+    }
+
+    /// Get the type of a node
+    pub fn get_node_type(&self, id: &str) -> Option<String> {
+        self.nodes.get(id).and_then(|node| node.node_type.clone())
     }
 
     /// Add an edge between two nodes

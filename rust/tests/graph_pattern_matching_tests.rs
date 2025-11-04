@@ -257,8 +257,6 @@ fn test_simple_pattern_match() {
     }
 }
 
-/*
-
 #[test]
 fn test_pattern_with_node_type() {
     let code = r#"
@@ -275,8 +273,14 @@ fn test_pattern_with_node_type() {
 
     let result = execute_and_return(code);
     assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
-    assert_eq!(result.unwrap(), Value::number(1.0));
+    let value = result.unwrap();
+    match value.kind {
+        graphoid::values::ValueKind::Number(n) => assert_eq!(n, 1.0),
+        _ => panic!("Expected number, got: {:?}", value.type_name()),
+    }
 }
+
+/*
 
 #[test]
 fn test_pattern_with_where_clause() {

@@ -2353,6 +2353,41 @@ impl Executor {
 
                 Ok(Value::none())
             }
+            "set_node_type" => {
+                // Set the type of a node
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "set_node_type() expects 2 arguments (node_id, type), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get node ID
+                let node_id = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
+                    _ => {
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
+                    }
+                };
+
+                // Get node type
+                let node_type = match &args[1].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => {
+                        return Err(GraphoidError::type_error("string", args[1].type_name()));
+                    }
+                };
+
+                // Set the node type
+                graph.set_node_type(node_id, node_type)?;
+
+                // Update graph in environment
+                if let Expr::Variable { name, .. } = object_expr {
+                    self.env.set(name, Value::graph(graph))?;
+                }
+
+                Ok(Value::none())
+            }
             "add_edge" => {
                 // Add an edge between two nodes
                 if args.len() < 2 || args.len() > 3 {
@@ -4207,6 +4242,11 @@ impl Executor {
 
         // Try each node in the graph as a potential match for the first pattern node
         for node_id in graph.nodes.keys() {
+            // Check if this node matches the pattern's type constraint
+            if !self.node_matches_type(graph, node_id, first_pattern_node)? {
+                continue;
+            }
+
             let mut bindings = HashMap::new();
             bindings.insert(first_pattern_node.variable.clone(), node_id.clone());
 
@@ -4271,6 +4311,11 @@ impl Executor {
 
             // This edge matches! Try to match the target node
 
+            // Check if target node matches the pattern's type constraint
+            if !self.node_matches_type(graph, to_id, next_node_pattern)? {
+                continue;
+            }
+
             // Check if we've already bound this variable
             if let Some(existing_binding) = bindings.get(&next_node_pattern.variable) {
                 // Variable already bound - check if it matches
@@ -4294,6 +4339,31 @@ impl Executor {
         }
 
         Ok(false)  // No match found
+    }
+
+    /// Check if a node matches a pattern node's type constraint
+    fn node_matches_type(
+        &self,
+        graph: &crate::values::Graph,
+        node_id: &str,
+        pattern_node: &crate::ast::PatternNode,
+    ) -> Result<bool> {
+        // If pattern has a type constraint, check it
+        if let Some(ref required_type) = pattern_node.node_type {
+            let node = graph.nodes.get(node_id)
+                .ok_or_else(|| GraphoidError::runtime(
+                    "Internal error: node not found in graph".to_string()
+                ))?;
+
+            // Check if node's type matches the required type
+            match &node.node_type {
+                Some(actual_type) => Ok(actual_type == required_type),
+                None => Ok(false),  // Node has no type, doesn't match
+            }
+        } else {
+            // No type constraint, any node matches
+            Ok(true)
+        }
     }
 }
 
