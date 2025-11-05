@@ -4,7 +4,7 @@
 //! Each node stores direct pointers to its neighbors, avoiding index scans.
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use super::Value;
+use super::{Value, ValueKind, PatternNode, PatternEdge};
 use crate::graph::rules::{Rule, RuleContext, GraphOperation, RuleSpec, RuleInstance, RuleSeverity};
 use crate::graph::rulesets::get_ruleset_rules;
 use crate::error::GraphoidError;
@@ -1376,6 +1376,151 @@ impl Graph {
         }
 
         -1 // No path found
+    }
+
+    /// Match a pattern in the graph and return all matches as bindings.
+    ///
+    /// Pattern arguments should be alternating PatternNode and PatternEdge values.
+    /// For example: [node("a"), edge(), node("b")] matches a simple two-node pattern.
+    ///
+    /// Returns a list of binding maps where keys are variable names and values are node IDs.
+    pub fn match_pattern(&self, pattern_args: Vec<Value>) -> Result<Vec<HashMap<String, String>>, GraphoidError> {
+        // Parse pattern arguments into nodes and edges
+        let (pattern_nodes, pattern_edges) = {
+            let mut nodes = Vec::new();
+            let mut edges = Vec::new();
+            for (i, arg) in pattern_args.iter().enumerate() {
+                match &arg.kind {
+                    ValueKind::PatternNode(pn) => nodes.push(pn.clone()),
+                    ValueKind::PatternEdge(pe) => edges.push(pe.clone()),
+                    _ => return Err(GraphoidError::runtime(format!(
+                        "Invalid pattern argument at position {}: expected PatternNode or PatternEdge", i
+                    ))),
+                }
+            }
+            (nodes, edges)
+        };
+
+        // Handle empty pattern
+        if pattern_nodes.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut results = Vec::new();
+        let first_var = pattern_nodes[0].variable.as_ref()
+            .ok_or_else(|| GraphoidError::runtime("Pattern node must have a variable name".to_string()))?;
+
+        // Find all nodes matching the first pattern node
+        for (node_id, _node) in &self.nodes {
+            // Check if node matches type constraint
+            let matches_type = match &pattern_nodes[0].node_type {
+                None => true,
+                Some(required_type) => self.get_node_type(node_id) == Some(required_type.clone()),
+            };
+
+            if !matches_type {
+                continue;
+            }
+
+            // Start building a binding with this node
+            let mut binding = HashMap::new();
+            binding.insert(first_var.clone(), node_id.clone());
+
+            // If no edges, this is a complete match (single node pattern)
+            if pattern_edges.is_empty() {
+                results.push(binding);
+                continue;
+            }
+
+            // Try to extend the match following edges (recursive backtracking)
+            Self::extend_pattern_match(
+                &self.nodes,
+                &mut binding,
+                node_id,
+                &pattern_nodes,
+                &pattern_edges,
+                0,
+                &mut results
+            );
+        }
+
+        Ok(results)
+    }
+
+    /// Extend a partial match by following edges (unified recursive algorithm).
+    /// Uses backtracking to find all complete matches.
+    fn extend_pattern_match(
+        graph_nodes: &HashMap<String, GraphNode>,
+        binding: &mut HashMap<String, String>,
+        current_node: &str,
+        pattern_nodes: &[PatternNode],
+        pattern_edges: &[PatternEdge],
+        edge_index: usize,
+        results: &mut Vec<HashMap<String, String>>
+    ) {
+        // Base case: all edges processed, we have a complete match
+        if edge_index >= pattern_edges.len() {
+            results.push(binding.clone());
+            return;
+        }
+
+        let edge_pattern = &pattern_edges[edge_index];
+        let next_node_pattern = &pattern_nodes[edge_index + 1];
+        let next_var = match &next_node_pattern.variable {
+            Some(v) => v,
+            None => return,
+        };
+
+        let current_graph_node = match graph_nodes.get(current_node) {
+            Some(n) => n,
+            None => return,
+        };
+
+        // Try each neighbor that matches the pattern
+        for (neighbor_id, edge_info) in &current_graph_node.neighbors {
+            // Check edge type constraint
+            if let Some(ref required_type) = edge_pattern.edge_type {
+                if edge_info.edge_type != *required_type {
+                    continue;
+                }
+            }
+
+            // Check neighbor node type constraint
+            let matches_type = match &next_node_pattern.node_type {
+                None => true,
+                Some(required_type) => {
+                    match graph_nodes.get(neighbor_id) {
+                        Some(node) => node.node_type.as_ref() == Some(required_type),
+                        None => false,
+                    }
+                }
+            };
+            if !matches_type {
+                continue;
+            }
+
+            // Check bidirectional constraint
+            if edge_pattern.direction == "both" {
+                let has_reverse = graph_nodes.get(neighbor_id)
+                    .map_or(false, |n| n.neighbors.contains_key(current_node));
+                if !has_reverse {
+                    continue;
+                }
+            }
+
+            // Bind and recurse
+            binding.insert(next_var.clone(), neighbor_id.clone());
+            Self::extend_pattern_match(
+                graph_nodes,
+                binding,
+                neighbor_id,
+                pattern_nodes,
+                pattern_edges,
+                edge_index + 1,
+                results
+            );
+            binding.remove(next_var); // Backtrack
+        }
     }
 
     /// Returns all nodes reachable within N hops from a starting node.

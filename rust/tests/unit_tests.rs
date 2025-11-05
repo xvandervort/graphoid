@@ -29,4 +29,5 @@ mod unit {
     pub mod freeze_behaviors_tests;
     pub mod orphan_management_tests;
     pub mod subgraph_operations_tests;
+    pub mod graph_pattern_execution_tests;
 }
