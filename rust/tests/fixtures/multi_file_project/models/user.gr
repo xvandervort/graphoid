@@ -1,0 +1,16 @@
+# models/user.gr - User model
+module user_model alias user
+
+fn create_user(name, age) {
+    user_map = {}
+    user_map["name"] = name
+    user_map["age"] = age
+    user_map["created_at"] = 123456789.0
+    return user_map
+}
+
+fn validate_user(user) {
+    return user["age"] >= 18
+}
+
+default_age = 25

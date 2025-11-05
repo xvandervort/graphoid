@@ -1,0 +1,24 @@
+# string.gr - String manipulation utilities
+module string_utils alias str
+
+fn uppercase(text) {
+    # Placeholder - would use native implementation
+    return text
+}
+
+fn lowercase(text) {
+    # Placeholder - would use native implementation
+    return text
+}
+
+fn trim(text) {
+    # Placeholder - would use native implementation
+    return text
+}
+
+fn split(text, delimiter) {
+    # Placeholder - would use native implementation
+    return [text]
+}
+
+__version = "0.1.0"

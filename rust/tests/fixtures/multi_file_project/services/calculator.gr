@@ -1,0 +1,12 @@
+# services/calculator.gr - Calculator service that uses math utils
+module calculator_service alias calculator
+
+import "../utils/math"
+
+fn calculate_circle_area(radius) {
+    return math.multiply(math.pi, math.multiply(radius, radius))
+}
+
+fn sum_two_numbers(x, y) {
+    return math.add(x, y)
+}

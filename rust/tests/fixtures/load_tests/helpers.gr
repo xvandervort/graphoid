@@ -1,0 +1,10 @@
+# helpers.gr - Helper functions and variables
+helper_value = 42
+
+fn double(x) {
+    return x * 2
+}
+
+fn triple(x) {
+    return x * 3
+}

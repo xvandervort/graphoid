@@ -438,11 +438,22 @@ impl Executor {
                 // Import a module and create a namespace in the current environment
                 let module_value = self.load_module(module, alias.as_ref())?;
 
-                // Determine the binding name (alias or module name)
-                let binding_name = alias.as_ref().unwrap_or(module);
+                // Determine the binding name:
+                // 1. Use explicit import alias if provided (import "foo" alias bar)
+                // 2. Use module's declared alias if available (module foo alias bar)
+                // 3. Use module's declared name (module foo)
+                // 4. Fall back to filename stem (already handled in load_module)
+                let binding_name = if let Some(alias_name) = alias {
+                    alias_name.clone()
+                } else if let ValueKind::Module(ref m) = module_value.kind {
+                    // Prefer module's declared alias, fall back to module name
+                    m.alias.clone().unwrap_or_else(|| m.name.clone())
+                } else {
+                    module.clone()
+                };
 
                 // Bind the module to the environment
-                self.env.define(binding_name.clone(), module_value);
+                self.env.define(binding_name, module_value);
                 Ok(None)
             }
             Stmt::ModuleDecl { name, alias, .. } => {
@@ -455,10 +466,11 @@ impl Executor {
                 }
                 Ok(None)
             }
-            Stmt::Load { .. } => {
+            Stmt::Load { path, .. } => {
                 // Load statement - inline file contents into current scope
-                // TODO: Implement in Day 5
-                Err(GraphoidError::runtime("Load statement not yet implemented".to_string()))
+                // Unlike import, this merges variables into the current namespace
+                self.execute_load(path)?;
+                Ok(None)
             }
             Stmt::Configure { settings, body, .. } => {
                 // Evaluate settings and push new config
@@ -4185,6 +4197,40 @@ impl Executor {
         self.module_manager.end_loading(&resolved_path);
 
         Ok(Value::module(module))
+    }
+
+    /// Executes a load statement - merges file contents into current namespace
+    fn execute_load(&mut self, file_path: &str) -> Result<()> {
+        use std::fs;
+
+        // Resolve the file path
+        let resolved_path = if let Some(ref current) = self.current_file {
+            self.module_manager.resolve_module_path(file_path, Some(current))?
+        } else {
+            self.module_manager.resolve_module_path(file_path, None)?
+        };
+
+        // Read file source
+        let source = fs::read_to_string(&resolved_path)?;
+
+        // Create temporary executor with fresh environment to execute the file
+        let temp_env = Environment::new();
+        let mut temp_executor = Executor::with_env(temp_env);
+        temp_executor.set_current_file(Some(resolved_path.clone()));
+
+        // Execute file source in temporary environment
+        temp_executor.execute_source(&source)?;
+
+        // Merge all variables from temporary environment into current environment
+        let all_vars = temp_executor.env.get_all_bindings();
+        for (name, value) in all_vars {
+            // Skip internal module metadata variables
+            if !name.starts_with("__") {
+                self.env.define(name, value);
+            }
+        }
+
+        Ok(())
     }
 
     /// Executes a try/catch/finally statement

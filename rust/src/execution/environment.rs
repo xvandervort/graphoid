@@ -86,6 +86,13 @@ impl Environment {
     pub fn take_parent(&mut self) -> Option<Box<Environment>> {
         self.parent.take()
     }
+
+    /// Gets all variable bindings in the current scope only (not parent scopes).
+    /// Returns a Vec of (name, value) pairs.
+    /// Used for load statement to merge variables into another environment.
+    pub fn get_all_bindings(&self) -> Vec<(String, Value)> {
+        self.variables.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+    }
 }
 
 impl Default for Environment {

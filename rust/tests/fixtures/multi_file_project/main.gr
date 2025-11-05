@@ -1,0 +1,12 @@
+# main.gr - Main application file
+import "models/user"
+import "services/calculator"
+
+# Create a user
+alice = user.create_user("Alice", 30)
+
+# Calculate circle area
+area = calculator.calculate_circle_area(5)
+
+# Use calculator
+sum_result = calculator.sum_two_numbers(10, 20)

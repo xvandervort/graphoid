@@ -1,0 +1,4 @@
+# config.gr - A simple configuration file
+debug = true
+max_connections = 100
+server_name = "test_server"
