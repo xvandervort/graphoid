@@ -1,8 +1,13 @@
 # Graphoid/Glang: Rust Implementation Roadmap
 
-**Version**: 2.0
-**Last Updated**: November 4, 2025
-**Status**: Phase 7 complete (1,609 tests passing) - Phase 8 ~75% complete, ready to finish Module System
+**Version**: 2.1
+**Last Updated**: November 6, 2025
+**Status**: 🚨 **UNDER REVIEW** - Executor integration gap discovered, phase completion being reassessed
+
+**🚨 CRITICAL UPDATE (November 6, 2025)**: An executability audit revealed that features implemented at the Rust API level are not accessible from .gr user-facing files. Phase completion claims are being revised based on actual .gr file executability. See `EXECUTABILITY_AUDIT.md` for details.
+
+**Previous Status**: Phase 7 claimed complete (1,609 Rust tests passing), Phase 8 ~75% complete
+**Revised Status**: Phases 3-9 usability uncertain, comprehensive audit in progress
 
 **⚠️ IMPORTANT**: This roadmap has been significantly updated based on new language features. See [archived updates document](archive/sessions/2025-01-roadmap-updates/ROADMAP_UPDATES_FOR_NEW_FEATURES.md) for complete details of changes.
 
@@ -30,9 +35,40 @@ The old Python implementation in `src/glang/` serves as a reference for behavior
 ### Test-Driven Development (TDD)
 **CRITICAL**: ALL development MUST follow TDD principles:
 - Write tests BEFORE implementation (Red → Green → Refactor)
-- Both unit tests (Rust) and integration tests (.gr files)
+- **TWO-LEVEL TESTING REQUIREMENT** (see below)
 - Every feature tested in BOTH REPL and CLI modes
 - Minimum test counts specified for each phase
+
+### 🚨 Two-Level Testing Requirement (MANDATORY)
+
+**A feature is NOT complete until it works from `.gr` files.**
+
+Passing Rust unit tests alone is INSUFFICIENT. Every feature requires:
+
+**Level 1: Rust API Testing (Unit Tests)**
+- Location: `tests/unit/`
+- Purpose: Verify internal implementation correctness
+- Tests: Data structures, algorithms, edge cases
+- Command: `cargo test --lib`
+
+**Level 2: .gr Integration Testing (Executor Tests)**
+- Location: `tests/integration/`
+- Purpose: Verify feature is accessible from user-facing language
+- Tests: End-to-end workflows, realistic use cases
+- Command: `cargo run --quiet path/to/test.gr`
+
+**Feature Completion Checklist**:
+- [ ] Rust API implemented in `src/values/*.rs`
+- [ ] Rust unit tests written and passing
+- [ ] **Method/function registered in `src/execution/executor.rs`** ⚠️ CRITICAL
+- [ ] `.gr` integration test written in `tests/integration/`
+- [ ] `.gr` integration test passes (verified manually)
+- [ ] Example `.gr` file added to `examples/` (if significant feature)
+- [ ] Documentation updated
+
+**If ANY checkbox is unchecked, the feature is NOT complete!**
+
+See `INTEGRATION_TESTING_GUIDE.md` for complete implementation details.
 
 ---
 

@@ -10,29 +10,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Current Status (November 2025)
 
-**RUST IMPLEMENTATION - 7+ PHASES COMPLETE, 50% OF ROADMAP DONE**
+**🚨 CRITICAL FINDING: EXECUTOR INTEGRATION GAP DISCOVERED (November 6, 2025)**
 
-The Rust implementation has made substantial progress with 7+ complete phases and Phase 8 nearly done.
+A comprehensive executability audit revealed that **features implemented at the Rust API level are not accessible from .gr user-facing files**. See `dev_docs/EXECUTABILITY_AUDIT.md` for full details.
 
-- ✅ **Phases 0-7 Complete** - Foundation through behavior system (October 2025)
-- ✅ **Phase 6.5 Complete** - Foundational gaps & verification (132+ tests):
-  - Architecture verification (graph-backed collections)
-  - Parser completeness (inline conditionals, element-wise ops, integer division)
-  - Mutation operators (sort!/reverse! convention)
-  - Graph querying Levels 1-2
-  - Subgraph operations (orphan management, extraction, insertion)
-- ✅ **Phase 7 Complete** - Function Pattern Matching & Behavior System (186+ tests):
-  - Behavior system (91 tests): framework, standard, mapping, custom, ordering, freeze
-  - Pattern matching (77 tests): pipe syntax, parser, matcher, integration
-  - Implementation files: behaviors.rs, pattern_matcher.rs
-- ⚠️ **Phase 8 ~75% Complete** - Module System (31 tests, 2-3 days remaining):
-  - Module manager implemented
-  - Circular dependency detection working
-  - Import/export system incomplete
-- 🔜 **Phase 9 Next** - Graph Pattern Matching & Advanced Querying
-- 📊 **1,609 Tests Passing** - Comprehensive test coverage, zero regressions
-- 📋 **14-Phase Roadmap** - 50% complete (7 of 14 phases done)
-- 📚 **Comprehensive Specifications** - Language spec, architecture design, production tooling all documented
+**Key Issues**:
+- ❌ `print()` function not working - even "Hello World" fails
+- ❌ **REPL completely broken** - cannot execute basic commands
+- ❌ Pattern matching (Phase 9) non-functional from .gr files despite 186 passing Rust tests
+- ❌ Many implemented features likely non-functional from user perspective
+
+**Status Under Review**: Phase completion claims are being reassessed based on actual .gr file executability, not just Rust test passage.
+
+---
+
+**REVISED IMPLEMENTATION STATUS**
+
+- ✅ **Phases 0-2 Complete** - Lexer and Parser (verified working)
+- ⚠️ **Phases 3-7 Status UNCERTAIN** - Rust tests pass but .gr executability unverified:
+  - Phase 3: Value System & Basic Execution
+  - Phase 4: Functions & Lambdas
+  - Phase 5: Collections & Methods
+  - Phase 6: Graph Types & Rules
+  - Phase 6.5: Foundational gaps (132+ tests)
+  - Phase 7: Behaviors & Pattern Matching (186+ tests)
+- ⚠️ **Phase 8 ~75% Complete** - Module System (31 tests, executor integration incomplete)
+- 🚨 **Phase 9** - Pattern matching API implemented but **0% usable** from .gr files
+- 📊 **1,609 Rust Tests Passing** - But **0 integration tests** with .gr files
+- 📋 **14-Phase Roadmap** - Actual completion TBD based on executability audit
+
+**Action Plan**: See `dev_docs/EXECUTABILITY_FIX_PLAN.md` for 3-phase fix strategy (2-3 days critical, 1-2 weeks comprehensive)
 
 **Python Implementation**: The Python implementation in `python/` serves as a **reference prototype** demonstrating language concepts. The Rust implementation in `rust/` is the **production target**.
 
@@ -540,6 +547,18 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 14-phase plan:
 
 ### Testing Strategy
 
+**🚨 CRITICAL: Features MUST Be Usable by Programmers to Be "Complete"**
+
+A feature is NOT complete until it works from `.gr` files. Passing Rust tests alone is insufficient.
+
+**The Two-Level Testing Requirement**:
+1. **Level 1: Rust API Testing** - Unit tests verify internal implementation
+2. **Level 2: .gr Integration Testing** - Verify feature is accessible from user-facing language
+
+**Both levels are MANDATORY**. See `dev_docs/INTEGRATION_TESTING_GUIDE.md` for complete details.
+
+---
+
 **CRITICAL: Test-Driven Development (TDD) is MANDATORY**
 
 All development follows strict TDD methodology:
@@ -571,25 +590,31 @@ pub fn shortest_path(&self, from: &str, to: &str, edge_type: Option<&str>, weigh
 ```
 
 **Test Organization**:
-- **Unit tests** - In `tests/unit/` for individual components
-- **Integration tests** - In `tests/integration/` for workflows
+- **Unit tests (Rust)** - In `tests/unit/` for internal API verification
+- **Integration tests (.gr files)** - In `tests/integration/` for user-facing executability
 - **Property-based tests** - For algorithmic correctness
 - **Regression tests** - For every bug fix
 
 **IMPORTANT: Test File Organization**
 
 - ❌ **NEVER** use `#[cfg(test)]` modules in `src/` files
-- ✅ **ALWAYS** place tests in separate files in `tests/unit/` or `tests/integration/`
+- ✅ **ALWAYS** place Rust tests in `tests/unit/` or `tests/integration/`
+- ✅ **ALWAYS** create `.gr` integration tests in `tests/integration/`
 - ✅ **ALWAYS** write tests BEFORE implementation (TDD)
+- ✅ **ALWAYS** register methods/functions in executor after implementing
 - Tests in `tests/unit/` should import from the crate: `use graphoid::module::Type;`
 - Each source module can have a corresponding test file (e.g., `src/graph/rules.rs` → `tests/unit/graph_rules_tests.rs`)
 - Register new test files in `tests/unit_tests.rs`
 
-**Verification**: Run `find src -name "*.rs" -exec grep -l "#\[cfg(test)\]" {} \;` - should return no results
+**Verification**:
+- Rust: Run `find src -name "*.rs" -exec grep -l "#\[cfg(test)\]" {} \;` - should return no results
+- Integration: Run `bash scripts/test_integration.sh` - all .gr files should execute
 
 **Why TDD**: Writing tests first ensures complete test coverage, better API design, prevents regressions, and validates requirements before implementation.
 
 **Why Separate Files**: Keeps source files clean, reduces compilation time for non-test builds, and follows Rust best practices for larger projects.
+
+**Why .gr Integration Tests**: Rust unit tests only verify internal API. They don't test executor integration or user-facing accessibility. A feature that passes Rust tests but fails from .gr files is NOT complete.
 
 ### Git Workflow
 

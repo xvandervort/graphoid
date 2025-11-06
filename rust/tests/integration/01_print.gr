@@ -1,0 +1,24 @@
+# Integration Test: print() function
+#
+# Purpose: Verify print() built-in function works from .gr files
+# Expected output:
+#   Hello World
+#   x = 10
+#   Multiple arguments: 1 2 3
+#   Numbers: 42 3.14
+#   Booleans: true false
+#   None: none
+#   Symbol: :test
+#   ✅ print() works!
+
+print("Hello World")
+x = 10
+print("x =", x)
+print("Multiple arguments:", 1, 2, 3)
+a = 42
+b = 3.14
+print("Numbers:", a, b)
+print("Booleans:", true, false)
+print("None:", none)
+print("Symbol:", :test)
+print("✅ print() works!")

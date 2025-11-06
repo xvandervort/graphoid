@@ -2982,6 +2982,48 @@ impl Executor {
         // Check if this is a builtin function call (special handling)
         if let Expr::Variable { name, .. } = callee {
             match name.as_str() {
+                "print" => {
+                    // print(...) - outputs values to stdout with space separation
+                    // Accepts variable number of arguments
+                    let mut output = String::new();
+
+                    for (i, arg) in args.iter().enumerate() {
+                        if i > 0 {
+                            output.push(' ');
+                        }
+
+                        let value = match arg {
+                            Argument::Positional(expr) => self.eval_expr(expr)?,
+                            Argument::Named { .. } => {
+                                return Err(GraphoidError::runtime(
+                                    "print() does not accept named arguments".to_string()
+                                ));
+                            }
+                        };
+
+                        // Convert value to string representation
+                        let str_repr = match &value.kind {
+                            ValueKind::String(s) => s.clone(),
+                            ValueKind::Number(n) => {
+                                // Format numbers nicely - remove .0 for integers
+                                if n.fract() == 0.0 && n.is_finite() {
+                                    format!("{:.0}", n)
+                                } else {
+                                    n.to_string()
+                                }
+                            }
+                            ValueKind::Boolean(b) => b.to_string(),
+                            ValueKind::Symbol(s) => format!(":{}", s),
+                            ValueKind::None => "none".to_string(),
+                            _ => value.to_string_value(),
+                        };
+
+                        output.push_str(&str_repr);
+                    }
+
+                    println!("{}", output);
+                    return Ok(Value::none());
+                }
                 "RuntimeError" | "ValueError" | "TypeError" | "IOError" | "NetworkError" | "ParseError" => {
                     // Evaluate the message argument
                     if args.len() != 1 {
