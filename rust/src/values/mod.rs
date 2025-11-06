@@ -343,6 +343,94 @@ impl PatternMatchResults {
 
         Ok(PatternMatchResults::new(filtered, self.graph.clone()))
     }
+
+    /// Project only specific variables from the match results (similar to Cypher's RETURN clause)
+    ///
+    /// # Arguments
+    /// * `vars` - List of variable names to include in the projection
+    ///
+    /// # Returns
+    /// New PatternMatchResults with only the specified variables in each binding
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Match returns: {person: "Alice", friend: "Bob"}
+    /// let projected = results.return_vars(vec!["person"]);
+    /// // Returns: {person: "Alice"}
+    /// ```
+    pub fn return_vars(&self, vars: Vec<&str>) -> Self {
+        let projected: Vec<std::collections::HashMap<String, String>> = self.bindings
+            .iter()
+            .map(|binding| {
+                let mut new_binding = std::collections::HashMap::new();
+                for var in &vars {
+                    if let Some(node_id) = binding.get(*var) {
+                        new_binding.insert(var.to_string(), node_id.clone());
+                    }
+                }
+                new_binding
+            })
+            .collect();
+
+        PatternMatchResults::new(projected, self.graph.clone())
+    }
+
+    /// Project specific properties from bound nodes (similar to Cypher's RETURN with property access)
+    ///
+    /// # Arguments
+    /// * `specs` - List of property specifications in "variable.property" format
+    ///
+    /// # Returns
+    /// Vector of HashMaps where keys are "variable.property" and values are the property values
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Match returns: {person: "Alice", friend: "Bob"}
+    /// // Where Alice has age=30, Bob has age=25
+    /// let projected = results.return_properties(vec!["person.age", "friend.age"])?;
+    /// // Returns: [{"person.age": 30.0, "friend.age": 25.0}]
+    /// ```
+    pub fn return_properties(&self, specs: Vec<&str>) -> Result<Vec<std::collections::HashMap<String, Value>>, crate::error::GraphoidError> {
+        let mut result = Vec::new();
+
+        for binding in &self.bindings {
+            let mut props_map = std::collections::HashMap::new();
+
+            for spec in &specs {
+                // Parse "variable.property" format
+                let parts: Vec<&str> = spec.split('.').collect();
+                if parts.len() != 2 {
+                    return Err(crate::error::GraphoidError::runtime(
+                        format!("Invalid property specification: '{}'. Expected format: 'variable.property'", spec)
+                    ));
+                }
+
+                let variable = parts[0];
+                let property = parts[1];
+
+                // Get the node for this variable
+                if let Some(node_id) = binding.get(variable) {
+                    if let Some(node) = self.graph.nodes.get(node_id) {
+                        // Get the property value (or None if it doesn't exist)
+                        let prop_value = node.properties.get(property)
+                            .cloned()
+                            .unwrap_or_else(|| Value::none());
+                        props_map.insert(spec.to_string(), prop_value);
+                    } else {
+                        // Node doesn't exist - shouldn't happen but handle gracefully
+                        props_map.insert(spec.to_string(), Value::none());
+                    }
+                } else {
+                    // Variable not in binding - return None
+                    props_map.insert(spec.to_string(), Value::none());
+                }
+            }
+
+            result.push(props_map);
+        }
+
+        Ok(result)
+    }
 }
 
 // Implement Index trait for array-like access

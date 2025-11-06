@@ -1,4 +1,4 @@
-use graphoid::values::{Graph, GraphType, Value};
+use graphoid::values::{Graph, GraphType, Value, ValueKind};
 use std::collections::HashMap;
 
 /// Helper function to create a pattern node value
@@ -1579,4 +1579,281 @@ fn test_variable_path_star_syntax() {
     // 2 hops: A->C (1 path)
     // Total: 6 paths
     assert_eq!(results.len(), 6);
+}
+
+// ============================================================================
+// RETURN CLAUSE TESTS (Day 5 Part A)
+// ============================================================================
+
+#[test]
+fn test_return_vars_single_variable() {
+    // Build graph: Alice -> Bob -> Charlie
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("Alice".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("Bob".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("Charlie".to_string(), Value::number(3.0)).unwrap();
+    graph.add_edge("Alice", "Bob", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("Bob", "Charlie", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node("person") -edge()-> node("friend")
+    let pattern_args = vec![
+        create_pattern_node("person", None),
+        create_pattern_edge(None, None),
+        create_pattern_node("friend", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Should find 2 matches:
+    // Match 1: person=Alice, friend=Bob
+    // Match 2: person=Bob, friend=Charlie
+    assert_eq!(results.len(), 2);
+
+    // Return only "person" variable
+    let projected = results.return_vars(vec!["person"]);
+
+    // Should still have 2 matches, but only "person" variable
+    assert_eq!(projected.len(), 2);
+
+    // Collect person values (order may vary due to HashMap iteration)
+    let persons: Vec<&str> = projected.iter()
+        .map(|m| m.get("person").unwrap().as_str())
+        .collect();
+
+    // Both matches should have "person" but not "friend"
+    for binding in &projected {
+        assert!(binding.contains_key("person"));
+        assert!(!binding.contains_key("friend"));
+    }
+
+    // Should contain both Alice and Bob
+    assert!(persons.contains(&"Alice"));
+    assert!(persons.contains(&"Bob"));
+}
+
+#[test]
+fn test_return_vars_multiple_variables() {
+    // Build graph: Alice -> Bob -> Charlie -> David
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("Alice".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("Bob".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("Charlie".to_string(), Value::number(3.0)).unwrap();
+    graph.add_node("David".to_string(), Value::number(4.0)).unwrap();
+    graph.add_edge("Alice", "Bob", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("Bob", "Charlie", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("Charlie", "David", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node("a") -edge()-> node("b") -edge()-> node("c")
+    let pattern_args = vec![
+        create_pattern_node("a", None),
+        create_pattern_edge(None, None),
+        create_pattern_node("b", None),
+        create_pattern_edge(None, None),
+        create_pattern_node("c", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+    assert_eq!(results.len(), 2); // Alice->Bob->Charlie, Bob->Charlie->David
+
+    // Return only "a" and "c" variables (skip "b")
+    let projected = results.return_vars(vec!["a", "c"]);
+
+    assert_eq!(projected.len(), 2);
+
+    // All matches should have "a" and "c" but not "b"
+    for binding in &projected {
+        assert!(binding.contains_key("a"));
+        assert!(!binding.contains_key("b"));
+        assert!(binding.contains_key("c"));
+    }
+
+    // Collect the (a, c) pairs (order may vary)
+    let mut pairs: Vec<(&str, &str)> = projected.iter()
+        .map(|m| (m.get("a").unwrap().as_str(), m.get("c").unwrap().as_str()))
+        .collect();
+    pairs.sort();
+
+    // Should contain: (Alice, Charlie) and (Bob, David)
+    assert_eq!(pairs, vec![("Alice", "Charlie"), ("Bob", "David")]);
+}
+
+#[test]
+fn test_return_vars_all_variables() {
+    // Build graph: Alice -> Bob
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("Alice".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("Bob".to_string(), Value::number(2.0)).unwrap();
+    graph.add_edge("Alice", "Bob", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node("person") -edge()-> node("friend")
+    let pattern_args = vec![
+        create_pattern_node("person", None),
+        create_pattern_edge(None, None),
+        create_pattern_node("friend", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Return all variables (should be same as original)
+    let projected = results.return_vars(vec!["person", "friend"]);
+
+    assert_eq!(projected.len(), 1);
+    assert!(projected[0].contains_key("person"));
+    assert!(projected[0].contains_key("friend"));
+    assert_eq!(projected[0].get("person").unwrap(), "Alice");
+    assert_eq!(projected[0].get("friend").unwrap(), "Bob");
+}
+
+#[test]
+fn test_return_vars_nonexistent_variable() {
+    // Build graph: Alice -> Bob
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("Alice".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("Bob".to_string(), Value::number(2.0)).unwrap();
+    graph.add_edge("Alice", "Bob", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node("person") -edge()-> node("friend")
+    let pattern_args = vec![
+        create_pattern_node("person", None),
+        create_pattern_edge(None, None),
+        create_pattern_node("friend", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Return a variable that doesn't exist (should be silently ignored)
+    let projected = results.return_vars(vec!["person", "nonexistent"]);
+
+    assert_eq!(projected.len(), 1);
+    assert!(projected[0].contains_key("person"));
+    assert!(!projected[0].contains_key("nonexistent"));
+    assert!(!projected[0].contains_key("friend"));
+}
+
+#[test]
+fn test_return_properties_simple() {
+    // Build graph with properties: Alice(age:30) -> Bob(age:25)
+    let mut graph = Graph::new(GraphType::Directed);
+
+    let mut alice_props = HashMap::new();
+    alice_props.insert("age".to_string(), Value::number(30.0));
+    alice_props.insert("name".to_string(), Value::string("Alice".to_string()));
+    graph.add_node("Alice".to_string(), Value::number(1.0)).unwrap();
+    graph.set_node_properties("Alice", alice_props).unwrap();
+
+    let mut bob_props = HashMap::new();
+    bob_props.insert("age".to_string(), Value::number(25.0));
+    bob_props.insert("name".to_string(), Value::string("Bob".to_string()));
+    graph.add_node("Bob".to_string(), Value::number(2.0)).unwrap();
+    graph.set_node_properties("Bob", bob_props).unwrap();
+
+    graph.add_edge("Alice", "Bob", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node("person") -edge()-> node("friend")
+    let pattern_args = vec![
+        create_pattern_node("person", None),
+        create_pattern_edge(None, None),
+        create_pattern_node("friend", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Return specific properties: person.name and friend.age
+    let projected = results.return_properties(vec!["person.name", "friend.age"]).unwrap();
+
+    // Should get a vector of HashMaps with requested properties
+    assert_eq!(projected.len(), 1);
+
+    // First match should have person.name = "Alice" and friend.age = 25.0
+    assert_eq!(projected[0].get("person.name").unwrap(), &Value::string("Alice".to_string()));
+    assert_eq!(projected[0].get("friend.age").unwrap(), &Value::number(25.0));
+    assert!(!projected[0].contains_key("person.age"));
+    assert!(!projected[0].contains_key("friend.name"));
+}
+
+#[test]
+fn test_return_properties_multiple_matches() {
+    // Build graph: Alice(age:30) -> Bob(age:25) -> Charlie(age:35)
+    let mut graph = Graph::new(GraphType::Directed);
+
+    let mut alice_props = HashMap::new();
+    alice_props.insert("age".to_string(), Value::number(30.0));
+    graph.add_node("Alice".to_string(), Value::number(1.0)).unwrap();
+    graph.set_node_properties("Alice", alice_props).unwrap();
+
+    let mut bob_props = HashMap::new();
+    bob_props.insert("age".to_string(), Value::number(25.0));
+    graph.add_node("Bob".to_string(), Value::number(2.0)).unwrap();
+    graph.set_node_properties("Bob", bob_props).unwrap();
+
+    let mut charlie_props = HashMap::new();
+    charlie_props.insert("age".to_string(), Value::number(35.0));
+    graph.add_node("Charlie".to_string(), Value::number(3.0)).unwrap();
+    graph.set_node_properties("Charlie", charlie_props).unwrap();
+
+    graph.add_edge("Alice", "Bob", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("Bob", "Charlie", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node("person") -edge()-> node("friend")
+    let pattern_args = vec![
+        create_pattern_node("person", None),
+        create_pattern_edge(None, None),
+        create_pattern_node("friend", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+    assert_eq!(results.len(), 2);
+
+    // Return person.age for all matches
+    let projected = results.return_properties(vec!["person.age"]).unwrap();
+
+    assert_eq!(projected.len(), 2);
+
+    // Collect ages (order may vary due to HashMap iteration)
+    let ages: Vec<f64> = projected.iter()
+        .map(|m| {
+            if let ValueKind::Number(n) = m.get("person.age").unwrap().kind {
+                n
+            } else {
+                panic!("Expected number");
+            }
+        })
+        .collect();
+
+    // Should contain both Alice's age (30) and Bob's age (25)
+    assert!(ages.contains(&30.0));
+    assert!(ages.contains(&25.0));
+}
+
+#[test]
+fn test_return_properties_nonexistent_property() {
+    // Build graph: Alice(age:30) -> Bob(age:25)
+    let mut graph = Graph::new(GraphType::Directed);
+
+    let mut alice_props = HashMap::new();
+    alice_props.insert("age".to_string(), Value::number(30.0));
+    graph.add_node("Alice".to_string(), Value::number(1.0)).unwrap();
+    graph.set_node_properties("Alice", alice_props).unwrap();
+
+    let mut bob_props = HashMap::new();
+    bob_props.insert("age".to_string(), Value::number(25.0));
+    graph.add_node("Bob".to_string(), Value::number(2.0)).unwrap();
+    graph.set_node_properties("Bob", bob_props).unwrap();
+
+    graph.add_edge("Alice", "Bob", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node("person") -edge()-> node("friend")
+    let pattern_args = vec![
+        create_pattern_node("person", None),
+        create_pattern_edge(None, None),
+        create_pattern_node("friend", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Return a property that doesn't exist (should use None/null)
+    let projected = results.return_properties(vec!["person.nonexistent"]).unwrap();
+
+    assert_eq!(projected.len(), 1);
+    assert_eq!(projected[0].get("person.nonexistent").unwrap(), &Value::none());
 }

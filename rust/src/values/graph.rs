@@ -393,6 +393,16 @@ impl Graph {
         self.nodes.get(id).and_then(|node| node.node_type.clone())
     }
 
+    /// Set properties for a node (replaces existing properties)
+    pub fn set_node_properties(&mut self, id: &str, properties: HashMap<String, Value>) -> Result<(), GraphoidError> {
+        let node = self.nodes.get_mut(id).ok_or_else(|| {
+            GraphoidError::runtime(format!("Node '{}' not found", id))
+        })?;
+
+        node.properties = properties;
+        Ok(())
+    }
+
     /// Add an edge between two nodes
     pub fn add_edge(&mut self, from: &str, to: &str, edge_type: String, weight: Option<f64>, properties: HashMap<String, Value>) -> Result<(), GraphoidError> {
         // Check if graph is frozen
