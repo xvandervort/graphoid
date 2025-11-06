@@ -1371,3 +1371,212 @@ fn test_where_filter_empty_results() {
 
     assert_eq!(filtered.len(), 0);
 }
+
+// ============================================================================
+// Day 5 Part B: Variable-Length Paths
+// ============================================================================
+
+/// Helper function to create a pattern path value
+fn create_pattern_path(edge_type: Option<&str>, min: usize, max: usize, direction: Option<&str>) -> Value {
+    Value::pattern_path(
+        edge_type.unwrap_or("").to_string(),
+        min,
+        max,
+        direction.unwrap_or("outgoing").to_string()
+    )
+}
+
+#[test]
+fn test_variable_path_single_hop() {
+    // Build graph: A -> B -> C
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    graph.add_edge("A", "B", "LINK".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("B", "C", "LINK".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node -[*1..1]-> node (exactly 1 hop, equivalent to regular edge)
+    let pattern_args = vec![
+        create_pattern_node("start", None),
+        create_pattern_path(None, 1, 1, None),
+        create_pattern_node("end", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Should find: A->B and B->C (2 single-hop paths)
+    assert_eq!(results.len(), 2);
+}
+
+#[test]
+fn test_variable_path_one_to_two_hops() {
+    // Build graph: A -> B -> C
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    graph.add_edge("A", "B", "LINK".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("B", "C", "LINK".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node -[*1..2]-> node (1 or 2 hops)
+    let pattern_args = vec![
+        create_pattern_node("start", None),
+        create_pattern_path(None, 1, 2, None),
+        create_pattern_node("end", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Should find: A->B (1 hop), B->C (1 hop), A->C (2 hops) = 3 paths
+    assert_eq!(results.len(), 3);
+
+    // Verify we have both direct and indirect paths
+    let has_direct_ab = results.iter().any(|r|
+        r.get("start").unwrap() == "A" && r.get("end").unwrap() == "B"
+    );
+    let has_direct_bc = results.iter().any(|r|
+        r.get("start").unwrap() == "B" && r.get("end").unwrap() == "C"
+    );
+    let has_indirect_ac = results.iter().any(|r|
+        r.get("start").unwrap() == "A" && r.get("end").unwrap() == "C"
+    );
+
+    assert!(has_direct_ab, "Should find A->B");
+    assert!(has_direct_bc, "Should find B->C");
+    assert!(has_indirect_ac, "Should find A->C via B");
+}
+
+#[test]
+fn test_variable_path_exactly_two_hops() {
+    // Build graph: A -> B -> C -> D
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    graph.add_node("D".to_string(), Value::number(4.0)).unwrap();
+    graph.add_edge("A", "B", "LINK".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("B", "C", "LINK".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("C", "D", "LINK".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node -[*2..2]-> node (exactly 2 hops)
+    let pattern_args = vec![
+        create_pattern_node("start", None),
+        create_pattern_path(None, 2, 2, None),
+        create_pattern_node("end", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Should find: A->C (via B) and B->D (via C) = 2 paths
+    assert_eq!(results.len(), 2);
+}
+
+#[test]
+fn test_variable_path_with_edge_type() {
+    // Build graph with typed edges
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    graph.add_edge("A", "B", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("B", "C", "FRIEND".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("A", "C", "ENEMY".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node -[FRIEND*1..2]-> node (1-2 FRIEND edges)
+    let pattern_args = vec![
+        create_pattern_node("start", None),
+        create_pattern_path(Some("FRIEND"), 1, 2, None),
+        create_pattern_node("end", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Should find: A->B (FRIEND), B->C (FRIEND), A->C (via B with FRIENDs)
+    // Should NOT find: A->C direct (it's ENEMY)
+    assert_eq!(results.len(), 3);
+
+    // Verify A->C via ENEMY is not included
+    let direct_enemy = results.iter().any(|r| {
+        r.get("start").unwrap() == "A" &&
+        r.get("end").unwrap() == "C" &&
+        results.len() == 1  // If this was the only path, it would be the direct one
+    });
+    assert!(!direct_enemy, "Should not find direct A->C ENEMY path when filtering for FRIEND");
+}
+
+#[test]
+fn test_variable_path_no_paths_found() {
+    // Build disconnected graph
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    // No edges
+
+    // Pattern: node -[*1..3]-> node
+    let pattern_args = vec![
+        create_pattern_node("start", None),
+        create_pattern_path(None, 1, 3, None),
+        create_pattern_node("end", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Should find no paths
+    assert_eq!(results.len(), 0);
+}
+
+#[test]
+fn test_variable_path_with_cycle() {
+    // Build graph with cycle: A -> B -> C -> A
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    graph.add_edge("A", "B", "LINK".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("B", "C", "LINK".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("C", "A", "LINK".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node -[*1..2]-> node (max 2 hops to avoid infinite paths)
+    let pattern_args = vec![
+        create_pattern_node("start", None),
+        create_pattern_path(None, 1, 2, None),
+        create_pattern_node("end", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Should find:
+    // 1 hop: A->B, B->C, C->A (3 paths)
+    // 2 hops: A->C (via B), B->A (via C), C->B (via A) (3 paths)
+    // Total: 6 paths
+    assert_eq!(results.len(), 6);
+}
+
+#[test]
+fn test_variable_path_star_syntax() {
+    // Build graph: A -> B -> C
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(2.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(3.0)).unwrap();
+    graph.add_edge("A", "B", "LINK".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("B", "C", "LINK".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: node -[*0..10]-> node (0-10 hops, like Cypher's *)
+    // Note: 0 hops means match same node
+    let pattern_args = vec![
+        create_pattern_node("start", None),
+        create_pattern_path(None, 0, 10, None),
+        create_pattern_node("end", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Should find:
+    // 0 hops: A->A, B->B, C->C (3 paths)
+    // 1 hop: A->B, B->C (2 paths)
+    // 2 hops: A->C (1 path)
+    // Total: 6 paths
+    assert_eq!(results.len(), 6);
+}

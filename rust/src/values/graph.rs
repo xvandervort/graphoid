@@ -4,10 +4,17 @@
 //! Each node stores direct pointers to its neighbors, avoiding index scans.
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use super::{Value, ValueKind, PatternNode, PatternEdge};
+use super::{Value, ValueKind, PatternNode, PatternEdge, PatternPath};
 use crate::graph::rules::{Rule, RuleContext, GraphOperation, RuleSpec, RuleInstance, RuleSeverity};
 use crate::graph::rulesets::get_ruleset_rules;
 use crate::error::GraphoidError;
+
+/// Enum to represent either a fixed edge or variable-length path in pattern matching
+#[derive(Debug, Clone)]
+enum EdgeOrPath {
+    Edge(PatternEdge),
+    Path(PatternPath),
+}
 
 /// Type of graph: directed or undirected
 #[derive(Debug, Clone, PartialEq)]
@@ -1380,21 +1387,22 @@ impl Graph {
 
     /// Match a pattern in the graph and return all matches as bindings.
     ///
-    /// Pattern arguments should be alternating PatternNode and PatternEdge values.
+    /// Pattern arguments should be alternating PatternNode and PatternEdge/PatternPath values.
     /// For example: [node("a"), edge(), node("b")] matches a simple two-node pattern.
     ///
     /// Returns a list of binding maps where keys are variable names and values are node IDs.
     pub fn match_pattern(&self, pattern_args: Vec<Value>) -> Result<crate::values::PatternMatchResults, GraphoidError> {
-        // Parse pattern arguments into nodes and edges
+        // Parse pattern arguments into nodes and edges/paths
         let (pattern_nodes, pattern_edges) = {
             let mut nodes = Vec::new();
             let mut edges = Vec::new();
             for (i, arg) in pattern_args.iter().enumerate() {
                 match &arg.kind {
                     ValueKind::PatternNode(pn) => nodes.push(pn.clone()),
-                    ValueKind::PatternEdge(pe) => edges.push(pe.clone()),
+                    ValueKind::PatternEdge(pe) => edges.push(EdgeOrPath::Edge(pe.clone())),
+                    ValueKind::PatternPath(pp) => edges.push(EdgeOrPath::Path(pp.clone())),
                     _ => return Err(GraphoidError::runtime(format!(
-                        "Invalid pattern argument at position {}: expected PatternNode or PatternEdge", i
+                        "Invalid pattern argument at position {}: expected PatternNode, PatternEdge, or PatternPath", i
                     ))),
                 }
             }
@@ -1447,114 +1455,249 @@ impl Graph {
         Ok(crate::values::PatternMatchResults::new(results, self.clone()))
     }
 
-    /// Extend a partial match by following edges (unified recursive algorithm).
+    /// Find all paths from start node with length in range [min_len, max_len].
+    /// Uses BFS to explore paths level by level.
+    fn find_variable_length_paths(
+        graph_nodes: &HashMap<String, GraphNode>,
+        start_node: &str,
+        min_len: usize,
+        max_len: usize,
+        edge_type: Option<&str>,
+        direction: &str
+    ) -> Vec<Vec<String>> {
+        let mut results = Vec::new();
+
+        // Handle zero-length paths (same node)
+        if min_len == 0 {
+            results.push(vec![start_node.to_string()]);
+        }
+
+        if max_len == 0 {
+            return results;
+        }
+
+        // Use BFS with path tracking
+        let mut queue: Vec<Vec<String>> = vec![vec![start_node.to_string()]];
+
+        while let Some(current_path) = queue.pop() {
+            let current_len = current_path.len() - 1; // Path length is number of edges
+
+            if current_len >= max_len {
+                continue; // Don't extend beyond max_len
+            }
+
+            let current_node = current_path.last().unwrap();
+            let graph_node = match graph_nodes.get(current_node) {
+                Some(n) => n,
+                None => continue,
+            };
+
+            // Choose which edges to follow based on direction
+            let edges_to_follow: Vec<(&String, &EdgeInfo)> = match direction {
+                "incoming" => graph_node.predecessors.iter().collect(),
+                "outgoing" => graph_node.neighbors.iter().collect(),
+                "both" => {
+                    let mut edges: Vec<(&String, &EdgeInfo)> = graph_node.neighbors.iter().collect();
+                    edges.extend(graph_node.predecessors.iter());
+                    edges
+                },
+                _ => graph_node.neighbors.iter().collect(),
+            };
+
+            for (neighbor_id, edge_info) in edges_to_follow {
+                // Check edge type constraint
+                if let Some(required_type) = edge_type {
+                    if edge_info.edge_type != required_type {
+                        continue;
+                    }
+                }
+
+                // Create new path by extending current path
+                let mut new_path = current_path.clone();
+                new_path.push(neighbor_id.clone());
+
+                let new_len = new_path.len() - 1;
+
+                // Add to results if within range
+                if new_len >= min_len && new_len <= max_len {
+                    results.push(new_path.clone());
+                }
+
+                // Add to queue for further exploration if not at max
+                if new_len < max_len {
+                    queue.push(new_path);
+                }
+            }
+        }
+
+        results
+    }
+
+    /// Extend a partial match by following edges or variable-length paths (unified recursive algorithm).
     /// Uses backtracking to find all complete matches.
     fn extend_pattern_match(
         graph_nodes: &HashMap<String, GraphNode>,
         binding: &mut HashMap<String, String>,
         current_node: &str,
         pattern_nodes: &[PatternNode],
-        pattern_edges: &[PatternEdge],
+        pattern_edges: &[EdgeOrPath],
         edge_index: usize,
         results: &mut Vec<HashMap<String, String>>
     ) {
-        // Base case: all edges processed, we have a complete match
+        // Base case: all edges/paths processed, we have a complete match
         if edge_index >= pattern_edges.len() {
             results.push(binding.clone());
             return;
         }
 
-        let edge_pattern = &pattern_edges[edge_index];
         let next_node_pattern = &pattern_nodes[edge_index + 1];
         let next_var = match &next_node_pattern.variable {
             Some(v) => v,
             None => return,
         };
 
-        let current_graph_node = match graph_nodes.get(current_node) {
-            Some(n) => n,
-            None => return,
-        };
+        // Handle either fixed edge or variable-length path
+        match &pattern_edges[edge_index] {
+            EdgeOrPath::Edge(edge_pattern) => {
+                // Original single-edge matching logic
+                let current_graph_node = match graph_nodes.get(current_node) {
+                    Some(n) => n,
+                    None => return,
+                };
 
-        // Choose which edges to follow based on direction
-        let edges_to_follow: Vec<(&String, &EdgeInfo)> = match edge_pattern.direction.as_str() {
-            "incoming" => {
-                // Follow incoming edges (predecessors)
-                current_graph_node.predecessors.iter().collect()
-            },
-            "outgoing" => {
-                // Follow outgoing edges (neighbors)
-                current_graph_node.neighbors.iter().collect()
-            },
-            "both" => {
-                // For bidirectional, we follow outgoing edges but verify reverse exists
-                current_graph_node.neighbors.iter().collect()
-            },
-            _ => {
-                // Default to outgoing for unknown directions
-                current_graph_node.neighbors.iter().collect()
-            }
-        };
+                // Choose which edges to follow based on direction
+                let edges_to_follow: Vec<(&String, &EdgeInfo)> = match edge_pattern.direction.as_str() {
+                    "incoming" => current_graph_node.predecessors.iter().collect(),
+                    "outgoing" => current_graph_node.neighbors.iter().collect(),
+                    "both" => current_graph_node.neighbors.iter().collect(),
+                    _ => current_graph_node.neighbors.iter().collect(),
+                };
 
-        // Try each neighbor that matches the pattern
-        for (neighbor_id, edge_info) in edges_to_follow {
-            // Check edge type constraint
-            if let Some(ref required_type) = edge_pattern.edge_type {
-                if edge_info.edge_type != *required_type {
-                    continue;
-                }
-            }
+                // Try each neighbor that matches the pattern
+                for (neighbor_id, edge_info) in edges_to_follow {
+                    // Check edge type constraint
+                    if let Some(ref required_type) = edge_pattern.edge_type {
+                        if edge_info.edge_type != *required_type {
+                            continue;
+                        }
+                    }
 
-            // Check neighbor node type constraint
-            let matches_type = match &next_node_pattern.node_type {
-                None => true,
-                Some(required_type) => {
-                    match graph_nodes.get(neighbor_id) {
-                        Some(node) => node.node_type.as_ref() == Some(required_type),
-                        None => false,
+                    // Check neighbor node type constraint
+                    let matches_type = match &next_node_pattern.node_type {
+                        None => true,
+                        Some(required_type) => {
+                            match graph_nodes.get(neighbor_id) {
+                                Some(node) => node.node_type.as_ref() == Some(required_type),
+                                None => false,
+                            }
+                        }
+                    };
+                    if !matches_type {
+                        continue;
+                    }
+
+                    // Check bidirectional constraint (only for "both" direction)
+                    if edge_pattern.direction == "both" {
+                        let has_reverse = graph_nodes.get(neighbor_id)
+                            .map_or(false, |n| n.neighbors.contains_key(current_node));
+                        if !has_reverse {
+                            continue;
+                        }
+                    }
+
+                    // Check if variable is already bound
+                    let was_bound = binding.contains_key(next_var);
+                    if let Some(existing_binding) = binding.get(next_var) {
+                        if existing_binding != neighbor_id {
+                            continue;
+                        }
+                    } else {
+                        binding.insert(next_var.clone(), neighbor_id.clone());
+                    }
+
+                    // Recurse to extend the match
+                    Self::extend_pattern_match(
+                        graph_nodes,
+                        binding,
+                        neighbor_id,
+                        pattern_nodes,
+                        pattern_edges,
+                        edge_index + 1,
+                        results
+                    );
+
+                    // Backtrack: remove binding only if we added it
+                    if !was_bound {
+                        binding.remove(next_var);
                     }
                 }
-            };
-            if !matches_type {
-                continue;
-            }
+            },
+            EdgeOrPath::Path(path_pattern) => {
+                // Variable-length path matching
+                let edge_type = if path_pattern.edge_type.is_empty() {
+                    None
+                } else {
+                    Some(path_pattern.edge_type.as_str())
+                };
 
-            // Check bidirectional constraint (only for "both" direction)
-            if edge_pattern.direction == "both" {
-                let has_reverse = graph_nodes.get(neighbor_id)
-                    .map_or(false, |n| n.neighbors.contains_key(current_node));
-                if !has_reverse {
-                    continue;
+                // Find all paths from current node with the specified length range
+                let paths = Self::find_variable_length_paths(
+                    graph_nodes,
+                    current_node,
+                    path_pattern.min,
+                    path_pattern.max,
+                    edge_type,
+                    &path_pattern.direction
+                );
+
+                // Try each found path
+                for path in paths {
+                    if path.is_empty() {
+                        continue;
+                    }
+
+                    let end_node = path.last().unwrap();
+
+                    // Check end node type constraint
+                    let matches_type = match &next_node_pattern.node_type {
+                        None => true,
+                        Some(required_type) => {
+                            match graph_nodes.get(end_node) {
+                                Some(node) => node.node_type.as_ref() == Some(required_type),
+                                None => false,
+                            }
+                        }
+                    };
+                    if !matches_type {
+                        continue;
+                    }
+
+                    // Check if variable is already bound
+                    let was_bound = binding.contains_key(next_var);
+                    if let Some(existing_binding) = binding.get(next_var) {
+                        if existing_binding != end_node {
+                            continue;
+                        }
+                    } else {
+                        binding.insert(next_var.clone(), end_node.clone());
+                    }
+
+                    // Recurse to extend the match
+                    Self::extend_pattern_match(
+                        graph_nodes,
+                        binding,
+                        end_node,
+                        pattern_nodes,
+                        pattern_edges,
+                        edge_index + 1,
+                        results
+                    );
+
+                    // Backtrack: remove binding only if we added it
+                    if !was_bound {
+                        binding.remove(next_var);
+                    }
                 }
-            }
-
-            // Check if variable is already bound (for patterns with duplicate variable names)
-            let was_bound = binding.contains_key(next_var);
-            if let Some(existing_binding) = binding.get(next_var) {
-                // Variable already bound - check if it matches
-                if existing_binding != neighbor_id {
-                    continue;  // Doesn't match, try next neighbor
-                }
-                // Matches! Continue with existing binding (no need to re-bind)
-            } else {
-                // Not bound yet, bind it
-                binding.insert(next_var.clone(), neighbor_id.clone());
-            }
-
-            // Recurse to extend the match
-            Self::extend_pattern_match(
-                graph_nodes,
-                binding,
-                neighbor_id,
-                pattern_nodes,
-                pattern_edges,
-                edge_index + 1,
-                results
-            );
-
-            // Backtrack: remove binding only if we added it
-            if !was_bound {
-                binding.remove(next_var);
             }
         }
     }
