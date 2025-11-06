@@ -1,5 +1,5 @@
 use graphoid::execution::Executor;
-use graphoid::values::{Value, ValueKind};
+use graphoid::values::ValueKind;
 
 #[test]
 fn test_import_json_module() {

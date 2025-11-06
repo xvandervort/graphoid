@@ -225,7 +225,7 @@ fn test_tree_has_tree_ruleset_applied() {
     use graphoid::execution::Executor;
     use graphoid::lexer::Lexer;
     use graphoid::parser::Parser;
-    use graphoid::values::{Value, ValueKind};
+    use graphoid::values::ValueKind;
 
     let source = "t = tree {}";
 
@@ -259,7 +259,7 @@ fn test_graph_index_access() {
     use graphoid::execution::Executor;
     use graphoid::lexer::Lexer;
     use graphoid::parser::Parser;
-    use graphoid::values::{Value, ValueKind};
+    use graphoid::values::Value;
 
     let source = r#"
         g = graph {}
@@ -289,7 +289,7 @@ fn test_graph_index_assignment() {
     use graphoid::execution::Executor;
     use graphoid::lexer::Lexer;
     use graphoid::parser::Parser;
-    use graphoid::values::{Value, ValueKind};
+    use graphoid::values::Value;
 
     let source = r#"
         g = graph {}
@@ -319,7 +319,7 @@ fn test_graph_index_consistency_with_hash() {
     use graphoid::execution::Executor;
     use graphoid::lexer::Lexer;
     use graphoid::parser::Parser;
-    use graphoid::values::{Value, ValueKind};
+    use graphoid::values::Value;
 
     let source = r#"
         g = graph {}

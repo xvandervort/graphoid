@@ -1476,8 +1476,28 @@ impl Graph {
             None => return,
         };
 
+        // Choose which edges to follow based on direction
+        let edges_to_follow: Vec<(&String, &EdgeInfo)> = match edge_pattern.direction.as_str() {
+            "incoming" => {
+                // Follow incoming edges (predecessors)
+                current_graph_node.predecessors.iter().collect()
+            },
+            "outgoing" => {
+                // Follow outgoing edges (neighbors)
+                current_graph_node.neighbors.iter().collect()
+            },
+            "both" => {
+                // For bidirectional, we follow outgoing edges but verify reverse exists
+                current_graph_node.neighbors.iter().collect()
+            },
+            _ => {
+                // Default to outgoing for unknown directions
+                current_graph_node.neighbors.iter().collect()
+            }
+        };
+
         // Try each neighbor that matches the pattern
-        for (neighbor_id, edge_info) in &current_graph_node.neighbors {
+        for (neighbor_id, edge_info) in edges_to_follow {
             // Check edge type constraint
             if let Some(ref required_type) = edge_pattern.edge_type {
                 if edge_info.edge_type != *required_type {
@@ -1499,7 +1519,7 @@ impl Graph {
                 continue;
             }
 
-            // Check bidirectional constraint
+            // Check bidirectional constraint (only for "both" direction)
             if edge_pattern.direction == "both" {
                 let has_reverse = graph_nodes.get(neighbor_id)
                     .map_or(false, |n| n.neighbors.contains_key(current_node));
@@ -1508,8 +1528,20 @@ impl Graph {
                 }
             }
 
-            // Bind and recurse
-            binding.insert(next_var.clone(), neighbor_id.clone());
+            // Check if variable is already bound (for patterns with duplicate variable names)
+            let was_bound = binding.contains_key(next_var);
+            if let Some(existing_binding) = binding.get(next_var) {
+                // Variable already bound - check if it matches
+                if existing_binding != neighbor_id {
+                    continue;  // Doesn't match, try next neighbor
+                }
+                // Matches! Continue with existing binding (no need to re-bind)
+            } else {
+                // Not bound yet, bind it
+                binding.insert(next_var.clone(), neighbor_id.clone());
+            }
+
+            // Recurse to extend the match
             Self::extend_pattern_match(
                 graph_nodes,
                 binding,
@@ -1519,7 +1551,11 @@ impl Graph {
                 edge_index + 1,
                 results
             );
-            binding.remove(next_var); // Backtrack
+
+            // Backtrack: remove binding only if we added it
+            if !was_bound {
+                binding.remove(next_var);
+            }
         }
     }
 

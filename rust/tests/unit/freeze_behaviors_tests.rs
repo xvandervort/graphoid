@@ -11,7 +11,6 @@
 
 use graphoid::values::{Value, List, Hash};
 use graphoid::graph::{RuleSpec, RuleInstance};
-use graphoid::error::GraphoidError;
 
 // ============================================================================
 // Basic Freeze/Unfreeze Tests (4 tests)
@@ -209,7 +208,7 @@ fn test_shallow_freeze_prevents_modification() {
 
 #[test]
 fn test_hash_can_be_frozen() {
-    let mut hash = Hash::new();
+    let hash = Hash::new();
     // Note: Hash doesn't have set() method yet, skip setting value for now
 
     let mut value = Value::map(hash);
