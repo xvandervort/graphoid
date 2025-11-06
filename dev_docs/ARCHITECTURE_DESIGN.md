@@ -349,7 +349,7 @@ impl ControlLayer {
 User-defined rules are functions written in Graphoid:
 
 ```glang
-func validate_employee_graph(graph) {
+fn validate_employee_graph(graph) {
     if graph.nodes.size() > 100 {
         return false
     }

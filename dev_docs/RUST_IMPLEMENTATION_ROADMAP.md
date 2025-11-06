@@ -809,10 +809,10 @@ fn test_strings() {
 
 #[test]
 fn test_identifiers_and_keywords() {
-    let mut lexer = Lexer::new("func if else while name");
+    let mut lexer = Lexer::new("fn if else while name");
     let tokens = lexer.tokenize().unwrap();
 
-    assert_eq!(tokens[0].token_type, TokenType::Func);
+    assert_eq!(tokens[0].token_type, TokenType::Fn);
     assert_eq!(tokens[1].token_type, TokenType::If);
     assert_eq!(tokens[2].token_type, TokenType::Else);
     assert_eq!(tokens[3].token_type, TokenType::While);
@@ -1283,7 +1283,7 @@ fn test_parse_variable_declaration() {
 #[test]
 fn test_parse_function() {
     let source = r#"
-    func add(x, y) {
+    fn add(x, y) {
         return x + y
     }
     "#;

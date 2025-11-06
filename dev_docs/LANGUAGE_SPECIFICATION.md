@@ -617,7 +617,7 @@ bob_friends = g.match(
 **Programmatic Pattern Construction:**
 ```Graphoid
 # Build patterns conditionally
-func build_social_pattern(include_type_filter) {
+fn build_social_pattern(include_type_filter) {
     base = node("person")
     edge_part = edge(type: "FRIEND")
     target = include_type_filter ? node("friend", type: "User") : node("friend")
@@ -633,7 +633,7 @@ results = g.match(...pattern_parts)  # Spread array
 **Pattern Templates:**
 ```Graphoid
 # Define reusable pattern templates
-func connection_pattern(edge_type, node_type) {
+fn connection_pattern(edge_type, node_type) {
     return [
         node(type: node_type),
         edge(type: edge_type),
@@ -673,7 +673,7 @@ print(influencer_path.max)        # 3
 **Pattern Validation:**
 ```Graphoid
 # Validate patterns before using
-func validate_pattern(pattern_obj) {
+fn validate_pattern(pattern_obj) {
     if pattern_obj.type == "node" {
         return pattern_obj.variable != none
     } else if pattern_obj.type == "edge" {

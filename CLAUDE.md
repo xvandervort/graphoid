@@ -277,7 +277,7 @@ describe "Calculator" {
 
     context "when dividing by zero" {
         it "raises an error" {
-            expect(func() {
+            expect(fn() {
                 calculator.divide(10, 0)
             }).to_raise("RuntimeError")
         }
@@ -398,7 +398,7 @@ my_tree.add_rule("single_root")
 my_tree.add_rule("max_children_2")  # Binary tree
 
 # User-defined rules
-func validate_positive_values(graph) {
+fn validate_positive_values(graph) {
     for node in graph.nodes() {
         if node.value() < 0 {
             return false

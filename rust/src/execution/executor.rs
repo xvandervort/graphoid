@@ -110,12 +110,38 @@ impl Executor {
     /// Convert a symbol name to a RuleSpec
     fn symbol_to_rule_spec(symbol: &str, param: Option<f64>) -> Result<RuleSpec> {
         match (symbol, param) {
+            // ================================================================
+            // Validation Rules (Structural constraints)
+            // ================================================================
             ("no_cycles", None) => Ok(RuleSpec::NoCycles),
             ("single_root", None) => Ok(RuleSpec::SingleRoot),
             ("connected", None) => Ok(RuleSpec::Connected),
             ("binary_tree", None) => Ok(RuleSpec::BinaryTree),
             ("no_dups" | "no_duplicates", None) => Ok(RuleSpec::NoDuplicates),
             ("max_degree", Some(n)) => Ok(RuleSpec::MaxDegree(n as usize)),
+            ("weighted_edges", None) => Ok(RuleSpec::WeightedEdges),
+            ("unweighted_edges", None) => Ok(RuleSpec::UnweightedEdges),
+
+            // ================================================================
+            // Transformation Rules (Value transformations)
+            // ================================================================
+            ("none_to_zero", None) => Ok(RuleSpec::NoneToZero),
+            ("none_to_empty", None) => Ok(RuleSpec::NoneToEmpty),
+            ("positive", None) => Ok(RuleSpec::Positive),
+            ("round_to_int", None) => Ok(RuleSpec::RoundToInt),
+            ("uppercase", None) => Ok(RuleSpec::Uppercase),
+            ("lowercase", None) => Ok(RuleSpec::Lowercase),
+
+            // ================================================================
+            // Freeze Control Rules
+            // ================================================================
+            ("no_frozen", None) => Ok(RuleSpec::NoFrozen),
+            ("copy_elements", None) => Ok(RuleSpec::CopyElements),
+            ("shallow_freeze_only", None) => Ok(RuleSpec::ShallowFreezeOnly),
+
+            // ================================================================
+            // Error handling
+            // ================================================================
             (name, None) => Err(GraphoidError::runtime(format!(
                 "Unknown rule: :{}",
                 name
@@ -1341,10 +1367,10 @@ impl Executor {
     fn eval_list_method(&mut self, list: &List, method: &str, args: &[Value]) -> Result<Value> {
         let elements = list.to_vec();
         match method {
-            "size" | "length" => {
+            "size" | "length" | "len" => {
                 if !args.is_empty() {
                     return Err(GraphoidError::runtime(format!(
-                        "Method 'size'/'length' expects 0 arguments, but got {}",
+                        "Method 'size'/'length'/'len' expects 0 arguments, but got {}",
                         args.len()
                     )));
                 }
@@ -1581,11 +1607,11 @@ impl Executor {
                 Ok(Value::list(List::from_vec(slice)))
             }
             "add_rule" => {
-                // add_rule(rule_symbol) or add_rule(rule_symbol, param)
+                // add_rule(rule_symbol) or add_rule(rule_symbol, param) or add_rule(rule_symbol, param1, param2)
                 // Handles BOTH validation rules AND transformation rules (behaviors)
-                if args.is_empty() || args.len() > 2 {
+                if args.is_empty() || args.len() > 3 {
                     return Err(GraphoidError::runtime(format!(
-                        "add_rule() expects 1 or 2 arguments, but got {}",
+                        "add_rule() expects 1-3 arguments, but got {}",
                         args.len()
                     )));
                 }
@@ -1604,26 +1630,54 @@ impl Executor {
                 // Clone list
                 let mut new_list = list.clone();
 
-                // Try to parse rule from symbol (handles both validation and transformation rules)
-                // Get optional parameter
-                let param = if args.len() == 2 {
-                    match &args[1].kind {
-                        ValueKind::Number(n) => Some(*n),
+                // Handle validate_range specially (needs 2 params: min, max)
+                let rule_spec = if rule_symbol == "validate_range" {
+                    if args.len() != 3 {
+                        return Err(GraphoidError::runtime(format!(
+                            "validate_range requires 2 arguments (min, max), but got {}",
+                            args.len() - 1
+                        )));
+                    }
+                    let min = match &args[1].kind {
+                        ValueKind::Number(n) => *n,
                         _other => {
                             return Err(GraphoidError::runtime(format!(
-                                "add_rule() parameter must be a number, got {}",
+                                "validate_range min must be a number, got {}",
                                 args[1].type_name()
                             )));
                         }
-                    }
+                    };
+                    let max = match &args[2].kind {
+                        ValueKind::Number(n) => *n,
+                        _other => {
+                            return Err(GraphoidError::runtime(format!(
+                                "validate_range max must be a number, got {}",
+                                args[2].type_name()
+                            )));
+                        }
+                    };
+                    RuleSpec::ValidateRange { min, max }
                 } else {
-                    None
+                    // For all other rules, get optional single parameter
+                    let param = if args.len() >= 2 {
+                        match &args[1].kind {
+                            ValueKind::Number(n) => Some(*n),
+                            _other => {
+                                return Err(GraphoidError::runtime(format!(
+                                    "add_rule() parameter must be a number, got {}",
+                                    args[1].type_name()
+                                )));
+                            }
+                        }
+                    } else {
+                        None
+                    };
+
+                    // Convert symbol to RuleSpec
+                    Self::symbol_to_rule_spec(rule_symbol, param)?
                 };
 
-                // Convert to RuleSpec
-                let rule_spec = Self::symbol_to_rule_spec(rule_symbol, param)?;
-
-                // Add validation rule, return
+                // Add rule and return new list
                 new_list.add_rule(RuleInstance::new(rule_spec))?;
                 Ok(Value::list(new_list))
             }
@@ -1998,21 +2052,30 @@ impl Executor {
                 };
                 Ok(Value::boolean(hash.contains_key(key)))
             }
-            "size" => {
+            "size" | "len" | "length" => {
                 // Return number of entries
                 if !args.is_empty() {
                     return Err(GraphoidError::runtime(
-                        "size() takes no arguments".to_string()
+                        "size()/len()/length() takes no arguments".to_string()
                     ));
                 }
                 Ok(Value::number(hash.len() as f64))
             }
+            "is_empty" => {
+                // Check if map is empty
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "is_empty() takes no arguments".to_string()
+                    ));
+                }
+                Ok(Value::boolean(hash.is_empty()))
+            }
             "add_rule" => {
-                // add_rule(rule_symbol) or add_rule(rule_symbol, param)
+                // add_rule(rule_symbol) or add_rule(rule_symbol, param) or add_rule(rule_symbol, param1, param2)
                 // Handles BOTH validation rules AND transformation rules (behaviors)
-                if args.is_empty() || args.len() > 2 {
+                if args.is_empty() || args.len() > 3 {
                     return Err(GraphoidError::runtime(format!(
-                        "add_rule() expects 1 or 2 arguments, but got {}",
+                        "add_rule() expects 1-3 arguments, but got {}",
                         args.len()
                     )));
                 }
@@ -2031,26 +2094,54 @@ impl Executor {
                 // Clone hash
                 let mut new_hash = hash.clone();
 
-                // Try to parse rule from symbol (handles both validation and transformation rules)
-                // Get optional parameter
-                let param = if args.len() == 2 {
-                    match &args[1].kind {
-                        ValueKind::Number(n) => Some(*n),
+                // Handle validate_range specially (needs 2 params: min, max)
+                let rule_spec = if rule_symbol == "validate_range" {
+                    if args.len() != 3 {
+                        return Err(GraphoidError::runtime(format!(
+                            "validate_range requires 2 arguments (min, max), but got {}",
+                            args.len() - 1
+                        )));
+                    }
+                    let min = match &args[1].kind {
+                        ValueKind::Number(n) => *n,
                         _other => {
                             return Err(GraphoidError::runtime(format!(
-                                "add_rule() parameter must be a number, got {}",
+                                "validate_range min must be a number, got {}",
                                 args[1].type_name()
                             )));
                         }
-                    }
+                    };
+                    let max = match &args[2].kind {
+                        ValueKind::Number(n) => *n,
+                        _other => {
+                            return Err(GraphoidError::runtime(format!(
+                                "validate_range max must be a number, got {}",
+                                args[2].type_name()
+                            )));
+                        }
+                    };
+                    RuleSpec::ValidateRange { min, max }
                 } else {
-                    None
+                    // For all other rules, get optional single parameter
+                    let param = if args.len() >= 2 {
+                        match &args[1].kind {
+                            ValueKind::Number(n) => Some(*n),
+                            _other => {
+                                return Err(GraphoidError::runtime(format!(
+                                    "add_rule() parameter must be a number, got {}",
+                                    args[1].type_name()
+                                )));
+                            }
+                        }
+                    } else {
+                        None
+                    };
+
+                    // Convert symbol to RuleSpec
+                    Self::symbol_to_rule_spec(rule_symbol, param)?
                 };
 
-                // Convert to RuleSpec
-                let rule_spec = Self::symbol_to_rule_spec(rule_symbol, param)?;
-
-                // Add validation rule, return
+                // Add rule and return new hash
                 new_hash.add_rule(RuleInstance::new(rule_spec))?;
                 Ok(Value::map(new_hash))
             }
@@ -2097,6 +2188,29 @@ impl Executor {
                 new_hash.remove_rule(&rule_spec);
                 Ok(Value::map(new_hash))
             }
+            "remove" => {
+                // remove(key) - returns new hash without the specified key
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "remove() expects 1 argument (key), but got {}",
+                        args.len()
+                    )));
+                }
+                let key = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "remove() requires a string key, got {}",
+                            args[0].type_name()
+                        )));
+                    }
+                };
+
+                // Clone hash and remove key
+                let mut new_hash = hash.clone();
+                let _ = new_hash.remove(&key);  // Ignore result - Ok if key doesn't exist
+                Ok(Value::map(new_hash))
+            }
             _ => {
                 // Check if this is property-style access (no arguments, method name matches a key)
                 if args.is_empty() {
@@ -2116,7 +2230,7 @@ impl Executor {
     /// Evaluates a method call on a string.
     fn eval_string_method(&self, s: &str, method: &str, args: &[Value]) -> Result<Value> {
         match method {
-            "length" | "size" => {
+            "length" | "size" | "len" => {
                 if !args.is_empty() {
                     return Err(GraphoidError::runtime(format!(
                         "String method '{}' takes no arguments, but got {}",
@@ -2259,6 +2373,47 @@ impl Executor {
                 };
 
                 Ok(Value::boolean(s.contains(substring.as_str())))
+            }
+            "replace" => {
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'replace' expects 2 arguments (old, new), but got {}",
+                        args.len()
+                    )));
+                }
+                let old = match &args[0].kind {
+                    ValueKind::String(o) => o,
+                    _other => {
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
+                    }
+                };
+                let new = match &args[1].kind {
+                    ValueKind::String(n) => n,
+                    _other => {
+                        return Err(GraphoidError::type_error("string", args[1].type_name()));
+                    }
+                };
+
+                Ok(Value::string(s.replace(old.as_str(), new.as_str())))
+            }
+            "index_of" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'index_of' expects 1 argument (substring), but got {}",
+                        args.len()
+                    )));
+                }
+                let substring = match &args[0].kind {
+                    ValueKind::String(sub) => sub,
+                    _other => {
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
+                    }
+                };
+
+                match s.find(substring.as_str()) {
+                    Some(index) => Ok(Value::number(index as f64)),
+                    None => Ok(Value::number(-1.0)),
+                }
             }
             _ => Err(GraphoidError::runtime(format!(
                 "String does not have method '{}'",

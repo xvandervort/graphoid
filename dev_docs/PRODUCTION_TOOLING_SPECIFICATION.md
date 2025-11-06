@@ -553,7 +553,7 @@ property.test("reversing twice gives original", func() {
 ```glang
 # Set breakpoint with debug.break()
 
-func fibonacci(n) {
+fn fibonacci(n) {
     if n <= 1 {
         return n
     }
@@ -567,7 +567,7 @@ func fibonacci(n) {
 #### Conditional Breakpoints
 
 ```glang
-func process_items(items) {
+fn process_items(items) {
     for item in items {
         # Only break when condition is true
         debug.break_if(item.value < 0, "Negative value found")
@@ -1072,12 +1072,12 @@ import "io"
 import "json"
 
 # Generate code
-func generate_bindings() {
+fn generate_bindings() {
     config = json.parse(io.read_file("config.json"))
 
     code = "// Auto-generated bindings\n"
     for item in config.items {
-        code = code + "func " + item.name + "() { ... }\n"
+        code = code + "fn " + item.name + "() { ... }\n"
     }
 
     io.write_file("src/generated.gr", code)
@@ -1122,12 +1122,12 @@ graphoid install ./mypackage/
 # Tests can be written inline for quick validation
 
 configure { enable_tests: true } {
-    func add(a, b) {
+    fn add(a, b) {
         return a + b
     }
 
     # Inline test - only runs in test mode
-    test func test_add() {
+    test fn test_add() {
         assert.equal(add(2, 3), 5)
     }
 }
@@ -1139,17 +1139,17 @@ configure { enable_tests: true } {
 # Mark functions for debugging
 
 @debug  # Auto-break on entry
-func problematic_function(data) {
+fn problematic_function(data) {
     # ...
 }
 
 @trace  # Log all calls
-func important_function(x) {
+fn important_function(x) {
     # ...
 }
 
 @profile  # Auto-profile
-func slow_function() {
+fn slow_function() {
     # ...
 }
 ```
