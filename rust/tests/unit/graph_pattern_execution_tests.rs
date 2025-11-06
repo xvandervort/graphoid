@@ -1196,3 +1196,178 @@ fn test_edge_type_filter_with_no_matching_edges() {
     // Should find no matches
     assert_eq!(results.len(), 0);
 }
+
+// ============================================================================
+// Day 4: Where Clause Filtering
+// ============================================================================
+
+#[test]
+fn test_where_filter_numeric_value_greater_than() {
+    // Build graph: Person(Alice, age=25) -> Person(Bob, age=30)
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("Alice".to_string(), Value::number(25.0)).unwrap();
+    graph.add_node("Bob".to_string(), Value::number(30.0)).unwrap();
+    graph.add_node("Charlie".to_string(), Value::number(17.0)).unwrap();
+    graph.add_edge("Alice", "Bob", "KNOWS".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("Alice", "Charlie", "KNOWS".to_string(), None, HashMap::new()).unwrap();
+
+    // Pattern: find all KNOWS relationships
+    let pattern_args = vec![
+        create_pattern_node("person", None),
+        create_pattern_edge(Some("KNOWS"), None),
+        create_pattern_node("friend", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Filter: friend.value > 18 (only Bob passes, Charlie doesn't)
+    let filtered = results.where_node_value("friend", |value| {
+        if let Some(n) = value.to_number() {
+            n > 18.0
+        } else {
+            false
+        }
+    }).unwrap();
+
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered.get(0).unwrap().get("person").unwrap(), "Alice");
+    assert_eq!(filtered.get(0).unwrap().get("friend").unwrap(), "Bob");
+}
+
+#[test]
+fn test_where_filter_multiple_nodes() {
+    // Build graph with ages
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("Alice".to_string(), Value::number(25.0)).unwrap();
+    graph.add_node("Bob".to_string(), Value::number(30.0)).unwrap();
+    graph.add_node("Charlie".to_string(), Value::number(15.0)).unwrap();
+    graph.add_edge("Alice", "Bob", "KNOWS".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("Charlie", "Bob", "KNOWS".to_string(), None, HashMap::new()).unwrap();
+
+    let pattern_args = vec![
+        create_pattern_node("a", None),
+        create_pattern_edge(Some("KNOWS"), None),
+        create_pattern_node("b", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Filter: both a and b must be > 18
+    let filtered = results.where_both_nodes("a", "b", |a_val, b_val| {
+        let a_num = a_val.to_number().unwrap_or(0.0);
+        let b_num = b_val.to_number().unwrap_or(0.0);
+        a_num > 18.0 && b_num > 18.0
+    }).unwrap();
+
+    // Only Alice-Bob should pass (Charlie is 15)
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered.get(0).unwrap().get("a").unwrap(), "Alice");
+    assert_eq!(filtered.get(0).unwrap().get("b").unwrap(), "Bob");
+}
+
+#[test]
+fn test_where_filter_all_pass() {
+    // All matches pass the filter
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("A".to_string(), Value::number(100.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(200.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(300.0)).unwrap();
+    graph.add_edge("A", "B", "LINK".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("B", "C", "LINK".to_string(), None, HashMap::new()).unwrap();
+
+    let pattern_args = vec![
+        create_pattern_node("x", None),
+        create_pattern_edge(None, None),
+        create_pattern_node("y", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Filter: all values > 50 (all should pass)
+    let filtered = results.where_node_value("x", |value| {
+        value.to_number().unwrap_or(0.0) > 50.0
+    }).unwrap();
+
+    assert_eq!(filtered.len(), 2); // A->B and B->C
+}
+
+#[test]
+fn test_where_filter_none_pass() {
+    // No matches pass the filter
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("A".to_string(), Value::number(10.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(20.0)).unwrap();
+    graph.add_edge("A", "B", "LINK".to_string(), None, HashMap::new()).unwrap();
+
+    let pattern_args = vec![
+        create_pattern_node("x", None),
+        create_pattern_edge(None, None),
+        create_pattern_node("y", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Filter: value > 100 (none pass)
+    let filtered = results.where_node_value("x", |value| {
+        value.to_number().unwrap_or(0.0) > 100.0
+    }).unwrap();
+
+    assert_eq!(filtered.len(), 0);
+}
+
+// TODO: Implement test_where_filter_with_properties once set_node_properties is available
+// #[test]
+// fn test_where_filter_with_properties() { ... }
+
+#[test]
+fn test_where_filter_chaining() {
+    // Test chaining multiple filters
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("A".to_string(), Value::number(100.0)).unwrap();
+    graph.add_node("B".to_string(), Value::number(200.0)).unwrap();
+    graph.add_node("C".to_string(), Value::number(50.0)).unwrap();
+    graph.add_edge("A", "B", "LINK".to_string(), None, HashMap::new()).unwrap();
+    graph.add_edge("A", "C", "LINK".to_string(), None, HashMap::new()).unwrap();
+
+    let pattern_args = vec![
+        create_pattern_node("x", None),
+        create_pattern_edge(None, None),
+        create_pattern_node("y", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+
+    // Chain filters: x > 50 AND y > 100
+    let filtered = results
+        .where_node_value("x", |v| v.to_number().unwrap_or(0.0) > 50.0).unwrap()
+        .where_node_value("y", |v| v.to_number().unwrap_or(0.0) > 100.0).unwrap();
+
+    // Only A->B should pass (A->C fails because C is 50)
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered.get(0).unwrap().get("x").unwrap(), "A");
+    assert_eq!(filtered.get(0).unwrap().get("y").unwrap(), "B");
+}
+
+#[test]
+fn test_where_filter_empty_results() {
+    // Filter on empty match results
+    let mut graph = Graph::new(GraphType::Directed);
+    graph.add_node("A".to_string(), Value::number(1.0)).unwrap();
+    // No edges
+
+    let pattern_args = vec![
+        create_pattern_node("x", None),
+        create_pattern_edge(None, None),
+        create_pattern_node("y", None),
+    ];
+
+    let results = graph.match_pattern(pattern_args).unwrap();
+    assert_eq!(results.len(), 0);
+
+    // Filter on empty results should return empty
+    let filtered = results.where_node_value("x", |v| {
+        v.to_number().unwrap_or(0.0) > 0.0
+    }).unwrap();
+
+    assert_eq!(filtered.len(), 0);
+}

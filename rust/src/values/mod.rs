@@ -16,6 +16,8 @@ pub use list::List;
 pub use hash::Hash;
 // Tree type removed - use graph{}.with_ruleset(:tree) instead
 
+// Pattern matching types are defined below in this module and automatically exported
+
 /// An error object with type, message, source location, stack trace, and optional cause.
 #[derive(Debug, Clone)]
 pub struct ErrorObject {
@@ -241,6 +243,125 @@ pub struct PatternPath {
     pub max: usize,
     /// Path direction: :outgoing, :incoming, or :both
     pub direction: String, // Symbol as string
+}
+
+/// Pattern match results wrapper that provides filtering and projection methods
+#[derive(Debug, Clone)]
+pub struct PatternMatchResults {
+    /// List of variable bindings (variable_name -> node_id)
+    bindings: Vec<std::collections::HashMap<String, String>>,
+    /// Reference to the source graph (needed for filtering)
+    graph: Graph,
+}
+
+impl PatternMatchResults {
+    /// Create new pattern match results
+    pub fn new(bindings: Vec<std::collections::HashMap<String, String>>, graph: Graph) -> Self {
+        PatternMatchResults { bindings, graph }
+    }
+
+    /// Get the number of matches
+    pub fn len(&self) -> usize {
+        self.bindings.len()
+    }
+
+    /// Check if results are empty
+    pub fn is_empty(&self) -> bool {
+        self.bindings.is_empty()
+    }
+
+    /// Get a specific match by index
+    pub fn get(&self, index: usize) -> Option<&std::collections::HashMap<String, String>> {
+        self.bindings.get(index)
+    }
+
+    /// Iterate over the bindings
+    pub fn iter(&self) -> std::slice::Iter<'_, std::collections::HashMap<String, String>> {
+        self.bindings.iter()
+    }
+
+    /// Filter results based on a node's value
+    pub fn where_node_value<F>(&self, variable: &str, predicate: F) -> Result<Self, crate::error::GraphoidError>
+    where
+        F: Fn(&Value) -> bool,
+    {
+        let filtered: Vec<std::collections::HashMap<String, String>> = self.bindings
+            .iter()
+            .filter(|binding| {
+                if let Some(node_id) = binding.get(variable) {
+                    if let Some(node) = self.graph.nodes.get(node_id) {
+                        return predicate(&node.value);
+                    }
+                }
+                false
+            })
+            .cloned()
+            .collect();
+
+        Ok(PatternMatchResults::new(filtered, self.graph.clone()))
+    }
+
+    /// Filter results based on two nodes' values
+    pub fn where_both_nodes<F>(&self, var1: &str, var2: &str, predicate: F) -> Result<Self, crate::error::GraphoidError>
+    where
+        F: Fn(&Value, &Value) -> bool,
+    {
+        let filtered: Vec<std::collections::HashMap<String, String>> = self.bindings
+            .iter()
+            .filter(|binding| {
+                if let (Some(node_id1), Some(node_id2)) = (binding.get(var1), binding.get(var2)) {
+                    if let (Some(node1), Some(node2)) = (self.graph.nodes.get(node_id1), self.graph.nodes.get(node_id2)) {
+                        return predicate(&node1.value, &node2.value);
+                    }
+                }
+                false
+            })
+            .cloned()
+            .collect();
+
+        Ok(PatternMatchResults::new(filtered, self.graph.clone()))
+    }
+
+    /// Filter results based on a node's property value
+    pub fn where_node_property<F>(&self, variable: &str, property: &str, predicate: F) -> Result<Self, crate::error::GraphoidError>
+    where
+        F: Fn(Option<&Value>) -> bool,
+    {
+        let filtered: Vec<std::collections::HashMap<String, String>> = self.bindings
+            .iter()
+            .filter(|binding| {
+                if let Some(node_id) = binding.get(variable) {
+                    if let Some(node) = self.graph.nodes.get(node_id) {
+                        let prop_value = node.properties.get(property);
+                        return predicate(prop_value);
+                    }
+                }
+                false
+            })
+            .cloned()
+            .collect();
+
+        Ok(PatternMatchResults::new(filtered, self.graph.clone()))
+    }
+}
+
+// Implement Index trait for array-like access
+impl std::ops::Index<usize> for PatternMatchResults {
+    type Output = std::collections::HashMap<String, String>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.bindings[index]
+    }
+}
+
+// Implement IntoIterator for &PatternMatchResults to support for loops
+impl<'a> IntoIterator for &'a PatternMatchResults {
+    type Item = &'a std::collections::HashMap<String, String>;
+    type IntoIter = std::slice::Iter<'a, std::collections::HashMap<String, String>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.bindings.iter()
+    }
 }
 
 /// The actual data/kind of a value

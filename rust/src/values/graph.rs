@@ -1384,7 +1384,7 @@ impl Graph {
     /// For example: [node("a"), edge(), node("b")] matches a simple two-node pattern.
     ///
     /// Returns a list of binding maps where keys are variable names and values are node IDs.
-    pub fn match_pattern(&self, pattern_args: Vec<Value>) -> Result<Vec<HashMap<String, String>>, GraphoidError> {
+    pub fn match_pattern(&self, pattern_args: Vec<Value>) -> Result<crate::values::PatternMatchResults, GraphoidError> {
         // Parse pattern arguments into nodes and edges
         let (pattern_nodes, pattern_edges) = {
             let mut nodes = Vec::new();
@@ -1403,7 +1403,7 @@ impl Graph {
 
         // Handle empty pattern
         if pattern_nodes.is_empty() {
-            return Ok(Vec::new());
+            return Ok(crate::values::PatternMatchResults::new(Vec::new(), self.clone()));
         }
 
         let mut results = Vec::new();
@@ -1444,7 +1444,7 @@ impl Graph {
             );
         }
 
-        Ok(results)
+        Ok(crate::values::PatternMatchResults::new(results, self.clone()))
     }
 
     /// Extend a partial match by following edges (unified recursive algorithm).
