@@ -1,0 +1,56 @@
+# Collections Demo - Lists, Maps, and Collection Methods
+
+print("=== Lists ===")
+numbers = [1, 2, 3, 4, 5]
+print("Numbers:", numbers)
+print("First:", numbers.first())
+print("Last:", numbers.last())
+print("Length:", numbers.len())
+
+# Functional operations
+doubled = numbers.map(x => x * 2)
+print("Doubled:", doubled)
+
+evens = numbers.filter(x => x % 2 == 0)
+print("Even numbers:", evens)
+
+odds = numbers.reject(x => x % 2 == 0)
+print("Odd numbers:", odds)
+
+# Immutable operations
+with_99 = numbers.insert(2, 99)
+print("Original:", numbers)
+print("After insert(2, 99):", with_99)
+
+without_3 = numbers.remove(3)
+print("After remove(3):", without_3)
+
+print("\n=== Maps ===")
+person = {
+    "name": "Alice",
+    "age": 30,
+    "city": "Portland"
+}
+print("Person:", person)
+print("Name:", person["name"])
+print("Keys:", person.keys())
+print("Values:", person.values())
+print("Has 'age'?", person.has_key("age"))
+print("Size:", person.size())
+print("Empty?", person.is_empty())
+
+# Immutable remove
+smaller = person.remove("city")
+print("Original person:", person)
+print("Without city:", smaller)
+
+print("\n=== List Transformations ===")
+items = [1, 2, 3, 4, 5]
+sorted = items.reverse()
+print("Reversed:", sorted)
+
+unique = [1, 2, 2, 3, 3, 3, 4].uniq()
+print("Unique values:", unique)
+
+clean = [1, none, 2, none, 3].compact()
+print("Without none:", clean)

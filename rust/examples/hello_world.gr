@@ -1,0 +1,19 @@
+# Hello World - Your first Graphoid program
+
+print("Hello, World!")
+print("Welcome to Graphoid!")
+
+# Variables
+name = "Alice"
+age = 25
+print(name, "is", age, "years old")
+
+# Math
+result = 10 + 5 * 2
+print("10 + 5 * 2 =", result)
+
+# String operations
+greeting = "hello graphoid"
+print("Uppercase:", greeting.upper())
+print("Length:", greeting.len())
+print("Replaced:", greeting.replace("graphoid", "world"))

@@ -1,0 +1,139 @@
+# Property Projection and Filtering
+# Demonstrates working with node properties in pattern matching
+
+# NOTE: Property support requires the full parser/executor integration
+# This example shows the intended API for property-based queries
+
+# Create a knowledge graph with typed nodes and properties
+g = graph{type: :directed}
+
+# Add Person nodes with properties
+g.add_node("alice", {
+    type: "Person",
+    name: "Alice Smith",
+    age: 30,
+    city: "New York",
+    occupation: "Engineer"
+})
+
+g.add_node("bob", {
+    type: "Person",
+    name: "Bob Jones",
+    age: 25,
+    city: "San Francisco",
+    occupation: "Designer"
+})
+
+g.add_node("charlie", {
+    type: "Person",
+    name: "Charlie Brown",
+    age: 35,
+    city: "New York",
+    occupation: "Manager"
+})
+
+g.add_node("diana", {
+    type: "Person",
+    name: "Diana Prince",
+    age: 28,
+    city: "Boston",
+    occupation: "Engineer"
+})
+
+# Add relationships
+g.add_edge("alice", "bob", "COLLEAGUE")
+g.add_edge("alice", "charlie", "REPORTS_TO")
+g.add_edge("bob", "diana", "FRIEND")
+g.add_edge("charlie", "diana", "COLLEAGUE")
+
+print("=== Property-Based Pattern Matching ===\n")
+
+# Example 1: Find all colleague relationships
+print("All COLLEAGUE relationships:")
+colleagues = g.match(
+    node("person1"),
+    edge(type: "COLLEAGUE"),
+    node("person2")
+)
+print("Found", colleagues.len(), "colleague pairs")
+
+# Example 2: Extract names only (property projection)
+print("\nExtracting names:")
+names = colleagues.return_properties([
+    "person1.name",
+    "person2.name"
+])
+print("Extracted", names.len(), "name pairs")
+# Output would be: [{"person1.name": "Alice Smith", "person2.name": "Bob Jones"}, ...]
+
+# Example 3: Extract multiple properties
+print("\nExtracting multiple properties:")
+details = colleagues.return_properties([
+    "person1.name",
+    "person1.occupation",
+    "person2.name",
+    "person2.occupation"
+])
+print("Extracted detailed info for", details.len(), "pairs")
+
+# Example 4: Find FRIEND relationships with ages
+print("\nFRIEND relationships with ages:")
+friends = g.match(
+    node("user1"),
+    edge(type: "FRIEND"),
+    node("user2")
+)
+ages = friends.return_properties(["user1.age", "user2.age"])
+print("Friend ages:", ages.len(), "pairs")
+
+# Example 5: Project only person1 info
+print("\nProjecting only person1:")
+person1_only = colleagues.return_vars(["person1"])
+print("Person1 bindings:", person1_only.len())
+
+# Example 6: Find reporting relationships
+print("\nREPORTS_TO relationships:")
+reports = g.match(
+    node("employee"),
+    edge(type: "REPORTS_TO"),
+    node("manager")
+)
+hierarchy = reports.return_properties([
+    "employee.name",
+    "employee.occupation",
+    "manager.name"
+])
+print("Org hierarchy:", hierarchy.len(), "relationships")
+
+# Example 7: Mixed variable and property projection
+print("\nMixed projection:")
+# Get the node IDs and specific properties
+mixed = colleagues.return_vars(["person1", "person2"])
+print("Node bindings:", mixed.len())
+
+# Then extract properties separately if needed
+props = colleagues.return_properties([
+    "person1.city",
+    "person2.city"
+])
+print("City pairs:", props.len())
+
+# Example 8: All connections in the graph
+print("\nAll connections (any edge type):")
+all_connections = g.match(
+    node("from"),
+    edge(),  # Any edge type
+    node("to")
+)
+all_details = all_connections.return_properties([
+    "from.name",
+    "from.city",
+    "to.name",
+    "to.city"
+])
+print("Total connections:", all_details.len())
+
+print("\n=== Property projection demo complete ===")
+print("\nNote: Property filtering with where clauses:")
+print("  results.where_node_property('person', 'age', lambda age: age > 25)")
+print("  results.where_both_nodes('p1', 'p2', lambda v1, v2: v1.city == v2.city)")

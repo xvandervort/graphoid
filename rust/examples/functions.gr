@@ -1,0 +1,97 @@
+# Functions and Control Flow Demo
+
+print("=== Functions ===")
+
+# Define a simple function
+func greet(name) {
+    print("Hello,", name)
+}
+
+greet("Alice")
+greet("Bob")
+
+# Function with return value
+func add(a, b) {
+    return a + b
+}
+
+result = add(5, 3)
+print("5 + 3 =", result)
+
+# Function with multiple statements
+func calculate_circle(radius) {
+    area = 3.14159 * radius * radius
+    circumference = 2 * 3.14159 * radius
+    return {"area": area, "circumference": circumference}
+}
+
+circle = calculate_circle(5)
+print("Circle with radius 5:")
+print("  Area:", circle["area"])
+print("  Circumference:", circle["circumference"])
+
+print("\n=== Lambdas ===")
+
+# Anonymous functions
+square = x => x * x
+print("square(7) =", square(7))
+
+# Lambdas with multiple parameters
+multiply = (a, b) => a * b
+print("multiply(4, 5) =", multiply(4, 5))
+
+# Lambdas with collections
+numbers = [1, 2, 3, 4, 5]
+squares = numbers.map(x => x * x)
+print("Squares:", squares)
+
+print("\n=== Conditionals ===")
+
+# if-else
+age = 25
+if age >= 18 {
+    print("Adult")
+} else {
+    print("Minor")
+}
+
+# Inline conditionals
+status = if age >= 21 { "Can drink" } else { "Cannot drink" }
+print("Status:", status)
+
+# unless (inverse of if)
+score = 85
+unless score < 60 {
+    print("Passing grade!")
+}
+
+print("\n=== Loops ===")
+
+# for loop
+print("Counting:")
+for i in [1, 2, 3, 4, 5] {
+    print("  ", i)
+}
+
+# while loop
+print("Countdown:")
+count = 5
+while count > 0 {
+    print("  ", count)
+    count = count - 1
+}
+print("  Liftoff!")
+
+print("\n=== Pattern Matching (Pipe Syntax) ===")
+
+# Define functions for different cases
+func process_number(n) {
+    n | x => x * 2
+}
+
+func process_string(s) {
+    s | str => str.upper()
+}
+
+print("Process 5:", process_number(5))
+print("Process 'hello':", process_string("hello"))

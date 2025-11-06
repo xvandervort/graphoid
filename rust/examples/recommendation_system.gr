@@ -1,0 +1,86 @@
+# Friend Recommendation System
+# Demonstrates advanced pattern matching for recommendation algorithms
+
+# Create social network
+g = graph{type: :directed}
+
+# Add users
+users = ["alice", "bob", "charlie", "diana", "eve", "frank"]
+for i in 0..5 {
+    g.add_node(users[i], i + 1)
+}
+
+# Build friend network
+# Alice's friends: Bob, Charlie
+g.add_edge("alice", "bob", "FRIEND")
+g.add_edge("alice", "charlie", "FRIEND")
+
+# Bob's friends: Alice, Diana, Eve
+g.add_edge("bob", "alice", "FRIEND")
+g.add_edge("bob", "diana", "FRIEND")
+g.add_edge("bob", "eve", "FRIEND")
+
+# Charlie's friends: Alice, Frank
+g.add_edge("charlie", "alice", "FRIEND")
+g.add_edge("charlie", "frank", "FRIEND")
+
+# Diana's friends: Bob
+g.add_edge("diana", "bob", "FRIEND")
+
+# Eve's friends: Bob, Frank
+g.add_edge("eve", "bob", "FRIEND")
+g.add_edge("eve", "frank", "FRIEND")
+
+# Frank's friends: Charlie, Eve
+g.add_edge("frank", "charlie", "FRIEND")
+g.add_edge("frank", "eve", "FRIEND")
+
+print("=== Friend Recommendation System ===\n")
+
+# Strategy 1: Friends-of-Friends (2-hop connections)
+print("Finding friends-of-friends for recommendation...")
+fof_results = g.match(
+    node("user"),
+    edge(type: "FRIEND"),
+    node("friend"),
+    edge(type: "FRIEND"),
+    node("recommendation")
+)
+
+print("Found", fof_results.len(), "potential recommendations (2-hop)")
+
+# Project to get user -> recommendation pairs
+recommendations = fof_results.return_vars(["user", "recommendation"])
+print("Simplified:", recommendations.len(), "user-recommendation pairs")
+
+# Strategy 2: Variable-length paths (1-3 hops)
+# Note: This finds users reachable within 1-3 friend hops
+print("\nFinding users reachable within 3 hops...")
+reachable = g.match(
+    node("start"),
+    path(type: "FRIEND", min: 1, max: 3),
+    node("reachable")
+)
+
+print("Found", reachable.len(), "reachable user pairs")
+
+# Strategy 3: Common friends (implicit)
+# Find users who share mutual friends
+# Pattern: A -> F <- B (where F is a common friend)
+print("\nFinding users with common friends...")
+common_friends = g.match(
+    node("user1"),
+    edge(type: "FRIEND"),
+    node("common"),
+    edge(type: "FRIEND", direction: :incoming),
+    node("user2")
+)
+
+print("Found", common_friends.len(), "pairs with common friends")
+
+# Get unique user pairs
+pairs = common_friends.return_vars(["user1", "user2"])
+print("Unique pairs:", pairs.len())
+
+print("\n=== Recommendation algorithm complete ===")
+print("Next step: Filter out existing friendships and self-connections")

@@ -1,0 +1,67 @@
+# Social Network Pattern Matching Examples
+# Demonstrates basic graph pattern matching with explicit syntax
+
+# Create a social network graph
+g = graph{type: :directed}
+
+# Add users with properties
+g.add_node("alice", 1)
+g.add_node("bob", 2)
+g.add_node("charlie", 3)
+g.add_node("diana", 4)
+
+# Add relationships
+g.add_edge("alice", "bob", "FRIEND")
+g.add_edge("alice", "charlie", "FRIEND")
+g.add_edge("bob", "diana", "FRIEND")
+g.add_edge("charlie", "diana", "FOLLOWS")
+g.add_edge("diana", "alice", "FOLLOWS")
+
+# Example 1: Find all friend relationships
+print("=== All FRIEND relationships ===")
+friends = g.match(
+    node("person"),
+    edge(type: "FRIEND"),
+    node("friend")
+)
+print("Found", friends.len(), "friendships")
+
+# Example 2: Find mutual follows (bidirectional)
+print("\n=== Bidirectional connections ===")
+mutual = g.match(
+    node("user1"),
+    edge(direction: :both),
+    node("user2")
+)
+print("Found", mutual.len(), "bidirectional connections")
+
+# Example 3: Project only specific variables
+print("\n=== Projected results ===")
+projected = friends.return_vars(["person"])
+print("Unique people with friends:", projected.len())
+
+# Example 4: Find FOLLOWS relationships
+print("\n=== FOLLOWS relationships ===")
+follows = g.match(
+    node("follower"),
+    edge(type: "FOLLOWS"),
+    node("followee")
+)
+print("Found", follows.len(), "follow relationships")
+
+# Example 5: Multi-hop pattern (friends of friends)
+print("\n=== Friends of friends ===")
+fof = g.match(
+    node("user"),
+    edge(type: "FRIEND"),
+    node("intermediate"),
+    edge(type: "FRIEND"),
+    node("friend_of_friend")
+)
+print("Found", fof.len(), "2-hop friend connections")
+
+# Example 6: Return only start and end nodes (skip intermediate)
+fof_simplified = fof.return_vars(["user", "friend_of_friend"])
+print("Simplified results:", fof_simplified.len(), "connections")
+
+print("\n=== Pattern matching complete ===")

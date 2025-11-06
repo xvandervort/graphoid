@@ -1,0 +1,62 @@
+# Behavior System Demo - Automatic Value Transformations
+
+print("=== Transformation Behaviors ===")
+
+# none_to_zero - Replace none values with 0
+print("\n1. none_to_zero")
+temperatures = [98.6, none, 102.5, none, 99.1]
+print("Original:", temperatures)
+clean_temps = temperatures.add_rule(:none_to_zero)
+print("With none_to_zero:", clean_temps)
+
+# positive - Convert negative numbers to absolute values
+print("\n2. positive")
+numbers = [-5, 10, -3, 7, -1]
+print("Original:", numbers)
+all_positive = numbers.add_rule(:positive)
+print("With positive:", all_positive)
+
+# round_to_int - Round decimals to integers
+print("\n3. round_to_int")
+decimals = [1.2, 3.7, 5.5, 2.1, 8.9]
+print("Original:", decimals)
+integers = decimals.add_rule(:round_to_int)
+print("With round_to_int:", integers)
+
+# validate_range - Clamp values to min/max
+print("\n4. validate_range")
+scores = [50, 110, 95, 130, 85, 70]
+print("Original:", scores)
+clamped = scores.add_rule(:validate_range, 60, 100)
+print("Clamped to [60, 100]:", clamped)
+
+# uppercase/lowercase - String transformations
+print("\n5. String transformations")
+words = ["hello", "WORLD", "GrApHoId"]
+print("Original:", words)
+upper = words.add_rule(:uppercase)
+print("Uppercase:", upper)
+lower = words.add_rule(:lowercase)
+print("Lowercase:", lower)
+
+print("\n=== Validation Behaviors ===")
+
+# no_duplicates - Enforce uniqueness
+print("\n6. no_duplicates")
+items = [1, 2, 3, 2, 4, 3, 5]
+print("Original:", items)
+unique_items = items.add_rule(:no_duplicates)
+print("Unique only:", unique_items)
+
+print("\n=== Chaining Behaviors ===")
+mixed = [-5.7, none, 3.2, -1.9, none, 8.1]
+print("Original:", mixed)
+
+# Chain multiple transformations
+result = mixed.add_rule(:none_to_zero)
+             .add_rule(:positive)
+             .add_rule(:round_to_int)
+print("After none_to_zero + positive + round_to_int:", result)
+
+print("\nBehaviors automatically transform values during operations!")
+print("This keeps your data clean without manual validation.")

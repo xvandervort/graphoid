@@ -1,0 +1,97 @@
+# Graph Demo - The heart of Graphoid!
+
+print("=== Basic Graph Creation ===")
+
+# Create a directed graph
+network = graph { type: :directed }
+print("Created directed graph")
+
+# Add nodes
+network.add_node("Server1", 100)
+network.add_node("Server2", 200)
+network.add_node("Server3", 150)
+network.add_node("Client", 50)
+
+print("Nodes:", network.nodes())
+
+# Add edges
+network.add_edge("Server1", "Server2", "connects")
+network.add_edge("Server2", "Server3", "connects")
+network.add_edge("Client", "Server1", "requests")
+
+print("Edges:", network.edges())
+
+print("\n=== Node and Edge Queries ===")
+
+# Get node value
+server1_value = network.get_node("Server1")
+print("Server1 value:", server1_value)
+
+# Check connections
+print("Server1 neighbors:", network.neighbors("Server1"))
+print("Outgoing from Server1:", network.outgoing_edges("Server1"))
+print("Incoming to Server3:", network.incoming_edges("Server3"))
+
+# Check if edge exists
+has_edge = network.has_edge("Server1", "Server2", "connects")
+print("Edge Server1->Server2 exists?", has_edge)
+
+print("\n=== Graph Traversal ===")
+
+# Breadth-first search
+print("BFS from Server1:", network.bfs("Server1"))
+
+# Depth-first search
+print("DFS from Server1:", network.dfs("Server1"))
+
+# Shortest path
+path = network.shortest_path("Client", "Server3", none, false)
+print("Shortest path Client->Server3:", path)
+
+print("\n=== Weighted Graphs ===")
+
+# Create weighted graph for routing
+routes = graph { type: :directed }
+
+# Add cities
+routes.add_node("Portland", none)
+routes.add_node("Seattle", none)
+routes.add_node("SF", none)
+routes.add_node("LA", none)
+
+# Add weighted edges (distances)
+routes.add_edge("Portland", "Seattle", "highway", 173, {})
+routes.add_edge("Portland", "SF", "highway", 635, {})
+routes.add_edge("Seattle", "SF", "highway", 808, {})
+routes.add_edge("SF", "LA", "highway", 383, {})
+
+print("\nRoute network created")
+print("Cities:", routes.nodes())
+
+# Find shortest weighted path
+shortest = routes.shortest_path("Portland", "LA", none, true)
+print("Shortest route Portland->LA:", shortest)
+
+print("\n=== Graph Types ===")
+
+# Different graph types available:
+# - :directed (edges have direction)
+# - :undirected (edges are bidirectional)
+# - :dag (directed acyclic graph - no cycles)
+
+# Create a DAG for dependencies
+deps = graph { type: :dag }
+deps.add_node("parse", none)
+deps.add_node("compile", none)
+deps.add_node("link", none)
+deps.add_node("run", none)
+
+deps.add_edge("parse", "compile", "depends")
+deps.add_edge("compile", "link", "depends")
+deps.add_edge("link", "run", "depends")
+
+print("\nBuild dependency graph (DAG)")
+print("Build order:", deps.bfs("parse"))
+
+print("\nGraphs are the foundation of Graphoid!")
+print("Everything is a graph - even lists and maps!")

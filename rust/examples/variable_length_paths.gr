@@ -1,0 +1,108 @@
+# Variable-Length Path Matching
+# Demonstrates advanced path queries with variable-length patterns
+
+# Create a graph with multiple path lengths
+g = graph{type: :directed}
+
+# Create a chain: A -> B -> C -> D -> E -> F
+nodes = ["A", "B", "C", "D", "E", "F"]
+for i in 0..5 {
+    g.add_node(nodes[i], i)
+}
+
+# Linear chain
+g.add_edge("A", "B", "LINK")
+g.add_edge("B", "C", "LINK")
+g.add_edge("C", "D", "LINK")
+g.add_edge("D", "E", "LINK")
+g.add_edge("E", "F", "LINK")
+
+# Add some shortcuts
+g.add_edge("A", "C", "SHORTCUT")  # 2-hop shortcut
+g.add_edge("B", "E", "SHORTCUT")  # 3-hop shortcut
+
+print("=== Variable-Length Path Matching ===\n")
+
+# Example 1: Paths of exactly 1 hop
+print("Paths of exactly 1 hop:")
+one_hop = g.match(
+    node("start"),
+    path(min: 1, max: 1),  # Equivalent to a single edge
+    node("end")
+)
+print("Found", one_hop.len(), "single-hop paths")
+
+# Example 2: Paths of 1-2 hops
+print("\nPaths of 1-2 hops:")
+short_paths = g.match(
+    node("start"),
+    path(min: 1, max: 2),
+    node("end")
+)
+print("Found", short_paths.len(), "paths of length 1-2")
+
+# Example 3: Paths of exactly 2 hops
+print("\nPaths of exactly 2 hops:")
+two_hop = g.match(
+    node("start"),
+    path(min: 2, max: 2),
+    node("end")
+)
+print("Found", two_hop.len(), "2-hop paths")
+
+# Example 4: Longer paths (1-3 hops)
+print("\nPaths of 1-3 hops:")
+medium_paths = g.match(
+    node("start"),
+    path(min: 1, max: 3),
+    node("end")
+)
+print("Found", medium_paths.len(), "paths of length 1-3")
+
+# Example 5: Only LINK edges (filter by type)
+print("\nOnly LINK edges, 1-3 hops:")
+link_paths = g.match(
+    node("start"),
+    path(type: "LINK", min: 1, max: 3),
+    node("end")
+)
+print("Found", link_paths.len(), "LINK paths")
+
+# Example 6: Only SHORTCUT edges
+print("\nOnly SHORTCUT edges:")
+shortcuts = g.match(
+    node("start"),
+    path(type: "SHORTCUT", min: 1, max: 1),
+    node("end")
+)
+print("Found", shortcuts.len(), "SHORTCUT paths")
+
+# Example 7: Zero-length paths (same node)
+print("\nZero-length paths (reflexive):")
+zero_hop = g.match(
+    node("start"),
+    path(min: 0, max: 2),  # Includes 0-hop (same node)
+    node("end")
+)
+print("Found", zero_hop.len(), "paths (including 0-hop)")
+
+# Example 8: Long-range reachability
+print("\nFull reachability (1-10 hops):")
+reachable = g.match(
+    node("start"),
+    path(min: 1, max: 10),  # Up to 10 hops
+    node("end")
+)
+print("Found", reachable.len(), "reachable pairs")
+
+# Example 9: Specific start point
+print("\nReachability from node A:")
+from_a = g.match(
+    node("start"),
+    path(min: 1, max: 5),
+    node("end")
+)
+# Filter for start = "A" would be done with where clause
+print("All paths:", from_a.len())
+
+print("\n=== Variable-length path demo complete ===")
