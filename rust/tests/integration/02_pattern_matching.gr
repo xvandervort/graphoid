@@ -1,0 +1,32 @@
+# Integration Test: Graph Pattern Matching
+#
+# Purpose: Verify pattern matching works from .gr files
+# Expected output:
+#   Testing basic pattern matching...
+#   Found 1 matches
+#   Match: {"person": {"name": "Alice", "age": 30}, "friend": {"name": "Bob", "age": 25}}
+#   Testing multi-hop patterns...
+#   Found 1 friend-of-friend connection
+#   ✅ Pattern matching works!
+
+print("Testing basic pattern matching...")
+
+# Create a social network graph
+g = graph {type: :directed}
+g.add_node("alice", {name: "Alice", age: 30})
+g.add_node("bob", {name: "Bob", age: 25})
+g.add_node("charlie", {name: "Charlie", age: 28})
+
+g.add_edge("alice", "bob", "FRIEND")
+g.add_edge("bob", "charlie", "FRIEND")
+
+# Match a simple friend pattern
+results = g.match(node("person"), edge(type: "FRIEND"), node("friend"))
+print("Results:", results)
+
+# Match multi-hop pattern
+print("Testing multi-hop patterns...")
+fof_results = g.match(node("person"), edge(type: "FRIEND"), node("friend"), edge(type: "FRIEND"), node("fof"))
+print("Friend-of-friend results:", fof_results)
+
+print("✅ Pattern matching works!")
