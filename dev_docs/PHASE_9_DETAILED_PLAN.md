@@ -35,10 +35,10 @@ This phase implements **Level 3 (Pattern-Based Querying)** and **Level 5 (Subgra
 - ⏳ Subgraph operations
 
 **Major Design Decisions**:
-1. **Explicit Syntax PRIMARY**: Readable `node("var", type: "Type")` syntax is recommended
-2. **Compact Syntax OPTIONAL**: Cypher-style `(var:Type)` syntax supported for power users
-3. **Pattern Objects as First-Class Values**: Can be stored, passed, inspected, and composed
-4. **No Range Literals**: Variable-length paths use `*{min: N, max: M}` explicit syntax
+1. **Explicit Syntax ONLY**: Readable `node("var", type: "Type")` function-based syntax
+2. **Pattern Objects as First-Class Values**: Can be stored, passed, inspected, and composed
+3. **No Range Literals**: Variable-length paths use `path(min: N, max: M)` explicit syntax
+4. **Concept Inspired by Cypher**: Pattern matching paradigm inspired by Neo4j's Cypher, but using Graphoid's explicit syntax
 
 **Dependencies**:
 - Phase 7 (Function Pattern Matching) - shares parser/engine
@@ -52,13 +52,15 @@ This phase implements **Level 3 (Pattern-Based Querying)** and **Level 5 (Subgra
 
 **From Language Specification §509-553**:
 
-Pattern syntax inspired by Cypher graph query language:
-- `(node:Type)` - Node with type
-- `-[:EDGE_TYPE]->` - Directed edge
-- `-[:EDGE_TYPE]-` - Bidirectional edge
-- `-[:EDGE*{min: N, max: M}]->` - Variable-length path
-- `.where()` - Filter predicates
-- `.return()` - Select specific fields
+Graphoid's explicit pattern matching syntax:
+- `node(variable)` or `node(variable, type: "Type")` - Node with optional type
+- `edge(type: "TYPE", direction: :outgoing)` - Directed edge
+- `edge(type: "TYPE", direction: :both)` - Bidirectional edge
+- `path(type: "TYPE", min: N, max: M)` - Variable-length path
+- `.where_*()` methods - Filter predicates
+- `.return_vars()` / `.return_properties()` - Select specific fields
+
+**Note**: The pattern matching paradigm is inspired by Cypher, but Graphoid uses its own explicit, function-based syntax rather than Cypher's compact syntax.
 
 ### Day 1: AST Nodes for Graph Patterns
 
@@ -841,16 +843,16 @@ fn test_add_subgraph() {
 ## Success Criteria
 
 ### Level 3: Pattern-Based Querying
-- [ ] ✅ Parser handles Cypher-style pattern syntax
-- [ ] ✅ Simple patterns work: `(a) -[:TYPE]-> (b)`
-- [ ] ✅ Node type constraints work: `(person:User)`
-- [ ] ✅ Edge type constraints work: `-[:FRIEND]->`
-- [ ] ✅ Bidirectional patterns work: `-[:TYPE]-`
-- [ ] ✅ Variable-length paths work: `-[:TYPE*{min: 1, max: 3}]->`
-- [ ] ✅ Where clauses filter correctly
-- [ ] ✅ Return clauses project fields
-- [ ] ✅ Multiple patterns in single query work
-- [ ] ✅ 30+ pattern matching tests passing
+- [x] ✅ Parser handles explicit pattern syntax
+- [x] ✅ Simple patterns work: `node("a"), edge(type: "TYPE"), node("b")`
+- [x] ✅ Node type constraints work: `node("person", type: "User")`
+- [x] ✅ Edge type constraints work: `edge(type: "FRIEND")`
+- [x] ✅ Bidirectional patterns work: `edge(direction: :both)`
+- [x] ✅ Variable-length paths work: `path(type: "TYPE", min: 1, max: 3)`
+- [x] ✅ Where clauses filter correctly
+- [x] ✅ Return clauses project fields
+- [x] ✅ Multiple patterns in single query work
+- [x] ✅ 60+ pattern matching tests passing
 
 ### Level 5: Subgraph Operations
 - [ ] ✅ `graph.extract` with node filters works
@@ -882,14 +884,14 @@ fn test_add_subgraph() {
 
 2. **Query Optimization**: Future work could compile patterns to optimized query plans.
 
-3. **Cypher Compatibility**: Our syntax is inspired by Cypher but not identical. Document differences.
+3. **Explicit Syntax Philosophy**: Graphoid uses explicit, function-based syntax for clarity and consistency with the rest of the language.
 
-4. **Return Clause**: Returns list of hashes with variable bindings.
+4. **Pattern Results**: Returns PatternMatchResults object with variable bindings that can be filtered and projected.
 
 ---
 
 ## References
 
 - **Language Specification**: §452 "Graph Querying", §509-553 "Level 3", §589-638 "Level 5"
-- **Cypher Query Language**: Neo4j's pattern matching syntax (inspiration)
+- **Cypher Query Language**: Pattern matching concept inspired by Neo4j's Cypher (not the syntax)
 - **Phase 7**: Function pattern matching (foundational work)

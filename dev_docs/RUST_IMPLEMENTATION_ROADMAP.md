@@ -3017,7 +3017,7 @@ fn get_sound(animal) {
 **📋 Detailed Implementation Plan**: See [`dev_docs/PHASE_9_DETAILED_PLAN.md`](PHASE_9_DETAILED_PLAN.md) for:
 - 10-day implementation plan with daily deliverables
 - 60+ test specifications covering all query levels
-- Cypher-style pattern syntax implementation
+- Explicit pattern syntax implementation
 - Pattern parser and matcher for graphs
 - Query execution engine
 - Subgraph operations
@@ -3025,17 +3025,17 @@ fn get_sound(animal) {
 - Integration tests and acceptance criteria
 
 **Duration**: 7-10 days
-**Goal**: Implement Cypher-style graph pattern matching - the "make or break" feature for a graph language
+**Goal**: Implement declarative graph pattern matching - the "make or break" feature for a graph language
 
 **Overview**:
-- **Level 3: Pattern-Based Querying** - Declarative pattern matching inspired by Cypher
-  - Pattern syntax: `(node:Type) -[:EDGE]-> (other:Type)`
+- **Level 3: Pattern-Based Querying** - Declarative pattern matching (concept inspired by Cypher)
+  - Pattern syntax: `node("var", type: "Type"), edge(type: "EDGE"), node("other", type: "Type")`
   - Pattern parser and AST nodes
   - Pattern matching engine for graphs
-  - `.where()` filtering predicates
-  - `.return()` projection for specific fields
-  - Variable-length paths: `-[:FOLLOWS*1..3]->`
-  - Bidirectional patterns: `-[:FRIEND]-`
+  - `.where_*()` filtering methods
+  - `.return_vars()` / `.return_properties()` projection for specific fields
+  - Variable-length paths: `path(type: "FOLLOWS", min: 1, max: 3)`
+  - Bidirectional patterns: `edge(direction: :both)`
 
 - **Level 5: Subgraph Operations** - Extract, manipulate, and compose subgraphs
   - `graph.extract { nodes: ..., edges: ... }`

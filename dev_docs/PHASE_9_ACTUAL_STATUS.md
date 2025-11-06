@@ -386,18 +386,20 @@ results.return_properties(["person.name", "friend.age"])
 
 ---
 
-### ❌ DEFERRED: Compact (Cypher) Syntax Parser
+### ❌ NOT IN SCOPE: Compact Syntax
 
-**Expected Syntax**:
+**Graphoid uses explicit syntax only**:
 ```graphoid
-results = graph.match((person:User) -[:FRIEND]-> (friend:User))
+results = graph.match(
+    node("person", type: "User"),
+    edge(type: "FRIEND"),
+    node("friend", type: "User")
+)
 ```
 
-**Current Status**: Not implemented
+**Rationale**: Graphoid's design philosophy emphasizes explicit, readable code. The function-based pattern syntax is clear, unambiguous, and consistent with the rest of the language.
 
-**Priority**: 🔶 LOW - Optional feature per spec, explicit syntax is preferred
-
-**Note**: May implement in future phase if demand exists
+**Note**: The pattern matching **concept** is inspired by Cypher, but Graphoid uses its own explicit syntax, not Cypher's compact syntax.
 
 ---
 
@@ -457,14 +459,9 @@ results = graph.match((person:User) -[:FRIEND]-> (friend:User))
    - Performance benchmarks
    - ~2 days estimated
 
-### Optional Features (May Skip)
+### Optional Features (Deferred)
 
-1. **Compact Cypher Syntax**
-   - Parser for `(node:Type) -[:EDGE]-> (other)`
-   - Priority: LOW per spec
-   - Decision: Defer to future phase if needed
-
-2. **Pattern .bind() Method**
+1. **Pattern .bind() Method**
    - Rebind pattern variables
    - Priority: MEDIUM
    - Decision: Defer to future phase
@@ -479,9 +476,8 @@ results = graph.match((person:User) -[:FRIEND]-> (friend:User))
 - ✅ Graph.match() execution - DONE
 - ✅ Pattern matching algorithm - DONE
 - ✅ Where clause filtering - DONE
-- ⏳ Return clause projection - TODO (next)
-- ✅ Explicit syntax support (PRIMARY) - DONE
-- ❌ Compact syntax support (OPTIONAL) - Deferred
+- ✅ Return clause projection - DONE
+- ✅ Explicit syntax support - DONE
 
 ### ❌ OUT OF SCOPE for Phase 9
 
@@ -553,13 +549,6 @@ results = graph.match((person:User) -[:FRIEND]-> (friend:User))
    - Example programs
    - **Priority**: ⭐ HIGH
 
-### Future (Optional)
-
-3. **Compact Cypher Syntax** (if time permits)
-   - Parser for `(node:Type) -[:EDGE]-> (other)`
-   - Convert to pattern objects internally
-   - **Priority**: 🔶 MEDIUM
-
 ---
 
 ## Acceptance Criteria
@@ -577,7 +566,6 @@ results = graph.match((person:User) -[:FRIEND]-> (friend:User))
 
 ### Optional (Nice-to-Have):
 
-- ⭕ Compact Cypher syntax parser - **Deferred**
 - ⭕ Pattern .bind() method - **Deferred**
 - ⭕ Advanced pattern composition - **Deferred**
 

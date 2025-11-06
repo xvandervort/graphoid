@@ -564,17 +564,7 @@ purchases = graph.match(
  .return(product.name, product.price)
 ```
 
-**Compact Syntax** (optional, for power users):
-
-```Graphoid
-# Cypher-inspired syntax is also supported
-results = graph.match((person:User) -[:FRIEND]-> (friend:User))
-
-# Note: In compact syntax, :FRIEND is a symbol that matches
-# against the string edge type "FRIEND" (symbols convert to strings)
-```
-
-**Explicit Pattern Syntax**:
+**Pattern Syntax Reference**:
 - `node(variable_name)` - Node with any type
 - `node(variable_name, type: "Type")` - Node with specific type
 - `edge(type: "TYPE")` - Edge with type, default outgoing direction
@@ -585,12 +575,6 @@ results = graph.match((person:User) -[:FRIEND]-> (friend:User))
 - `path(edge_type: "TYPE", min: N, max: M, direction: :outgoing)` - With direction
 - `.where()` - Filter predicates
 - `.return()` - Select specific fields
-
-**Compact Pattern Syntax** (optional):
-- `(node:Type)` - Node with type
-- `-[:EDGE_TYPE]->` - Directed edge (symbol :TYPE matches string "TYPE")
-- `-[:EDGE_TYPE]-` - Bidirectional edge
-- `-[:EDGE*{min: N, max: M}]->` - Variable-length path
 
 #### Pattern Objects as First-Class Values
 
@@ -730,6 +714,131 @@ if validate_pattern(my_node) {
   - `.max` - Maximum path length (number)
   - `.direction` - Direction symbol (default :outgoing)
   - `.pattern_type` - Always "path"
+
+#### Pattern Result Filtering and Projection
+
+**Working with Pattern Match Results:**
+
+Pattern matching returns a `PatternMatchResults` object containing all variable bindings. You can filter and project these results:
+
+```Graphoid
+# Basic pattern matching
+results = g.match(
+    node("person", type: "User"),
+    edge(type: "FRIEND"),
+    node("friend", type: "User")
+)
+
+# Results contain all matched bindings
+print(results.len())          # Number of matches
+print(results[0])             # First match: {"person": "alice", "friend": "bob"}
+
+# Return only specific variables (projection)
+projected = results.return_vars(["person"])
+# Now only contains: [{"person": "alice"}, {"person": "bob"}, ...]
+
+# Return multiple variables
+selected = results.return_vars(["person", "friend"])
+# Contains: [{"person": "alice", "friend": "bob"}, ...]
+
+# Return specific node properties
+props = results.return_properties(["person.name", "friend.age"])
+# Returns: [{"person.name": "Alice", "friend.age": 25.0}, ...]
+```
+
+**Filtering Results with Where Clauses:**
+
+```Graphoid
+# Filter based on node values
+adults_only = results.where_node_value("person", lambda val: val > 18)
+
+# Filter based on two nodes
+same_city = results.where_both_nodes("person", "friend",
+    lambda p, f: p.city == f.city
+)
+
+# Filter based on node properties
+verified = results.where_node_property("person", "verified",
+    lambda prop: prop == true
+)
+```
+
+**Real-World Example - Social Network:**
+
+```Graphoid
+# Find friends of friends who might be recommended
+g = graph{type: :directed}
+
+# Build social network
+g.add_node("alice", {name: "Alice", age: 30, city: "NYC"})
+g.add_node("bob", {name: "Bob", age: 25, city: "SF"})
+g.add_node("charlie", {name: "Charlie", age: 35, city: "NYC"})
+
+g.add_edge("alice", "bob", "FRIEND")
+g.add_edge("bob", "charlie", "FRIEND")
+
+# Pattern: 2-hop friend connections
+results = g.match(
+    node("user"),
+    path(type: "FRIEND", min: 2, max: 2),
+    node("recommendation")
+)
+
+# Project just the recommendations with their properties
+recommendations = results.return_properties([
+    "user.name",
+    "recommendation.name",
+    "recommendation.city"
+])
+
+# Output: [{"user.name": "Alice", "recommendation.name": "Charlie", "recommendation.city": "NYC"}]
+```
+
+**Complex Query Example:**
+
+```Graphoid
+# Find influencers: users with many followers
+results = g.match(
+    node("follower", type: "User"),
+    edge(type: "FOLLOWS"),
+    node("influencer", type: "User")
+)
+
+# Project influencer names with follower count
+# (Note: Aggregation would require additional methods)
+influencer_data = results.return_properties([
+    "influencer.name",
+    "influencer.follower_count"
+])
+
+# Filter for high-influence users
+high_influence = influencer_data.where_node_property(
+    "influencer",
+    "follower_count",
+    lambda count: count > 1000
+)
+```
+
+**Method Reference:**
+
+`PatternMatchResults` methods:
+- `.len()` - Number of matches
+- `.is_empty()` - Check if no matches
+- `.get(index)` - Get binding at index
+- `[index]` - Array-style access to binding
+- `.return_vars(["var1", "var2", ...])` - Project specific variables
+- `.return_properties(["var.prop", ...])` - Extract specific node properties
+- `.where_node_value(variable, predicate)` - Filter by node value
+- `.where_both_nodes(var1, var2, predicate)` - Filter by relationship between nodes
+- `.where_node_property(variable, property, predicate)` - Filter by node property
+
+**Performance Considerations:**
+
+For large graphs, pattern matching uses backtracking which can be expensive. Consider:
+1. Add type constraints to limit search space
+2. Use specific edge types rather than matching all edges
+3. Limit variable-length path max to reasonable values
+4. Consider adding indices on frequently-queried node types
 
 ### Level 4: Path Queries
 
