@@ -539,11 +539,49 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 14-phase plan:
 ### Code Quality Standards
 
 - **Test-Driven Development (TDD)** - Write tests FIRST, then implement (RED-GREEN-REFACTOR) - MANDATORY
+- **Example-Driven Development** - Create `.gr` example files for EVERY significant new feature - MANDATORY
 - **Idiomatic Rust** - Follow Rust best practices
 - **Zero warnings** - `cargo build` must be clean
 - **Test coverage** - 80%+ for core features (achieved through TDD)
 - **Documentation** - All public APIs documented
 - **Error messages** - Rich, helpful, with source positions
+
+### Example-Driven Development Rule
+
+**CRITICAL**: After implementing ANY significant new feature, you MUST create one or more `.gr` example files demonstrating it.
+
+**Why This Rule Exists:**
+- Ensures features are actually accessible from .gr programs (not just in Rust tests)
+- Validates end-to-end functionality
+- Provides immediate documentation through working code
+- Prevents implementation gaps (like Phase 7 behaviors being inaccessible)
+
+**What Counts as "Significant":**
+- New language features (pattern matching, modules, etc.)
+- New collection methods or transformations
+- New behavior/validation rules
+- New graph operations
+- New built-in functions
+
+**Where to Put Examples:**
+- `rust/examples/*.gr` - Standalone example files
+- Each example should have clear comments explaining what it demonstrates
+- Update `rust/examples/README.md` with descriptions
+
+**Example Checklist for New Features:**
+1. ✅ Implement feature in Rust
+2. ✅ Write Rust unit tests (TDD)
+3. ✅ **Create `.gr` example file(s)** demonstrating the feature
+4. ✅ Run the example to verify it works: `cargo run --quiet examples/your_example.gr`
+5. ✅ Update `rust/examples/README.md` with description
+6. ✅ Consider updating `docs/QUICKSTART.md` if it's a major feature
+
+**Real Example:**
+When Phase 7 behavior system was implemented:
+- ❌ BAD: 91 Rust tests passed, but behaviors weren't accessible from .gr programs
+- ✅ GOOD: After fixing executor registration, created `examples/behaviors.gr` showing all transformation rules
+
+**If you can't create a working `.gr` example, the feature isn't done!**
 
 ### Testing Strategy
 
@@ -551,11 +589,12 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 14-phase plan:
 
 A feature is NOT complete until it works from `.gr` files. Passing Rust tests alone is insufficient.
 
-**The Two-Level Testing Requirement**:
+**The Three-Level Validation Requirement**:
 1. **Level 1: Rust API Testing** - Unit tests verify internal implementation
-2. **Level 2: .gr Integration Testing** - Verify feature is accessible from user-facing language
+2. **Level 2: Executor Integration** - Feature must be registered in executor and accessible from .gr programs
+3. **Level 3: Example Documentation** - One or more `.gr` example files demonstrating the feature
 
-**Both levels are MANDATORY**. See `dev_docs/INTEGRATION_TESTING_GUIDE.md` for complete details.
+**All three levels are MANDATORY**. A feature that passes Rust tests but can't be used from .gr programs is NOT done.
 
 ---
 
@@ -592,6 +631,7 @@ pub fn shortest_path(&self, from: &str, to: &str, edge_type: Option<&str>, weigh
 **Test Organization**:
 - **Unit tests (Rust)** - In `tests/unit/` for internal API verification
 - **Integration tests (.gr files)** - In `tests/integration/` for user-facing executability
+- **Example files (.gr)** - In `rust/examples/` for documentation and demonstration
 - **Property-based tests** - For algorithmic correctness
 - **Regression tests** - For every bug fix
 
@@ -600,8 +640,10 @@ pub fn shortest_path(&self, from: &str, to: &str, edge_type: Option<&str>, weigh
 - ❌ **NEVER** use `#[cfg(test)]` modules in `src/` files
 - ✅ **ALWAYS** place Rust tests in `tests/unit/` or `tests/integration/`
 - ✅ **ALWAYS** create `.gr` integration tests in `tests/integration/`
+- ✅ **ALWAYS** create `.gr` example files in `rust/examples/` for new features
 - ✅ **ALWAYS** write tests BEFORE implementation (TDD)
 - ✅ **ALWAYS** register methods/functions in executor after implementing
+- ✅ **ALWAYS** verify examples run: `cargo run --quiet examples/your_example.gr`
 - Tests in `tests/unit/` should import from the crate: `use graphoid::module::Type;`
 - Each source module can have a corresponding test file (e.g., `src/graph/rules.rs` → `tests/unit/graph_rules_tests.rs`)
 - Register new test files in `tests/unit_tests.rs`
@@ -609,6 +651,7 @@ pub fn shortest_path(&self, from: &str, to: &str, edge_type: Option<&str>, weigh
 **Verification**:
 - Rust: Run `find src -name "*.rs" -exec grep -l "#\[cfg(test)\]" {} \;` - should return no results
 - Integration: Run `bash scripts/test_integration.sh` - all .gr files should execute
+- Examples: Run `for f in examples/*.gr; do cargo run --quiet "$f" || exit 1; done` - all examples should run successfully
 
 **Why TDD**: Writing tests first ensures complete test coverage, better API design, prevents regressions, and validates requirements before implementation.
 

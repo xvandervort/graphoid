@@ -26,11 +26,7 @@ without_3 = numbers.remove(3)
 print("After remove(3):", without_3)
 
 print("\n=== Maps ===")
-person = {
-    "name": "Alice",
-    "age": 30,
-    "city": "Portland"
-}
+person = {"name": "Alice", "age": 30, "city": "Portland"}
 print("Person:", person)
 print("Name:", person["name"])
 print("Keys:", person.keys())
