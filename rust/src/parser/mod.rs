@@ -1912,8 +1912,14 @@ impl Parser {
             }
 
             let mut entries = Vec::new();
+            // Skip newlines after opening brace
+            while self.match_token(&TokenType::Newline) {}
+
             if !self.check(&TokenType::RightBrace) {
                 loop {
+                    // Skip newlines before each entry
+                    while self.match_token(&TokenType::Newline) {}
+
                     // Parse key (must be string or identifier)
                     let key = if let TokenType::String(s) = &self.peek().token_type {
                         let k = s.clone();
@@ -1938,8 +1944,8 @@ impl Parser {
                         });
                     }
 
-                    // Parse value
-                    let value = self.expression()?;
+                    // Parse value - support lambdas
+                    let value = self.lambda_or_expression()?;
                     entries.push((key, value));
 
                     if !self.match_token(&TokenType::Comma) {
@@ -1947,6 +1953,9 @@ impl Parser {
                     }
                 }
             }
+
+            // Skip newlines before closing brace
+            while self.match_token(&TokenType::Newline) {}
 
             if !self.match_token(&TokenType::RightBrace) {
                 return Err(GraphoidError::SyntaxError {
@@ -2038,9 +2047,14 @@ impl Parser {
         // Maps without type: {}
         if self.match_token(&TokenType::LeftBrace) {
             let mut entries = Vec::new();
+            // Skip newlines after opening brace
+            while self.match_token(&TokenType::Newline) {}
 
             if !self.check(&TokenType::RightBrace) {
                 loop {
+                    // Skip newlines before each entry
+                    while self.match_token(&TokenType::Newline) {}
+
                     // Parse key (must be string or identifier)
                     let key = if let TokenType::String(s) = &self.peek().token_type {
                         let k = s.clone();
@@ -2065,8 +2079,8 @@ impl Parser {
                         });
                     }
 
-                    // Parse value
-                    let value = self.expression()?;
+                    // Parse value - support lambdas
+                    let value = self.lambda_or_expression()?;
                     entries.push((key, value));
 
                     if !self.match_token(&TokenType::Comma) {
@@ -2074,6 +2088,9 @@ impl Parser {
                     }
                 }
             }
+
+            // Skip newlines before closing brace
+            while self.match_token(&TokenType::Newline) {}
 
             if !self.match_token(&TokenType::RightBrace) {
                 return Err(GraphoidError::SyntaxError {

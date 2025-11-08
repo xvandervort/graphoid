@@ -2682,6 +2682,95 @@ impl Executor {
         }
     }
 
+    /// Helper: Apply node filter to graph, returns set of matching node IDs.
+    /// If invert=true, returns nodes that DON'T match the filter.
+    fn apply_node_filter(
+        &mut self,
+        graph: &crate::values::Graph,
+        node_filter: Option<&Value>,
+        invert: bool,
+    ) -> Result<std::collections::HashSet<String>> {
+        use std::collections::HashSet;
+        let mut matching_node_ids: HashSet<String> = HashSet::new();
+
+        if let Some(node_filter_func) = node_filter {
+            let func = match &node_filter_func.kind {
+                ValueKind::Function(f) => f,
+                _ => return Err(GraphoidError::type_error("function", node_filter_func.type_name())),
+            };
+
+            for node_id in graph.keys() {
+                if let Some(node_value) = graph.get_node(&node_id) {
+                    let result = self.call_function(func, &[node_value.clone()])?;
+                    let matches = result.is_truthy();
+                    // Apply inversion if requested
+                    if matches != invert {
+                        matching_node_ids.insert(node_id);
+                    }
+                }
+            }
+        } else {
+            // No filter - all nodes match (or all nodes excluded if inverted)
+            if !invert {
+                matching_node_ids.extend(graph.keys());
+            }
+        }
+
+        Ok(matching_node_ids)
+    }
+
+    /// Helper: Apply edge filter to graph, returns vec of matching edges (from, to, type).
+    /// If invert=true, returns edges that DON'T match the filter.
+    /// Only considers edges between nodes in allowed_nodes set.
+    fn apply_edge_filter(
+        &mut self,
+        graph: &crate::values::Graph,
+        edge_filter: Option<&Value>,
+        allowed_nodes: &std::collections::HashSet<String>,
+        invert: bool,
+    ) -> Result<Vec<(String, String, String)>> {
+        let mut matching_edges: Vec<(String, String, String)> = vec![];
+
+        // Access graph nodes directly
+        for (from_id, from_node) in &graph.nodes {
+            if !allowed_nodes.contains(from_id) {
+                continue;
+            }
+
+            for (to_id, edge_info) in &from_node.neighbors {
+                if !allowed_nodes.contains(to_id) {
+                    continue;
+                }
+
+                let edge_type = edge_info.edge_type.clone();
+
+                let edge_matches = if let Some(edge_filter_func) = edge_filter {
+                    let func = match &edge_filter_func.kind {
+                        ValueKind::Function(f) => f,
+                        _ => return Err(GraphoidError::type_error("function", edge_filter_func.type_name())),
+                    };
+
+                    let args = vec![
+                        Value::string(from_id.clone()),
+                        Value::string(to_id.clone()),
+                        Value::string(edge_type.clone()),
+                    ];
+                    let result = self.call_function(func, &args)?;
+                    result.is_truthy()
+                } else {
+                    true // No filter
+                };
+
+                // Apply inversion if requested
+                if edge_matches != invert {
+                    matching_edges.push((from_id.clone(), to_id.clone(), edge_type));
+                }
+            }
+        }
+
+        Ok(matching_edges)
+    }
+
     /// Evaluates a method call on a graph.
     fn eval_graph_method(&mut self, mut graph: crate::values::Graph, method: &str, args: &[Value], object_expr: &Expr) -> Result<Value> {
         match method {
@@ -3195,6 +3284,224 @@ impl Executor {
                     Value::list(crate::values::List::from_vec(edge_vec))
                 }).collect();
                 Ok(Value::list(crate::values::List::from_vec(edge_values)))
+            }
+            "extract" => {
+                // Extract subgraph using filter predicates
+                // Supports two syntaxes:
+                // 1. Positional: extract(node_filter?, edge_filter?, include_orphans?)
+                // 2. Block: extract({ nodes: filter, edges: filter, include_orphans: bool })
+
+                let (node_filter, edge_filter, include_orphans) = if args.len() == 1 {
+                    // Check if first arg is a map (block syntax)
+                    if let ValueKind::Map(map) = &args[0].kind {
+                        // Block syntax
+                        let node_filter = map.get("nodes").filter(|v| !matches!(v.kind, ValueKind::None));
+                        let edge_filter = map.get("edges").filter(|v| !matches!(v.kind, ValueKind::None));
+                        let include_orphans = map.get("include_orphans")
+                            .map(|v| v.is_truthy())
+                            .unwrap_or(true);
+
+                        (node_filter, edge_filter, include_orphans)
+                    } else {
+                        // Single positional arg (node_filter only)
+                        let node_filter = if !matches!(&args[0].kind, ValueKind::None) {
+                            Some(&args[0])
+                        } else {
+                            None
+                        };
+                        (node_filter, None, true)
+                    }
+                } else if args.len() <= 3 {
+                    // Positional syntax
+                    let node_filter = if !args.is_empty() && !matches!(&args[0].kind, ValueKind::None) {
+                        Some(&args[0])
+                    } else {
+                        None
+                    };
+
+                    let edge_filter = if args.len() > 1 && !matches!(&args[1].kind, ValueKind::None) {
+                        Some(&args[1])
+                    } else {
+                        None
+                    };
+
+                    let include_orphans = if args.len() > 2 {
+                        args[2].is_truthy()
+                    } else {
+                        true // default
+                    };
+
+                    (node_filter, edge_filter, include_orphans)
+                } else {
+                    return Err(GraphoidError::runtime(format!(
+                        "extract() expects 0-3 arguments or a single map, but got {}",
+                        args.len()
+                    )));
+                };
+
+                // Apply node filter using helper
+                let matching_node_ids = self.apply_node_filter(&graph, node_filter, false)?;
+
+                // Apply edge filter using helper
+                let matching_edges = self.apply_edge_filter(&graph, edge_filter, &matching_node_ids, false)?;
+
+                // Track which nodes have edges
+                let mut nodes_with_edges: std::collections::HashSet<String> = std::collections::HashSet::new();
+                for (from_id, to_id, _) in &matching_edges {
+                    nodes_with_edges.insert(from_id.clone());
+                    nodes_with_edges.insert(to_id.clone());
+                }
+
+                // Determine final nodes based on include_orphans
+                let final_nodes: std::collections::HashSet<String> = if include_orphans {
+                    matching_node_ids
+                } else {
+                    matching_node_ids.intersection(&nodes_with_edges).cloned().collect()
+                };
+
+                // Build result graph
+                use crate::values::graph::Graph;
+                let mut result = Graph::new(graph.graph_type.clone());
+                result.config = graph.config.clone();
+
+                // Add nodes
+                for node_id in &final_nodes {
+                    if let Some(node_value) = graph.get_node(node_id) {
+                        result.add_node(node_id.clone(), node_value.clone())?;
+                    }
+                }
+
+                // Add edges
+                for (from_id, to_id, edge_type) in matching_edges {
+                    result.add_edge(
+                        &from_id,
+                        &to_id,
+                        edge_type,
+                        None,
+                        std::collections::HashMap::new(),
+                    )?;
+                }
+
+                Ok(Value::graph(result))
+            }
+            "delete" => {
+                // Delete subgraph using filter predicates (inverse of extract)
+                // Supports two syntaxes:
+                // 1. Positional: delete(node_filter?, edge_filter?)
+                // 2. Block: delete({ nodes: filter, edges: filter })
+
+                let (node_filter, edge_filter) = if args.len() == 1 {
+                    // Check if first arg is a map (block syntax)
+                    if let ValueKind::Map(map) = &args[0].kind {
+                        // Block syntax
+                        let node_filter = map.get("nodes").filter(|v| !matches!(v.kind, ValueKind::None));
+                        let edge_filter = map.get("edges").filter(|v| !matches!(v.kind, ValueKind::None));
+                        (node_filter, edge_filter)
+                    } else {
+                        // Single positional arg (node_filter only)
+                        let node_filter = if !matches!(&args[0].kind, ValueKind::None) {
+                            Some(&args[0])
+                        } else {
+                            None
+                        };
+                        (node_filter, None)
+                    }
+                } else if args.len() <= 2 {
+                    // Positional syntax
+                    let node_filter = if !args.is_empty() && !matches!(&args[0].kind, ValueKind::None) {
+                        Some(&args[0])
+                    } else {
+                        None
+                    };
+
+                    let edge_filter = if args.len() > 1 && !matches!(&args[1].kind, ValueKind::None) {
+                        Some(&args[1])
+                    } else {
+                        None
+                    };
+
+                    (node_filter, edge_filter)
+                } else {
+                    return Err(GraphoidError::runtime(format!(
+                        "delete() expects 0-2 arguments or a single map, but got {}",
+                        args.len()
+                    )));
+                };
+
+                // Apply node filter with inversion (keep nodes that DON'T match)
+                let keeping_node_ids = self.apply_node_filter(&graph, node_filter, true)?;
+
+                // Apply edge filter with inversion (keep edges that DON'T match)
+                let keeping_edges = self.apply_edge_filter(&graph, edge_filter, &keeping_node_ids, true)?;
+
+                // Build result graph
+                use crate::values::graph::Graph;
+                let mut result = Graph::new(graph.graph_type.clone());
+                result.config = graph.config.clone();
+
+                // Add kept nodes
+                for node_id in &keeping_node_ids {
+                    if let Some(node_value) = graph.get_node(node_id) {
+                        result.add_node(node_id.clone(), node_value.clone())?;
+                    }
+                }
+
+                // Add kept edges
+                for (from_id, to_id, edge_type) in keeping_edges {
+                    result.add_edge(
+                        &from_id,
+                        &to_id,
+                        edge_type,
+                        None,
+                        std::collections::HashMap::new(),
+                    )?;
+                }
+
+                Ok(Value::graph(result))
+            }
+            "add_subgraph" => {
+                // Merge another graph with conflict resolution
+                // Arguments: (other_graph, conflict_strategy?)
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "add_subgraph() expects 1-2 arguments (other_graph, conflict_strategy), but got {}",
+                        args.len()
+                    )));
+                }
+
+                let other_graph = match &args[0].kind {
+                    ValueKind::Graph(g) => g,
+                    _ => return Err(GraphoidError::type_error("graph", args[0].type_name())),
+                };
+
+                let conflict_strategy = if args.len() > 1 {
+                    Some(args[1].to_string_value())
+                } else {
+                    None
+                };
+
+                let result = graph.add_subgraph(other_graph, conflict_strategy)?;
+                Ok(Value::graph(result))
+            }
+            "node_count" => {
+                // Return the number of nodes in the graph
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "node_count() expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                Ok(Value::number(graph.node_count() as f64))
+            }
+            "edge_count" => {
+                // Return the number of edges in the graph
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "edge_count() expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                Ok(Value::number(graph.edge_count() as f64))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Graph does not have method '{}'",

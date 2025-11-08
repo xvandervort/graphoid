@@ -2758,5 +2758,254 @@ impl Graph {
 
         Ok(())
     }
+
+    /// Extract a subgraph using filter predicates (Level 5 - Specification §877-920)
+    ///
+    /// Filters nodes and edges based on lambda predicates, returning a new graph
+    /// containing only matching elements.
+    ///
+    /// # Arguments
+    /// * `node_filter` - Optional predicate for filtering nodes: (id, value) -> bool
+    /// * `edge_filter` - Optional predicate for filtering edges: (from, to, type, weight, attrs) -> bool
+    /// * `include_orphans` - Whether to include nodes with no edges (default: true)
+    ///
+    /// # Returns
+    /// A new Graph containing only elements matching the filters
+    pub fn extract_filtered(
+        &self,
+        node_filter: Option<Box<dyn Fn(&str, &Value) -> bool>>,
+        edge_filter: Option<Box<dyn Fn(&str, &str, &str, Option<f64>, &std::collections::HashMap<String, Value>) -> bool>>,
+        include_orphans: bool,
+    ) -> Result<Graph, GraphoidError> {
+        // Create new graph with same configuration
+        let mut result = Graph::new(self.graph_type.clone());
+        result.config = self.config.clone();
+
+        // Step 1: Filter nodes
+        let mut matching_nodes: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        if let Some(filter) = node_filter {
+            for (node_id, node) in &self.nodes {
+                if filter(node_id, &node.value) {
+                    matching_nodes.insert(node_id.clone());
+                }
+            }
+        } else {
+            // No node filter - all nodes match initially
+            for node_id in self.nodes.keys() {
+                matching_nodes.insert(node_id.clone());
+            }
+        }
+
+        // Step 2: Filter edges and track nodes involved in matching edges
+        let mut nodes_with_edges: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut matching_edges: Vec<(String, String, EdgeInfo)> = vec![];
+
+        for (from_id, from_node) in &self.nodes {
+            // Skip if source node doesn't match node filter
+            if !matching_nodes.contains(from_id) {
+                continue;
+            }
+
+            for (to_id, edge_info) in &from_node.neighbors {
+                // Skip if target node doesn't match node filter
+                if !matching_nodes.contains(to_id) {
+                    continue;
+                }
+
+                // Apply edge filter if provided
+                let edge_matches = if let Some(ref filter) = edge_filter {
+                    filter(from_id, to_id, &edge_info.edge_type, edge_info.weight, &edge_info.properties)
+                } else {
+                    true // No edge filter - all edges between matching nodes match
+                };
+
+                if edge_matches {
+                    matching_edges.push((from_id.clone(), to_id.clone(), edge_info.clone()));
+                    nodes_with_edges.insert(from_id.clone());
+                    nodes_with_edges.insert(to_id.clone());
+                }
+            }
+        }
+
+        // Step 3: Determine final node set based on include_orphans
+        let final_nodes: std::collections::HashSet<String> = if include_orphans {
+            // Include all matching nodes, even orphans
+            matching_nodes
+        } else {
+            // Only include nodes that have at least one edge
+            matching_nodes.intersection(&nodes_with_edges).cloned().collect()
+        };
+
+        // Step 4: Add nodes to result graph
+        for node_id in &final_nodes {
+            if let Some(node) = self.nodes.get(node_id) {
+                result.add_node(node_id.clone(), node.value.clone())?;
+
+                // Preserve node type if it exists
+                if let Some(node_type) = &node.node_type {
+                    result.set_node_type(node_id, node_type.clone())?;
+                }
+            }
+        }
+
+        // Step 5: Add matching edges to result graph
+        for (from_id, to_id, edge_info) in matching_edges {
+            result.add_edge(
+                &from_id,
+                &to_id,
+                edge_info.edge_type,
+                edge_info.weight,
+                edge_info.properties,
+            )?;
+        }
+
+        Ok(result)
+    }
+
+    /// Delete a subgraph using filter predicates (Level 5 - Specification §877-920)
+    ///
+    /// Returns a new graph WITHOUT elements matching the filters.
+    /// Essentially the inverse of extract_filtered.
+    ///
+    /// # Arguments
+    /// * `node_filter` - Optional predicate for nodes to DELETE: (id, value) -> bool
+    /// * `edge_filter` - Optional predicate for edges to DELETE: (from, to, type, weight, attrs) -> bool
+    ///
+    /// # Returns
+    /// A new Graph without elements matching the filters
+    pub fn delete_filtered(
+        &self,
+        node_filter: Option<Box<dyn Fn(&str, &Value) -> bool>>,
+        edge_filter: Option<Box<dyn Fn(&str, &str, &str, Option<f64>, &std::collections::HashMap<String, Value>) -> bool>>,
+    ) -> Result<Graph, GraphoidError> {
+        // Create inverted filters
+        let inverted_node_filter = node_filter.map(|f| {
+            Box::new(move |id: &str, val: &Value| -> bool {
+                !f(id, val)
+            }) as Box<dyn Fn(&str, &Value) -> bool>
+        });
+
+        let inverted_edge_filter = edge_filter.map(|f| {
+            Box::new(move |from: &str, to: &str, edge_type: &str, weight: Option<f64>, attrs: &std::collections::HashMap<String, Value>| -> bool {
+                !f(from, to, edge_type, weight, attrs)
+            }) as Box<dyn Fn(&str, &str, &str, Option<f64>, &std::collections::HashMap<String, Value>) -> bool>
+        });
+
+        // Use extract_filtered with inverted filters
+        // Always include orphans when deleting (keep nodes that don't match delete filter)
+        self.extract_filtered(inverted_node_filter, inverted_edge_filter, true)
+    }
+
+    /// Add/merge another graph into this one (Level 5 - Specification §877-920)
+    ///
+    /// Merges all nodes and edges from another graph into a new graph.
+    /// Handles node ID conflicts with configurable strategies.
+    ///
+    /// # Arguments
+    /// * `other` - The graph to merge
+    /// * `on_conflict` - Conflict resolution strategy: "keep_original", "overwrite", or None (default: keep_original)
+    ///
+    /// # Returns
+    /// A new Graph containing merged elements from both graphs
+    pub fn add_subgraph(
+        &self,
+        other: &Graph,
+        on_conflict: Option<String>,
+    ) -> Result<Graph, GraphoidError> {
+        // Create result graph starting with a copy of self
+        let mut result = Graph::new(self.graph_type.clone());
+        result.config = self.config.clone();
+
+        // Determine conflict strategy
+        let strategy = on_conflict.as_deref().unwrap_or("keep_original");
+
+        // Step 1: Add all nodes from self
+        for (node_id, node) in &self.nodes {
+            result.add_node(node_id.clone(), node.value.clone())?;
+            if let Some(node_type) = &node.node_type {
+                result.set_node_type(node_id, node_type.clone())?;
+            }
+        }
+
+        // Step 2: Add nodes from other, handling conflicts
+        for (node_id, node) in &other.nodes {
+            if result.has_node(node_id) {
+                // Node exists - handle conflict
+                match strategy {
+                    "keep_original" => {
+                        // Skip - keep existing node
+                        continue;
+                    }
+                    "overwrite" => {
+                        // Replace with new value
+                        // We need to update the existing node's value
+                        if let Some(existing_node) = result.nodes.get_mut(node_id) {
+                            existing_node.value = node.value.clone();
+                            existing_node.node_type = node.node_type.clone();
+                        }
+                    }
+                    "merge" => {
+                        // For now, merge means overwrite value but keep all edges
+                        if let Some(existing_node) = result.nodes.get_mut(node_id) {
+                            existing_node.value = node.value.clone();
+                            // Node type: prefer other's type if set
+                            if node.node_type.is_some() {
+                                existing_node.node_type = node.node_type.clone();
+                            }
+                        }
+                    }
+                    _ => {
+                        return Err(GraphoidError::runtime(format!(
+                            "Unknown conflict resolution strategy: '{}'. Use 'keep_original', 'overwrite', or 'merge'",
+                            strategy
+                        )));
+                    }
+                }
+            } else {
+                // Node doesn't exist - add it
+                result.add_node(node_id.clone(), node.value.clone())?;
+                if let Some(node_type) = &node.node_type {
+                    result.set_node_type(node_id, node_type.clone())?;
+                }
+            }
+        }
+
+        // Step 3: Add all edges from self
+        for (from_id, from_node) in &self.nodes {
+            for (to_id, edge_info) in &from_node.neighbors {
+                result.add_edge(
+                    from_id,
+                    to_id,
+                    edge_info.edge_type.clone(),
+                    edge_info.weight,
+                    edge_info.properties.clone(),
+                )?;
+            }
+        }
+
+        // Step 4: Add all edges from other
+        // Note: Edges are uniquely identified by (from, to, type) tuple
+        // If same edge exists, it will be skipped by add_edge
+        for (from_id, from_node) in &other.nodes {
+            for (to_id, edge_info) in &from_node.neighbors {
+                // Only add edge if both nodes exist in result
+                if result.has_node(from_id) && result.has_node(to_id) {
+                    // Try to add edge - if it already exists, this will fail gracefully
+                    // depending on graph configuration
+                    let _ = result.add_edge(
+                        from_id,
+                        to_id,
+                        edge_info.edge_type.clone(),
+                        edge_info.weight,
+                        edge_info.properties.clone(),
+                    );
+                    // Ignore errors for duplicate edges - keep first one
+                }
+            }
+        }
+
+        Ok(result)
+    }
 }
 
