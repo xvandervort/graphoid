@@ -91,6 +91,69 @@ Demonstrates the core feature of Graphoid:
 ~/.cargo/bin/cargo run --quiet examples/graphs.gr
 ```
 
+### 6. modules_basic.gr ✅ Working
+
+**Module System Basics**
+
+Explains the basic concepts of the module system:
+- Module declaration syntax: `module name alias short`
+- Import statements: `import "./path/to/module"`
+- Namespace access: `module_alias.function()`
+- Load vs import differences
+
+This is an informational example explaining how modules work.
+
+```bash
+~/.cargo/bin/cargo run --quiet examples/modules_basic.gr
+```
+
+### 7. modules_math.gr + modules_main.gr ✅ Working
+
+**Multi-File Module Example**
+
+`modules_math.gr` is a complete module demonstrating:
+- Module declaration with alias
+- Exporting constants (PI, E, GOLDEN_RATIO)
+- Exporting functions (square, cube, power, circle_area, etc.)
+- Utility functions (abs, max, min)
+
+`modules_main.gr` imports and uses the math module:
+- Importing `modules_math.gr`
+- Accessing module constants
+- Calling module functions
+- Full working example of multi-file programs
+
+```bash
+~/.cargo/bin/cargo run --quiet examples/modules_main.gr
+```
+
+Expected output:
+```
+=== Using Math Module ===
+
+Mathematical constants:
+  PI = 3.14159265359
+  E = 2.71828182846
+  Golden Ratio = 1.61803398875
+
+Basic operations:
+  square(7) = 49
+  cube(3) = 27
+  power(2, 10) = 1024
+
+Circle with radius 5 :
+  Area = 78.53981633974999
+  Circumference = 31.4159265359
+
+Sphere with radius 5 :
+  Volume = 523.5987755983333
+
+Utility functions:
+  abs(-42) = 42
+  max(10, 20) = 20
+  min(10, 20) = 10
+```
+
 ## Interactive REPL
 
 Try Graphoid interactively:
@@ -147,6 +210,33 @@ graphoid> exit
 - `replace(old, new)` - Replace substring
 - `index_of(sub)` - Find substring position
 - `split(delim)` - Split into list
+
+### Module System
+
+Organize code into reusable modules:
+
+**Module Declaration (in module file):**
+```graphoid
+module math alias m
+
+PI = 3.14159
+fn square(x) { return x * x }
+```
+
+**Import Module (in main file):**
+```graphoid
+import "./math"
+result = m.square(5)
+pi = m.PI
+```
+
+**Load File (merges into current namespace):**
+```graphoid
+load "./utilities.gr"
+# Can use functions directly without namespace
+```
+
+See `modules_math.gr` and `modules_main.gr` for complete working example.
 
 ### Behavior Rules
 

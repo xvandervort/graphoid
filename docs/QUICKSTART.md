@@ -340,6 +340,197 @@ result = data
 print(result)  # [6, 0, 3, 2, 0, 8]
 ```
 
+## Module System
+
+Graphoid supports multi-file programs through modules. Organize your code into reusable, maintainable pieces.
+
+### Creating a Module
+
+**File: math.gr**
+```graphoid
+# Declare this file as a module
+module math alias m
+
+# Export constants
+PI = 3.14159265359
+E = 2.71828182846
+
+# Export functions
+fn square(x) {
+    return x * x
+}
+
+fn circle_area(radius) {
+    return PI * radius * radius
+}
+
+fn abs(x) {
+    if x < 0 {
+        return -x
+    }
+    return x
+}
+```
+
+### Importing a Module
+
+**File: main.gr**
+```graphoid
+# Import the math module
+import "./math"
+
+# Use module alias to access exports
+print("PI =", m.PI)
+
+area = m.circle_area(5)
+print("Circle area:", area)
+
+val = m.abs(-42)
+print("Absolute value:", val)
+```
+
+### Module Declaration Syntax
+
+```graphoid
+# Full syntax
+module <module_name> alias <short_name>
+
+# Example
+module utilities alias util
+module database alias db
+module network alias net
+```
+
+The `alias` provides a short name for accessing the module's members.
+
+### Import Syntax
+
+```graphoid
+# Import with relative path
+import "./math"           # Same directory
+import "./lib/utils"      # Subdirectory
+import "../shared/config" # Parent directory
+
+# Import with alias override
+import "./math" alias math_lib
+
+# Module is bound by its declared alias (or override)
+result = m.square(10)     # Uses module's declared alias
+```
+
+### Load Statement (Alternative)
+
+The `load` statement merges a file's contents directly into your namespace:
+
+```graphoid
+# Load merges into current namespace (no module boundary)
+load "./utilities.gr"
+
+# Functions available directly (no namespace prefix)
+result = square(5)  # No module prefix needed
+```
+
+**Import vs Load:**
+- **`import`**: Creates isolated namespace, access via alias
+- **`load`**: Merges directly into current namespace
+
+### Module Caching
+
+Modules are loaded once and cached. Subsequent imports reuse the cached module:
+
+```graphoid
+import "./math"  # Loads and caches
+import "./math"  # Reuses cache (instant)
+```
+
+### Circular Dependency Detection
+
+Graphoid detects and prevents circular imports:
+
+```graphoid
+# File: a.gr
+import "./b"  # b imports c, c imports a → ERROR
+
+# Error: Circular dependency detected: a.gr → b.gr → c.gr → a.gr
+```
+
+### Module Resolution
+
+Graphoid searches for modules in this order:
+
+1. **Relative paths**: `./`, `../`
+2. **Same directory** as importing file
+3. **Search paths**: `src/`, `lib/`, `stdlib/`
+
+Extensions are optional:
+```graphoid
+import "./math"     # Resolves to math.gr
+import "./math.gr"  # Same result
+```
+
+### Example: Multi-File Project
+
+```
+my_project/
+├── main.gr
+├── lib/
+│   ├── math.gr
+│   └── string_utils.gr
+└── services/
+    └── api.gr
+```
+
+**lib/math.gr:**
+```graphoid
+module math alias m
+PI = 3.14159
+fn square(x) { return x * x }
+```
+
+**lib/string_utils.gr:**
+```graphoid
+module string_utils alias str
+fn capitalize(text) {
+    # Implementation
+}
+```
+
+**services/api.gr:**
+```graphoid
+module api alias api
+import "../lib/math"
+
+fn calculate_area(r) {
+    return m.PI * r * r
+}
+```
+
+**main.gr:**
+```graphoid
+import "./lib/math"
+import "./lib/string_utils"
+import "./services/api"
+
+# Use all modules
+area = api.calculate_area(5)
+print("Area:", area)
+```
+
+### Working Examples
+
+See `rust/examples/` for complete working module examples:
+- `modules_basic.gr` - Concepts and syntax
+- `modules_math.gr` - Complete module implementation
+- `modules_main.gr` - Using an imported module
+
+Run them:
+```bash
+cd rust
+cargo run --quiet examples/modules_main.gr
+```
+
+---
+
 ## Functions and Control Flow
 
 ### Functions
@@ -518,6 +709,7 @@ Check out the `rust/examples/` directory for more complete examples:
 ~/.cargo/bin/cargo run --quiet examples/hello_world.gr
 ~/.cargo/bin/cargo run --quiet examples/collections.gr
 ~/.cargo/bin/cargo run --quiet examples/behaviors.gr
+~/.cargo/bin/cargo run --quiet examples/modules_main.gr
 ~/.cargo/bin/cargo run --quiet examples/functions.gr
 ~/.cargo/bin/cargo run --quiet examples/graphs.gr
 ```
@@ -604,6 +796,27 @@ and, or, not        # Logical
 :lowercase           # string
 :validate_range      # clamp(min, max)
 :no_duplicates       # unique values only
+```
+
+### Module System
+
+```graphoid
+# Module declaration (in module file)
+module math alias m
+
+# Import module (in main file)
+import "./math"
+import "./lib/utils"
+import "../config"
+
+# Load file (merges namespace)
+load "./utilities.gr"
+
+# Access module members
+m.square(5)          # Call function
+m.PI                 # Access constant
+
+# Module caching & circular detection built-in
 ```
 
 ## Getting Help

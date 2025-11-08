@@ -624,6 +624,22 @@ impl Graph {
         self.nodes.values().map(|n| n.neighbors.len()).sum()
     }
 
+    /// Get all node IDs as a list
+    pub fn node_ids(&self) -> Vec<String> {
+        self.nodes.keys().cloned().collect()
+    }
+
+    /// Get all edges as a list of tuples (from, to, edge_type)
+    pub fn edge_list(&self) -> Vec<(String, String, String)> {
+        let mut edges = Vec::new();
+        for (from_id, node) in &self.nodes {
+            for (to_id, edge_info) in &node.neighbors {
+                edges.push((from_id.clone(), to_id.clone(), edge_info.edge_type.clone()));
+            }
+        }
+        edges
+    }
+
     /// Remove a node from the graph
     /// Remove a node with optional orphan handling policy override
     pub fn remove_node(

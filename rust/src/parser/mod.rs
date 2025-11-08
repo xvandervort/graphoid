@@ -1146,6 +1146,15 @@ impl Parser {
                 });
             } else {
                 // Suffix if/unless form (no else)
+                // Important: Suffix forms should NOT have a block after the condition
+                // If we see `{`, this is likely a statement-level if, not a suffix conditional
+                if self.check(&TokenType::LeftBrace) {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Suffix conditional (value if condition) cannot have a block. Did you mean to use a statement-level if?".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
+
                 return Ok(Expr::Conditional {
                     condition: Box::new(condition),
                     then_expr: Box::new(expr),
@@ -1376,8 +1385,23 @@ impl Parser {
         let mut expr = self.primary()?;
 
         loop {
+            // Save position before skipping newlines
+            let checkpoint = self.current;
+
             // Skip newlines to allow method chaining across lines
             while self.match_token(&TokenType::Newline) {}
+
+            // Check if we have a postfix operator
+            let has_postfix = self.check(&TokenType::LeftParen)
+                || self.check(&TokenType::LeftBracket)
+                || self.check(&TokenType::Dot);
+
+            // If we skipped newlines but don't have a postfix operator, rewind
+            // This prevents suffix conditionals from crossing line boundaries
+            if checkpoint != self.current && !has_postfix {
+                self.current = checkpoint;
+                break;
+            }
 
             if self.match_token(&TokenType::LeftParen) {
                 // Function call
@@ -1932,6 +1956,83 @@ impl Parser {
             }
 
             return Ok(Expr::Map { entries, position });
+        }
+
+        // If expressions with block syntax: if condition { expr } else { expr }
+        // This must come BEFORE map literal parsing to avoid confusion
+        if self.match_token(&TokenType::If) || self.match_token(&TokenType::Unless) {
+            let is_unless = self.previous().token_type == TokenType::Unless;
+            let if_position = self.previous_position();
+
+            // Parse condition
+            let condition = self.or_expression()?;
+
+            // Check for block syntax
+            if self.match_token(&TokenType::LeftBrace) {
+                // Parse then block
+                let then_statements = self.block()?;
+
+                if !self.match_token(&TokenType::RightBrace) {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected '}' after if block".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
+
+                let then_expr = Expr::Block {
+                    statements: then_statements,
+                    position: if_position.clone(),
+                };
+
+                // Check for else
+                let else_expr = if self.match_token(&TokenType::Else) {
+                    if is_unless {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "'unless' cannot be used with 'else'".to_string(),
+                            position: if_position,
+                        });
+                    }
+
+                    // Else must also be a block
+                    if !self.match_token(&TokenType::LeftBrace) {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected '{' after 'else'".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+
+                    let else_statements = self.block()?;
+
+                    if !self.match_token(&TokenType::RightBrace) {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected '}' after else block".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+
+                    Some(Box::new(Expr::Block {
+                        statements: else_statements,
+                        position: self.previous_position(),
+                    }))
+                } else {
+                    None
+                };
+
+                return Ok(Expr::Conditional {
+                    condition: Box::new(condition),
+                    then_expr: Box::new(then_expr),
+                    else_expr,
+                    is_unless,
+                    position: if_position,
+                });
+            } else {
+                // No block, this shouldn't happen in primary()
+                // This would be handled by conditional_expression for suffix forms
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '{' after if condition (use suffix form for inline conditionals)".to_string(),
+                    position: self.peek().position(),
+                });
+            }
         }
 
         // Maps without type: {}

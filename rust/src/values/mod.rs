@@ -353,10 +353,22 @@ impl PatternMatchResults {
     /// New PatternMatchResults with only the specified variables in each binding
     ///
     /// # Example
-    /// ```ignore
-    /// // Match returns: {person: "Alice", friend: "Bob"}
+    /// ```
+    /// use graphoid::values::{PatternMatchResults, Graph};
+    /// use std::collections::HashMap;
+    ///
+    /// let graph = Graph::new(graphoid::values::GraphType::Directed);
+    /// let mut bindings = Vec::new();
+    /// let mut binding = HashMap::new();
+    /// binding.insert("person".to_string(), "Alice".to_string());
+    /// binding.insert("friend".to_string(), "Bob".to_string());
+    /// bindings.push(binding);
+    ///
+    /// let results = PatternMatchResults::new(bindings, graph);
     /// let projected = results.return_vars(vec!["person"]);
-    /// // Returns: {person: "Alice"}
+    /// assert_eq!(projected.len(), 1);
+    /// assert!(projected.get(0).unwrap().contains_key("person"));
+    /// assert!(!projected.get(0).unwrap().contains_key("friend"));
     /// ```
     pub fn return_vars(&self, vars: Vec<&str>) -> Self {
         let projected: Vec<std::collections::HashMap<String, String>> = self.bindings
@@ -384,11 +396,34 @@ impl PatternMatchResults {
     /// Vector of HashMaps where keys are "variable.property" and values are the property values
     ///
     /// # Example
-    /// ```ignore
-    /// // Match returns: {person: "Alice", friend: "Bob"}
-    /// // Where Alice has age=30, Bob has age=25
-    /// let projected = results.return_properties(vec!["person.age", "friend.age"])?;
-    /// // Returns: [{"person.age": 30.0, "friend.age": 25.0}]
+    /// ```
+    /// use graphoid::values::{PatternMatchResults, Graph, Value};
+    /// use std::collections::HashMap;
+    ///
+    /// let mut graph = Graph::new(graphoid::values::GraphType::Directed);
+    /// // Add nodes with properties
+    /// graph.add_node("Alice".to_string(), Value::number(30.0)).unwrap();
+    /// graph.add_node("Bob".to_string(), Value::number(25.0)).unwrap();
+    /// graph.set_node_properties("Alice", {
+    ///     let mut props = HashMap::new();
+    ///     props.insert("age".to_string(), Value::number(30.0));
+    ///     props
+    /// }).unwrap();
+    /// graph.set_node_properties("Bob", {
+    ///     let mut props = HashMap::new();
+    ///     props.insert("age".to_string(), Value::number(25.0));
+    ///     props
+    /// }).unwrap();
+    ///
+    /// let mut bindings = Vec::new();
+    /// let mut binding = HashMap::new();
+    /// binding.insert("person".to_string(), "Alice".to_string());
+    /// binding.insert("friend".to_string(), "Bob".to_string());
+    /// bindings.push(binding);
+    ///
+    /// let results = PatternMatchResults::new(bindings, graph);
+    /// let projected = results.return_properties(vec!["person.age", "friend.age"]).unwrap();
+    /// assert_eq!(projected.len(), 1);
     /// ```
     pub fn return_properties(&self, specs: Vec<&str>) -> Result<Vec<std::collections::HashMap<String, Value>>, crate::error::GraphoidError> {
         let mut result = Vec::new();

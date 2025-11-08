@@ -1,0 +1,38 @@
+# Main Program Using Math Module
+# This demonstrates importing and using a module
+
+import "./modules_math"
+
+print("=== Using Math Module ===")
+print()
+
+# Access constants
+print("Mathematical constants:")
+print("  PI =", m.PI)
+print("  E =", m.E)
+print("  Golden Ratio =", m.GOLDEN_RATIO)
+print()
+
+# Use basic functions
+print("Basic operations:")
+print("  square(7) =", m.square(7))
+print("  cube(3) =", m.cube(3))
+print("  power(2, 10) =", m.power(2, 10))
+print()
+
+# Use geometric functions
+radius = 5
+print("Circle with radius", radius, ":")
+print("  Area =", m.circle_area(radius))
+print("  Circumference =", m.circle_circumference(radius))
+print()
+
+print("Sphere with radius", radius, ":")
+print("  Volume =", m.sphere_volume(radius))
+print()
+
+# Use utility functions
+print("Utility functions:")
+print("  abs(-42) =", m.abs(-42))
+print("  max(10, 20) =", m.max(10, 20))
+print("  min(10, 20) =", m.min(10, 20))

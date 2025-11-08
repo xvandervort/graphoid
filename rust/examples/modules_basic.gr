@@ -1,0 +1,40 @@
+# Basic Module System Example
+# This example demonstrates how to create and import modules in Graphoid
+
+# This would normally be in a separate file called math.gr:
+# =========================================================
+# module math alias m
+#
+# fn square(x) {
+#     return x * x
+# }
+#
+# fn cube(x) {
+#     return x * x * x
+# }
+#
+# PI = 3.14159
+# E = 2.71828
+# =========================================================
+
+# Then in your main file, you would import it:
+# import "./math"
+#
+# result = m.square(5)
+# print("Square of 5:", result)
+#
+# pi = m.PI
+# print("PI:", pi)
+
+print("=== Module System Basics ===")
+print()
+print("Modules allow you to organize code into separate files")
+print("and create reusable libraries.")
+print()
+print("Key concepts:")
+print("1. Module Declaration: 'module name alias short_name'")
+print("2. Import Statement: 'import \"./path/to/module\"'")
+print("3. Namespace Access: 'module_alias.function()'")
+print("4. Load Statement: 'load \"./file.gr\"' (merges into current namespace)")
+print()
+print("See rust/tests/fixtures/modules/ for working examples")

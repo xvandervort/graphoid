@@ -24,6 +24,12 @@ fn run_file(path: &str) {
         Ok(source) => {
             let mut executor = Executor::new();
 
+            // Set current file for module resolution
+            use std::path::PathBuf;
+            let abs_path = PathBuf::from(path).canonicalize()
+                .unwrap_or_else(|_| PathBuf::from(path));
+            executor.set_current_file(Some(abs_path));
+
             match execute_source(&source, &mut executor) {
                 Ok(_) => {
                     // File executed successfully

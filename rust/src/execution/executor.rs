@@ -757,15 +757,32 @@ impl Executor {
     /// Evaluates a block expression (used in lambda bodies).
     /// Returns the value of the last expression, or none if the block is empty or only has statements.
     fn eval_block(&mut self, statements: &[Stmt]) -> Result<Value> {
-        // Execute all statements in the block
-        for stmt in statements {
+        if statements.is_empty() {
+            return Ok(Value::none());
+        }
+
+        // Execute all statements except the last
+        for stmt in &statements[..statements.len() - 1] {
             // Execute the statement and check for returns
             if let Some(return_value) = self.eval_stmt(stmt)? {
                 return Ok(return_value);
             }
         }
 
-        // No explicit return, return none
+        // Handle the last statement specially - it might be an implicit return
+        let last_stmt = &statements[statements.len() - 1];
+
+        // If it's an expression statement, return its value
+        if let Stmt::Expression { expr, .. } = last_stmt {
+            return self.eval_expr(expr);
+        }
+
+        // Otherwise, execute it normally and check for explicit return
+        if let Some(return_value) = self.eval_stmt(last_stmt)? {
+            return Ok(return_value);
+        }
+
+        // No explicit return and last statement is not an expression, return none
         Ok(Value::none())
     }
 
@@ -3122,6 +3139,62 @@ impl Executor {
                     .collect();
 
                 Ok(Value::list(crate::values::List::from_vec(result_list)))
+            }
+            "get_node" => {
+                // Get the value of a node by ID
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "get_node() expects 1 argument (node_id), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get node ID
+                let node_id = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
+                    _ => {
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
+                    }
+                };
+
+                // Get the node value
+                match graph.get_node(node_id) {
+                    Some(value) => Ok(value.clone()),
+                    None => Ok(Value::none()),
+                }
+            }
+            "nodes" => {
+                // Get all node IDs as a list
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "nodes() expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let node_ids = graph.node_ids();
+                let node_id_values: Vec<Value> = node_ids.iter().map(|id| Value::string(id.clone())).collect();
+                Ok(Value::list(crate::values::List::from_vec(node_id_values)))
+            }
+            "edges" => {
+                // Get all edges as a list of lists [from, to, edge_type]
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "edges() expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let edge_list = graph.edge_list();
+                let edge_values: Vec<Value> = edge_list.iter().map(|(from, to, edge_type)| {
+                    let edge_vec = vec![
+                        Value::string(from.clone()),
+                        Value::string(to.clone()),
+                        Value::string(edge_type.clone()),
+                    ];
+                    Value::list(crate::values::List::from_vec(edge_vec))
+                }).collect();
+                Ok(Value::list(crate::values::List::from_vec(edge_values)))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Graph does not have method '{}'",

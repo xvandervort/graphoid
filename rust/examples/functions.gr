@@ -3,13 +3,13 @@
 print("=== Functions ===")
 
 # Define a simple function
-func add(a, b) { return a + b }
+fn add(a, b) { return a + b }
 
 result = add(5, 3)
 print("5 + 3 =", result)
 
 # Another function
-func square(x) { return x * x }
+fn square(x) { return x * x }
 print("square(7) =", square(7))
 
 print("\n=== Lambdas ===")
@@ -53,13 +53,16 @@ for i in [1, 2, 3, 4, 5] { print("  ", i) }
 # while loop
 print("Countdown:")
 count = 5
-while count > 0 { print("  ", count); count = count - 1 }
+while count > 0 {
+    print("  ", count)
+    count = count - 1
+}
 print("  Liftoff!")
 
 print("\n=== Pattern Matching ===")
 
-# Pipe syntax for transformation
-func double(n) { return n | x => x * 2 }
-print("Process 5:", double(5))
+# TODO: Pipe syntax not yet implemented
+# fn double(n) { return n | x => x * 2 }
+# print("Process 5:", double(5))
 
 print("\nFunctions make Graphoid expressive and powerful!")
