@@ -465,7 +465,7 @@ impl Executor {
                 let module_value = self.load_module(module, alias.as_ref())?;
 
                 // Determine the binding name:
-                // 1. Use explicit import alias if provided (import "foo" alias bar)
+                // 1. Use explicit import alias if provided (import "foo" as bar)
                 // 2. Use module's declared alias if available (module foo alias bar)
                 // 3. Use module's declared name (module foo)
                 // 4. Fall back to filename stem (already handled in load_module)

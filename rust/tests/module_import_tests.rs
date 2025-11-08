@@ -22,7 +22,7 @@ fn test_import_creates_module_namespace() {
 #[test]
 fn test_import_with_alias() {
     let mut executor = Executor::new();
-    let source = r#"import "simple_module" alias sm"#;
+    let source = r#"import "simple_module" as sm"#;
 
     let test_file = PathBuf::from("tests/fixtures/modules/test.gr");
     executor.set_current_file(Some(test_file));

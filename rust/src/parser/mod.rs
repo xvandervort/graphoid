@@ -536,7 +536,7 @@ impl Parser {
         };
 
         // Check for 'as' alias
-        let alias = if self.match_token(&TokenType::Alias) {
+        let alias = if self.match_token(&TokenType::As) {
             if let TokenType::Identifier(id) = &self.peek().token_type {
                 let a = id.clone();
                 self.advance();
