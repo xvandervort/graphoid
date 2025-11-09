@@ -28,11 +28,12 @@ fn test_binary_tree_includes_tree_rules() {
 #[test]
 fn test_bst_includes_binary_tree_rules() {
     let rules = get_ruleset_rules("bst");
-    // Currently identical to binary_tree
-    assert_eq!(rules.len(), 4);
+    // BST includes binary_tree rules + BST ordering
+    assert_eq!(rules.len(), 5);
 
     let specs: Vec<&RuleSpec> = rules.iter().map(|r| &r.spec).collect();
     assert!(specs.contains(&&RuleSpec::MaxDegree(2)));
+    assert!(specs.contains(&&RuleSpec::BSTOrdering));
 }
 
 #[test]

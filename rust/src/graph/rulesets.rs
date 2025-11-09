@@ -10,7 +10,7 @@
 //! graph (no rules)
 //!   └─ :tree (no_cycles, single_root, connected)
 //!       └─ :binary_tree (tree + max_degree 2)
-//!           └─ :bst (binary_tree + bst_ordering - not yet implemented)
+//!           └─ :bst (binary_tree + bst_ordering)
 //!   └─ :dag (no_cycles only)
 //! ```
 //!
@@ -35,7 +35,7 @@ use super::rules::{RuleSpec, RuleInstance};
 ///
 /// - `:tree` - Basic tree structure (no_cycles, single_root, connected)
 /// - `:binary_tree` - Binary tree (includes :tree + max 2 children)
-/// - `:bst` - Binary search tree (includes :binary_tree + ordering - TODO)
+/// - `:bst` - Binary search tree (includes :binary_tree + BST ordering)
 /// - `:dag` - Directed acyclic graph (no_cycles only)
 ///
 /// # Arguments
@@ -101,15 +101,17 @@ fn ruleset_binary_tree() -> Vec<RuleInstance> {
 /// :bst ruleset - Binary search tree
 ///
 /// Includes all :binary_tree rules plus:
-/// - BST ordering: Left child < parent < right child (TODO - not yet implemented)
+/// - BST ordering: Left child < parent < right child
 ///
-/// Note: The BST ordering rule is not yet implemented. Currently this ruleset
-/// behaves identically to :binary_tree. BST-specific behavior (automatic ordering
-/// on insert) will be added in a future phase.
+/// The BST ordering rule enforces that:
+/// - All node values must be numeric
+/// - For edges labeled "left": child value < parent value
+/// - For edges labeled "right": child value > parent value
+/// - Equality is not allowed (strict ordering)
 fn ruleset_bst() -> Vec<RuleInstance> {
-    // TODO: Add BSTOrderingRule when implemented
-    // For now, BST is identical to binary_tree
-    ruleset_binary_tree()
+    let mut rules = ruleset_binary_tree(); // Inherit binary_tree rules
+    rules.push(RuleInstance::new(RuleSpec::BSTOrdering));
+    rules
 }
 
 /// :dag ruleset - Directed acyclic graph

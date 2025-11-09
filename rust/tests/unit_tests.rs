@@ -30,4 +30,6 @@ mod unit {
     pub mod orphan_management_tests;
     pub mod subgraph_operations_tests;
     pub mod graph_pattern_execution_tests;
+    pub mod priv_keyword_tests;
+    pub mod bst_ordering_tests;
 }

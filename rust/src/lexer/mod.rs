@@ -583,6 +583,7 @@ impl Lexer {
             "load" => TokenType::Load,
             "module" => TokenType::Module,
             "alias" => TokenType::Alias,
+            "priv" => TokenType::Priv,
             "configure" => TokenType::Configure,
             "precision" => TokenType::Precision,
             "and" => TokenType::And,

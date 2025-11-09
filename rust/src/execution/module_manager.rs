@@ -10,6 +10,7 @@ pub struct Module {
     pub namespace: Environment,
     pub file_path: PathBuf,
     pub config: Option<ConfigScope>,
+    pub private_symbols: std::collections::HashSet<String>,  // Phase 10: Track private symbols
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -65,8 +66,13 @@ impl ModuleManager {
     }
 
     fn get_stdlib_path() -> PathBuf {
-        // TODO: Make configurable
-        PathBuf::from("stdlib")
+        // Check GRAPHOID_STDLIB_PATH environment variable
+        if let Ok(path) = std::env::var("GRAPHOID_STDLIB_PATH") {
+            PathBuf::from(path)
+        } else {
+            // Default to "stdlib" directory
+            PathBuf::from("stdlib")
+        }
     }
 
     /// Resolve module name to file path

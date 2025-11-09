@@ -35,6 +35,7 @@ pub enum TokenType {
     Load,
     Module,
     Alias,
+    Priv,        // priv keyword for private symbols
     Configure,
     Precision,
     And,

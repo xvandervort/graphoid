@@ -4,7 +4,7 @@ use crate::execution::Environment;
 use crate::execution::config::{ConfigStack, ErrorMode};
 use crate::execution::error_collector::ErrorCollector;
 use crate::execution::function_graph::FunctionGraph;
-use crate::execution::module_manager::{ModuleManager, Module};
+use crate::execution::module_manager::{ModuleManager, Module, ConfigScope, ErrorMode as ModuleErrorMode, BoundsMode};
 use crate::values::{Function, Value, ValueKind, List, Hash, ErrorObject};
 use crate::graph::{RuleSpec, RuleInstance};
 use crate::lexer::Lexer;
@@ -27,6 +27,8 @@ pub struct Executor {
     pub function_graph: Rc<RefCell<FunctionGraph>>,
     /// Global function table (for recursion support)
     global_functions: HashMap<String, Function>,
+    /// Private symbols (Phase 10: priv keyword support)
+    private_symbols: std::collections::HashSet<String>,
 }
 
 impl Executor {
@@ -42,6 +44,7 @@ impl Executor {
             error_collector: ErrorCollector::new(),
             function_graph: Rc::new(RefCell::new(FunctionGraph::new())),
             global_functions: HashMap::new(),
+            private_symbols: std::collections::HashSet::new(),
         }
     }
 
@@ -57,6 +60,7 @@ impl Executor {
             error_collector: ErrorCollector::new(),
             function_graph: Rc::new(RefCell::new(FunctionGraph::new())),
             global_functions: HashMap::new(),
+            private_symbols: std::collections::HashSet::new(),
         }
     }
 
@@ -238,10 +242,17 @@ impl Executor {
             Stmt::VariableDecl {
                 name,
                 value,
+                is_private,
                 ..
             } => {
                 let val = self.eval_expr(value)?;
                 self.env.define(name.clone(), val);
+
+                // Phase 10: Track private symbols
+                if *is_private {
+                    self.private_symbols.insert(name.clone());
+                }
+
                 Ok(None)
             }
             Stmt::Assignment { target, value, .. } => {
@@ -331,6 +342,7 @@ impl Executor {
                 params,
                 body,
                 pattern_clauses,
+                is_private,
                 ..
             } => {
                 // Extract parameter names
@@ -356,6 +368,12 @@ impl Executor {
 
                 // Store function in environment
                 self.env.define(name.clone(), Value::function(func));
+
+                // Phase 10: Track private symbols
+                if *is_private {
+                    self.private_symbols.insert(name.clone());
+                }
+
                 Ok(None)
             }
             Stmt::Return { value, .. } => {
@@ -961,6 +979,14 @@ impl Executor {
 
         // Check for module member access (e.g., module.function(args) or module.variable)
         if let ValueKind::Module(ref module) = &object_value.kind {
+            // Phase 10: Check if member is private
+            if module.private_symbols.contains(method) {
+                return Err(GraphoidError::runtime(format!(
+                    "Cannot access private symbol '{}' from module '{}'",
+                    method, module.name
+                )));
+            }
+
             // Look up the member in the module's namespace
             let member = module.namespace.get(method)?;
 
@@ -3606,7 +3632,7 @@ impl Executor {
                         .iter()
                         .map(|collected_err| {
                             Value::error(ErrorObject::new(
-                                "RuntimeError".to_string(), // TODO: preserve actual error type
+                                collected_err.error.error_type(),
                                 collected_err.error.to_string(),
                                 collected_err.file.clone(),
                                 collected_err.position.line,
@@ -4758,13 +4784,17 @@ impl Executor {
             None
         };
 
+        // Extract module config from executor's config stack
+        let module_config = Self::extract_module_config(&module_executor);
+
         // Create Module value
         let module = Module {
             name: module_name,
             alias: module_alias,
             namespace: module_executor.env.clone(),
             file_path: resolved_path.clone(),
-            config: None, // TODO: Extract config from module
+            config: module_config,
+            private_symbols: module_executor.private_symbols.clone(),  // Phase 10: Track private symbols
         };
 
         // Register module in manager
@@ -4774,6 +4804,33 @@ impl Executor {
         self.module_manager.end_loading(&resolved_path);
 
         Ok(Value::module(module))
+    }
+
+    /// Extract module configuration from executor's config stack
+    fn extract_module_config(executor: &Executor) -> Option<ConfigScope> {
+        let config = executor.config_stack.current();
+
+        // Only create ConfigScope if there are non-default settings
+        let has_custom_config = config.decimal_places.is_some()
+            || config.error_mode != crate::execution::config::ErrorMode::Strict
+            || config.bounds_checking != crate::execution::config::BoundsCheckingMode::Strict;
+
+        if !has_custom_config {
+            return None;
+        }
+
+        Some(ConfigScope {
+            decimal_places: config.decimal_places.map(|p| p as u8),
+            error_mode: Some(match config.error_mode {
+                crate::execution::config::ErrorMode::Strict => ModuleErrorMode::Strict,
+                crate::execution::config::ErrorMode::Lenient => ModuleErrorMode::Lenient,
+                crate::execution::config::ErrorMode::Collect => ModuleErrorMode::Collect,
+            }),
+            bounds_checking: Some(match config.bounds_checking {
+                crate::execution::config::BoundsCheckingMode::Strict => BoundsMode::Strict,
+                crate::execution::config::BoundsCheckingMode::Lenient => BoundsMode::Lenient,
+            }),
+        })
     }
 
     /// Executes a load statement - merges file contents into current namespace
@@ -4931,13 +4988,16 @@ impl Executor {
 
                 // Bind error to variable if specified (in the catch scope)
                 if let Some(ref var_name) = catch_clause.variable {
+                    // Extract position from error
+                    let error_position = error.position();
+
                     // Create an Error object from the GraphoidError with call stack
                     let error_obj = ErrorObject::with_stack_trace(
                         error_type_name.clone(),
                         actual_message.clone(),
                         self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
-                        0,    // TODO: Extract from GraphoidError position
-                        0,    // TODO: Extract from GraphoidError position
+                        error_position.line,
+                        error_position.column,
                         self.call_stack.clone(),
                     );
                     self.env.define(var_name.clone(), Value::error(error_obj));

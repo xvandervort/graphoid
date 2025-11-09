@@ -103,6 +103,37 @@ impl GraphoidError {
     pub fn runtime(message: String) -> Self {
         GraphoidError::RuntimeError { message }
     }
+
+    /// Returns the type name of the error (e.g., "SyntaxError", "RuntimeError")
+    pub fn error_type(&self) -> String {
+        match self {
+            GraphoidError::SyntaxError { .. } => "SyntaxError".to_string(),
+            GraphoidError::TypeError { .. } => "TypeError".to_string(),
+            GraphoidError::RuntimeError { .. } => "RuntimeError".to_string(),
+            GraphoidError::RuleViolation { .. } => "RuleViolation".to_string(),
+            GraphoidError::ModuleNotFound { .. } => "ModuleNotFound".to_string(),
+            GraphoidError::IOError { .. } => "IOError".to_string(),
+            GraphoidError::CircularDependency { .. } => "CircularDependency".to_string(),
+            GraphoidError::IoError(_) => "IOError".to_string(),
+            GraphoidError::ConfigError { .. } => "ConfigError".to_string(),
+        }
+    }
+
+    /// Returns the source position if available, otherwise returns unknown position
+    pub fn position(&self) -> SourcePosition {
+        match self {
+            GraphoidError::SyntaxError { position, .. } => position.clone(),
+            GraphoidError::TypeError { position, .. } => position.clone(),
+            GraphoidError::ModuleNotFound { position, .. } => position.clone(),
+            GraphoidError::IOError { position, .. } => position.clone(),
+            GraphoidError::CircularDependency { position, .. } => position.clone(),
+            // Errors without position return unknown
+            GraphoidError::RuntimeError { .. } => SourcePosition::unknown(),
+            GraphoidError::RuleViolation { .. } => SourcePosition::unknown(),
+            GraphoidError::IoError(_) => SourcePosition::unknown(),
+            GraphoidError::ConfigError { .. } => SourcePosition::unknown(),
+        }
+    }
 }
 
 impl Clone for GraphoidError {

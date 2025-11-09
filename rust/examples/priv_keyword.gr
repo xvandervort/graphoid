@@ -1,0 +1,71 @@
+# Phase 10: Private Symbol Demonstration
+#
+# The priv keyword marks functions and variables as private to a module.
+# Private symbols can only be accessed from within the same module,
+# not from importing modules.
+
+print("=== Example 1: Private Variables ===")
+
+priv API_KEY = "sk-1234567890abcdef"
+priv MAX_RETRIES = 3
+
+PUBLIC_URL = "https://api.example.com"
+
+fn make_request() {
+    print("Making request to")
+    print(PUBLIC_URL)
+    print("Using API key")
+    print(API_KEY)
+}
+
+make_request()
+
+print("\n=== Example 2: Private Functions ===")
+
+priv fn validate_input(x) {
+    if x == none {
+        return false
+    }
+    return true
+}
+
+priv fn square(x) {
+    return x * x
+}
+
+fn process_number(x) {
+    valid = validate_input(x)
+    if valid {
+        result = square(x)
+        print("Result")
+        print(result)
+        return result
+    }
+    print("Invalid input")
+    return none
+}
+
+process_number(5)
+
+print("\n=== Example 3: Mixing Public and Private ===")
+
+priv INTERNAL_STATE = 0
+
+fn get_state() {
+    return INTERNAL_STATE
+}
+
+priv fn increment() {
+    INTERNAL_STATE = INTERNAL_STATE + 1
+}
+
+fn update() {
+    increment()
+    print("State updated")
+}
+
+update()
+
+print("\n=== Examples Complete ===")
+print("All private symbols are accessible within this module")
+print("but would NOT be accessible if this file were imported")

@@ -105,6 +105,8 @@ pub enum RuleSpec {
     WeightedEdges,
     /// No edges may have weights (all unweighted)
     UnweightedEdges,
+    /// Binary Search Tree ordering (left < parent < right)
+    BSTOrdering,
 
     // ========================================================================
     // Transformation Rules (Value transformations)
@@ -171,6 +173,7 @@ impl RuleSpec {
             RuleSpec::NoDuplicates => Box::new(NoDuplicatesRule::new()),
             RuleSpec::WeightedEdges => Box::new(WeightedEdgesRule::new()),
             RuleSpec::UnweightedEdges => Box::new(UnweightedEdgesRule::new()),
+            RuleSpec::BSTOrdering => Box::new(BSTOrderingRule::new()),
 
             // Transformation rules (from behaviors.rs for now)
             RuleSpec::NoneToZero => Box::new(NoneToZeroBehavior),
@@ -208,6 +211,7 @@ impl RuleSpec {
             RuleSpec::NoDuplicates => "no_duplicates",
             RuleSpec::WeightedEdges => "weighted_edges",
             RuleSpec::UnweightedEdges => "unweighted_edges",
+            RuleSpec::BSTOrdering => "bst_ordering",
 
             // Transformation rules
             RuleSpec::NoneToZero => "none_to_zero",
@@ -240,6 +244,7 @@ impl RuleSpec {
             "connected" => Some(RuleSpec::Connected),
             "binary_tree" => Some(RuleSpec::BinaryTree),
             "no_duplicates" => Some(RuleSpec::NoDuplicates),
+            "bst_ordering" => Some(RuleSpec::BSTOrdering),
 
             // Transformation rules
             "none_to_zero" => Some(RuleSpec::NoneToZero),
@@ -976,6 +981,115 @@ impl Rule for UnweightedEdgesRule {
         }
 
         Ok(())
+    }
+}
+
+/// Rule that enforces Binary Search Tree ordering: left < parent < right
+pub struct BSTOrderingRule;
+
+impl BSTOrderingRule {
+    /// Create a new BST ordering rule
+    pub fn new() -> Self {
+        BSTOrderingRule
+    }
+
+    /// Check if a value is numeric
+    fn is_numeric(value: &Value) -> bool {
+        matches!(value.kind, crate::values::ValueKind::Number(_))
+    }
+
+    /// Extract numeric value from a Value
+    fn get_number(value: &Value) -> Option<f64> {
+        if let crate::values::ValueKind::Number(n) = value.kind {
+            Some(n)
+        } else {
+            None
+        }
+    }
+}
+
+impl Rule for BSTOrderingRule {
+    fn name(&self) -> &str {
+        "bst_ordering"
+    }
+
+    fn validate(&self, graph: &Graph, context: &RuleContext) -> Result<(), GraphoidError> {
+        match &context.operation {
+            GraphOperation::AddNode { value, .. } => {
+                // BST ordering requires numeric values
+                if !Self::is_numeric(value) {
+                    return Err(GraphoidError::RuleViolation {
+                        rule: self.name().to_string(),
+                        message: "BST ordering rule requires all node values to be numeric".to_string(),
+                    });
+                }
+            }
+            GraphOperation::AddEdge { from, to, edge_type, .. } => {
+                // Only validate edges labeled "left" or "right"
+                if edge_type != "left" && edge_type != "right" {
+                    return Ok(());
+                }
+
+                // Get parent and child nodes
+                let parent_node = graph.nodes.get(from).ok_or_else(|| {
+                    GraphoidError::runtime(format!("Parent node '{}' not found", from))
+                })?;
+
+                let child_node = graph.nodes.get(to).ok_or_else(|| {
+                    GraphoidError::runtime(format!("Child node '{}' not found", to))
+                })?;
+
+                // Extract numeric values
+                let parent_value = Self::get_number(&parent_node.value).ok_or_else(|| {
+                    GraphoidError::RuleViolation {
+                        rule: self.name().to_string(),
+                        message: format!("Parent node '{}' must have a numeric value for BST ordering", from),
+                    }
+                })?;
+
+                let child_value = Self::get_number(&child_node.value).ok_or_else(|| {
+                    GraphoidError::RuleViolation {
+                        rule: self.name().to_string(),
+                        message: format!("Child node '{}' must have a numeric value for BST ordering", to),
+                    }
+                })?;
+
+                // Validate BST ordering based on edge type
+                if edge_type == "left" {
+                    // Left child must be strictly less than parent
+                    if child_value >= parent_value {
+                        return Err(GraphoidError::RuleViolation {
+                            rule: self.name().to_string(),
+                            message: format!(
+                                "BST ordering violation: left child ({}) must be less than parent ({})",
+                                child_value, parent_value
+                            ),
+                        });
+                    }
+                } else if edge_type == "right" {
+                    // Right child must be strictly greater than parent
+                    if child_value <= parent_value {
+                        return Err(GraphoidError::RuleViolation {
+                            rule: self.name().to_string(),
+                            message: format!(
+                                "BST ordering violation: right child ({}) must be greater than parent ({})",
+                                child_value, parent_value
+                            ),
+                        });
+                    }
+                }
+            }
+            _ => {
+                // For other operations (RemoveNode, RemoveEdge, etc.), no validation needed
+            }
+        }
+        Ok(())
+    }
+
+    fn should_run_on(&self, operation: &GraphOperation) -> bool {
+        // BST ordering should run on both node additions (to check numeric values)
+        // and edge additions (to check ordering)
+        matches!(operation, GraphOperation::AddNode { .. } | GraphOperation::AddEdge { .. })
     }
 }
 

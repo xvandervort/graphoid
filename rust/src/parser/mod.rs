@@ -51,6 +51,21 @@ impl Parser {
             });
         }
 
+        // Check for priv keyword (Phase 10)
+        let is_private = self.match_token(&TokenType::Priv);
+
+        // If we have priv followed by an identifier and =, it's a private variable declaration
+        if is_private && matches!(self.peek().token_type, TokenType::Identifier(_)) {
+            // Look ahead to see if there's an = after the identifier
+            let is_assignment = self.tokens.get(self.current + 1)
+                .map(|t| matches!(t.token_type, TokenType::Equal))
+                .unwrap_or(false);
+
+            if is_assignment {
+                return self.priv_variable_declaration_without_type();
+            }
+        }
+
         // Check for type annotations or keywords
         // BUT: If ListType is followed by dot, it's a static method call, not a declaration
         let is_list_static_call = self.check(&TokenType::ListType) && self.check_next(&TokenType::Dot);
@@ -66,9 +81,9 @@ impl Parser {
             || self.check(&TokenType::DataType)
             || self.check(&TokenType::TimeType)
         ) {
-            self.variable_declaration()
+            self.variable_declaration(is_private)
         } else if self.match_token(&TokenType::Func) {
-            self.function_declaration()
+            self.function_declaration(is_private)
         } else if self.match_token(&TokenType::If) {
             self.if_statement()
         } else if self.match_token(&TokenType::While) {
@@ -106,12 +121,32 @@ impl Parser {
         result
     }
 
-    fn variable_declaration(&mut self) -> Result<Stmt> {
+    fn variable_declaration(&mut self, is_private: bool) -> Result<Stmt> {
         let position = self.peek().position();
 
         // Parse type annotation
         let type_annotation = self.type_annotation()?;
 
+        // Parse the rest of the variable declaration
+        self.variable_declaration_common(position, Some(type_annotation), is_private)
+    }
+
+    /// Parse a private variable declaration without an explicit type annotation
+    /// e.g., priv SECRET = "value"
+    fn priv_variable_declaration_without_type(&mut self) -> Result<Stmt> {
+        let position = self.peek().position();
+
+        // Parse variable declaration without type annotation
+        self.variable_declaration_common(position, None, true)
+    }
+
+    /// Common logic for parsing variable declarations
+    fn variable_declaration_common(
+        &mut self,
+        position: SourcePosition,
+        type_annotation: Option<TypeAnnotation>,
+        is_private: bool
+    ) -> Result<Stmt> {
         // Expect identifier
         let name = if let TokenType::Identifier(id) = &self.peek().token_type {
             let n = id.clone();
@@ -137,8 +172,9 @@ impl Parser {
 
         Ok(Stmt::VariableDecl {
             name,
-            type_annotation: Some(type_annotation),
+            type_annotation,
             value,
+            is_private,
             position,
         })
     }
@@ -165,51 +201,79 @@ impl Parser {
 
         self.advance();
 
-        // TODO: Parse type constraints like list<num>
-        //
+        // Parse type constraints (e.g., list<num>)
         // ⚠️  IMPORTANT: NO GENERICS POLICY ENFORCEMENT
         // See: dev_docs/NO_GENERICS_POLICY.md
-        //
-        // When implementing type constraints, MUST enforce:
-        //
-        // 1. ✅ ALLOWED: Single type parameter on built-in collections
-        //    - list<num>, hash<string>, tree<num>, graph<num>
-        //    - Constraint must be a PRIMITIVE type only
-        //    - Runtime-checked, not compile-time
-        //
-        // 2. ❌ FORBIDDEN: Multiple type parameters
-        //    - hash<K, V> → SYNTAX ERROR
-        //    - Result<T, E> → SYNTAX ERROR
-        //    - Reject with: "Multiple type parameters not supported"
-        //
-        // 3. ❌ FORBIDDEN: Nested constraints
-        //    - list<list<num>> → SYNTAX ERROR
-        //    - Reject with: "Nested type constraints not supported"
-        //
-        // 4. ❌ FORBIDDEN: Type constraints on user-defined types
-        //    - Only allow on: list, hash, tree, graph
-        //    - Reject with: "Type parameters only allowed on built-in collections"
-        //
-        // 5. ❌ FORBIDDEN: Generic type variables
-        //    - <T> where T is not num/string/bool/etc → SYNTAX ERROR
-        //    - Reject with: "Generic type variables not supported"
-        //
-        // Implementation strategy:
-        // - if peek() == TokenType::Less:
-        //     - Ensure base_type is one of: list, hash, tree, graph
-        //     - Parse exactly ONE constraint type
-        //     - Ensure constraint is primitive (num, string, bool, symbol, time, none)
-        //     - Check for comma → reject (multiple params)
-        //     - Check for another '<' → reject (nesting)
-        //     - Expect TokenType::Greater
-        //
+        let constraint = if self.match_token(&TokenType::Less) {
+            // Type constraints only allowed on built-in collections
+            if base_type != "list" && base_type != "hash" && base_type != "tree" && base_type != "graph" {
+                return Err(GraphoidError::SyntaxError {
+                    message: format!("Type parameters only allowed on built-in collections (list, hash, tree, graph), not '{}'", base_type),
+                    position: self.peek().position(),
+                });
+            }
+
+            // Parse the constraint type (must be a primitive)
+            let constraint_type = match &self.peek().token_type {
+                TokenType::NumType => "num",
+                TokenType::StringType => "string",
+                TokenType::BoolType => "bool",
+                TokenType::TimeType => "time",
+                TokenType::Symbol(_) => {
+                    // Allow symbol types like :symbol
+                    if let TokenType::Symbol(s) = &self.peek().token_type {
+                        s.as_str()
+                    } else {
+                        "symbol"
+                    }
+                }
+                TokenType::Identifier(id) if id == "none" => "none",
+                _ => {
+                    return Err(GraphoidError::SyntaxError {
+                        message: format!("Type constraint must be a primitive type (num, string, bool, time, none), got {:?}", self.peek().token_type),
+                        position: self.peek().position(),
+                    });
+                }
+            }.to_string();
+
+            self.advance();
+
+            // Check for multiple type parameters (FORBIDDEN)
+            if self.check(&TokenType::Comma) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Multiple type parameters not supported. See: dev_docs/NO_GENERICS_POLICY.md".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            // Check for nested constraints (FORBIDDEN)
+            if self.check(&TokenType::Less) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Nested type constraints not supported. See: dev_docs/NO_GENERICS_POLICY.md".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            // Expect closing '>'
+            if !self.match_token(&TokenType::Greater) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '>' after type constraint".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            Some(constraint_type)
+        } else {
+            None
+        };
+
         Ok(TypeAnnotation {
             base_type,
-            constraint: None,
+            constraint,
         })
     }
 
-    fn function_declaration(&mut self) -> Result<Stmt> {
+    fn function_declaration(&mut self, is_private: bool) -> Result<Stmt> {
         let position = self.previous_position();
 
         // Expect identifier
@@ -229,11 +293,12 @@ impl Parser {
         //
         // If next token is '<', this is an attempt at generic function syntax
         // fn foo<T>(...) → FORBIDDEN
-        //
-        // TODO: When we see '<' after function name, reject with:
-        // "Generic functions are not supported in Graphoid.
-        //  Use duck typing instead - functions work on values, not types.
-        //  See: dev_docs/NO_GENERICS_POLICY.md"
+        if self.check(&TokenType::Less) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Generic functions are not supported in Graphoid. Use duck typing instead - functions work on values, not types. See: dev_docs/NO_GENERICS_POLICY.md".to_string(),
+                position: self.peek().position(),
+            });
+        }
 
         // Expect '('
         if !self.match_token(&TokenType::LeftParen) {
@@ -361,6 +426,7 @@ impl Parser {
             params,
             body,
             pattern_clauses,
+            is_private,  // Phase 10: priv keyword support
             position,
         })
     }
@@ -1107,7 +1173,7 @@ impl Parser {
 
     // Expression parsing with precedence climbing
     fn expression(&mut self) -> Result<Expr> {
-        // TODO: Add lambda parsing
+        // Note: Lambda parsing happens in primary() via Pipe token
         self.conditional_expression()
     }
 

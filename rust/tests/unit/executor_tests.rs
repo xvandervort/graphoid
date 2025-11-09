@@ -584,6 +584,7 @@ fn test_eval_variable_declaration() {
             value: LiteralValue::Number(42.0),
             position: pos(),
         },
+        is_private: false,
         position: pos(),
     };
 
@@ -606,6 +607,7 @@ fn test_eval_variable_reference() {
             value: LiteralValue::Number(42.0),
             position: pos(),
         },
+        is_private: false,
         position: pos(),
     };
     executor.eval_stmt(&stmt).unwrap();
@@ -632,6 +634,7 @@ fn test_eval_variable_assignment() {
             value: LiteralValue::Number(10.0),
             position: pos(),
         },
+        is_private: false,
         position: pos(),
     };
     executor.eval_stmt(&decl).unwrap();
@@ -676,6 +679,7 @@ fn test_eval_variable_in_expression() {
             value: LiteralValue::Number(10.0),
             position: pos(),
         },
+        is_private: false,
         position: pos(),
     };
     executor.eval_stmt(&stmt).unwrap();
@@ -1135,6 +1139,7 @@ fn test_function_declaration() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1180,6 +1185,7 @@ fn test_function_call_simple() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1224,6 +1230,7 @@ fn test_function_no_params() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1271,6 +1278,7 @@ fn test_function_with_expression_body() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1328,6 +1336,7 @@ fn test_function_nested_calls() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1362,6 +1371,7 @@ fn test_function_nested_calls() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1435,6 +1445,7 @@ fn test_function_closure() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1470,6 +1481,7 @@ fn test_function_return_none() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1524,6 +1536,7 @@ fn test_function_wrong_arg_count() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1748,6 +1761,7 @@ fn test_function_as_value() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1806,6 +1820,7 @@ fn test_function_multiple_params() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1868,6 +1883,7 @@ fn test_recursive_function() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1917,6 +1933,7 @@ fn test_function_with_string_return() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -1957,6 +1974,7 @@ fn test_function_modifying_closure_var() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2117,6 +2135,7 @@ fn test_function_returning_boolean() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2189,6 +2208,7 @@ fn test_function_returning_list() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2247,6 +2267,7 @@ fn test_deeply_nested_calls() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2293,6 +2314,7 @@ fn test_function_with_no_return_statement() {
         params: vec![],
         body: vec![], // No statements
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2336,6 +2358,7 @@ fn test_function_early_return() {
             },
         ],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2420,6 +2443,7 @@ fn test_function_with_side_effects() {
             },
         ],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2466,6 +2490,7 @@ fn test_nested_closures() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2515,6 +2540,7 @@ fn test_function_parameter_shadowing() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2565,6 +2591,7 @@ fn test_function_returning_function_value() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2675,6 +2702,7 @@ fn test_function_with_comparison() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2787,6 +2815,7 @@ fn test_function_with_unary_ops() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2832,6 +2861,7 @@ fn test_function_with_not_op() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -2922,6 +2952,7 @@ fn test_function_four_params() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -3016,6 +3047,7 @@ fn test_function_call_with_expression_args() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -3288,6 +3320,7 @@ fn test_if_return_in_function() {
             },
         ],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -3367,6 +3400,7 @@ fn test_call_stack_cleared_after_return() {
             position: pos(),
         }],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -3415,6 +3449,7 @@ fn test_while_loop_simple_counter() {
                 position: pos(),
             },
             type_annotation: None,
+            is_private: false,
             position: pos(),
         })
         .unwrap();
@@ -3471,6 +3506,7 @@ fn test_while_loop_never_executes() {
                 position: pos(),
             },
             type_annotation: None,
+            is_private: false,
             position: pos(),
         })
         .unwrap();
@@ -3532,6 +3568,7 @@ fn test_while_loop_with_multiple_statements() {
                 position: pos(),
             },
             type_annotation: None,
+            is_private: false,
             position: pos(),
         })
         .unwrap();
@@ -3544,6 +3581,7 @@ fn test_while_loop_with_multiple_statements() {
                 position: pos(),
             },
             type_annotation: None,
+            is_private: false,
             position: pos(),
         })
         .unwrap();
@@ -3637,6 +3675,7 @@ fn test_while_loop_in_function() {
                     position: pos(),
                 },
                 type_annotation: None,
+                is_private: false,
                 position: pos(),
             },
             Stmt::VariableDecl {
@@ -3646,6 +3685,7 @@ fn test_while_loop_in_function() {
                     position: pos(),
                 },
                 type_annotation: None,
+                is_private: false,
                 position: pos(),
             },
             Stmt::While {
@@ -3706,6 +3746,7 @@ fn test_while_loop_in_function() {
             },
         ],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -3750,6 +3791,7 @@ fn test_nested_while_loops() {
                 position: pos(),
             },
             type_annotation: None,
+            is_private: false,
             position: pos(),
         })
         .unwrap();
@@ -3762,6 +3804,7 @@ fn test_nested_while_loops() {
                 position: pos(),
             },
             type_annotation: None,
+            is_private: false,
             position: pos(),
         })
         .unwrap();
@@ -3837,6 +3880,7 @@ fn test_nested_while_loops() {
                     position: pos(),
                 },
                 type_annotation: None,
+                is_private: false,
                 position: pos(),
             },
             inner_while,
@@ -3884,6 +3928,7 @@ fn test_for_loop_simple() {
                 position: pos(),
             },
             type_annotation: None,
+            is_private: false,
             position: pos(),
         })
         .unwrap();
@@ -3947,6 +3992,7 @@ fn test_for_loop_empty_list() {
                 position: pos(),
             },
             type_annotation: None,
+            is_private: false,
             position: pos(),
         })
         .unwrap();
@@ -3997,6 +4043,7 @@ fn test_for_loop_with_strings() {
                 position: pos(),
             },
             type_annotation: None,
+            is_private: false,
             position: pos(),
         })
         .unwrap();
@@ -4072,6 +4119,7 @@ fn test_for_loop_in_function() {
                     position: pos(),
                 },
                 type_annotation: None,
+                is_private: false,
                 position: pos(),
             },
             Stmt::For {
@@ -4107,6 +4155,7 @@ fn test_for_loop_in_function() {
             },
         ],
         pattern_clauses: None,
+        is_private: false,
         position: pos(),
     };
 
@@ -4160,6 +4209,7 @@ fn test_nested_for_loops() {
                 position: pos(),
             },
             type_annotation: None,
+            is_private: false,
             position: pos(),
         })
         .unwrap();

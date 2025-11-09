@@ -222,11 +222,12 @@ fn test_bst_ruleset_activates_rules() {
     // Verify ruleset is stored
     assert!(g.has_ruleset("bst"));
 
-    // Verify rules are activated (currently same as binary_tree)
+    // Verify rules are activated (includes BSTOrderingRule)
     let active_rules = g.get_active_rule_specs();
-    assert_eq!(active_rules.len(), 4); // 3 tree rules + 1 max_degree rule
+    assert_eq!(active_rules.len(), 5); // 3 tree rules + 1 max_degree rule + 1 BST ordering rule
 
-    // TODO: When BSTOrderingRule is implemented, this should be 5 rules
+    // Verify BST ordering rule is present
+    assert!(active_rules.iter().any(|spec| matches!(spec, RuleSpec::BSTOrdering)));
 }
 
 // ============================================================================

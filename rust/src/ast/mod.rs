@@ -13,6 +13,7 @@ pub enum Stmt {
         name: String,
         type_annotation: Option<TypeAnnotation>,
         value: Expr,
+        is_private: bool,  // Phase 10: priv keyword support
         position: SourcePosition,
     },
     Assignment {
@@ -25,6 +26,7 @@ pub enum Stmt {
         params: Vec<Parameter>,
         body: Vec<Stmt>,
         pattern_clauses: Option<Vec<PatternClause>>,  // Phase 7: Pattern matching
+        is_private: bool,  // Phase 10: priv keyword support
         position: SourcePosition,
     },
     If {

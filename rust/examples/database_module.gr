@@ -1,0 +1,51 @@
+# Example Module: Database Connection
+# Demonstrates encapsulation using private symbols
+
+module database
+
+# Private configuration - hidden from importers
+priv CONNECTION_STRING = "postgresql://localhost:5432/mydb"
+priv MAX_CONNECTIONS = 10
+priv TIMEOUT_SECONDS = 30
+
+# Private implementation details
+priv func establish_connection() {
+    print("Connecting to: " + CONNECTION_STRING)
+    print("Max connections: " + MAX_CONNECTIONS)
+    return "connection_handle_" + CONNECTION_STRING
+}
+
+priv func validate_query(query) {
+    # Internal query validation
+    if query == none || query == "" {
+        return false
+    }
+    return true
+}
+
+# Public API - these CAN be accessed by importers
+func connect() {
+    print("Database: Initializing connection...")
+    handle = establish_connection()
+    print("Database: Connected successfully")
+    return handle
+}
+
+func execute(query) {
+    if !validate_query(query) {
+        print("Database: Invalid query")
+        return none
+    }
+
+    print("Database: Executing query: " + query)
+    return "result_set"
+}
+
+func disconnect(handle) {
+    print("Database: Disconnecting " + handle)
+}
+
+# Module can use its own private symbols
+PUBLIC_VERSION = "1.0.0"
+
+print("Database module loaded (version " + PUBLIC_VERSION + ")")
