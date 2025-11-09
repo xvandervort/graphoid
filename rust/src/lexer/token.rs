@@ -36,6 +36,7 @@ pub enum TokenType {
     Module,
     Alias,
     Priv,        // priv keyword for private symbols
+    Match,       // match keyword for pattern matching
     Configure,
     Precision,
     And,
@@ -109,6 +110,7 @@ pub enum TokenType {
     RightBracket,
     Comma,
     Dot,
+    DotDotDot,       // ... (rest/spread operator)
     Colon,
     Semicolon,
 

@@ -1,0 +1,56 @@
+# Pattern Matching Examples
+
+print("=== Pattern Matching Examples ===")
+
+# Example 1: Simple number matching
+print("\nExample 1: Number matching")
+fn classify_number(x) {
+    return match x { 0 => "zero", 1 => "one", 2 => "two", _ => "other" }
+}
+
+print(classify_number(0))
+print(classify_number(1))
+print(classify_number(42))
+
+# Example 2: String matching
+print("\nExample 2: String matching")
+fn greet(name) {
+    return match name { "Alice" => "Hello, Alice!", "Bob" => "Hey Bob!", _ => "Hello, stranger!" }
+}
+
+print(greet("Alice"))
+print(greet("Bob"))
+print(greet("Charlie"))
+
+# Example 3: List pattern matching
+print("\nExample 3: List patterns")
+fn describe_list(lst) {
+    return match lst { [] => "empty list", [x] => "single element", [x, y] => "two elements", _ => "multiple elements" }
+}
+
+print(describe_list([]))
+print(describe_list([1]))
+print(describe_list([1, 2]))
+print(describe_list([1, 2, 3, 4]))
+
+# Example 4: Rest patterns
+print("\nExample 4: Rest patterns")
+fn process_list(lst) {
+    return match lst { [] => "empty", [first, ...rest] => "first and rest", [...all] => "all" }
+}
+
+print(process_list([]))
+print(process_list([1]))
+print(process_list([1, 2, 3]))
+
+# Example 5: Rest pattern with variable binding
+print("\nExample 5: Rest pattern binding")
+fn get_head_and_tail(lst) {
+    return match lst { [head, ...tail] => head, _ => none }
+}
+
+print(get_head_and_tail([1, 2, 3, 4]))
+print(get_head_and_tail([42]))
+print(get_head_and_tail([]))
+
+print("\n=== Pattern Matching Complete ===")

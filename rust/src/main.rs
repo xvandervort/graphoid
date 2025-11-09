@@ -58,9 +58,13 @@ fn run_repl() {
         io::stdout().flush().unwrap();
 
         let mut input = String::new();
-        if io::stdin().read_line(&mut input).is_err() {
-            eprintln!("Error reading input");
-            continue;
+        match io::stdin().read_line(&mut input) {
+            Ok(0) => break,  // EOF reached (e.g., Ctrl+D or piped input ended)
+            Ok(_) => {},     // Successfully read some bytes
+            Err(_) => {
+                eprintln!("Error reading input");
+                continue;
+            }
         }
 
         let input = input.trim();

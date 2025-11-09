@@ -313,15 +313,7 @@ impl Parser {
         if !self.check(&TokenType::RightParen) {
             loop {
                 // Check for variadic parameter (...)
-                let is_variadic = if self.check(&TokenType::Dot)
-                    && self.current + 1 < self.tokens.len()
-                    && matches!(self.tokens[self.current + 1].token_type, TokenType::Dot)
-                    && self.current + 2 < self.tokens.len()
-                    && matches!(self.tokens[self.current + 2].token_type, TokenType::Dot) {
-                    // Consume the three dots
-                    self.advance();
-                    self.advance();
-                    self.advance();
+                let is_variadic = if self.match_token(&TokenType::DotDotDot) {
                     true
                 } else {
                     false
@@ -1732,6 +1724,11 @@ impl Parser {
             });
         }
 
+        // Match expressions
+        if self.match_token(&TokenType::Match) {
+            return self.match_expression(position);
+        }
+
         // Numbers
         if let TokenType::Number(n) = self.peek().token_type {
             self.advance();
@@ -2233,6 +2230,11 @@ impl Parser {
         }
     }
 
+    /// Skip all consecutive newline tokens
+    fn skip_newlines(&mut self) {
+        while self.match_token(&TokenType::Newline) {}
+    }
+
     /// Parses key-value entries for graph/tree/map config
     fn parse_config_entries(&mut self) -> Result<Vec<(String, Expr)>> {
         let mut entries = Vec::new();
@@ -2393,6 +2395,197 @@ impl Parser {
             guard,
             body,
             position,
+        })
+    }
+
+    /// Parse match expression: match value { pattern => expr, ... }
+    fn match_expression(&mut self, position: SourcePosition) -> Result<Expr> {
+        use crate::ast::MatchArm;
+
+        // Parse the value to match against
+        let value = Box::new(self.expression()?);
+
+        // Expect opening brace
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' after match value".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Skip optional newlines after opening brace
+        self.skip_newlines();
+
+        // Parse match arms
+        let mut arms = Vec::new();
+
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            let arm_position = self.peek().position();
+
+            // Parse pattern
+            let pattern = self.match_pattern()?;
+
+            // Expect arrow
+            if !self.match_token(&TokenType::Arrow) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '=>' after match pattern".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            // Parse body expression (using primary() to avoid consuming postfix ops across newlines)
+            let body = self.primary()?;
+
+            arms.push(MatchArm {
+                pattern,
+                body,
+                position: arm_position,
+            });
+
+            // Match arm must be followed by comma, newline, or closing brace
+            if self.match_token(&TokenType::Comma) {
+                // Comma found, skip any trailing newlines
+                self.skip_newlines();
+            } else if self.match_token(&TokenType::Newline) {
+                // Newline found, skip any additional newlines
+                self.skip_newlines();
+            } else if self.check(&TokenType::RightBrace) {
+                // Closing brace - we're done
+                break;
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: format!("Expected comma, newline, or '}}' after match arm, got {:?}", self.peek().token_type),
+                    position: self.peek().position(),
+                });
+            }
+        }
+
+        // Skip optional newlines before closing brace
+        self.skip_newlines();
+
+        // Expect closing brace
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' after match arms".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        if arms.is_empty() {
+            return Err(GraphoidError::SyntaxError {
+                message: "Match expression must have at least one arm".to_string(),
+                position,
+            });
+        }
+
+        Ok(Expr::Match {
+            value,
+            arms,
+            position,
+        })
+    }
+
+    /// Parse match pattern
+    fn match_pattern(&mut self) -> Result<crate::ast::MatchPattern> {
+        use crate::ast::{MatchPattern, LiteralValue};
+
+        // Wildcard pattern: _
+        if let TokenType::Identifier(name) = &self.peek().token_type {
+            if name == "_" {
+                self.advance();
+                return Ok(MatchPattern::Wildcard);
+            }
+        }
+
+        // List pattern: [], [x], [x, y], [x, ...rest]
+        if self.match_token(&TokenType::LeftBracket) {
+            let mut elements = Vec::new();
+            let mut rest_name: Option<String> = None;
+
+            while !self.check(&TokenType::RightBracket) && !self.is_at_end() {
+                // Check for rest pattern: ...name or just ...
+                if self.match_token(&TokenType::DotDotDot) {
+                    // Get rest variable name (optional)
+                    if let TokenType::Identifier(name) = &self.peek().token_type {
+                        rest_name = Some(name.clone());
+                        self.advance();
+                    } else {
+                        // Anonymous rest pattern: ... (captures but doesn't bind)
+                        rest_name = Some("_".to_string());
+                    }
+
+                    // Optional comma after rest
+                    self.match_token(&TokenType::Comma);
+
+                    // Rest must be last element
+                    if !self.check(&TokenType::RightBracket) {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Rest pattern must be the last element in a list pattern".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+                    break;
+                }
+
+                // Parse regular nested pattern
+                elements.push(self.match_pattern()?);
+
+                // Optional comma
+                if !self.check(&TokenType::RightBracket) {
+                    self.match_token(&TokenType::Comma);
+                }
+            }
+
+            if !self.match_token(&TokenType::RightBracket) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected ']' after list pattern".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            return Ok(MatchPattern::List {
+                elements,
+                rest_name,
+            });
+        }
+
+        // Number literal
+        if let TokenType::Number(n) = self.peek().token_type {
+            self.advance();
+            return Ok(MatchPattern::Literal(LiteralValue::Number(n)));
+        }
+
+        // String literal
+        if let TokenType::String(s) = &self.peek().token_type {
+            let str_val = s.clone();
+            self.advance();
+            return Ok(MatchPattern::Literal(LiteralValue::String(str_val)));
+        }
+
+        // Boolean literals
+        if self.match_token(&TokenType::True) {
+            return Ok(MatchPattern::Literal(LiteralValue::Boolean(true)));
+        }
+
+        if self.match_token(&TokenType::False) {
+            return Ok(MatchPattern::Literal(LiteralValue::Boolean(false)));
+        }
+
+        // None literal
+        if self.match_token(&TokenType::None) {
+            return Ok(MatchPattern::Literal(LiteralValue::None));
+        }
+
+        // Variable binding pattern
+        if let TokenType::Identifier(name) = &self.peek().token_type {
+            let var_name = name.clone();
+            self.advance();
+            return Ok(MatchPattern::Variable(var_name));
+        }
+
+        Err(GraphoidError::SyntaxError {
+            message: format!("Expected pattern, got {:?}", self.peek().token_type),
+            position: self.peek().position(),
         })
     }
 

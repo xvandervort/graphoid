@@ -231,6 +231,7 @@ impl Executor {
                     Err(graphoid_error)
                 }
             }
+            Expr::Match { value, arms, position } => self.eval_match(value, arms, position),
         }
     }
 
@@ -5435,6 +5436,133 @@ impl Executor {
         } else {
             // No type constraint, any node matches
             Ok(true)
+        }
+    }
+
+    /// Evaluate a match expression
+    fn eval_match(
+        &mut self,
+        value_expr: &Expr,
+        arms: &[crate::ast::MatchArm],
+        _position: &SourcePosition,
+    ) -> Result<Value> {
+        // Evaluate the value to match against
+        let value = self.eval_expr(value_expr)?;
+
+        // Try each arm in order
+        for arm in arms {
+            // Try to match the pattern
+            if let Some(bindings) = self.match_expr_pattern(&arm.pattern, &value)? {
+                // Pattern matched! Create a new child environment with bindings
+                let mut child_env = Environment::with_parent(self.env.clone());
+                for (var_name, var_value) in bindings {
+                    child_env.define(var_name, var_value);
+                }
+
+                // Swap environments temporarily
+                let old_env = std::mem::replace(&mut self.env, child_env);
+
+                // Evaluate the arm body
+                let result = self.eval_expr(&arm.body);
+
+                // Restore the previous environment
+                self.env = old_env;
+
+                return result;
+            }
+        }
+
+        // No pattern matched - this is an error
+        Err(GraphoidError::runtime(format!(
+            "No match arm matched value: {:?}",
+            value
+        )))
+    }
+
+    /// Try to match a pattern against a value (for match expressions)
+    /// Returns Some(bindings) if match succeeds, None if it fails
+    fn match_expr_pattern(
+        &self,
+        pattern: &crate::ast::MatchPattern,
+        value: &Value,
+    ) -> Result<Option<Vec<(String, Value)>>> {
+        use crate::ast::{MatchPattern, LiteralValue};
+        use crate::values::ValueKind;
+
+        match pattern {
+            // Wildcard matches everything
+            MatchPattern::Wildcard => Ok(Some(Vec::new())),
+
+            // Variable binding matches everything and binds the value
+            MatchPattern::Variable(name) => {
+                // Special case: "_" is wildcard, not a binding
+                if name == "_" {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(Some(vec![(name.clone(), value.clone())]))
+                }
+            }
+
+            // Literal pattern: must match exactly
+            MatchPattern::Literal(lit) => {
+                let matches = match (lit, &value.kind) {
+                    (LiteralValue::Number(n1), ValueKind::Number(n2)) => (n1 - n2).abs() < f64::EPSILON,
+                    (LiteralValue::String(s1), ValueKind::String(s2)) => s1 == s2,
+                    (LiteralValue::Boolean(b1), ValueKind::Boolean(b2)) => b1 == b2,
+                    (LiteralValue::None, ValueKind::None) => true,
+                    _ => false,
+                };
+                Ok(if matches { Some(Vec::new()) } else { None })
+            }
+
+            // List pattern
+            MatchPattern::List { elements, rest_name } => {
+                match &value.kind {
+                    ValueKind::List(list_val) => {
+                        let list_elements = list_val.to_vec();
+
+                        // Check length compatibility
+                        if rest_name.is_some() {
+                            // With rest pattern, we need at least as many elements as non-rest patterns
+                            if list_elements.len() < elements.len() {
+                                return Ok(None);
+                            }
+                        } else {
+                            // Without rest, must match exactly
+                            if list_elements.len() != elements.len() {
+                                return Ok(None);
+                            }
+                        }
+
+                        // Match each fixed element
+                        let mut all_bindings = Vec::new();
+                        for (i, pat) in elements.iter().enumerate() {
+                            if let Some(bindings) = self.match_expr_pattern(pat, &list_elements[i])? {
+                                all_bindings.extend(bindings);
+                            } else {
+                                return Ok(None);
+                            }
+                        }
+
+                        // Handle rest pattern if present
+                        if let Some(rest_var) = rest_name {
+                            if rest_var != "_" {
+                                // Bind the remaining elements to the rest variable
+                                let rest_elements: Vec<Value> = list_elements[elements.len()..].to_vec();
+                                let rest_list = List::from_vec(rest_elements);
+                                all_bindings.push((rest_var.clone(), Value {
+                                    kind: ValueKind::List(rest_list),
+                                    frozen: false,
+                                }));
+                            }
+                            // If rest_var is "_", don't bind (anonymous rest)
+                        }
+
+                        Ok(Some(all_bindings))
+                    }
+                    _ => Ok(None),  // Not a list
+                }
+            }
         }
     }
 }

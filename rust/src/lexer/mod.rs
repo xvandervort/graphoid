@@ -74,6 +74,18 @@ impl Lexer {
             ']' => TokenType::RightBracket,
             ',' => TokenType::Comma,
             '.' => {
+                // Check for ... (rest/spread operator)
+                if self.peek() == '.' && self.peek_next() == '.' {
+                    self.advance(); // consume second dot
+                    self.advance(); // consume third dot
+                    return Ok(Token::new(
+                        TokenType::DotDotDot,
+                        "...".to_string(),
+                        start_line,
+                        start_column,
+                    ));
+                }
+
                 // Check for element-wise operators
                 let next_ch = self.peek();
                 match next_ch {
@@ -584,6 +596,7 @@ impl Lexer {
             "module" => TokenType::Module,
             "alias" => TokenType::Alias,
             "priv" => TokenType::Priv,
+            "match" => TokenType::Match,
             "configure" => TokenType::Configure,
             "precision" => TokenType::Precision,
             "and" => TokenType::And,

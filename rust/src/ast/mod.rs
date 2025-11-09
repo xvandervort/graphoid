@@ -183,6 +183,35 @@ pub enum Expr {
         error: Box<Expr>,  // Error value/message to raise
         position: SourcePosition,
     },
+    Match {
+        value: Box<Expr>,
+        arms: Vec<MatchArm>,
+        position: SourcePosition,
+    },
+}
+
+/// A single arm in a match expression
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchArm {
+    pub pattern: MatchPattern,
+    pub body: Expr,
+    pub position: SourcePosition,
+}
+
+/// Pattern for match expressions
+#[derive(Debug, Clone, PartialEq)]
+pub enum MatchPattern {
+    /// Literal value pattern (42, "hello", true)
+    Literal(LiteralValue),
+    /// Variable binding pattern (x, name)
+    Variable(String),
+    /// Wildcard pattern (_)
+    Wildcard,
+    /// List pattern ([x, y, z] or [x, ...rest])
+    List {
+        elements: Vec<MatchPattern>,
+        rest_name: Option<String>,  // Some("rest") for [x, ...rest], None for fixed-length
+    },
 }
 
 impl Expr {
@@ -202,6 +231,7 @@ impl Expr {
             Expr::Graph { position, .. } => position,
             Expr::Conditional { position, .. } => position,
             Expr::Raise { position, .. } => position,
+            Expr::Match { position, .. } => position,
         }
     }
 }
