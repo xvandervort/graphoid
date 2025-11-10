@@ -1,0 +1,242 @@
+# Subgraph Operations Examples
+# Demonstrates Phase 9 Level 5: Extract, Delete, and Merge Operations
+
+print("=== Subgraph Operations Demo ===\n")
+
+# Create a knowledge graph with multiple node types
+g = graph{type: :directed}
+
+# Add different types of nodes
+g.add_node("user1", 1)
+g.add_node("user2", 2)
+g.add_node("user3", 3)
+g.add_node("admin1", 10)
+g.add_node("admin2", 20)
+g.add_node("bot1", 100)
+g.add_node("bot2", 200)
+
+# Add relationships
+g.add_edge("user1", "user2", "FRIEND")
+g.add_edge("user2", "user3", "FRIEND")
+g.add_edge("admin1", "user1", "MANAGES")
+g.add_edge("admin2", "user2", "MANAGES")
+g.add_edge("bot1", "admin1", "REPORTS_TO")
+g.add_edge("bot2", "admin2", "REPORTS_TO")
+g.add_edge("user1", "bot1", "USES")
+
+print("Original graph:")
+print("- Nodes:", g.node_count())
+print("- Edges:", g.edge_count())
+
+# =============================================================================
+# Example 1: Extract Subgraph with Node Filter
+# =============================================================================
+
+print("\n=== Example 1: Extract Users Only ===")
+
+# Extract nodes where value < 10 (users only)
+user_filter = val => val < 10
+
+users_subgraph = g.extract(user_filter, none, true)
+
+print("Users subgraph:")
+print("- Nodes:", users_subgraph.node_count())
+print("- Edges:", users_subgraph.edge_count())
+print("(Should have 3 users and 2 FRIEND edges)")
+
+# =============================================================================
+# Example 2: Extract with Edge Type Filter
+# =============================================================================
+
+print("\n=== Example 2: Extract FRIEND Network ===")
+
+# Filter for FRIEND edges only
+friend_filter = (from, to, edge_type) => edge_type == "FRIEND"
+
+# Extract with edge filter, excluding orphan nodes
+friends_only = g.extract(none, friend_filter, false)
+
+print("FRIEND network:")
+print("- Nodes:", friends_only.node_count())
+print("- Edges:", friends_only.edge_count())
+print("(Should have 3 nodes connected by FRIEND edges)")
+
+# =============================================================================
+# Example 3: Extract with Both Node and Edge Filters
+# =============================================================================
+
+print("\n=== Example 3: Extract Admin Management Network ===")
+
+# Filter for admins (value >= 10 and < 100)
+admin_filter = val => val >= 10 and val < 100
+
+# Filter for MANAGES edges
+manages_filter = (from, to, edge_type) => edge_type == "MANAGES"
+
+# Extract admin management subgraph
+admin_network = g.extract(admin_filter, manages_filter, true)
+
+print("Admin management network:")
+print("- Nodes:", admin_network.node_count())
+print("- Edges:", admin_network.edge_count())
+print("(Should have 2 admins and 2 MANAGES edges)")
+
+# =============================================================================
+# Example 4: Delete Subgraph - Remove Bots
+# =============================================================================
+
+print("\n=== Example 4: Delete Bot Nodes ===")
+
+# Filter for bots (value >= 100)
+bot_filter = val => val >= 100
+
+# Delete bots - keeps everything except bots
+no_bots = g.delete(bot_filter, none)
+
+print("Graph without bots:")
+print("- Nodes:", no_bots.node_count())
+print("- Edges:", no_bots.edge_count())
+print("(Should have 5 nodes - removed 2 bots)")
+
+# =============================================================================
+# Example 5: Delete Edges by Type
+# =============================================================================
+
+print("\n=== Example 5: Delete REPORTS_TO Edges ===")
+
+# Filter for REPORTS_TO edges
+reports_filter = (from, to, edge_type) => edge_type == "REPORTS_TO"
+
+# Delete reporting relationships
+no_reports = g.delete(none, reports_filter)
+
+print("Graph without reporting:")
+print("- Nodes:", no_reports.node_count())
+print("- Edges:", no_reports.edge_count())
+print("(All nodes kept, 2 REPORTS_TO edges removed)")
+
+# =============================================================================
+# Example 6: Merge Graphs - No Conflicts
+# =============================================================================
+
+print("\n=== Example 6: Merge Graphs (No Conflicts) ===")
+
+# Create two separate graphs
+graph_a = graph{type: :directed}
+graph_a.add_node("A", 1)
+graph_a.add_node("B", 2)
+graph_a.add_edge("A", "B", "link")
+
+graph_b = graph{type: :directed}
+graph_b.add_node("C", 3)
+graph_b.add_node("D", 4)
+graph_b.add_edge("C", "D", "link")
+
+# Merge with no conflicts (default strategy)
+merged = graph_a.add_subgraph(graph_b, none)
+
+print("Merged graph:")
+print("- Nodes:", merged.node_count())
+print("- Edges:", merged.edge_count())
+print("(Should have 4 nodes and 2 edges)")
+
+# =============================================================================
+# Example 7: Merge with Conflicts - Keep Original
+# =============================================================================
+
+print("\n=== Example 7: Merge with Conflict Resolution (Keep Original) ===")
+
+# Create overlapping graphs
+graph_x = graph{type: :directed}
+graph_x.add_node("shared", 100)
+graph_x.add_node("x_only", 10)
+
+graph_y = graph{type: :directed}
+graph_y.add_node("shared", 999)  # Conflict! Different value
+graph_y.add_node("y_only", 20)
+
+# Merge keeping original values for conflicts
+keep_orig = graph_x.add_subgraph(graph_y, "keep_original")
+
+print("Merged (keep original):")
+print("- Nodes:", keep_orig.node_count())
+print("(Value of 'shared' should be 100, the original)")
+
+# =============================================================================
+# Example 8: Merge with Conflicts - Overwrite
+# =============================================================================
+
+print("\n=== Example 8: Merge with Conflict Resolution (Overwrite) ===")
+
+# Same graphs, but overwrite conflicts
+overwrite = graph_x.add_subgraph(graph_y, "overwrite")
+
+print("Merged (overwrite):")
+print("- Nodes:", overwrite.node_count())
+print("(Value of 'shared' should be 999, the new value)")
+
+# =============================================================================
+# Example 9: Complex Workflow - Extract, Modify, Merge Back
+# =============================================================================
+
+print("\n=== Example 9: Extract-Transform-Merge Workflow ===")
+
+# Start with original graph
+workflow = graph{type: :directed}
+workflow.add_node("node1", 1)
+workflow.add_node("node2", 2)
+workflow.add_node("node3", 3)
+workflow.add_node("node4", 4)
+workflow.add_edge("node1", "node2", "connects")
+workflow.add_edge("node3", "node4", "connects")
+
+print("Initial workflow graph:", workflow.node_count(), "nodes")
+
+# Step 1: Extract subset (nodes with value <= 2)
+subset_filter = val => val <= 2
+subset = workflow.extract(subset_filter, none, true)
+print("Extracted subset:", subset.node_count(), "nodes")
+
+# Step 2: Create a modified version
+modified = graph{type: :directed}
+modified.add_node("new_node", 5)
+modified.add_edge("new_node", "node1", "enhances")
+
+# Step 3: Merge modifications back
+enhanced = workflow.add_subgraph(modified, "keep_original")
+print("Enhanced workflow:", enhanced.node_count(), "nodes")
+print("(Original 4 nodes + 1 new node)")
+
+# =============================================================================
+# Example 10: Delete Then Extract
+# =============================================================================
+
+print("\n=== Example 10: Chained Operations ===")
+
+# Create test graph
+chain = graph{type: :directed}
+chain.add_node("keep1", 5)
+chain.add_node("keep2", 6)
+chain.add_node("remove1", 100)
+chain.add_node("remove2", 200)
+chain.add_edge("keep1", "keep2", "good")
+chain.add_edge("remove1", "remove2", "bad")
+
+print("Original:", chain.node_count(), "nodes,", chain.edge_count(), "edges")
+
+# Step 1: Delete high-value nodes (>= 100)
+high_val_filter = val => val >= 100
+cleaned = chain.delete(high_val_filter, none)
+print("After delete:", cleaned.node_count(), "nodes")
+
+# Step 2: Extract only "good" edges
+good_filter = (from, to, edge_type) => edge_type == "good"
+final = cleaned.extract(none, good_filter, false)
+print("After extract:", final.node_count(), "nodes,", final.edge_count(), "edges")
+
+print("\n=== Subgraph Operations Demo Complete ===")
+print("\nKey Operations Demonstrated:")
+print("1. extract() - Extract subgraphs with node/edge filters")
+print("2. delete() - Remove matching nodes/edges (inverse of extract)")
+print("3. add_subgraph() - Merge graphs with conflict resolution")
+print("4. Chaining operations for complex transformations")
