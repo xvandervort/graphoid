@@ -11,7 +11,7 @@ pub mod list;
 pub mod hash;
 // pub mod tree; // DELETED in Step 5 - trees are now graphs with rules
 
-pub use graph::{Graph, GraphType, ExecutionPlan};
+pub use graph::{Graph, GraphType, GraphNode, ExecutionPlan};
 pub use list::List;
 pub use hash::Hash;
 // Tree type removed - use graph{}.with_ruleset(:tree) instead
@@ -246,7 +246,7 @@ pub struct PatternPath {
 }
 
 /// Pattern match results wrapper that provides filtering and projection methods
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PatternMatchResults {
     /// List of variable bindings (variable_name -> node_id)
     bindings: Vec<std::collections::HashMap<String, String>>,
@@ -258,6 +258,11 @@ impl PatternMatchResults {
     /// Create new pattern match results
     pub fn new(bindings: Vec<std::collections::HashMap<String, String>>, graph: Graph) -> Self {
         PatternMatchResults { bindings, graph }
+    }
+
+    /// Get a reference to the source graph
+    pub fn graph(&self) -> &Graph {
+        &self.graph
     }
 
     /// Get the number of matches
@@ -304,14 +309,14 @@ impl PatternMatchResults {
     /// Filter results based on two nodes' values
     pub fn where_both_nodes<F>(&self, var1: &str, var2: &str, predicate: F) -> Result<Self, crate::error::GraphoidError>
     where
-        F: Fn(&Value, &Value) -> bool,
+        F: Fn(&GraphNode, &GraphNode) -> bool,
     {
         let filtered: Vec<std::collections::HashMap<String, String>> = self.bindings
             .iter()
             .filter(|binding| {
                 if let (Some(node_id1), Some(node_id2)) = (binding.get(var1), binding.get(var2)) {
                     if let (Some(node1), Some(node2)) = (self.graph.nodes.get(node_id1), self.graph.nodes.get(node_id2)) {
-                        return predicate(&node1.value, &node2.value);
+                        return predicate(node1, node2);
                     }
                 }
                 false
@@ -344,128 +349,6 @@ impl PatternMatchResults {
         Ok(PatternMatchResults::new(filtered, self.graph.clone()))
     }
 
-    /// Project only specific variables from the match results (similar to Cypher's RETURN clause)
-    ///
-    /// # Arguments
-    /// * `vars` - List of variable names to include in the projection
-    ///
-    /// # Returns
-    /// New PatternMatchResults with only the specified variables in each binding
-    ///
-    /// # Example
-    /// ```
-    /// use graphoid::values::{PatternMatchResults, Graph};
-    /// use std::collections::HashMap;
-    ///
-    /// let graph = Graph::new(graphoid::values::GraphType::Directed);
-    /// let mut bindings = Vec::new();
-    /// let mut binding = HashMap::new();
-    /// binding.insert("person".to_string(), "Alice".to_string());
-    /// binding.insert("friend".to_string(), "Bob".to_string());
-    /// bindings.push(binding);
-    ///
-    /// let results = PatternMatchResults::new(bindings, graph);
-    /// let projected = results.return_vars(vec!["person"]);
-    /// assert_eq!(projected.len(), 1);
-    /// assert!(projected.get(0).unwrap().contains_key("person"));
-    /// assert!(!projected.get(0).unwrap().contains_key("friend"));
-    /// ```
-    pub fn return_vars(&self, vars: Vec<&str>) -> Self {
-        let projected: Vec<std::collections::HashMap<String, String>> = self.bindings
-            .iter()
-            .map(|binding| {
-                let mut new_binding = std::collections::HashMap::new();
-                for var in &vars {
-                    if let Some(node_id) = binding.get(*var) {
-                        new_binding.insert(var.to_string(), node_id.clone());
-                    }
-                }
-                new_binding
-            })
-            .collect();
-
-        PatternMatchResults::new(projected, self.graph.clone())
-    }
-
-    /// Project specific properties from bound nodes (similar to Cypher's RETURN with property access)
-    ///
-    /// # Arguments
-    /// * `specs` - List of property specifications in "variable.property" format
-    ///
-    /// # Returns
-    /// Vector of HashMaps where keys are "variable.property" and values are the property values
-    ///
-    /// # Example
-    /// ```
-    /// use graphoid::values::{PatternMatchResults, Graph, Value};
-    /// use std::collections::HashMap;
-    ///
-    /// let mut graph = Graph::new(graphoid::values::GraphType::Directed);
-    /// // Add nodes with properties
-    /// graph.add_node("Alice".to_string(), Value::number(30.0)).unwrap();
-    /// graph.add_node("Bob".to_string(), Value::number(25.0)).unwrap();
-    /// graph.set_node_properties("Alice", {
-    ///     let mut props = HashMap::new();
-    ///     props.insert("age".to_string(), Value::number(30.0));
-    ///     props
-    /// }).unwrap();
-    /// graph.set_node_properties("Bob", {
-    ///     let mut props = HashMap::new();
-    ///     props.insert("age".to_string(), Value::number(25.0));
-    ///     props
-    /// }).unwrap();
-    ///
-    /// let mut bindings = Vec::new();
-    /// let mut binding = HashMap::new();
-    /// binding.insert("person".to_string(), "Alice".to_string());
-    /// binding.insert("friend".to_string(), "Bob".to_string());
-    /// bindings.push(binding);
-    ///
-    /// let results = PatternMatchResults::new(bindings, graph);
-    /// let projected = results.return_properties(vec!["person.age", "friend.age"]).unwrap();
-    /// assert_eq!(projected.len(), 1);
-    /// ```
-    pub fn return_properties(&self, specs: Vec<&str>) -> Result<Vec<std::collections::HashMap<String, Value>>, crate::error::GraphoidError> {
-        let mut result = Vec::new();
-
-        for binding in &self.bindings {
-            let mut props_map = std::collections::HashMap::new();
-
-            for spec in &specs {
-                // Parse "variable.property" format
-                let parts: Vec<&str> = spec.split('.').collect();
-                if parts.len() != 2 {
-                    return Err(crate::error::GraphoidError::runtime(
-                        format!("Invalid property specification: '{}'. Expected format: 'variable.property'", spec)
-                    ));
-                }
-
-                let variable = parts[0];
-                let property = parts[1];
-
-                // Get the node for this variable
-                if let Some(node_id) = binding.get(variable) {
-                    if let Some(node) = self.graph.nodes.get(node_id) {
-                        // Get the property value (or None if it doesn't exist)
-                        let prop_value = node.properties.get(property)
-                            .cloned()
-                            .unwrap_or_else(|| Value::none());
-                        props_map.insert(spec.to_string(), prop_value);
-                    } else {
-                        // Node doesn't exist - shouldn't happen but handle gracefully
-                        props_map.insert(spec.to_string(), Value::none());
-                    }
-                } else {
-                    // Variable not in binding - return None
-                    props_map.insert(spec.to_string(), Value::none());
-                }
-            }
-
-            result.push(props_map);
-        }
-
-        Ok(result)
-    }
 }
 
 // Implement Index trait for array-like access
@@ -518,6 +401,8 @@ pub enum ValueKind {
     PatternEdge(PatternEdge),
     /// Pattern path object (Phase 9) - for variable-length pattern matching
     PatternPath(PatternPath),
+    /// Pattern match results (Phase 9) - results from graph pattern matching
+    PatternMatchResults(PatternMatchResults),
 }
 
 /// A value with freeze tracking
@@ -612,6 +497,14 @@ impl Value {
         }
     }
 
+    pub fn pattern_match_results(results: PatternMatchResults) -> Self {
+        let frozen = results.graph.is_frozen();
+        Value {
+            kind: ValueKind::PatternMatchResults(results),
+            frozen
+        }
+    }
+
     /// Returns true if the value is "truthy" in Graphoid.
     /// Falsy values: `false`, `none`, `0`, empty strings, and empty collections.
     pub fn is_truthy(&self) -> bool {
@@ -630,6 +523,7 @@ impl Value {
             ValueKind::PatternNode(_) => true, // Pattern objects are always truthy
             ValueKind::PatternEdge(_) => true,
             ValueKind::PatternPath(_) => true,
+            ValueKind::PatternMatchResults(results) => !results.is_empty(), // Empty results are falsy
         }
     }
 
@@ -703,6 +597,9 @@ impl Value {
                 format!("<pattern path(edge_type: \"{}\", min: {}, max: {}, direction: :{})>",
                     pp.edge_type, pp.min, pp.max, pp.direction)
             }
+            ValueKind::PatternMatchResults(results) => {
+                format!("<pattern match results: {} matches>", results.len())
+            }
         }
     }
 
@@ -723,6 +620,7 @@ impl Value {
             ValueKind::PatternNode(_) => "pattern_node",
             ValueKind::PatternEdge(_) => "pattern_edge",
             ValueKind::PatternPath(_) => "pattern_path",
+            ValueKind::PatternMatchResults(_) => "pattern_match_results",
         }
     }
 

@@ -59,7 +59,7 @@ print("Found", colleagues.len(), "colleague pairs")
 
 # Example 2: Extract names only (property projection)
 print("\nExtracting names:")
-names = colleagues.return_properties([
+names = colleagues.return([
     "person1.name",
     "person2.name"
 ])
@@ -68,7 +68,7 @@ print("Extracted", names.len(), "name pairs")
 
 # Example 3: Extract multiple properties
 print("\nExtracting multiple properties:")
-details = colleagues.return_properties([
+details = colleagues.return([
     "person1.name",
     "person1.occupation",
     "person2.name",
@@ -83,12 +83,12 @@ friends = g.match(
     edge(type: "FRIEND"),
     node("user2")
 )
-ages = friends.return_properties(["user1.age", "user2.age"])
+ages = friends.return(["user1.age", "user2.age"])
 print("Friend ages:", ages.len(), "pairs")
 
 # Example 5: Project only person1 info
 print("\nProjecting only person1:")
-person1_only = colleagues.return_vars(["person1"])
+person1_only = colleagues.return(["person1"])
 print("Person1 bindings:", person1_only.len())
 
 # Example 6: Find reporting relationships
@@ -98,7 +98,7 @@ reports = g.match(
     edge(type: "REPORTS_TO"),
     node("manager")
 )
-hierarchy = reports.return_properties([
+hierarchy = reports.return([
     "employee.name",
     "employee.occupation",
     "manager.name"
@@ -108,11 +108,11 @@ print("Org hierarchy:", hierarchy.len(), "relationships")
 # Example 7: Mixed variable and property projection
 print("\nMixed projection:")
 # Get the node IDs and specific properties
-mixed = colleagues.return_vars(["person1", "person2"])
+mixed = colleagues.return(["person1", "person2"])
 print("Node bindings:", mixed.len())
 
 # Then extract properties separately if needed
-props = colleagues.return_properties([
+props = colleagues.return([
     "person1.city",
     "person2.city"
 ])
@@ -125,7 +125,7 @@ all_connections = g.match(
     edge(),  # Any edge type
     node("to")
 )
-all_details = all_connections.return_properties([
+all_details = all_connections.return([
     "from.name",
     "from.city",
     "to.name",

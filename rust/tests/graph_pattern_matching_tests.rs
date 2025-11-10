@@ -72,9 +72,9 @@ fn test_explicit_syntax_simple_pattern() {
 
     let result = execute_and_return(code);
     assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
-    // Should return a list of matches
+    // Should return pattern match results
     let value = result.unwrap();
-    assert_eq!(value.type_name(), "list");
+    assert_eq!(value.type_name(), "pattern_match_results");
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn test_explicit_syntax_with_node_types() {
     let result = execute_and_return(code);
     assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
     let value = result.unwrap();
-    assert_eq!(value.type_name(), "list");
+    assert_eq!(value.type_name(), "pattern_match_results");
 }
 
 #[test]
@@ -115,7 +115,7 @@ fn test_explicit_syntax_reusable_patterns() {
     let result = execute_and_return(code);
     assert!(result.is_ok(), "Expected execution to succeed, got: {:?}", result.err());
     let value = result.unwrap();
-    assert_eq!(value.type_name(), "list");
+    assert_eq!(value.type_name(), "pattern_match_results");
 }
 
 // ============================================================================
@@ -176,8 +176,9 @@ fn test_pattern_with_where_clause() {
         g.add_edge("Alice", "Bob", "FRIEND")
         g.add_edge("Alice", "Carol", "FRIEND")
 
+        # Filter results where friend age >= 18
         results = g.match(node("person"), edge(type: "FRIEND"), node("friend"))
-                   .where(friend.age >= 18)
+                   .where(binding => binding["friend"]["age"] >= 18)
         results.size()
     "#;
 
@@ -196,7 +197,7 @@ fn test_pattern_with_return_clause() {
 
         # Match pattern and return only specific fields
         results = g.match(node("person"), edge(type: "FRIEND"), node("friend"))
-                   .return(person.name, friend.age)
+                   .return(["person.name", "friend.age"])
 
         results.size()
     "#;
@@ -216,7 +217,7 @@ fn test_return_clause_validates_fields() {
 
         # Match pattern and return only specific fields
         results = g.match(node("person"), edge(type: "FRIEND"), node("friend"))
-                   .return(person.name, friend.age)
+                   .return(["person.name", "friend.age"])
 
         # Get the first result and validate it contains only the projected fields
         first = results[0]
@@ -252,7 +253,7 @@ fn test_return_clause_with_multiple_matches() {
 
         # Match pattern and return only names
         results = g.match(node("person"), edge(type: "FRIEND"), node("friend"))
-                   .return(friend.name)
+                   .return(["friend.name"])
 
         results.size()
     "#;

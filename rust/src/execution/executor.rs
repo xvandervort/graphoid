@@ -1018,13 +1018,15 @@ impl Executor {
             method
         };
 
-        // Special handling for 'where' method - needs unevaluated expression
-        if base_method == "where" && !args.is_empty() {
+        // Special handling for 'where' method on lists - needs unevaluated expression
+        // PatternMatchResults.where() uses evaluated arguments, so skip this for that type
+        if base_method == "where" && !args.is_empty() && matches!(object_value.kind, ValueKind::List(_)) {
             return self.eval_where_method(object_value, args);
         }
 
-        // Special handling for 'return' method - needs unevaluated expressions
-        if base_method == "return" && !args.is_empty() {
+        // Special handling for 'return' method on lists - needs unevaluated expressions
+        // PatternMatchResults.return_vars() / return_properties() use evaluated arguments
+        if base_method == "return" && !args.is_empty() && matches!(object_value.kind, ValueKind::List(_)) {
             return self.eval_return_method(object_value, args);
         }
 
@@ -1304,6 +1306,7 @@ impl Executor {
             ValueKind::PatternNode(pn) => self.eval_pattern_node_method(pn, method, args),
             ValueKind::PatternEdge(pe) => self.eval_pattern_edge_method(pe, method, args),
             ValueKind::PatternPath(pp) => self.eval_pattern_path_method(pp, method, args),
+            ValueKind::PatternMatchResults(results) => self.eval_pattern_match_results_method(results, method, args),
             _other => Err(GraphoidError::runtime(format!(
                 "Type '{}' does not have method '{}'",
                 value.type_name(),
@@ -2709,6 +2712,157 @@ impl Executor {
         }
     }
 
+    /// Evaluates a method call on pattern match results.
+    fn eval_pattern_match_results_method(&mut self, results: &crate::values::PatternMatchResults, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "len" | "count" | "size" => {
+                // Get the number of matches
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternMatchResults.{}() expects no arguments, got {}",
+                        method,
+                        args.len()
+                    )));
+                }
+                Ok(Value::number(results.len() as f64))
+            }
+            "where" => {
+                // Filter results with a lambda
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternMatchResults.where() expects 1 argument (predicate function), got {}",
+                        args.len()
+                    )));
+                }
+
+                // Clone results for mutation
+                let filtered = results.clone();
+
+                // Apply filter - extract function from predicate value
+                let func = match &args[0].kind {
+                    ValueKind::Function(f) => f,
+                    _ => {
+                        return Err(GraphoidError::runtime(format!(
+                            "PatternMatchResults.where() expects a function, got {}",
+                            args[0].type_name()
+                        )));
+                    }
+                };
+
+                // Filter using the provided predicate
+                // Each match is a HashMap<String, String> (variable -> node_id)
+                // Convert to a map and pass to the predicate
+                let original_bindings = filtered.iter().cloned().collect::<Vec<_>>();
+                let mut kept_bindings = Vec::new();
+
+                for binding in original_bindings {
+                    // Convert binding to a Map value
+                    let mut map = crate::values::Hash::new();
+                    for (var, node_id) in &binding {
+                        // Get node value from graph
+                        if let Some(node) = filtered.graph().nodes.get(node_id) {
+                            let _ = map.insert(var.clone(), node.value.clone());
+                        }
+                    }
+                    let map_value = Value::map(map);
+
+                    // Call predicate
+                    let result = self.call_function(func, &[map_value])?;
+
+                    // Keep if truthy
+                    if result.is_truthy() {
+                        kept_bindings.push(binding);
+                    }
+                }
+
+                // Create new PatternMatchResults with filtered bindings
+                let new_results = crate::values::PatternMatchResults::new(kept_bindings, filtered.graph().clone());
+                Ok(Value::pattern_match_results(new_results))
+            }
+            "select" | "return" => {
+                // Unified select/return method - projects variables and/or properties
+                // Both names supported: select() (Rust-friendly) and return() (Cypher-like)
+                // Accepts list of specifiers:
+                //   "person" -> returns full variable binding
+                //   "person.name" -> returns property value
+                //   Mixed: ["person", "friend.age"] -> returns both
+
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "PatternMatchResults.return() expects 1 argument (list of specifiers), got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get specifiers from list
+                let specifiers = match &args[0].kind {
+                    ValueKind::List(list) => {
+                        list.to_vec()
+                            .iter()
+                            .map(|v| v.to_string_value())
+                            .collect::<Vec<String>>()
+                    }
+                    _ => {
+                        return Err(GraphoidError::type_error("list", args[0].type_name()));
+                    }
+                };
+
+                // Process each match and build projection
+                let mut projected_list = Vec::new();
+
+                for binding in results.iter() {
+                    let mut result_map = crate::values::Hash::new();
+
+                    for spec in &specifiers {
+                        if spec.contains('.') {
+                            // Property access: "variable.property"
+                            let parts: Vec<&str> = spec.splitn(2, '.').collect();
+                            if parts.len() == 2 {
+                                let var_name = parts[0];
+                                let prop_name = parts[1];
+
+                                // Get node from binding
+                                if let Some(node_id) = binding.get(var_name) {
+                                    if let Some(node) = results.graph().nodes.get(node_id) {
+                                        // Try to get property from node's value
+                                        let prop_value = match &node.value.kind {
+                                            ValueKind::Map(map) => {
+                                                map.get(prop_name).cloned().unwrap_or(Value::none())
+                                            }
+                                            _ => {
+                                                // If node value isn't a map, check properties directly
+                                                node.properties.get(prop_name)
+                                                    .cloned()
+                                                    .unwrap_or(Value::none())
+                                            }
+                                        };
+
+                                        let _ = result_map.insert(spec.clone(), prop_value);
+                                    }
+                                }
+                            }
+                        } else {
+                            // Variable access: return full node value
+                            if let Some(node_id) = binding.get(spec) {
+                                if let Some(node) = results.graph().nodes.get(node_id) {
+                                    let _ = result_map.insert(spec.clone(), node.value.clone());
+                                }
+                            }
+                        }
+                    }
+
+                    projected_list.push(Value::map(result_map));
+                }
+
+                Ok(Value::list(crate::values::List::from_vec(projected_list)))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "PatternMatchResults does not have method '{}'",
+                method
+            ))),
+        }
+    }
+
     /// Helper: Apply node filter to graph, returns set of matching node IDs.
     /// If invert=true, returns nodes that DON'T match the filter.
     fn apply_node_filter(
@@ -3238,23 +3392,10 @@ impl Executor {
                 // Perform pattern matching
                 let matches = self.match_pattern(&graph, &pattern)?;
 
-                // Convert matches to list of hashes
-                // Each hash maps pattern variables to node values (not IDs)
-                let result_list: Vec<Value> = matches
-                    .iter()
-                    .map(|bindings| {
-                        let mut hash = crate::values::Hash::new();
-                        for (var, node_id) in bindings {
-                            // Get the node's value from the graph
-                            if let Some(node) = graph.nodes.get(node_id) {
-                                let _ = hash.insert(var.clone(), node.value.clone());
-                            }
-                        }
-                        Value::map(hash)
-                    })
-                    .collect();
+                // Wrap matches in PatternMatchResults
+                let results = crate::values::PatternMatchResults::new(matches, graph.clone());
 
-                Ok(Value::list(crate::values::List::from_vec(result_list)))
+                Ok(Value::pattern_match_results(results))
             }
             "get_node" => {
                 // Get the value of a node by ID
@@ -3752,7 +3893,7 @@ impl Executor {
                             Argument::Named { name: param_name, value } => {
                                 let val = self.eval_expr(value)?;
                                 match param_name.as_str() {
-                                    "edge_type" => {
+                                    "edge_type" | "type" => {
                                         edge_type = Some(val.to_string_value());
                                     }
                                     "min" => {
@@ -3796,9 +3937,8 @@ impl Executor {
                     }
 
                     // Validate required parameters
-                    let edge_type = edge_type.ok_or_else(|| {
-                        GraphoidError::runtime("path() requires 'edge_type' parameter".to_string())
-                    })?;
+                    // edge_type is optional - if not provided, match any edge type
+                    let edge_type = edge_type.unwrap_or_else(|| "".to_string()); // Empty string means any type
                     let min = min.ok_or_else(|| {
                         GraphoidError::runtime("path() requires 'min' parameter".to_string())
                     })?;

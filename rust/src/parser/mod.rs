@@ -1590,8 +1590,14 @@ impl Parser {
         use crate::ast::Argument;
         let mut args = Vec::new();
 
+        // Skip leading newlines
+        self.skip_newlines();
+
         if !self.check(&TokenType::RightParen) {
             loop {
+                // Skip newlines before each argument
+                self.skip_newlines();
+
                 // Check for named argument syntax: name: value
                 if let TokenType::Identifier(name) = &self.peek().token_type {
                     // Look ahead to see if this is a named argument
@@ -1606,6 +1612,10 @@ impl Parser {
                                 name: param_name,
                                 value,
                             });
+
+                            // Skip newlines before comma check
+                            self.skip_newlines();
+
                             if !self.match_token(&TokenType::Comma) {
                                 break;
                             }
@@ -1617,11 +1627,18 @@ impl Parser {
                 // Positional argument
                 let expr = self.lambda_or_expression()?;
                 args.push(Argument::Positional(expr));
+
+                // Skip newlines before comma check
+                self.skip_newlines();
+
                 if !self.match_token(&TokenType::Comma) {
                     break;
                 }
             }
         }
+
+        // Skip trailing newlines before closing paren
+        self.skip_newlines();
 
         Ok(args)
     }
@@ -1835,15 +1852,28 @@ impl Parser {
                 });
             }
 
+            // Skip leading newlines
+            self.skip_newlines();
+
             let mut elements = Vec::new();
             if !self.check(&TokenType::RightBracket) {
                 loop {
+                    // Skip newlines before each element
+                    self.skip_newlines();
+
                     elements.push(self.expression()?);
+
+                    // Skip newlines before comma check
+                    self.skip_newlines();
+
                     if !self.match_token(&TokenType::Comma) {
                         break;
                     }
                 }
             }
+
+            // Skip trailing newlines before closing bracket
+            self.skip_newlines();
 
             if !self.match_token(&TokenType::RightBracket) {
                 return Err(GraphoidError::SyntaxError {
@@ -1859,14 +1889,27 @@ impl Parser {
         if self.match_token(&TokenType::LeftBracket) {
             let mut elements = Vec::new();
 
+            // Skip leading newlines
+            self.skip_newlines();
+
             if !self.check(&TokenType::RightBracket) {
                 loop {
+                    // Skip newlines before each element
+                    self.skip_newlines();
+
                     elements.push(self.expression()?);
+
+                    // Skip newlines before comma check
+                    self.skip_newlines();
+
                     if !self.match_token(&TokenType::Comma) {
                         break;
                     }
                 }
             }
+
+            // Skip trailing newlines before closing bracket
+            self.skip_newlines();
 
             if !self.match_token(&TokenType::RightBracket) {
                 return Err(GraphoidError::SyntaxError {

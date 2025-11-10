@@ -6,8 +6,10 @@ g = graph{type: :directed}
 
 # Create a chain: A -> B -> C -> D -> E -> F
 nodes = ["A", "B", "C", "D", "E", "F"]
-for i in 0..5 {
+i = 0
+while i < 6 {
     g.add_node(nodes[i], i)
+    i = i + 1
 }
 
 # Linear chain

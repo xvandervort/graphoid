@@ -1,15 +1,17 @@
 # Phase 9: Actual Implementation Status
 
-**Last Updated**: November 6, 2025 (After Day 5 Part B completion)
+**Last Updated**: November 9, 2025 (Comprehensive Audit)
 **Purpose**: Document what's actually implemented vs what Phase 9 plan says
 
 ---
 
 ## Current Status Summary
 
-**Phase 9 Progress**: ~65% complete (Days 1-5 Part B done)
-**Test Count**: **56 pattern execution tests passing** ✅
-**Total Project Tests**: 1,688 passing ✅
+**Phase 9 Progress**: ⚠️ **CORE COMPLETE, INTEGRATION INCOMPLETE**
+**Core Functionality**: ✅ **100%** - All pattern matching features work
+**Example Files**: ❌ **0% runnable** - Blocked by parser limitations
+**Test Count**: **144 Phase 9 tests passing** ✅ (38 unit + 106 integration)
+**Total Project Tests**: 1,727+ passing ✅
 
 ### Completed This Session (Nov 6, 2025)
 
@@ -200,22 +202,23 @@ results = g.match([
 
 ---
 
-### ⏳ Day 5 Part A: Return Clause (TODO - NEXT)
+### ✅ Day 5 Part A: Return Clause (COMPLETE)
 
 **Goal**: Implement `.return()` projection on PatternMatchResults
 
-**Planned**:
-- ⏳ `.return_vars()` method for variable selection
-- ⏳ `.return_properties()` for property access
-- ⏳ Field projection from matches
+**Implemented**:
+- ✅ `.return_vars()` method for variable selection (src/values/mod.rs:373)
+- ✅ `.return_properties()` for property access (src/values/mod.rs:428)
+- ✅ Field projection from matches
 
-**Example Target**:
+**Working Examples**:
 ```graphoid
-results = g.match([...]).return_vars(["person"])
-results = g.match([...]).return_properties(["person.name", "friend.age"])
+results = g.match(node("person"), edge(), node("friend"))
+projected = results.return_vars(["person"])  # ✅ Works
+props = results.return_properties(["person.name", "friend.age"])  # ✅ Works
 ```
 
-**Estimated**: 3-4 hours
+**Test Coverage**: 3 tests in graph_pattern_matching_tests.rs ✅
 
 ---
 
@@ -372,17 +375,17 @@ results.where(lambda match: match["person"] != "Alice")
 
 ---
 
-### ⏳ PARTIAL: Return Clause Projection
+### ✅ COMPLETE: Return Clause Projection
 
-**Expected API**:
+**API**:
 ```graphoid
 results.return_vars(["person"])
 results.return_properties(["person.name", "friend.age"])
 ```
 
-**Current Status**: Not yet implemented
+**Current Status**: ✅ Fully implemented (src/values/mod.rs:373-470)
 
-**Priority**: ⭐ HIGH - Next task (Day 5 Part A)
+**Test Coverage**: 3 tests in graph_pattern_matching_tests.rs
 
 ---
 
@@ -440,31 +443,71 @@ results = graph.match(
 
 ## Gap Analysis
 
-### ✅ CLOSED GAPS (Since November 5)
+### ✅ CLOSED GAPS (All Core Features Complete)
 
 1. ~~Graph.match() method~~ - ✅ IMPLEMENTED
 2. ~~Pattern Matching Algorithm~~ - ✅ IMPLEMENTED
 3. ~~Where Clause Filtering~~ - ✅ IMPLEMENTED
 4. ~~Variable-length paths~~ - ✅ IMPLEMENTED (Nov 6)
+5. ~~Return Clause Projection~~ - ✅ IMPLEMENTED (verified Nov 9)
 
-### Remaining Gaps (Must Implement)
+### ❌ BLOCKERS - Must Fix for Phase 9 Complete
 
-1. **Return Clause Projection** (Day 5 Part A - Next)
-   - `.return_vars()` for variable selection
-   - `.return_properties()` for property access
-   - ~3-4 hours estimated
+**VERIFIED STATUS (Nov 9, 2025)**: The multiline parser issue was **NOT** fixed yesterday.
 
-2. **Integration Tests** (Days 6-7)
-   - End-to-end scenarios
-   - Performance benchmarks
-   - ~2 days estimated
+1. **Multiline Function Call Parser Support** 🚨 **CRITICAL BLOCKER**
+   - **Status**: ❌ **NOT FIXED** - Still broken as of Nov 9, 2025
+   - **Issue**: Parser doesn't handle newlines inside function argument lists
+   - **Impact**: ALL Phase 9 example files fail to run
+   - **Verification**:
+     ```bash
+     # Tested: /home/irv/work/grang/rust/tmp/test_multiline_match.gr
+     # Result: Error: Parser error: Syntax error: Unexpected token: Newline at line 12, column 20
+     ```
+   - **Example**:
+     ```graphoid
+     # ❌ Fails to parse (all Phase 9 examples use this format)
+     results = g.match(
+         node("person"),
+         edge(type: "FRIEND"),
+         node("friend")
+     )
+
+     # ✅ Works perfectly (but not used in any example files)
+     results = g.match(node("person"), edge(type: "FRIEND"), node("friend"))
+     ```
+   - **Priority**: 🚨 **CRITICAL** - Phase 9 cannot be marked complete without this
+   - **Estimated**: 4-6 hours (parser enhancement)
+   - **Required**: Must be fixed before Phase 9 can be marked complete
+
+2. **Invalid Range Operator Syntax in Examples** 🚨 **CRITICAL BLOCKER**
+   - **Status**: ❌ **INVALID SYNTAX** - Example files incorrectly use `..` syntax
+   - **Issue**: Example files use `for i in 0..5` but **Graphoid does NOT have a range operator by design**
+   - **Impact**: Files using ranges fail to parse with "Expected method name after '.'"
+   - **Affected files**:
+     - `variable_length_paths.gr` (line 9: `for i in 0..5`)
+     - `recommendation_system.gr`
+     - `property_projection.gr`
+   - **Error**: `Parser error: Expected method name after '.' at line 9, column 12`
+   - **Priority**: 🚨 **CRITICAL** - Example files use invalid syntax
+   - **Estimated**: 1-2 hours to rewrite examples
+   - **Required**: Rewrite examples to use valid Graphoid syntax:
+     - Use explicit lists: `for i in [0, 1, 2, 3, 4, 5]`
+     - Use while loops: `i = 0; while i < 5 { ... i = i + 1 }`
+     - Use graph iteration: `for node in graph.nodes()`
+   - **NOTE**: Graphoid intentionally does NOT have a range operator - this is a design decision
 
 ### Optional Features (Deferred)
 
 1. **Pattern .bind() Method**
    - Rebind pattern variables
-   - Priority: MEDIUM
+   - Priority: LOW
    - Decision: Defer to future phase
+
+2. **Performance Benchmarks**
+   - Pattern matching performance tests
+   - Priority: LOW
+   - Decision: Defer until optimization phase
 
 ---
 
@@ -573,29 +616,60 @@ results = graph.match(
 
 ## Conclusion
 
-**Phase 9 Status**: ~65% complete ✅
+**Phase 9 Status**: ⚠️ **INCOMPLETE** - Core features done, integration blocked
 
-**What's Done** (Nov 6, 2025):
+**What's Done** (Verified Nov 9, 2025):
 - ✅ Infrastructure (AST, values, builtins)
 - ✅ Core pattern matching execution
 - ✅ Graph.match() method with full features
 - ✅ Where clause filtering
 - ✅ Variable-length path support
-- ✅ 56 pattern execution tests passing
+- ✅ Return clause projection (.return_vars(), .return_properties())
+- ✅ 144 Phase 9 tests passing (38 unit + 106 integration)
 - ✅ Zero compiler warnings
+- ✅ Pattern matching works from .gr files (single-line only)
 
-**What's Needed**:
-- ⏳ Return clause projection (3-4 hours)
-- ⏳ Integration tests & documentation (2 days)
+**What's BROKEN** (Blockers for completion):
+- 🚨 **Multiline function calls** - Parser fails on newlines in argument lists
+  - Status: NOT fixed (contrary to earlier assumptions)
+  - Impact: ALL Phase 9 example files fail to run
+  - Estimated: 4-6 hours to fix
+  - **CRITICAL**: Must fix before Phase 9 can be marked complete
 
-**Estimated Time Remaining**: 3-4 days
+- 🚨 **Invalid range operator syntax in examples** - Examples use `..` syntax that doesn't exist
+  - Status: Invalid syntax in example files (Graphoid has NO range operator by design)
+  - Impact: 3+ example files fail to parse
+  - Estimated: 1-2 hours to rewrite examples with valid syntax
+  - **CRITICAL**: Must rewrite examples to use lists, while loops, or graph iteration
 
-**Quality**: Excellent - Strict TDD, comprehensive tests, zero regressions
+**Example Files Status**: ❌ **0 of 4 Phase 9 example files runnable**
+- `social_network_patterns.gr` - ❌ Multiline parser issue
+- `variable_length_paths.gr` - ❌ Range operator + multiline issues
+- `property_projection.gr` - ❌ Multiline parser issue
+- `recommendation_system.gr` - ❌ Range operator + multiline issues
 
-**Ready for Day 5 Part A**: ✅ YES
+**Estimated Time Remaining**: 1-2 days (mandatory fixes)
+
+**Quality**: Core implementation excellent, but integration incomplete
+
+**Recommendation**: Phase 9 is **NOT complete** until:
+1. Multiline function call parser support is implemented (MANDATORY)
+2. Example files are rewritten to remove invalid range syntax (MANDATORY)
+3. At least one example file runs successfully (MANDATORY)
+
+**Next Steps** (REQUIRED, in order):
+1. Fix multiline function call parsing (4-6 hours)
+   - Allow newlines inside function argument lists
+   - Update parser to skip Newline tokens within parentheses
+2. Rewrite example files to remove invalid range syntax (1-2 hours)
+   - Replace `for i in 0..5` with `for i in [0, 1, 2, 3, 4, 5]`
+   - Or use while loops: `i = 0; while i < 5 { ... }`
+   - Or use graph iteration (preferred for Graphoid!)
+3. Verify all Phase 9 example files run successfully
+4. THEN Phase 9 can be marked complete
 
 ---
 
 **Created**: November 5, 2025
-**Updated**: November 6, 2025 (After Day 5 Part B completion)
-**Next**: Implement return clause (Day 5 Part A)
+**Updated**: November 9, 2025 (Comprehensive audit with execution testing)
+**Next**: Fix multiline parser and range operator (REQUIRED for Phase 9 completion)
