@@ -1,0 +1,46 @@
+# service_module.gr - Mid-level service module
+#
+# This module imports utils_module.gr and provides higher-level functionality.
+# It demonstrates how one module can import and use another module.
+
+module business_service alias service
+
+# Import the utilities module
+import "./utils_module"
+
+# Business logic using utilities
+fn calculate_total(price, quantity) {
+    subtotal = utils.multiply(price, quantity)
+    tax = utils.multiply(subtotal, 0.08)
+    total = utils.add(subtotal, tax)
+    return total
+}
+
+fn calculate_discount(price, discount_percent) {
+    discount_amount = utils.multiply(price, discount_percent)
+    discount_amount = utils.multiply(discount_amount, 0.01)
+    final_price = price - discount_amount
+    return final_price
+}
+
+fn calculate_circle_area(radius) {
+    # Using utility's square function and PI constant
+    radius_squared = utils.square(radius)
+    area = utils.multiply(utils.PI, radius_squared)
+    return area
+}
+
+fn format_price(amount) {
+    # Using utility's string formatting
+    return utils.format_currency(amount)
+}
+
+fn calculate_profit_margin(cost, price) {
+    profit = price - cost
+    margin = profit / cost
+    margin_percent = utils.multiply(margin, 100)
+    return margin_percent
+}
+
+print("✓ Business service module loaded")
+print("  (using utilities module)")

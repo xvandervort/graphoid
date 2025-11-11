@@ -1,0 +1,70 @@
+# app_main.gr - Application entry point
+#
+# This demonstrates a THREE-LEVEL module hierarchy:
+#   app_main.gr → service_module.gr → utils_module.gr
+#
+# The app imports service, and service imports utils.
+# This shows that modules can import other modules.
+
+print("=== Three-Level Module Import Demo ===")
+print()
+
+# Import the business service module
+# (which itself imports utils_module)
+import "./service_module"
+
+print()
+print("--- Example 1: Calculate Order Total ---")
+
+# Calculate total for an order
+price = 50.0
+quantity = 3
+total = service.calculate_total(price, quantity)
+
+print("Price per item: $" + price)
+print("Quantity: " + quantity)
+print("Total (with 8% tax): " + service.format_price(total))
+print()
+
+print("--- Example 2: Apply Discount ---")
+
+original_price = 100.0
+discount_percent = 20
+final_price = service.calculate_discount(original_price, discount_percent)
+
+print("Original price: $" + original_price)
+print("Discount: " + discount_percent + "%")
+print("Final price: " + service.format_price(final_price))
+print()
+
+print("--- Example 3: Calculate Circle Area ---")
+
+radius = 5
+area = service.calculate_circle_area(radius)
+
+print("Radius: " + radius)
+print("Area: " + area)
+print()
+
+print("--- Example 4: Profit Margin ---")
+
+cost = 60.0
+selling_price = 100.0
+margin = service.calculate_profit_margin(cost, selling_price)
+
+print("Cost: $" + cost)
+print("Selling price: $" + selling_price)
+print("Profit margin: " + margin + "%")
+print()
+
+print("=== Module Import Chain ===")
+print("app_main.gr → imports → service_module.gr")
+print("service_module.gr → imports → utils_module.gr")
+print()
+print("Key points:")
+print("  • Modules can import other modules")
+print("  • Three-level hierarchy works correctly")
+print("  • Each module has its own namespace")
+print("  • Service uses utils.function() to call utility functions")
+print("  • App uses service.function() to call service functions")
+print()

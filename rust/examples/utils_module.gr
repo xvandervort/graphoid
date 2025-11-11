@@ -1,0 +1,34 @@
+# utils_module.gr - Low-level utility module
+#
+# This module provides basic math and string utilities.
+# It will be imported by service_module.gr
+
+module utilities alias utils
+
+# Math utilities
+fn add(a, b) {
+    return a + b
+}
+
+fn multiply(a, b) {
+    return a * b
+}
+
+fn square(x) {
+    return multiply(x, x)
+}
+
+# String utilities
+fn format_currency(amount) {
+    return "$" + amount
+}
+
+fn format_percentage(value) {
+    return value + "%"
+}
+
+# Constants
+PI = 3.14159
+E = 2.71828
+
+print("✓ Utilities module loaded")

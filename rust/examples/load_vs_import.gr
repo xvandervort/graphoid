@@ -1,0 +1,137 @@
+# Load vs Import: Understanding the Difference
+#
+# This example demonstrates the key difference between 'load' and 'import'
+# in Graphoid's module system.
+
+print("=== Graphoid Module System: load vs import ===")
+print()
+
+# =============================================================================
+# PART 1: Using 'import' - Creates a Module Namespace
+# =============================================================================
+
+print("--- PART 1: import (creates namespace) ---")
+print()
+
+# When you import a module, it creates a separate namespace.
+# You access its contents via the module name (or alias).
+
+# Example: Import the math module from stdlib
+import "math"
+
+# Access math functions through the module namespace
+result1 = math.abs(-15)
+result2 = math.max(10, 20)
+
+print("Using import:")
+print("  math.abs(-15) =", result1)
+print("  math.max(10, 20) =", result2)
+print()
+
+# The module's symbols are NOT in the current namespace:
+# This would error: abs(-15)  # Error: 'abs' not defined
+# You must use: math.abs(-15)
+
+print("Key point: Symbols are accessed via 'math.symbol'")
+print("They are NOT directly accessible in current namespace")
+print()
+
+# =============================================================================
+# PART 2: Using 'load' - Merges Into Current Namespace
+# =============================================================================
+
+print("--- PART 2: load (merges into current namespace) ---")
+print()
+
+# When you load a file, its variables and functions merge into
+# your current namespace. No module prefix needed.
+
+# Note: This is conceptual - you would need an actual config.gr file
+# For a real example, see tests/fixtures/load_tests/
+
+print("Using load (conceptual example):")
+print()
+print("  load \"config.gr\"")
+print()
+print("  # config.gr contains:")
+print("  #   debug = true")
+print("  #   max_connections = 100")
+print()
+print("  # After load, these are directly accessible:")
+print("  if debug {")
+print("      print(\"Debug mode:\", max_connections)")
+print("  }")
+print()
+print("Key point: Symbols are directly accessible")
+print("No module prefix needed!")
+print()
+
+# =============================================================================
+# PART 3: When to Use Each
+# =============================================================================
+
+print("--- PART 3: When to use each ---")
+print()
+
+print("Use 'import' when:")
+print("  • You want to organize code into reusable modules")
+print("  • You need namespace isolation")
+print("  • You're importing standard library modules")
+print("  • You want to avoid name conflicts")
+print("  • The module should be cached (not re-executed)")
+print()
+
+print("Use 'load' when:")
+print("  • You want to merge configuration into current scope")
+print("  • You're including utility functions temporarily")
+print("  • You want direct access without a module prefix")
+print("  • You're working with test helpers")
+print("  • The file should execute every time (no caching)")
+print()
+
+# =============================================================================
+# PART 4: Practical Examples
+# =============================================================================
+
+print("--- PART 4: Practical examples ---")
+print()
+
+print("Example 1: Using multiple imports")
+print("  import \"math\"")
+print("  import \"string\"")
+print("  import \"json\"")
+print()
+print("  result = math.sqrt(16)")
+print("  text = string.upper(\"hello\")")
+print("  data = json.parse(\"{\\\"key\\\": \\\"value\\\"}\")")
+print()
+
+print("Example 2: Load for configuration")
+print("  load \"config.gr\"  # Contains: api_key, endpoints, etc.")
+print()
+print("  # Now use directly:")
+print("  response = fetch(endpoints.users, api_key)")
+print()
+
+# =============================================================================
+# Summary
+# =============================================================================
+
+print("=== Summary ===")
+print()
+print("import \"module\":")
+print("  ✓ Creates namespace")
+print("  ✓ Cached (loads once)")
+print("  ✓ Access: module.symbol")
+print("  ✓ Use for libraries and reusable code")
+print()
+
+print("load \"file.gr\":")
+print("  ✓ Merges into current scope")
+print("  ✓ No caching (executes every time)")
+print("  ✓ Access: symbol (directly)")
+print("  ✓ Use for config files and utilities")
+print()
+
+print("Both support relative paths: './file.gr' or '../config.gr'")
+print()
