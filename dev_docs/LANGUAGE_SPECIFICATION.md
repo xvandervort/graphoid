@@ -1415,6 +1415,53 @@ fn validate(input) {
 }
 ```
 
+### Privacy with `priv` Keyword
+
+**Everything is public by default** in Graphoid modules. Use the `priv` keyword to mark symbols as private (accessible only within the same module file):
+
+```Graphoid
+# helpers.gr
+module helpers
+
+priv fn internal_helper() {
+    # Private function - only accessible within helpers.gr
+    return 42
+}
+
+fn public_api() {
+    # Public function - accessible from imports (default)
+    return internal_helper() * 2  # ✅ Can call private function within module
+}
+
+priv secret_value = 99  # Private variable
+public_value = 100      # Public variable (default)
+```
+
+**Usage from another file:**
+
+```Graphoid
+# main.gr
+import "helpers"
+
+result = helpers.public_api()      # ✅ Works - public function
+value = helpers.public_value       # ✅ Works - public variable
+
+helpers.internal_helper()          # ❌ Error: 'internal_helper' is private
+secret = helpers.secret_value      # ❌ Error: 'secret_value' is private
+```
+
+**Privacy Rules:**
+1. **Public by default** - No `export` keyword needed, everything is accessible unless marked `priv`
+2. **`priv` symbols** - Only accessible within the same module file
+3. **Within same module** - All symbols (public and private) are accessible
+4. **From imports** - Only public symbols are accessible via `module.symbol` syntax
+5. **Synonym** - Both `priv` and `private` keywords work
+
+**Why Public by Default:**
+- **KISS Principle** - Reduces boilerplate (no `export` on every function)
+- **80/20 Rule** - Most code should be accessible; privacy is the exception
+- **Explicit Privacy** - `priv` marks the few things that should be hidden
+
 ### Module Aliases
 
 **Standard Library Aliases**:

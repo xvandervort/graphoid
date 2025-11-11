@@ -451,136 +451,209 @@ pub struct ModuleManager {
 
 ---
 
-## Day 3: Standard Library Modules
+## Day 3: Verification and Integration Testing
+
+**NOTE**: Actual standard library modules (JSON, IO, Math, String, List, etc.) will be implemented in **Phase 11** (Pure Graphoid Stdlib) and **Phase 12** (Native Stdlib). Day 3 focuses on verifying that the module system infrastructure works correctly.
 
 ### Goal
-Implement core standard library modules.
+Verify the complete module system works end-to-end through comprehensive integration testing and example creation.
 
 ### Tasks
 
-#### 3.1 Module Registry
-**File**: `src/execution/stdlib_registry.rs` (new file)
+#### 3.1 Verify Module Alias Resolution
+**File**: `tests/module_alias_tests.rs` (new file)
 
+Verify that module aliases work in member access:
 ```rust
-pub struct StdlibRegistry {
-    modules: HashMap<String, Box<dyn StdlibModule>>,
+#[test]
+fn test_module_alias_access() {
+    // Create test module with alias
+    let mut module = Module::new("statistics".to_string());
+    module.alias = Some("stats".to_string());
+
+    // Register function
+    module.namespace.define("mean".to_string(), /* function */);
+
+    // Verify both names work
+    assert!(module.has_member("mean"));
+    // Test that stats.mean() resolves correctly
+}
+```
+
+**Tests**: 8 tests
+- Module with alias defined
+- Access via full name works
+- Access via alias works
+- Module without alias works
+- Multiple aliases (future-proofing)
+- Alias doesn't conflict with other modules
+- Built-in stdlib alias patterns
+- Error when accessing undefined member
+
+#### 3.2 Create Test .gr Files in stdlib/ Directory
+
+**Create Directory Structure**:
+```bash
+stdlib/
+├── test_module.gr          # Simple test module
+├── test_with_alias.gr      # Module with alias
+└── nested/
+    └── submodule.gr        # Nested module test
+```
+
+**test_module.gr**:
+```graphoid
+module test_module
+
+fn greet(name) {
+    return "Hello, " + name
 }
 
-pub trait StdlibModule {
-    fn name(&self) -> &str;
-    fn aliases(&self) -> Vec<&str>;
-    fn initialize(&self) -> Environment;
+value = 42
+```
+
+**test_with_alias.gr**:
+```graphoid
+module test_with_alias
+alias twa
+
+fn helper() {
+    return "Helper function"
 }
 ```
 
-#### 3.2 Core Modules
-Implement these standard library modules:
+#### 3.3 Integration Tests
 
-**1. JSON Module** (`stdlib/json`)
-```graphoid
-import "json"
+**File**: `tests/module_integration_tests.rs`
 
-data = {"name": "Alice", "age": 30}
-json_string = json.encode(data)
-parsed = json.decode(json_string)
+End-to-end workflow tests:
+
+**Test 1: Full Import and Use Cycle**
+```rust
+#[test]
+fn test_import_use_stdlib_module() {
+    // Create executor
+    // Import from stdlib/
+    // Call module function
+    // Verify result
+}
 ```
 
-Functions:
-- `encode(value)` -> string
-- `decode(string)` -> value
-- `pretty(value)` -> string (formatted JSON)
-
-**2. IO Module** (`stdlib/io`)
-```graphoid
-import "io"
-
-content = io.read_file("data.txt")
-io.write_file("output.txt", content)
-io.print("message")
+**Test 2: Module Alias Usage**
+```rust
+#[test]
+fn test_module_alias_member_access() {
+    // Import module with alias
+    // Access via full name
+    // Access via alias name
+    // Both should work
+}
 ```
 
-Functions:
-- `read_file(path)` -> string
-- `write_file(path, content)` -> none
-- `print(value)` -> none
-- `println(value)` -> none
-- `read_line()` -> string
-
-**3. Math Module** (`stdlib/math`)
-```graphoid
-import "math"
-
-value = math.sqrt(16)  # 4
-angle = math.sin(math.PI / 2)  # 1
+**Test 3: Circular Dependency Detection**
+```rust
+#[test]
+fn test_circular_import_detected() {
+    // Module A imports B
+    // Module B imports A
+    // Should error with clear message
+}
 ```
 
-Functions:
-- `sqrt(x)`, `pow(x, y)`, `abs(x)`
-- `sin(x)`, `cos(x)`, `tan(x)`
-- `floor(x)`, `ceil(x)`, `round(x)`
-- Constants: `PI`, `E`
-
-**4. String Module** (`stdlib/string`)
-```graphoid
-import "string"
-
-padded = string.pad_left("hello", 10)
-repeated = string.repeat("x", 5)
+**Test 4: Module Caching**
+```rust
+#[test]
+fn test_module_cached_on_second_import() {
+    // Import same module twice
+    // Should not execute twice
+    // Should return cached instance
+}
 ```
 
-Functions:
-- `pad_left(str, width)`, `pad_right(str, width)`
-- `repeat(str, count)`
-- `join(list, delimiter)`
-- `lines(str)` - split by newlines
+**Tests**: 20 integration tests
+- Full import→access→usage workflow
+- Module alias resolution
+- Circular dependency detection
+- Module caching verification
+- Relative imports work
+- Absolute imports work
+- Nested module imports
+- load vs import semantics
+- priv keyword enforcement
+- Multiple imports in same file
+- Cross-module function calls
+- Module re-exports
+- Error messages clear and helpful
+- Module not found errors
+- Syntax errors in modules
+- Runtime errors in modules
+- Module config inheritance
+- Namespace isolation
+- Symbol shadowing
+- Import order independence
 
-**5. List Module** (`stdlib/list`)
+#### 3.4 Create Comprehensive .gr Examples
+
+**File**: `examples/modules_privacy.gr`
 ```graphoid
-import "list"
-
-flattened = list.flatten([[1, 2], [3, 4]])
-zipped = list.zip([1, 2], [3, 4])
+# Demonstrates priv keyword usage
+# See Phase 10 Day 1 implementation
 ```
 
-Functions:
-- `flatten(nested_list)`
-- `zip(list1, list2, ...)`
-- `range(start, end, step?)`
-- `repeat(value, count)`
-
-#### 3.3 Module Aliases
-**File**: `src/execution/stdlib_registry.rs`
-
-Register built-in aliases:
-- `statistics` → `stats`
-- `random` → `rand`
-- `regex` → `re`
-- `constants` → `const`
-
-**Implementation**:
-Both names automatically available:
+**File**: `examples/modules_load_vs_import.gr`
 ```graphoid
-import "statistics"
+# Demonstrates difference between load and import
+# See Phase 10 Day 4 implementation
+```
+
+**File**: `examples/modules_aliases.gr`
+```graphoid
+# Demonstrates module alias usage
+import "test_with_alias"
+
 # Both work:
-stats.mean([1, 2, 3])
-statistics.mean([1, 2, 3])
+result1 = test_with_alias.helper()
+result2 = twa.helper()  # Using alias
+
+print(result1)
+print(result2)
 ```
 
-**Tests**: 25 tests (5 per module × 5 modules)
-- JSON encode/decode
-- IO read/write
-- Math functions
-- String utilities
-- List operations
-- Module aliases work
-- Import names correct
-- Error handling
+**File**: `examples/modules_multi_file.gr`
+```graphoid
+# Demonstrates multi-file project organization
+import "./helpers"
+import "../config"
+
+# Use imported modules
+```
+
+#### 3.5 Verify End-to-End Workflows
+
+Run all example files to verify they work:
+```bash
+cargo run --quiet examples/modules_basic.gr
+cargo run --quiet examples/modules_privacy.gr
+cargo run --quiet examples/modules_load_vs_import.gr
+cargo run --quiet examples/modules_aliases.gr
+cargo run --quiet examples/modules_multi_file.gr
+```
+
+**Tests**: 5 example files × verification = 5 manual tests
 
 **Acceptance Criteria**:
-- ✅ 5 core stdlib modules implemented
-- ✅ All functions work correctly
-- ✅ Aliases automatically available
-- ✅ 25+ tests passing
+- ✅ Module alias resolution works correctly
+- ✅ All 20 integration tests pass
+- ✅ 5 comprehensive .gr example files created
+- ✅ All examples run successfully
+- ✅ Full module workflow verified end-to-end
+- ✅ Circular dependency detection works
+- ✅ Module caching works
+- ✅ priv keyword enforcement works
+- ✅ load vs import semantics clear
+- ✅ Error messages helpful and accurate
+
+**Total Tests for Day 3**: 28+ tests (8 alias + 20 integration)
 
 ---
 

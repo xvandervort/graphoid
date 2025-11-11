@@ -1,6 +1,6 @@
 # Phase 11: Pure Graphoid Standard Library - Detailed Implementation Plan
 
-**Duration**: 10-14 days
+**Duration**: 14-18 days
 **Status**: Not started
 **Goal**: Implement high-level standard library modules in pure Graphoid (.gr files)
 
@@ -28,6 +28,8 @@ Phase 11 implements standard library modules written entirely in Graphoid. These
 ---
 
 ## Module List
+
+**Total Modules**: 9 (7 originally planned + 2 moved from Phase 10)
 
 ### 1. Statistics Module (stats)
 
@@ -420,6 +422,216 @@ try {
 
 ---
 
+### 8. String Module
+
+**File**: `stdlib/string.gr`
+**Duration**: 1-2 days
+**Moved from Phase 10** - String manipulation utilities
+
+**API**:
+```graphoid
+import "string"
+
+# Padding
+left_padded = string.pad_left("hello", 10, " ")      # "     hello"
+right_padded = string.pad_right("hello", 10, " ")    # "hello     "
+centered = string.center("hello", 10, " ")           # "  hello   "
+
+# Repetition
+repeated = string.repeat("abc", 3)                   # "abcabcabc"
+repeated_char = string.repeat("*", 10)               # "**********"
+
+# Joining
+joined = string.join(["a", "b", "c"], ", ")          # "a, b, c"
+path = string.join_paths(["/home", "user", "file"])  # "/home/user/file"
+
+# Splitting
+lines = string.lines("line1\nline2\nline3")          # ["line1", "line2", "line3"]
+words = string.words("hello world test")             # ["hello", "world", "test"]
+chunks = string.chunks("abcdef", 2)                  # ["ab", "cd", "ef"]
+
+# Case conversion
+title = string.title_case("hello world")             # "Hello World"
+camel = string.camel_case("hello_world")             # "helloWorld"
+snake = string.snake_case("HelloWorld")              # "hello_world"
+kebab = string.kebab_case("HelloWorld")              # "hello-world"
+
+# Trimming
+trimmed = string.trim("  hello  ")                   # "hello"
+left_trimmed = string.trim_left("  hello  ")         # "hello  "
+right_trimmed = string.trim_right("  hello  ")       # "  hello"
+
+# Character operations
+reversed = string.reverse("hello")                   # "olleh"
+char_at = string.char_at("hello", 1)                 # "e"
+index = string.index_of("hello", "l")                # 2 (first occurrence)
+last_index = string.last_index_of("hello", "l")      # 3
+
+# Validation
+is_alpha = string.is_alpha("hello")                  # true
+is_digit = string.is_digit("12345")                  # true
+is_alnum = string.is_alnum("hello123")               # true
+is_space = string.is_space("   ")                    # true
+
+# Truncation
+truncated = string.truncate("hello world", 8)        # "hello..."
+truncated_custom = string.truncate("hello world", 8, ">>")  # "hello>>"
+```
+
+**Functions**:
+- `pad_left(str, width, fill)` - Left-pad string
+- `pad_right(str, width, fill)` - Right-pad string
+- `center(str, width, fill)` - Center string with padding
+- `repeat(str, count)` - Repeat string n times
+- `join(list, separator)` - Join list of strings
+- `join_paths(list)` - Join path components (platform-aware)
+- `lines(str)` - Split by newlines
+- `words(str)` - Split by whitespace
+- `chunks(str, size)` - Split into fixed-size chunks
+- `title_case(str)` - Convert to Title Case
+- `camel_case(str)` - Convert to camelCase
+- `snake_case(str)` - Convert to snake_case
+- `kebab_case(str)` - Convert to kebab-case
+- `trim(str)` - Trim whitespace from both ends
+- `trim_left(str)` - Trim left whitespace
+- `trim_right(str)` - Trim right whitespace
+- `reverse(str)` - Reverse string
+- `char_at(str, index)` - Get character at index
+- `index_of(str, substr)` - Find first occurrence
+- `last_index_of(str, substr)` - Find last occurrence
+- `is_alpha(str)` - Check if all alphabetic
+- `is_digit(str)` - Check if all digits
+- `is_alnum(str)` - Check if alphanumeric
+- `is_space(str)` - Check if all whitespace
+- `truncate(str, max_length)` - Truncate with "..."
+- `truncate(str, max_length, suffix)` - Truncate with custom suffix
+
+**Key Features**:
+- Pure Graphoid implementation using pattern matching
+- Handles Unicode correctly
+- Platform-aware path joining
+- No dependencies on native modules
+
+**Tests**: 30+ tests covering all string operations
+
+---
+
+### 9. List Module
+
+**File**: `stdlib/list.gr`
+**Duration**: 1-2 days
+**Moved from Phase 10** - Advanced list utilities
+
+**API**:
+```graphoid
+import "list"
+
+# Flattening
+nested = [[1, 2], [3, 4], [5, 6]]
+flat = list.flatten(nested)                          # [1, 2, 3, 4, 5, 6]
+
+deep_nested = [1, [2, [3, [4]]]]
+flat_deep = list.flatten_deep(deep_nested)           # [1, 2, 3, 4]
+
+# Zipping
+names = ["Alice", "Bob", "Charlie"]
+ages = [25, 30, 35]
+zipped = list.zip(names, ages)                       # [["Alice", 25], ["Bob", 30], ["Charlie", 35]]
+
+# Multiple lists
+list1 = [1, 2, 3]
+list2 = [10, 20, 30]
+list3 = [100, 200, 300]
+zipped_multi = list.zip_multi([list1, list2, list3]) # [[1, 10, 100], [2, 20, 200], [3, 30, 300]]
+
+# Unzipping
+pairs = [["Alice", 25], ["Bob", 30]]
+[names, ages] = list.unzip(pairs)                    # names = ["Alice", "Bob"], ages = [25, 30]
+
+# Range generation
+range1 = list.range(5)                               # [0, 1, 2, 3, 4]
+range2 = list.range(1, 6)                            # [1, 2, 3, 4, 5]
+range3 = list.range(0, 10, 2)                        # [0, 2, 4, 6, 8]
+range4 = list.range(10, 0, -2)                       # [10, 8, 6, 4, 2]
+
+# Repetition
+repeated = list.repeat([1, 2, 3], 3)                 # [1, 2, 3, 1, 2, 3, 1, 2, 3]
+repeated_val = list.repeat_value(0, 5)               # [0, 0, 0, 0, 0]
+
+# Partitioning
+numbers = [1, 2, 3, 4, 5, 6]
+[evens, odds] = list.partition(numbers, n => n % 2 == 0)  # evens = [2, 4, 6], odds = [1, 3, 5]
+
+# Chunking
+items = [1, 2, 3, 4, 5, 6, 7, 8]
+chunks = list.chunk(items, 3)                        # [[1, 2, 3], [4, 5, 6], [7, 8]]
+
+# Windowing
+nums = [1, 2, 3, 4, 5]
+windows = list.window(nums, 3)                       # [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
+
+# Unique values
+duplicates = [1, 2, 2, 3, 3, 3, 4]
+unique = list.unique(duplicates)                     # [1, 2, 3, 4]
+
+# Frequency counting
+values = ["a", "b", "a", "c", "b", "a"]
+freq = list.frequencies(values)                      # {"a": 3, "b": 2, "c": 1}
+
+# Sorting with key
+people = [{"name": "Bob", "age": 30}, {"name": "Alice", "age": 25}]
+sorted_by_age = list.sort_by(people, p => p["age"])  # Sorted by age
+
+# Grouping
+nums = [1, 2, 3, 4, 5, 6]
+grouped = list.group_by(nums, n => n % 3)            # {0: [3, 6], 1: [1, 4], 2: [2, 5]}
+
+# Intersperse
+items = ["a", "b", "c"]
+with_sep = list.intersperse(items, "|")              # ["a", "|", "b", "|", "c"]
+
+# Take/Drop
+items = [1, 2, 3, 4, 5]
+first_3 = list.take(items, 3)                        # [1, 2, 3]
+last_3 = list.take_last(items, 3)                    # [3, 4, 5]
+drop_2 = list.drop(items, 2)                         # [3, 4, 5]
+drop_last_2 = list.drop_last(items, 2)               # [1, 2, 3]
+```
+
+**Functions**:
+- `flatten(list)` - Flatten one level
+- `flatten_deep(list)` - Recursively flatten all levels
+- `zip(list1, list2)` - Zip two lists
+- `zip_multi(lists)` - Zip multiple lists
+- `unzip(pairs)` - Unzip pairs into separate lists
+- `range(end)` - Range from 0 to end-1
+- `range(start, end)` - Range from start to end-1
+- `range(start, end, step)` - Range with step
+- `repeat(list, count)` - Repeat list n times
+- `repeat_value(value, count)` - Repeat value n times
+- `partition(list, predicate)` - Split by predicate
+- `chunk(list, size)` - Split into fixed-size chunks
+- `window(list, size)` - Sliding window
+- `unique(list)` - Remove duplicates
+- `frequencies(list)` - Count occurrences
+- `sort_by(list, key_fn)` - Sort by key function
+- `group_by(list, key_fn)` - Group by key function
+- `intersperse(list, separator)` - Insert separator between elements
+- `take(list, n)` - Take first n elements
+- `take_last(list, n)` - Take last n elements
+- `drop(list, n)` - Drop first n elements
+- `drop_last(list, n)` - Drop last n elements
+
+**Key Features**:
+- Pure Graphoid implementation
+- Leverages pattern matching and lambdas
+- Works with Graphoid's built-in list operations
+- Functional programming patterns
+
+**Tests**: 35+ tests covering all list operations
+
+---
+
 ## Implementation Strategy
 
 ### Day 1-2: Statistics Module
@@ -464,17 +676,29 @@ try {
 - Help generation
 - Type validation
 
+### Day 15-16: String Module
+- Padding, trimming, case conversion
+- Joining, splitting, chunking
+- Character operations
+- Validation functions
+
+### Day 17-18: List Module
+- Flattening, zipping, unzipping
+- Range generation, repetition
+- Partitioning, chunking, windowing
+- Grouping, sorting, unique operations
+
 ---
 
 ## Testing Strategy
 
 **Each module must have**:
-- 20-30 unit tests
+- 20-35 unit tests per module
 - Integration tests with other modules
 - Error case coverage
 - Edge case handling
 
-**Total Tests**: 150-200 tests for Phase 11
+**Total Tests**: 220-260 tests for Phase 11
 
 ---
 
@@ -492,9 +716,9 @@ try {
 
 ## Success Criteria
 
-- [ ] ✅ All 7 modules implemented in .gr files
-- [ ] ✅ 150+ tests passing
-- [ ] ✅ Modules work together (CSV + Stats, HTTP + JSON)
+- [ ] ✅ All 9 modules implemented in .gr files
+- [ ] ✅ 220+ tests passing
+- [ ] ✅ Modules work together (CSV + Stats, HTTP + JSON, List + String)
 - [ ] ✅ Error handling robust (try/catch in modules)
 - [ ] ✅ Pattern matching used effectively
 - [ ] ✅ Behaviors demonstrated where appropriate

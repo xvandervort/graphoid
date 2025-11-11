@@ -1,6 +1,6 @@
 # Phase 12: Native Standard Library Modules - Detailed Implementation Plan
 
-**Duration**: 14-21 days
+**Duration**: 16-23 days
 **Status**: Not started
 **Goal**: Implement performance-critical standard library modules in Rust
 
@@ -24,6 +24,8 @@ Phase 12 implements standard library modules in native Rust for performance, sys
 ---
 
 ## Module List
+
+**Total Modules**: 10 (9 originally planned + 1 moved from Phase 10)
 
 ### 1. Constants Module
 
@@ -488,7 +490,183 @@ is_valid = crypto.bcrypt_verify("password", hashed)
 
 ---
 
-### 9. OS Module
+### 9. Math Module
+
+**File**: `src/stdlib/math.rs`
+**Duration**: 2 days
+**Moved from Phase 10** - Mathematical functions
+
+**API**:
+```graphoid
+import "math"
+
+# Basic operations
+result = math.sqrt(16)                    # 4.0
+power = math.pow(2, 8)                    # 256.0
+absolute = math.abs(-42)                  # 42
+
+# Trigonometric functions
+sine = math.sin(math.PI / 2)              # 1.0
+cosine = math.cos(0)                      # 1.0
+tangent = math.tan(math.PI / 4)           # 1.0
+arcsine = math.asin(1)                    # π/2
+arccosine = math.acos(1)                  # 0
+arctangent = math.atan(1)                 # π/4
+atan2 = math.atan2(1, 1)                  # π/4
+
+# Hyperbolic functions
+sinh = math.sinh(1)
+cosh = math.cosh(1)
+tanh = math.tanh(1)
+
+# Rounding
+floored = math.floor(3.7)                 # 3.0
+ceiled = math.ceil(3.2)                   # 4.0
+rounded = math.round(3.5)                 # 4.0
+rounded_prec = math.round(3.14159, 2)     # 3.14
+truncated = math.trunc(3.9)               # 3.0
+
+# Logarithms and exponentials
+natural_log = math.log(math.E)            # 1.0
+log10 = math.log10(100)                   # 2.0
+log2 = math.log2(8)                       # 3.0
+exp = math.exp(1)                         # e (2.718...)
+pow_e = math.exp(2)                       # e^2
+
+# Advanced functions
+hypotenuse = math.hypot(3, 4)             # 5.0 (sqrt(3^2 + 4^2))
+factorial = math.factorial(5)             # 120
+gcd = math.gcd(48, 18)                    # 6
+lcm = math.lcm(12, 18)                    # 36
+
+# Angle conversion
+radians = math.radians(180)               # π
+degrees = math.degrees(math.PI)           # 180.0
+
+# Special values
+inf = math.inf                            # Infinity
+neg_inf = math.neg_inf                    # -Infinity
+nan = math.nan                            # Not a Number
+
+# Checks
+is_nan = math.is_nan(value)
+is_inf = math.is_inf(value)
+is_finite = math.is_finite(value)
+
+# Min/Max (variadic)
+minimum = math.min(5, 2, 8, 1)            # 1
+maximum = math.max(5, 2, 8, 1)            # 8
+
+# Clamp
+clamped = math.clamp(15, 0, 10)           # 10 (clamps to [0, 10])
+
+# Sign
+sign_pos = math.sign(42)                  # 1
+sign_neg = math.sign(-42)                 # -1
+sign_zero = math.sign(0)                  # 0
+```
+
+**Mathematical Constants** (also available via constants module):
+```graphoid
+PI = math.PI                              # 3.141592653589793
+E = math.E                                # 2.718281828459045
+TAU = math.TAU                            # 6.283185307179586 (2π)
+PHI = math.PHI                            # 1.618033988749895 (golden ratio)
+SQRT2 = math.SQRT2                        # √2
+SQRT3 = math.SQRT3                        # √3
+```
+
+**Functions**:
+- `sqrt(x)` - Square root
+- `pow(base, exp)` - Power (base^exp)
+- `abs(x)` - Absolute value
+- `sin(x)`, `cos(x)`, `tan(x)` - Trigonometric functions (radians)
+- `asin(x)`, `acos(x)`, `atan(x)` - Inverse trigonometric
+- `atan2(y, x)` - Two-argument arctangent
+- `sinh(x)`, `cosh(x)`, `tanh(x)` - Hyperbolic functions
+- `floor(x)` - Round down
+- `ceil(x)` - Round up
+- `round(x)` - Round to nearest
+- `round(x, precision)` - Round to n decimal places
+- `trunc(x)` - Truncate to integer
+- `log(x)` - Natural logarithm (base e)
+- `log10(x)` - Logarithm base 10
+- `log2(x)` - Logarithm base 2
+- `exp(x)` - e^x
+- `hypot(x, y)` - Euclidean distance sqrt(x^2 + y^2)
+- `factorial(n)` - n! (positive integers only)
+- `gcd(a, b)` - Greatest common divisor
+- `lcm(a, b)` - Least common multiple
+- `radians(degrees)` - Convert degrees to radians
+- `degrees(radians)` - Convert radians to degrees
+- `is_nan(x)` - Check if NaN
+- `is_inf(x)` - Check if infinite
+- `is_finite(x)` - Check if finite
+- `min(...)` - Minimum of arguments (variadic)
+- `max(...)` - Maximum of arguments (variadic)
+- `clamp(value, min, max)` - Clamp value to range
+- `sign(x)` - Sign of number (-1, 0, or 1)
+
+**Implementation**:
+```rust
+pub struct MathModule;
+
+impl NativeModule for MathModule {
+    fn name(&self) -> &str { "math" }
+
+    fn functions(&self) -> HashMap<String, NativeFunction> {
+        let mut funcs = HashMap::new();
+        funcs.insert("sqrt".to_string(), math_sqrt as NativeFunction);
+        funcs.insert("pow".to_string(), math_pow as NativeFunction);
+        funcs.insert("abs".to_string(), math_abs as NativeFunction);
+        funcs.insert("sin".to_string(), math_sin as NativeFunction);
+        // ... etc
+        funcs
+    }
+
+    fn constants(&self) -> HashMap<String, Value> {
+        let mut consts = HashMap::new();
+        consts.insert("PI".to_string(), Value::Number(std::f64::consts::PI));
+        consts.insert("E".to_string(), Value::Number(std::f64::consts::E));
+        consts.insert("TAU".to_string(), Value::Number(std::f64::consts::TAU));
+        consts.insert("inf".to_string(), Value::Number(f64::INFINITY));
+        consts.insert("nan".to_string(), Value::Number(f64::NAN));
+        // ... etc
+        consts
+    }
+}
+
+fn math_sqrt(args: &[Value]) -> Result<Value, GraphoidError> {
+    if args.len() != 1 {
+        return Err(GraphoidError::runtime("sqrt requires 1 argument"));
+    }
+    let num = args[0].as_number()?;
+    if num < 0.0 {
+        return Err(GraphoidError::runtime("sqrt of negative number"));
+    }
+    Ok(Value::Number(num.sqrt()))
+}
+
+fn math_pow(args: &[Value]) -> Result<Value, GraphoidError> {
+    if args.len() != 2 {
+        return Err(GraphoidError::runtime("pow requires 2 arguments"));
+    }
+    let base = args[0].as_number()?;
+    let exp = args[1].as_number()?;
+    Ok(Value::Number(base.powf(exp)))
+}
+
+// ... other functions
+```
+
+**Dependencies**:
+- Standard library `std::f64` for math functions
+
+**Tests**: 40+ tests covering all mathematical operations and edge cases
+
+---
+
+### 10. OS Module
 
 **File**: `src/stdlib/os.rs`
 **Duration**: 3 days
@@ -608,9 +786,12 @@ perms = os.stat("file.txt")  # File metadata
 
 ### Week 4 (Days 15-19):
 - **Day 15-17**: Crypto module (hashing, encryption)
-- **Day 18-19**: OS module (environment, process)
+- **Day 18-19**: Math module (mathematical functions)
 
-### Week 5 (Days 20-21):
+### Week 5 (Days 20-22):
+- **Day 20-22**: OS module (environment, process)
+
+### Week 6 (Days 23):
 - Integration testing across all modules
 - Performance profiling
 - Documentation
@@ -650,7 +831,7 @@ pub fn register_stdlib_modules(executor: &mut Executor) {
 - Error case coverage
 - Performance benchmarks (for critical paths)
 
-**Total Tests**: 250-300 tests for Phase 12
+**Total Tests**: 290-340 tests for Phase 12
 
 **Platform Testing**:
 - Run on Linux, macOS, Windows
@@ -672,8 +853,8 @@ pub fn register_stdlib_modules(executor: &mut Executor) {
 
 ## Success Criteria
 
-- [ ] ✅ All 9 modules implemented in Rust
-- [ ] ✅ 250+ tests passing
+- [ ] ✅ All 10 modules implemented in Rust
+- [ ] ✅ 290+ tests passing
 - [ ] ✅ Cross-platform compatibility (Linux, macOS, Windows)
 - [ ] ✅ Performance benchmarks meet targets
 - [ ] ✅ Memory safety verified (no unsafe without justification)
