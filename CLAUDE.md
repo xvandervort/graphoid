@@ -416,7 +416,7 @@ my_graph.add_rule(validate_positive_values)
 
 Graphoid includes **professional-grade tooling** from day one:
 
-### 1. Testing Framework (Phase 12)
+### 1. Testing Framework (Phase 13)
 - **RSpec-style** behavior-driven testing
 - Command: `graphoid spec`
 - File extension: `.spec.gr`
@@ -424,7 +424,7 @@ Graphoid includes **professional-grade tooling** from day one:
 - Hierarchical organization
 - Mocking, stubbing, property-based testing
 
-### 2. Debugger (Phase 13)
+### 2. Debugger (Phase 14)
 - Breakpoints: `debug.break()`, `debug.break_if()`
 - Interactive debug REPL
 - Variable and stack inspection
@@ -433,7 +433,7 @@ Graphoid includes **professional-grade tooling** from day one:
 - Graph visualization
 - VSCode integration via DAP
 
-### 3. Package Manager (Phase 14)
+### 3. Package Manager (Phase 15)
 - Package manifest: `graphoid.toml`
 - Lock files: `graphoid.lock`
 - SemVer version constraints
@@ -458,19 +458,20 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 14-phase plan:
 | 6 | Graph Types & Rules | 10-14 days | ✅ COMPLETE |
 | 6.5 | Foundational Gaps & Verification | 5-7 days | ✅ COMPLETE (132+ tests) |
 | 7 | Function Pattern Matching & Behaviors | 5-7 days | ✅ COMPLETE (186+ tests) |
-| 8 | Module System | 4-6 days | ⚠️ ~75% COMPLETE (31 tests) |
-| 9 | Graph Pattern Matching & Advanced Querying | 7-10 days | 🔜 NEXT |
-| 10 | Advanced Module Features | 3-5 days | 🔲 Pending |
-| 11 | Native Stdlib Modules | 14-21 days | 🔲 Pending |
-| 12 | Testing Framework | 7-10 days | 🔲 Pending |
-| 13 | Debugger | 10-14 days | 🔲 Pending |
-| 14 | Package Manager | 14-21 days | 🔲 Pending |
+| 8 | Module System (Basic) | 4-6 days | ✅ COMPLETE (31 tests) |
+| 9 | Graph Pattern Matching | 7-10 days | ✅ COMPLETE (69 tests) |
+| 10 | Advanced Module Features | 3-5 days | ✅ COMPLETE (40 tests) |
+| 11 | Native Stdlib Modules | 16-23 days | 🔲 Pending |
+| 12 | Pure Graphoid Stdlib | 14-18 days | 🔲 Pending |
+| 13 | Testing Framework | 7-10 days | 🔲 Pending |
+| 14 | Debugger | 10-14 days | 🔲 Pending |
+| 15 | Package Manager | 14-21 days | 🔲 Pending |
 
 **Milestones**:
-- **MVP** (Phases 0-5): 6-8 weeks - Basic language works
-- **Feature Complete** (Phases 0-11): 12-16 weeks - All language features
-- **Production Tools** (Phases 0-14): 16-22 weeks - Testing, debugging, packaging
-- **Production Ready**: 24-28 weeks - Optimized, documented, polished
+- **MVP** (Phases 0-5): 6-8 weeks - Basic language works ✅
+- **Feature Complete** (Phases 0-12): 14-18 weeks - All language features
+- **Production Tools** (Phases 0-15): 18-24 weeks - Testing, debugging, packaging
+- **Production Ready**: 24-30 weeks - Optimized, documented, polished
 
 ---
 
