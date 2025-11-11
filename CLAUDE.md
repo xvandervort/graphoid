@@ -564,22 +564,22 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 14-phase plan:
 - New built-in functions
 
 **Where to Put Examples:**
-- `rust/examples/*.gr` - Standalone example files
+- `rust/samples/*.gr` - Standalone example files
 - Each example should have clear comments explaining what it demonstrates
-- Update `rust/examples/README.md` with descriptions
+- Update `rust/samples/README.md` with descriptions
 
 **Example Checklist for New Features:**
 1. ✅ Implement feature in Rust
 2. ✅ Write Rust unit tests (TDD)
 3. ✅ **Create `.gr` example file(s)** demonstrating the feature
-4. ✅ Run the example to verify it works: `cargo run --quiet examples/your_example.gr`
-5. ✅ Update `rust/examples/README.md` with description
+4. ✅ Run the example to verify it works: `cargo run --quiet samples/your_example.gr`
+5. ✅ Update `rust/samples/README.md` with description
 6. ✅ Consider updating `docs/QUICKSTART.md` if it's a major feature
 
 **Real Example:**
 When Phase 7 behavior system was implemented:
 - ❌ BAD: 91 Rust tests passed, but behaviors weren't accessible from .gr programs
-- ✅ GOOD: After fixing executor registration, created `examples/behaviors.gr` showing all transformation rules
+- ✅ GOOD: After fixing executor registration, created `samples/behaviors.gr` showing all transformation rules
 
 **If you can't create a working `.gr` example, the feature isn't done!**
 
@@ -631,7 +631,7 @@ pub fn shortest_path(&self, from: &str, to: &str, edge_type: Option<&str>, weigh
 **Test Organization**:
 - **Unit tests (Rust)** - In `tests/unit/` for internal API verification
 - **Integration tests (.gr files)** - In `tests/integration/` for user-facing executability
-- **Example files (.gr)** - In `rust/examples/` for documentation and demonstration
+- **Example files (.gr)** - In `rust/samples/` for documentation and demonstration
 - **Property-based tests** - For algorithmic correctness
 - **Regression tests** - For every bug fix
 
@@ -640,10 +640,10 @@ pub fn shortest_path(&self, from: &str, to: &str, edge_type: Option<&str>, weigh
 - ❌ **NEVER** use `#[cfg(test)]` modules in `src/` files
 - ✅ **ALWAYS** place Rust tests in `tests/unit/` or `tests/integration/`
 - ✅ **ALWAYS** create `.gr` integration tests in `tests/integration/`
-- ✅ **ALWAYS** create `.gr` example files in `rust/examples/` for new features
+- ✅ **ALWAYS** create `.gr` example files in `rust/samples/` for new features
 - ✅ **ALWAYS** write tests BEFORE implementation (TDD)
 - ✅ **ALWAYS** register methods/functions in executor after implementing
-- ✅ **ALWAYS** verify examples run: `cargo run --quiet examples/your_example.gr`
+- ✅ **ALWAYS** verify examples run: `cargo run --quiet samples/your_example.gr`
 - Tests in `tests/unit/` should import from the crate: `use graphoid::module::Type;`
 - Each source module can have a corresponding test file (e.g., `src/graph/rules.rs` → `tests/unit/graph_rules_tests.rs`)
 - Register new test files in `tests/unit_tests.rs`

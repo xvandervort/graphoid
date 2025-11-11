@@ -102,31 +102,31 @@ At the start of Phase 10, the following features were already in place:
 
 Created comprehensive `.gr` example files:
 
-1. **`examples/priv_keyword.gr`** ✅ (already existed, verified working)
+1. **`samples/priv_keyword.gr`** ✅ (already existed, verified working)
    - Demonstrates private variables
    - Demonstrates private functions
    - Shows mixing public and private
    - Runs successfully
 
-2. **`examples/modules_math.gr`** ✅ (already existed, verified working)
+2. **`samples/modules_math.gr`** ✅ (already existed, verified working)
    - Complete math module implementation
    - Shows module declaration with alias
    - Constants, basic operations, geometric functions
    - Utility functions
 
-3. **`examples/modules_main.gr`** ✅ (already existed, verified working)
+3. **`samples/modules_main.gr`** ✅ (already existed, verified working)
    - Imports and uses math module
    - Accesses constants, functions
    - Complete working example
    - Runs successfully
 
-4. **`examples/load_vs_import.gr`** ✅ (created this session)
+4. **`samples/load_vs_import.gr`** ✅ (created this session)
    - Comprehensive explanation of load vs import
    - Shows when to use each
    - Practical examples
    - Best practices
 
-5. **`examples/multi_file_project.gr`** ✅ (created this session)
+5. **`samples/multi_file_project.gr`** ✅ (created this session)
    - Project structure best practices
    - Module declaration patterns
    - Import patterns
@@ -134,6 +134,21 @@ Created comprehensive `.gr` example files:
    - Configuration management
    - Testing structure
    - Common pitfalls to avoid
+
+6. **`samples/utils_module.gr`** ✅ (created this session)
+   - Low-level utility module
+   - Math and string utilities
+   - Constants
+
+7. **`samples/service_module.gr`** ✅ (created this session)
+   - Mid-level service module
+   - Imports `utils_module.gr`
+   - Demonstrates module-to-module imports
+
+8. **`samples/app_main.gr`** ✅ (created this session)
+   - Top-level application
+   - Imports `service_module.gr`
+   - Demonstrates 3-level module hierarchy: app → service → utils
 
 ### 3. Documentation
 
@@ -257,8 +272,9 @@ import "string"
 - ✅ `rust/PHASE_10_COMPLETION_SUMMARY.md` (this file)
 
 ### Examples
-- ✅ `examples/load_vs_import.gr` (created)
-- ✅ `examples/multi_file_project.gr` (created)
+- ✅ `samples/load_vs_import.gr` (created)
+- ✅ `samples/multi_file_project.gr` (created)
+- ✅ `samples/utils_module.gr`, `service_module.gr`, `app_main.gr` (created - 3-level chain)
 - ✅ Verified existing: `priv_keyword.gr`, `modules_math.gr`, `modules_main.gr`
 
 ### Tests
