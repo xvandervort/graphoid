@@ -1,0 +1,188 @@
+# Bitwise Unsigned Mode Operations
+# Demonstrates the difference between signed and unsigned right shift operations
+# and when to use configure { :unsigned }
+
+# =============================================================================
+# SIGNED vs UNSIGNED RIGHT SHIFT
+# =============================================================================
+
+# By default, Graphoid uses SIGNED (arithmetic) right shift
+# This means the sign bit is preserved when shifting negative numbers
+
+print("=== Default Signed Right Shift ===")
+signed_result = -16 >> 2
+print("Signed: -16 >> 2 = " + signed_result)  # Result: -4
+print("Explanation: Sign bit is preserved (arithmetic shift)")
+print("")
+
+# With :unsigned mode, we get LOGICAL right shift
+# This treats the number as unsigned, filling with zeros from the left
+
+print("=== Unsigned Right Shift ===")
+configure { :unsigned } {
+    unsigned_result = -16 >> 2
+    print("Unsigned: -16 >> 2 = " + unsigned_result)  # Result: ~4.6e18
+    print("Explanation: Zeros filled from left (logical shift)")
+}
+print("")
+
+# =============================================================================
+# SIDE-BY-SIDE COMPARISON
+# =============================================================================
+
+print("=== Side-by-Side Comparison ===")
+
+# Signed mode (default)
+signed_neg_8 = -8 >> 1
+signed_neg_16 = -16 >> 2
+signed_neg_32 = -32 >> 3
+
+print("Signed shifts:")
+print("  -8 >> 1  = " + signed_neg_8)   # -4
+print("  -16 >> 2 = " + signed_neg_16)  # -4
+print("  -32 >> 3 = " + signed_neg_32)  # -4
+
+# Unsigned mode
+configure { :unsigned } {
+    unsigned_neg_8 = -8 >> 1
+    unsigned_neg_16 = -16 >> 2
+    unsigned_neg_32 = -32 >> 3
+
+    print("Unsigned shifts:")
+    print("  -8 >> 1  = " + unsigned_neg_8)   # Large positive
+    print("  -16 >> 2 = " + unsigned_neg_16)  # Large positive
+    print("  -32 >> 3 = " + unsigned_neg_32)  # Large positive
+}
+print("")
+
+# =============================================================================
+# POSITIVE NUMBERS - NO DIFFERENCE
+# =============================================================================
+
+print("=== Positive Numbers (No Difference) ===")
+
+# For positive numbers, signed and unsigned shifts give the same result
+pos_signed = 64 >> 2
+print("Signed:   64 >> 2 = " + pos_signed)
+
+configure { :unsigned } {
+    pos_unsigned = 64 >> 2
+    print("Unsigned: 64 >> 2 = " + pos_unsigned)
+}
+print("Both modes produce the same result for positive numbers")
+print("")
+
+# =============================================================================
+# USE CASE: BIT MANIPULATION
+# =============================================================================
+
+print("=== Use Case: Extracting High-Order Bits ===")
+
+# When working with bit patterns (like color values, flags, etc.)
+# you often want logical shifts regardless of the sign bit
+
+configure { :unsigned } {
+    # Example: Extract high byte from a 32-bit value
+    # (In real usage, this would work with actual bit patterns)
+    value = 0xFF00AB12
+    high_byte = (value >> 24) & 0xFF
+    print("Value: 0xFF00AB12")
+    print("High byte (unsigned shift): " + high_byte)
+}
+print("")
+
+# =============================================================================
+# USE CASE: ROTATING BITS
+# =============================================================================
+
+print("=== Use Case: Bit Rotation Simulation ===")
+
+configure { :unsigned } {
+    # Simulating a right rotation by combining shifts
+    # (This is a simplified example - real rotation would be more complex)
+    # 176 in decimal = 0b10110000 in binary
+
+    value = 0b10110000
+    shift_amount = 2
+
+    # Right shift with zero-fill
+    shifted = value >> shift_amount
+    print("Original: " + value + " (binary: 10110000)")
+    print("Shifted right by " + shift_amount + ": " + shifted)
+}
+print("")
+
+# =============================================================================
+# SCOPED vs FILE-LEVEL UNSIGNED
+# =============================================================================
+
+print("=== Scoped vs File-Level Configuration ===")
+
+# Scoped: Only applies within the block
+print("Before block (signed):")
+before_val = -8 >> 1
+print("  -8 >> 1 = " + before_val)
+
+configure { :unsigned } {
+    print("Inside block (unsigned):")
+    inside_val = -8 >> 1
+    print("  -8 >> 1 = " + inside_val)
+}
+
+print("After block (signed again):")
+after_val = -8 >> 1
+print("  -8 >> 1 = " + after_val)
+print("")
+
+# =============================================================================
+# COMBINING WITH OTHER BITWISE OPERATIONS
+# =============================================================================
+
+print("=== Unsigned Mode with Other Bitwise Operations ===")
+
+configure { :unsigned } {
+    # Unsigned mode only affects right shift (>>)
+    # Other bitwise operations (&, |, ^, ~, <<) work the same way
+
+    a = -16
+    b = -16 >> 2      # Unsigned right shift
+    c = a & 0xFF      # Bitwise AND (unaffected by unsigned mode)
+    d = a | 0x0F      # Bitwise OR (unaffected)
+    e = ~a            # Bitwise NOT (unaffected)
+
+    print("Original value: " + a)
+    print("After unsigned >> 2: " + b)
+    print("After & 0xFF: " + c)
+    print("After | 0x0F: " + d)
+    print("After ~: " + e)
+}
+print("")
+
+# =============================================================================
+# COMBINING UNSIGNED WITH OTHER CONFIG OPTIONS
+# =============================================================================
+
+print("=== Combining :unsigned with Other Configuration ===")
+
+# You can combine :unsigned with other configuration options
+configure { :unsigned, error_mode: :lenient } {
+    result = -16 >> 2
+    print("Unsigned right shift with lenient error mode: " + result)
+}
+print("")
+
+# =============================================================================
+# KEY TAKEAWAYS
+# =============================================================================
+
+print("=== Key Takeaways ===")
+print("1. Default: Signed (arithmetic) right shift preserves sign bit")
+print("2. :unsigned: Logical right shift fills with zeros")
+print("3. Positive numbers: No difference between modes")
+print("4. Negative numbers: Vastly different results")
+print("5. Use :unsigned for:")
+print("   - Bit manipulation (masks, flags)")
+print("   - Working with unsigned data representations")
+print("   - Algorithms requiring logical shifts")
+print("6. Scoped configuration: Use { } block for local behavior")
+print("7. File-level: Omit { } to apply for entire file")

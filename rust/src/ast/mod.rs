@@ -254,7 +254,14 @@ pub enum BinaryOp {
     Divide,
     IntDiv,      // //
     Modulo,
-    Power,
+    Power,       // ** (Phase 13+)
+
+    // Bitwise (Phase 13)
+    BitwiseAnd,      // &
+    BitwiseOr,       // |
+    BitwiseXor,      // ^
+    LeftShift,       // <<
+    RightShift,      // >>
 
     // Comparison
     Equal,
@@ -280,6 +287,7 @@ pub enum BinaryOp {
     DotIntDiv,
     DotModulo,
     DotPower,
+    DotXor,      // .^ (element-wise XOR, Phase 13+)
     DotEqual,
     DotNotEqual,
     DotLess,
@@ -292,6 +300,7 @@ pub enum BinaryOp {
 pub enum UnaryOp {
     Negate,
     Not,
+    BitwiseNot,  // ~ (Phase 13)
 }
 
 #[derive(Debug, Clone, PartialEq)]

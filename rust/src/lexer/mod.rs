@@ -109,6 +109,16 @@ impl Lexer {
                     }
                     '*' => {
                         self.advance();
+                        // Check for .**
+                        if self.peek() == '*' {
+                            self.advance();
+                            return Ok(Token::new(
+                                TokenType::DotDoubleStar,
+                                ".**".to_string(),
+                                start_line,
+                                start_column,
+                            ));
+                        }
                         return Ok(Token::new(
                             TokenType::DotStar,
                             ".*".to_string(),

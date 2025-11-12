@@ -72,7 +72,7 @@ fn test_element_int_div_scalar() {
 
 #[test]
 fn test_element_pow_scalar() {
-    let result = eval_expr("[2, 3, 4] .^ 2");
+    let result = eval_expr("[2, 3, 4] .** 2");
     assert_eq!(result, list_from_numbers(vec![4.0, 9.0, 16.0]));
 }
 
@@ -106,7 +106,7 @@ fn test_element_div_vector() {
 
 #[test]
 fn test_element_pow_vector() {
-    let result = eval_expr("[2, 3, 4] .^ [2, 2, 2]");
+    let result = eval_expr("[2, 3, 4] .** [2, 2, 2]");
     assert_eq!(result, list_from_numbers(vec![4.0, 9.0, 16.0]));
 }
 

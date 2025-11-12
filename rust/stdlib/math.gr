@@ -27,7 +27,7 @@ fn min(a, b) {
 }
 
 fn pow(base, exponent) {
-    return base ^ exponent
+    return base ** exponent
 }
 
 __version = "0.1.0"

@@ -630,6 +630,13 @@ impl Executor {
             BinaryOp::Modulo => self.eval_modulo(left_val, right_val),
             BinaryOp::Power => self.eval_power(left_val, right_val),
 
+            // Bitwise operators (Phase 13)
+            BinaryOp::BitwiseAnd => self.eval_bitwise_and(left_val, right_val),
+            BinaryOp::BitwiseOr => self.eval_bitwise_or(left_val, right_val),
+            BinaryOp::BitwiseXor => self.eval_bitwise_xor(left_val, right_val),
+            BinaryOp::LeftShift => self.eval_left_shift(left_val, right_val),
+            BinaryOp::RightShift => self.eval_right_shift(left_val, right_val),
+
             // Comparison operators
             BinaryOp::Equal => Ok(Value::boolean(left_val == right_val)),
             BinaryOp::NotEqual => Ok(Value::boolean(left_val != right_val)),
@@ -650,6 +657,7 @@ impl Executor {
             BinaryOp::DotIntDiv => self.eval_element_wise(left_val, right_val, BinaryOp::IntDiv),
             BinaryOp::DotModulo => self.eval_element_wise(left_val, right_val, BinaryOp::Modulo),
             BinaryOp::DotPower => self.eval_element_wise(left_val, right_val, BinaryOp::Power),
+            BinaryOp::DotXor => self.eval_element_wise(left_val, right_val, BinaryOp::BitwiseXor),
             BinaryOp::DotEqual => self.eval_element_wise(left_val, right_val, BinaryOp::Equal),
             BinaryOp::DotNotEqual => self.eval_element_wise(left_val, right_val, BinaryOp::NotEqual),
             BinaryOp::DotLess => self.eval_element_wise(left_val, right_val, BinaryOp::Less),
@@ -674,6 +682,7 @@ impl Executor {
                 _ => Err(GraphoidError::type_error("number", val.type_name())),
             },
             UnaryOp::Not => Ok(Value::boolean(!val.is_truthy())),
+            UnaryOp::BitwiseNot => self.eval_bitwise_not(val),
         }
     }
 
@@ -4830,6 +4839,102 @@ impl Executor {
                 "number",
                 &format!("{} and {}", left.type_name(), right.type_name()),
             )),
+        }
+    }
+
+    // Bitwise operation helpers (Phase 13)
+
+    // Helper to apply a bitwise operation on two i64 values
+    fn apply_bitwise_binary_op<F>(&self, left: Value, right: Value, op: F) -> Result<Value>
+    where
+        F: FnOnce(i64, i64) -> i64,
+    {
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => {
+                let l_int = l.trunc() as i64;
+                let r_int = r.trunc() as i64;
+                Ok(Value::number(op(l_int, r_int) as f64))
+            }
+            (_l, _r) => Err(GraphoidError::type_error(
+                "number",
+                &format!("{} and {}", left.type_name(), right.type_name()),
+            )),
+        }
+    }
+
+    fn eval_bitwise_and(&self, left: Value, right: Value) -> Result<Value> {
+        self.apply_bitwise_binary_op(left, right, |l, r| l & r)
+    }
+
+    fn eval_bitwise_or(&self, left: Value, right: Value) -> Result<Value> {
+        self.apply_bitwise_binary_op(left, right, |l, r| l | r)
+    }
+
+    fn eval_bitwise_xor(&self, left: Value, right: Value) -> Result<Value> {
+        self.apply_bitwise_binary_op(left, right, |l, r| l ^ r)
+    }
+
+    fn eval_left_shift(&self, left: Value, right: Value) -> Result<Value> {
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => {
+                let l_int = l.trunc() as i64;
+                let r_int = r.trunc() as u32;
+
+                if r_int >= 64 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Shift amount {} too large (max 63)", r_int
+                    )));
+                }
+
+                Ok(Value::number((l_int << r_int) as f64))
+            }
+            (_l, _r) => Err(GraphoidError::type_error(
+                "number",
+                &format!("{} and {}", left.type_name(), right.type_name()),
+            )),
+        }
+    }
+
+    fn eval_right_shift(&self, left: Value, right: Value) -> Result<Value> {
+        match (&left.kind, &right.kind) {
+            (ValueKind::Number(l), ValueKind::Number(r)) => {
+                let r_int = r.trunc() as u32;
+
+                if r_int >= 64 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Shift amount {} too large (max 63)", r_int
+                    )));
+                }
+
+                // Check configuration for unsigned mode
+                let result = if self.config_stack.current().unsigned_mode {
+                    // Logical right shift (zero-fill) - unsigned mode
+                    // First convert to i64, then reinterpret bits as u64
+                    let l_int = l.trunc() as i64;
+                    let l_uint = l_int as u64;  // Reinterpret bits, not cast value
+                    (l_uint >> r_int) as i64 as f64  // Convert back through i64 to preserve value
+                } else {
+                    // Arithmetic right shift (sign-extending) - default signed mode
+                    let l_int = l.trunc() as i64;
+                    (l_int >> r_int) as f64
+                };
+
+                Ok(Value::number(result))
+            }
+            (_l, _r) => Err(GraphoidError::type_error(
+                "number",
+                &format!("{} and {}", left.type_name(), right.type_name()),
+            )),
+        }
+    }
+
+    fn eval_bitwise_not(&self, val: Value) -> Result<Value> {
+        match &val.kind {
+            ValueKind::Number(n) => {
+                let n_int = n.trunc() as i64;
+                Ok(Value::number((!n_int) as f64))
+            }
+            _ => Err(GraphoidError::type_error("number", val.type_name())),
         }
     }
 

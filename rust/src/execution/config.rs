@@ -37,6 +37,9 @@ pub struct Config {
     pub orphan_policy: Option<OrphanPolicy>,
     pub reconnect_strategy: Option<ReconnectStrategy>,
     pub allow_overrides: Option<bool>,
+
+    // Bitwise operations (Phase 13)
+    pub unsigned_mode: bool,  // true = unsigned right shift, false = signed (default)
 }
 
 /// Error handling mode
@@ -85,6 +88,7 @@ impl Default for Config {
             orphan_policy: None,
             reconnect_strategy: None,
             allow_overrides: None,
+            unsigned_mode: false,  // Default to signed right shift
         }
     }
 }
@@ -179,6 +183,13 @@ impl ConfigStack {
                     new_config.allow_overrides = Some(value.is_truthy());
                 }
                 _ => {
+                    // Check if the value is the :unsigned symbol (standalone directive)
+                    if let ValueKind::Symbol(sym) = &value.kind {
+                        if sym == "unsigned" {
+                            new_config.unsigned_mode = true;
+                            continue;
+                        }
+                    }
                     return Err(GraphoidError::ConfigError {
                         message: format!("Unknown configuration key: {}", key),
                     });

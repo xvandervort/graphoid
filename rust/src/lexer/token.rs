@@ -96,7 +96,8 @@ pub enum TokenType {
     DotSlash,        // ./
     DotSlashSlash,   // .//
     DotPercent,      // .%
-    DotCaret,        // .^
+    DotCaret,        // .^ (element-wise XOR in Phase 13+)
+    DotDoubleStar,   // .** (element-wise power in Phase 13+)
     DotEqualEqual,   // .==
     DotBangEqual,    // .!=
     DotLess,         // .<

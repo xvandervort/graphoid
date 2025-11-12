@@ -693,30 +693,47 @@ impl Parser {
                 break;
             }
 
-            // Parse key (must be identifier)
-            let key = if let TokenType::Identifier(id) = &self.peek().token_type {
-                let k = id.clone();
+            // Check if this is a standalone symbol (like :unsigned)
+            if let TokenType::Symbol(sym) = &self.peek().token_type {
+                let symbol_name = sym.clone();
+                let pos = self.peek().position();
                 self.advance();
-                k
+
+                // Standalone symbol: treat it as a flag (symbol_name -> true)
+                settings.insert(
+                    symbol_name.clone(),
+                    Expr::Literal {
+                        value: LiteralValue::Symbol(symbol_name),
+                        position: pos,
+                    }
+                );
             } else {
-                return Err(GraphoidError::SyntaxError {
-                    message: format!("Expected configuration key, got {:?}", self.peek().token_type),
-                    position: self.peek().position(),
-                });
-            };
+                // Parse key-value pair (key: value)
+                // Parse key (must be identifier)
+                let key = if let TokenType::Identifier(id) = &self.peek().token_type {
+                    let k = id.clone();
+                    self.advance();
+                    k
+                } else {
+                    return Err(GraphoidError::SyntaxError {
+                        message: format!("Expected configuration key or symbol, got {:?}", self.peek().token_type),
+                        position: self.peek().position(),
+                    });
+                };
 
-            // Expect colon
-            if !self.match_token(&TokenType::Colon) {
-                return Err(GraphoidError::SyntaxError {
-                    message: "Expected ':' after configuration key".to_string(),
-                    position: self.peek().position(),
-                });
+                // Expect colon
+                if !self.match_token(&TokenType::Colon) {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected ':' after configuration key".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
+
+                // Parse value (expression)
+                let value = self.expression()?;
+
+                settings.insert(key, value);
             }
-
-            // Parse value (expression)
-            let value = self.expression()?;
-
-            settings.insert(key, value);
 
             // Optional comma or newline
             if !self.check(&TokenType::RightBrace) {
@@ -1291,7 +1308,7 @@ impl Parser {
     }
 
     fn comparison(&mut self) -> Result<Expr> {
-        let mut expr = self.term()?;
+        let mut expr = self.bitwise_or()?;
 
         while self.match_token(&TokenType::Less)
             || self.match_token(&TokenType::LessEqual)
@@ -1311,6 +1328,88 @@ impl Parser {
                 TokenType::DotLessEqual => BinaryOp::DotLessEqual,
                 TokenType::DotGreater => BinaryOp::DotGreater,
                 TokenType::DotGreaterEqual => BinaryOp::DotGreaterEqual,
+                _ => unreachable!(),
+            };
+            let position = self.previous_position();
+            let right = self.bitwise_or()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    // Phase 13: Bitwise OR (|) - Lower precedence than XOR
+    fn bitwise_or(&mut self) -> Result<Expr> {
+        let mut expr = self.bitwise_xor()?;
+
+        while self.match_token(&TokenType::Pipe) {
+            let position = self.previous_position();
+            let right = self.bitwise_xor()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op: BinaryOp::BitwiseOr,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    // Phase 13: Bitwise XOR (^) - Between OR and AND
+    fn bitwise_xor(&mut self) -> Result<Expr> {
+        let mut expr = self.bitwise_and()?;
+
+        while self.match_token(&TokenType::Caret) || self.match_token(&TokenType::DotCaret) {
+            let op = match &self.previous().token_type {
+                TokenType::Caret => BinaryOp::BitwiseXor,
+                TokenType::DotCaret => BinaryOp::DotXor,
+                _ => unreachable!(),
+            };
+            let position = self.previous_position();
+            let right = self.bitwise_and()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    // Phase 13: Bitwise AND (&) - Higher precedence than XOR
+    fn bitwise_and(&mut self) -> Result<Expr> {
+        let mut expr = self.shift()?;
+
+        while self.match_token(&TokenType::Ampersand) {
+            let position = self.previous_position();
+            let right = self.shift()?;
+            expr = Expr::Binary {
+                left: Box::new(expr),
+                op: BinaryOp::BitwiseAnd,
+                right: Box::new(right),
+                position,
+            };
+        }
+
+        Ok(expr)
+    }
+
+    // Phase 13: Bit shifts (<<, >>) - Between bitwise AND and addition
+    fn shift(&mut self) -> Result<Expr> {
+        let mut expr = self.term()?;
+
+        while self.match_token(&TokenType::LeftShift) || self.match_token(&TokenType::RightShift) {
+            let op = match &self.previous().token_type {
+                TokenType::LeftShift => BinaryOp::LeftShift,
+                TokenType::RightShift => BinaryOp::RightShift,
                 _ => unreachable!(),
             };
             let position = self.previous_position();
@@ -1390,17 +1489,21 @@ impl Parser {
         Ok(expr)
     }
 
+    // Phase 13: Power (**) - Right-associative!
     fn power(&mut self) -> Result<Expr> {
         let mut expr = self.unary()?;
 
-        while self.match_token(&TokenType::Caret) || self.match_token(&TokenType::DotCaret) {
+        // Check for ** or .** (element-wise power)
+        if self.match_token(&TokenType::DoubleStar) || self.match_token(&TokenType::DotDoubleStar) {
             let op = match &self.previous().token_type {
-                TokenType::Caret => BinaryOp::Power,
-                TokenType::DotCaret => BinaryOp::DotPower,
+                TokenType::DoubleStar => BinaryOp::Power,
+                TokenType::DotDoubleStar => BinaryOp::DotPower,
                 _ => unreachable!(),
             };
             let position = self.previous_position();
-            let right = self.unary()?;
+            // Right-associative: recursively call power() for right side
+            // This makes 2 ** 3 ** 2 = 2 ** (3 ** 2) = 2 ** 9 = 512
+            let right = self.power()?;
             expr = Expr::Binary {
                 left: Box::new(expr),
                 op,
@@ -1428,6 +1531,17 @@ impl Parser {
             let operand = self.unary()?;
             return Ok(Expr::Unary {
                 op: UnaryOp::Not,
+                operand: Box::new(operand),
+                position,
+            });
+        }
+
+        // Phase 13: Bitwise NOT (~)
+        if self.match_token(&TokenType::Tilde) {
+            let position = self.previous_position();
+            let operand = self.unary()?;
+            return Ok(Expr::Unary {
+                op: UnaryOp::BitwiseNot,
                 operand: Box::new(operand),
                 position,
             });

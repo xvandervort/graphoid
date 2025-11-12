@@ -35,4 +35,6 @@ mod unit {
     pub mod random_module_tests;
     pub mod os_module_tests;
     pub mod bst_ordering_tests;
+    pub mod bitwise_tests;
+    pub mod bitwise_unsigned_debug;
 }
