@@ -242,9 +242,21 @@ impl Lexer {
             ';' => TokenType::Semicolon,
             '+' => TokenType::Plus,
             '-' => TokenType::Minus,
-            '*' => TokenType::Star,
+            '*' => {
+                // Check for ** (power operator)
+                if self.match_char('*') {
+                    return Ok(Token::new(
+                        TokenType::DoubleStar,
+                        "**".to_string(),
+                        start_line,
+                        start_column,
+                    ));
+                }
+                TokenType::Star
+            }
             '%' => TokenType::Percent,
-            '^' => TokenType::Caret,
+            '^' => TokenType::Caret,  // Now XOR (Phase 13+), was power (Phase 0-12)
+            '~' => TokenType::Tilde,  // NEW: Bitwise NOT
 
             // Two-character operators
             '=' => {
@@ -269,14 +281,30 @@ impl Lexer {
                 }
             }
             '<' => {
-                if self.match_char('=') {
+                if self.match_char('<') {
+                    // Left shift <<
+                    return Ok(Token::new(
+                        TokenType::LeftShift,
+                        "<<".to_string(),
+                        start_line,
+                        start_column,
+                    ));
+                } else if self.match_char('=') {
                     TokenType::LessEqual
                 } else {
                     TokenType::Less
                 }
             }
             '>' => {
-                if self.match_char('=') {
+                if self.match_char('>') {
+                    // Right shift >>
+                    return Ok(Token::new(
+                        TokenType::RightShift,
+                        ">>".to_string(),
+                        start_line,
+                        start_column,
+                    ));
+                } else if self.match_char('=') {
                     TokenType::GreaterEqual
                 } else {
                     TokenType::Greater
@@ -328,11 +356,11 @@ impl Lexer {
             // Strings
             '"' | '\'' => return self.string(ch),
 
-            // Numbers
+            // Numbers (including binary 0b and hex 0x)
             ch if ch.is_ascii_digit() => {
                 self.current -= 1;
                 self.column -= 1;
-                return self.number();
+                return self.number_or_literal();
             }
 
             // Identifiers and keywords
@@ -524,6 +552,21 @@ impl Lexer {
         ))
     }
 
+    fn number_or_literal(&mut self) -> Result<Token> {
+        // Check for 0b (binary) or 0x (hex) prefix
+        if self.peek() == '0' {
+            let next = self.peek_next();
+            if next == 'b' || next == 'B' {
+                return self.binary_literal();
+            } else if next == 'x' || next == 'X' {
+                return self.hex_literal();
+            }
+        }
+
+        // Regular decimal number
+        self.number()
+    }
+
     fn number(&mut self) -> Result<Token> {
         let start_line = self.line;
         let start_column = self.column;
@@ -553,6 +596,160 @@ impl Lexer {
 
         Ok(Token::new(
             TokenType::Number(value),
+            lexeme,
+            start_line,
+            start_column,
+        ))
+    }
+
+    fn binary_literal(&mut self) -> Result<Token> {
+        let start_line = self.line;
+        let start_column = self.column;
+        let mut lexeme = String::new();
+
+        // Consume '0'
+        lexeme.push(self.advance());
+        // Consume 'b' or 'B'
+        lexeme.push(self.advance());
+
+        let mut value: i64 = 0;
+        let mut has_digits = false;
+
+        while !self.is_at_end() {
+            let ch = self.peek();
+            match ch {
+                '0' | '1' => {
+                    value = value.checked_mul(2).ok_or_else(|| GraphoidError::SyntaxError {
+                        message: "Binary literal overflow".to_string(),
+                        position: SourcePosition {
+                            line: start_line,
+                            column: start_column,
+                            file: None,
+                        },
+                    })?;
+                    value = value.checked_add((ch as i64) - ('0' as i64)).ok_or_else(|| GraphoidError::SyntaxError {
+                        message: "Binary literal overflow".to_string(),
+                        position: SourcePosition {
+                            line: start_line,
+                            column: start_column,
+                            file: None,
+                        },
+                    })?;
+                    lexeme.push(self.advance());
+                    has_digits = true;
+                }
+                '_' => {
+                    // Underscores for readability, skip them
+                    lexeme.push(self.advance());
+                }
+                '2'..='9' | 'a'..='z' | 'A'..='Z' => {
+                    // Invalid character in binary literal
+                    return Err(GraphoidError::SyntaxError {
+                        message: format!("Invalid character '{}' in binary literal", ch),
+                        position: SourcePosition {
+                            line: self.line,
+                            column: self.column,
+                            file: None,
+                        },
+                    });
+                }
+                _ => break,
+            }
+        }
+
+        if !has_digits {
+            return Err(GraphoidError::SyntaxError {
+                message: "Binary literal must have at least one digit".to_string(),
+                position: SourcePosition {
+                    line: start_line,
+                    column: start_column,
+                    file: None,
+                },
+            });
+        }
+
+        Ok(Token::new(
+            TokenType::Number(value as f64),
+            lexeme,
+            start_line,
+            start_column,
+        ))
+    }
+
+    fn hex_literal(&mut self) -> Result<Token> {
+        let start_line = self.line;
+        let start_column = self.column;
+        let mut lexeme = String::new();
+
+        // Consume '0'
+        lexeme.push(self.advance());
+        // Consume 'x' or 'X'
+        lexeme.push(self.advance());
+
+        let mut value: i64 = 0;
+        let mut has_digits = false;
+
+        while !self.is_at_end() {
+            let ch = self.peek();
+            match ch {
+                '0'..='9' | 'a'..='f' | 'A'..='F' => {
+                    let digit_value = match ch {
+                        '0'..='9' => (ch as i64) - ('0' as i64),
+                        'a'..='f' => (ch as i64) - ('a' as i64) + 10,
+                        'A'..='F' => (ch as i64) - ('A' as i64) + 10,
+                        _ => unreachable!(),
+                    };
+                    value = value.checked_mul(16).ok_or_else(|| GraphoidError::SyntaxError {
+                        message: "Hexadecimal literal overflow".to_string(),
+                        position: SourcePosition {
+                            line: start_line,
+                            column: start_column,
+                            file: None,
+                        },
+                    })?;
+                    value = value.checked_add(digit_value).ok_or_else(|| GraphoidError::SyntaxError {
+                        message: "Hexadecimal literal overflow".to_string(),
+                        position: SourcePosition {
+                            line: start_line,
+                            column: start_column,
+                            file: None,
+                        },
+                    })?;
+                    lexeme.push(self.advance());
+                    has_digits = true;
+                }
+                '_' => {
+                    // Underscores for readability, skip them
+                    lexeme.push(self.advance());
+                }
+                'g'..='z' | 'G'..='Z' => {
+                    // Invalid character in hex literal
+                    return Err(GraphoidError::SyntaxError {
+                        message: format!("Invalid character '{}' in hexadecimal literal", ch),
+                        position: SourcePosition {
+                            line: self.line,
+                            column: self.column,
+                            file: None,
+                        },
+                    });
+                }
+                _ => break,
+            }
+        }
+
+        if !has_digits {
+            return Err(GraphoidError::SyntaxError {
+                message: "Hexadecimal literal must have at least one digit".to_string(),
+                position: SourcePosition {
+                    line: start_line,
+                    column: start_column,
+                    file: None,
+                },
+            });
+        }
+
+        Ok(Token::new(
+            TokenType::Number(value as f64),
             lexeme,
             start_line,
             start_column,

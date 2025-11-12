@@ -905,3 +905,331 @@ message = "OK" unless error"#;
     let has_unless = tokens.iter().any(|t| t.token_type == TokenType::Unless);
     assert!(has_unless, "Should have 'unless' keyword");
 }
+
+// ===========================================================================
+// PHASE 13: Bitwise Operators & Numeric Literals
+// ===========================================================================
+
+#[test]
+fn test_power_operator_double_star() {
+    let mut lexer = Lexer::new("2 ** 8");
+    let tokens = lexer.tokenize().unwrap();
+
+    assert_eq!(tokens[0].token_type, TokenType::Number(2.0));
+    assert_eq!(tokens[1].token_type, TokenType::DoubleStar);
+    assert_eq!(tokens[2].token_type, TokenType::Number(8.0));
+}
+
+#[test]
+fn test_tilde_operator() {
+    let mut lexer = Lexer::new("~5");
+    let tokens = lexer.tokenize().unwrap();
+
+    assert_eq!(tokens[0].token_type, TokenType::Tilde);
+    assert_eq!(tokens[1].token_type, TokenType::Number(5.0));
+}
+
+#[test]
+fn test_left_shift_operator() {
+    let mut lexer = Lexer::new("1 << 3");
+    let tokens = lexer.tokenize().unwrap();
+
+    assert_eq!(tokens[0].token_type, TokenType::Number(1.0));
+    assert_eq!(tokens[1].token_type, TokenType::LeftShift);
+    assert_eq!(tokens[2].token_type, TokenType::Number(3.0));
+}
+
+#[test]
+fn test_right_shift_operator() {
+    let mut lexer = Lexer::new("16 >> 2");
+    let tokens = lexer.tokenize().unwrap();
+
+    assert_eq!(tokens[0].token_type, TokenType::Number(16.0));
+    assert_eq!(tokens[1].token_type, TokenType::RightShift);
+    assert_eq!(tokens[2].token_type, TokenType::Number(2.0));
+}
+
+#[test]
+fn test_shift_vs_comparison() {
+    // << should be LeftShift, not Less + Less
+    let mut lexer = Lexer::new("x << 2");
+    let tokens = lexer.tokenize().unwrap();
+
+    match &tokens[0].token_type {
+        TokenType::Identifier(s) => assert_eq!(s, "x"),
+        _ => panic!("Expected identifier"),
+    }
+    assert_eq!(tokens[1].token_type, TokenType::LeftShift);
+    assert_eq!(tokens[2].token_type, TokenType::Number(2.0));
+
+    // >> should be RightShift, not Greater + Greater
+    let mut lexer = Lexer::new("x >> 2");
+    let tokens = lexer.tokenize().unwrap();
+
+    match &tokens[0].token_type {
+        TokenType::Identifier(s) => assert_eq!(s, "x"),
+        _ => panic!("Expected identifier"),
+    }
+    assert_eq!(tokens[1].token_type, TokenType::RightShift);
+    assert_eq!(tokens[2].token_type, TokenType::Number(2.0));
+}
+
+#[test]
+fn test_shift_with_spaces_becomes_comparison() {
+    // "x < <2" with space should be: x, Less, Less, Number(2)
+    let mut lexer = Lexer::new("x < <2");
+    let tokens = lexer.tokenize().unwrap();
+
+    match &tokens[0].token_type {
+        TokenType::Identifier(s) => assert_eq!(s, "x"),
+        _ => panic!("Expected identifier"),
+    }
+    assert_eq!(tokens[1].token_type, TokenType::Less);
+    assert_eq!(tokens[2].token_type, TokenType::Less);
+    assert_eq!(tokens[3].token_type, TokenType::Number(2.0));
+}
+
+#[test]
+fn test_binary_literals_simple() {
+    let mut lexer = Lexer::new("0b1010");
+    let tokens = lexer.tokenize().unwrap();
+
+    match &tokens[0].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 10.0),
+        _ => panic!("Expected number"),
+    }
+}
+
+#[test]
+fn test_binary_literals_various() {
+    let mut lexer = Lexer::new("0b0 0b1 0b11111111 0b1100");
+    let tokens = lexer.tokenize().unwrap();
+
+    match &tokens[0].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 0.0),
+        _ => panic!("Expected number"),
+    }
+
+    match &tokens[1].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 1.0),
+        _ => panic!("Expected number"),
+    }
+
+    match &tokens[2].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 255.0),
+        _ => panic!("Expected number"),
+    }
+
+    match &tokens[3].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 12.0),
+        _ => panic!("Expected number"),
+    }
+}
+
+#[test]
+fn test_binary_literals_with_underscores() {
+    let mut lexer = Lexer::new("0b1111_0000 0b1100_1010_0101");
+    let tokens = lexer.tokenize().unwrap();
+
+    match &tokens[0].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 240.0), // 0b11110000
+        _ => panic!("Expected number"),
+    }
+
+    match &tokens[1].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 3237.0), // 0b110010100101
+        _ => panic!("Expected number"),
+    }
+}
+
+#[test]
+fn test_hex_literals_simple() {
+    let mut lexer = Lexer::new("0xFF");
+    let tokens = lexer.tokenize().unwrap();
+
+    match &tokens[0].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 255.0),
+        _ => panic!("Expected number"),
+    }
+}
+
+#[test]
+fn test_hex_literals_various() {
+    let mut lexer = Lexer::new("0x0 0xA 0xFF 0xDEADBEEF");
+    let tokens = lexer.tokenize().unwrap();
+
+    match &tokens[0].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 0.0),
+        _ => panic!("Expected number"),
+    }
+
+    match &tokens[1].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 10.0),
+        _ => panic!("Expected number"),
+    }
+
+    match &tokens[2].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 255.0),
+        _ => panic!("Expected number"),
+    }
+
+    match &tokens[3].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 3735928559.0),
+        _ => panic!("Expected number"),
+    }
+}
+
+#[test]
+fn test_hex_literals_with_underscores() {
+    let mut lexer = Lexer::new("0xFF_00_FF 0xDEAD_BEEF");
+    let tokens = lexer.tokenize().unwrap();
+
+    match &tokens[0].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 16711935.0), // 0xFF00FF
+        _ => panic!("Expected number"),
+    }
+
+    match &tokens[1].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 3735928559.0), // 0xDEADBEEF
+        _ => panic!("Expected number"),
+    }
+}
+
+#[test]
+fn test_hex_lowercase_and_uppercase() {
+    let mut lexer = Lexer::new("0xabcd 0xABCD 0xAbCd");
+    let tokens = lexer.tokenize().unwrap();
+
+    // All should parse to same value
+    match &tokens[0].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 43981.0), // 0xabcd
+        _ => panic!("Expected number"),
+    }
+
+    match &tokens[1].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 43981.0), // 0xABCD
+        _ => panic!("Expected number"),
+    }
+
+    match &tokens[2].token_type {
+        TokenType::Number(n) => assert_eq!(*n, 43981.0), // 0xAbCd
+        _ => panic!("Expected number"),
+    }
+}
+
+#[test]
+fn test_invalid_binary_literal() {
+    // 0b with no digits should error
+    let mut lexer = Lexer::new("0b");
+    let result = lexer.tokenize();
+    assert!(result.is_err(), "Should error on 0b with no digits");
+
+    // 0b with invalid digits should error
+    let mut lexer = Lexer::new("0b102");
+    let result = lexer.tokenize();
+    assert!(result.is_err(), "Should error on binary literal with digit > 1");
+}
+
+#[test]
+fn test_invalid_hex_literal() {
+    // 0x with no digits should error
+    let mut lexer = Lexer::new("0x");
+    let result = lexer.tokenize();
+    assert!(result.is_err(), "Should error on 0x with no digits");
+
+    // 0x with invalid chars should error
+    let mut lexer = Lexer::new("0xGHI");
+    let result = lexer.tokenize();
+    assert!(result.is_err(), "Should error on hex literal with invalid chars");
+}
+
+#[test]
+fn test_bitwise_expression() {
+    let source = "mask = 0xFF & 0x0F | (0b1010 ^ 0b0101)";
+    let mut lexer = Lexer::new(source);
+    let tokens = lexer.tokenize().unwrap();
+
+    // Verify key operators are present
+    let has_ampersand = tokens.iter().any(|t| t.token_type == TokenType::Ampersand);
+    assert!(has_ampersand, "Should have bitwise AND (&)");
+
+    let has_pipe = tokens.iter().any(|t| t.token_type == TokenType::Pipe);
+    assert!(has_pipe, "Should have bitwise OR (|)");
+
+    let has_caret = tokens.iter().any(|t| t.token_type == TokenType::Caret);
+    assert!(has_caret, "Should have bitwise XOR (^)");
+
+    // Verify hex and binary literals parsed correctly
+    let hex_values: Vec<f64> = tokens.iter().filter_map(|t| {
+        if let TokenType::Number(n) = t.token_type {
+            Some(n)
+        } else {
+            None
+        }
+    }).collect();
+
+    assert!(hex_values.contains(&255.0), "Should parse 0xFF as 255");
+    assert!(hex_values.contains(&15.0), "Should parse 0x0F as 15");
+    assert!(hex_values.contains(&10.0), "Should parse 0b1010 as 10");
+    assert!(hex_values.contains(&5.0), "Should parse 0b0101 as 5");
+}
+
+#[test]
+fn test_power_vs_xor() {
+    // ** is power, ^ is XOR (not power anymore!)
+    let mut lexer = Lexer::new("2 ** 8");
+    let tokens = lexer.tokenize().unwrap();
+    assert_eq!(tokens[1].token_type, TokenType::DoubleStar);
+
+    let mut lexer = Lexer::new("2 ^ 8");
+    let tokens = lexer.tokenize().unwrap();
+    assert_eq!(tokens[1].token_type, TokenType::Caret); // Now XOR, not power!
+}
+
+#[test]
+fn test_comprehensive_bitwise_code() {
+    let source = r#"
+# Bitwise operations example
+mask = 0xFF
+bits = 0b1010_1100
+
+# Bitwise operators
+result1 = bits & mask
+result2 = bits | 0x0F
+result3 = bits ^ 0b1111
+
+# NOT operator
+inverted = ~mask
+
+# Shifts
+left = bits << 2
+right = bits >> 1
+
+# Power operator (new syntax)
+power = 2 ** 10
+
+# Mixed expression
+complex = (0xFF & 0xF0) | (0b1010 << 2) ^ ~0x0F
+"#;
+
+    let mut lexer = Lexer::new(source);
+    let result = lexer.tokenize();
+
+    assert!(result.is_ok(), "Comprehensive bitwise code should tokenize");
+    let tokens = result.unwrap();
+
+    // Verify all new operators are present
+    assert!(tokens.iter().any(|t| t.token_type == TokenType::Ampersand));
+    assert!(tokens.iter().any(|t| t.token_type == TokenType::Pipe));
+    assert!(tokens.iter().any(|t| t.token_type == TokenType::Caret));
+    assert!(tokens.iter().any(|t| t.token_type == TokenType::Tilde));
+    assert!(tokens.iter().any(|t| t.token_type == TokenType::LeftShift));
+    assert!(tokens.iter().any(|t| t.token_type == TokenType::RightShift));
+    assert!(tokens.iter().any(|t| t.token_type == TokenType::DoubleStar));
+
+    // Verify literals with underscores work
+    let has_underscore_binary = tokens.iter().any(|t| {
+        t.lexeme.starts_with("0b") && t.lexeme.contains('_')
+    });
+    assert!(has_underscore_binary, "Should handle binary literals with underscores");
+}

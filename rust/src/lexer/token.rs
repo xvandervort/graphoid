@@ -68,7 +68,11 @@ pub enum TokenType {
     Slash,
     SlashSlash,      // // (integer division)
     Percent,
-    Caret,
+    Caret,           // ^ (XOR in Phase 13+, was power in Phase 0-12)
+    DoubleStar,      // ** (power operator, new in Phase 13)
+    Tilde,           // ~ (bitwise NOT, new in Phase 13)
+    LeftShift,       // << (new in Phase 13)
+    RightShift,      // >> (new in Phase 13)
     Equal,
     EqualEqual,
     Bang,            // ! (for mutation operators like sort!())
@@ -80,8 +84,8 @@ pub enum TokenType {
     RegexMatch,      // =~
     RegexNoMatch,    // !~
     Arrow,           // =>
-    Ampersand,       // &
-    Pipe,            // |
+    Ampersand,       // & (bitwise AND, also used in &&)
+    Pipe,            // | (bitwise OR, also used in ||)
     AmpersandAmpersand, // &&
     PipePipe,        // ||
 
