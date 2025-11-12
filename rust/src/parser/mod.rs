@@ -79,7 +79,6 @@ impl Parser {
             || self.check(&TokenType::TreeType)
             || self.check(&TokenType::GraphType)
             || self.check(&TokenType::DataType)
-            || self.check(&TokenType::TimeType)
         ) {
             self.variable_declaration(is_private)
         } else if self.match_token(&TokenType::Func) {
@@ -189,7 +188,6 @@ impl Parser {
             TokenType::TreeType => "tree",
             TokenType::GraphType => "graph",
             TokenType::DataType => "data",
-            TokenType::TimeType => "time",
             _ => {
                 return Err(GraphoidError::SyntaxError {
                     message: "Expected type annotation".to_string(),
@@ -218,7 +216,6 @@ impl Parser {
                 TokenType::NumType => "num",
                 TokenType::StringType => "string",
                 TokenType::BoolType => "bool",
-                TokenType::TimeType => "time",
                 TokenType::Symbol(_) => {
                     // Allow symbol types like :symbol
                     if let TokenType::Symbol(s) = &self.peek().token_type {

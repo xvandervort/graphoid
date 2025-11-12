@@ -445,7 +445,7 @@ Graphoid includes **professional-grade tooling** from day one:
 
 ## Implementation Roadmap
 
-See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 14-phase plan:
+See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 18-phase plan:
 
 | Phase | Focus | Duration | Status |
 |-------|-------|----------|--------|
@@ -461,17 +461,19 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 14-phase plan:
 | 8 | Module System (Basic) | 4-6 days | ✅ COMPLETE (31 tests) |
 | 9 | Graph Pattern Matching | 7-10 days | ✅ COMPLETE (69 tests) |
 | 10 | Advanced Module Features | 3-5 days | ✅ COMPLETE (40 tests) |
-| 11 | Native Stdlib Modules | 16-23 days | 🔲 Pending |
-| 12 | Pure Graphoid Stdlib | 14-18 days | 🔲 Pending |
-| 13 | Testing Framework | 7-10 days | 🔲 Pending |
-| 14 | Debugger | 10-14 days | 🔲 Pending |
-| 15 | Package Manager | 14-21 days | 🔲 Pending |
+| 11 | Pure Graphoid Stdlib | 10-14 days | 🔲 Pending |
+| 12 | Native Stdlib Modules | 14-21 days | 🔄 ~15% COMPLETE (Constants, Random) |
+| 13 | Bitwise Operators & Integer Types | 5-7 days | 🔲 Pending |
+| 14 | Stdlib Translation to Pure Graphoid | 7-10 days | 🔲 Pending |
+| 15 | Testing Framework | 7-10 days | 🔲 Pending |
+| 16 | Debugger | 10-14 days | 🔲 Pending |
+| 17 | Package Manager | 14-21 days | 🔲 Pending |
 
 **Milestones**:
 - **MVP** (Phases 0-5): 6-8 weeks - Basic language works ✅
-- **Feature Complete** (Phases 0-12): 14-18 weeks - All language features
-- **Production Tools** (Phases 0-15): 18-24 weeks - Testing, debugging, packaging
-- **Production Ready**: 24-30 weeks - Optimized, documented, polished
+- **Feature Complete** (Phases 0-14): 20-25 weeks - All language features + 90% self-hosting
+- **Production Tools** (Phases 0-17): 24-32 weeks - Testing, debugging, packaging
+- **Production Ready**: 32-40 weeks - Optimized, documented, polished
 
 ---
 

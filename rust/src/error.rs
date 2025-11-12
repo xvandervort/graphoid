@@ -75,6 +75,24 @@ pub enum GraphoidError {
 
     #[error("Configuration error: {message}")]
     ConfigError { message: String },
+
+    #[error("Loop control: {control}")]
+    LoopControl { control: LoopControlType },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LoopControlType {
+    Break,
+    Continue,
+}
+
+impl std::fmt::Display for LoopControlType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LoopControlType::Break => write!(f, "break"),
+            LoopControlType::Continue => write!(f, "continue"),
+        }
+    }
 }
 
 impl GraphoidError {
@@ -116,6 +134,7 @@ impl GraphoidError {
             GraphoidError::CircularDependency { .. } => "CircularDependency".to_string(),
             GraphoidError::IoError(_) => "IOError".to_string(),
             GraphoidError::ConfigError { .. } => "ConfigError".to_string(),
+            GraphoidError::LoopControl { .. } => "LoopControl".to_string(),
         }
     }
 
@@ -131,6 +150,7 @@ impl GraphoidError {
             GraphoidError::RuntimeError { .. } => SourcePosition::unknown(),
             GraphoidError::RuleViolation { .. } => SourcePosition::unknown(),
             GraphoidError::IoError(_) => SourcePosition::unknown(),
+            GraphoidError::LoopControl { .. } => SourcePosition::unknown(),
             GraphoidError::ConfigError { .. } => SourcePosition::unknown(),
         }
     }
@@ -191,6 +211,7 @@ impl Clone for GraphoidError {
                     message: message.clone(),
                 }
             }
+            GraphoidError::LoopControl { control } => GraphoidError::LoopControl { control: *control },
         }
     }
 }

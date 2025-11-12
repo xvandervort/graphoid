@@ -1,0 +1,32 @@
+import "os"
+
+print("=== OS Module Demo ===")
+print("")
+
+# System timestamp
+timestamp = os.system_timestamp()
+print("Current timestamp: " + timestamp)
+
+# Platform and architecture
+print("Platform: " + os.platform())
+print("Architecture: " + os.arch())
+
+# Current directory
+print("Current directory: " + os.getcwd())
+
+# Environment variables
+home = os.env("HOME")
+if home != none {
+    print("HOME: " + home)
+}
+
+# Test non-existent variable
+missing = os.env("NONEXISTENT_VAR_XYZ")
+print("Missing var is none: " + (missing == none))
+
+# Command-line arguments
+args = os.args()
+print("Number of args: " + args.length())
+
+print("")
+print("=== OS Module Working! ===")

@@ -1,0 +1,39 @@
+import "time"
+
+print("=== Time Module Demo ===")
+print("")
+
+# Creation
+now = time.now()
+print("Now: " + time.as_datetime(now, none))
+
+today = time.today()
+print("Today (start): " + time.as_date(today, none))
+
+birthday = time.from_date(1990, 12, 25)
+print("Birthday: " + time.as_date(birthday, "long"))
+
+# Calendar-aware arithmetic
+jan31 = time.from_date(2025, 1, 31)
+print("Jan 31 + 1 month: " + time.as_date(time.add_months(jan31, 1), none))
+
+# Predicates
+monday = time.from_date(2025, 1, 13)
+print("Is Monday a weekday? " + time.is_weekday(monday))
+
+saturday = time.from_date(2025, 1, 18)
+print("Is Saturday a weekend? " + time.is_weekend(saturday))
+
+# Navigation
+week_start = time.start_of_week(now)
+print("Start of week: " + time.as_date(week_start, none))
+
+month_end = time.end_of_month(now)
+print("End of month: " + time.as_date(month_end, none))
+
+# Business logic
+business = time.skip_weekends(saturday)
+print("Skip weekend from Saturday: " + time.as_date(business, none))
+
+print("")
+print("=== All Time Features Working! ===")

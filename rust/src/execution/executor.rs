@@ -431,11 +431,31 @@ impl Executor {
                     }
 
                     // Execute loop body
+                    let mut should_break = false;
                     for stmt in body {
-                        if let Some(val) = self.eval_stmt(stmt)? {
-                            // Return statement in loop body
-                            return Ok(Some(val));
+                        match self.eval_stmt(stmt) {
+                            Ok(Some(val)) => {
+                                // Return statement in loop body
+                                return Ok(Some(val));
+                            }
+                            Err(GraphoidError::LoopControl { control }) => {
+                                match control {
+                                    crate::error::LoopControlType::Break => {
+                                        should_break = true;
+                                        break;
+                                    }
+                                    crate::error::LoopControlType::Continue => {
+                                        break; // Break inner loop, continue outer loop
+                                    }
+                                }
+                            }
+                            Err(e) => return Err(e),
+                            Ok(None) => {}
                         }
+                    }
+
+                    if should_break {
+                        break;
                     }
                 }
                 Ok(None)
@@ -569,10 +589,18 @@ impl Executor {
             Stmt::Try { body, catch_clauses, finally_block, .. } => {
                 self.execute_try(body, catch_clauses, finally_block)
             }
-            _ => Err(GraphoidError::runtime(format!(
-                "Unsupported statement type: {:?}",
-                stmt
-            ))),
+            Stmt::Break { .. } => {
+                // Break statement - signal loop termination
+                Err(GraphoidError::LoopControl {
+                    control: crate::error::LoopControlType::Break,
+                })
+            }
+            Stmt::Continue { .. } => {
+                // Continue statement - signal loop continuation
+                Err(GraphoidError::LoopControl {
+                    control: crate::error::LoopControlType::Continue,
+                })
+            }
         }
     }
 
@@ -4968,6 +4996,11 @@ impl Executor {
             private_symbols: module_executor.private_symbols.clone(),  // Phase 10: Track private symbols
         };
 
+        // Copy module's global functions to main executor (enables forward references)
+        for (func_name, func) in module_executor.global_functions {
+            self.global_functions.insert(func_name, func);
+        }
+
         // Register module in manager
         self.module_manager.register_module(resolved_path.to_string_lossy().to_string(), module.clone());
 
@@ -5121,6 +5154,7 @@ impl Executor {
                     GraphoidError::CircularDependency { .. } => "CircularDependency".to_string(),
                     GraphoidError::IoError(_) => "IoError".to_string(),
                     GraphoidError::ConfigError { .. } => "ConfigError".to_string(),
+                    GraphoidError::LoopControl { .. } => "LoopControl".to_string(),
                 };
                 actual_message = error_message.clone();
             }
@@ -5136,6 +5170,7 @@ impl Executor {
                 GraphoidError::CircularDependency { .. } => "CircularDependency".to_string(),
                 GraphoidError::IoError(_) => "IoError".to_string(),
                 GraphoidError::ConfigError { .. } => "ConfigError".to_string(),
+                    GraphoidError::LoopControl { .. } => "LoopControl".to_string(),
             };
             actual_message = error_message.clone();
         }

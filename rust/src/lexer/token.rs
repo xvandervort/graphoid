@@ -60,7 +60,6 @@ pub enum TokenType {
     TreeType,
     GraphType,
     DataType,
-    TimeType,
 
     // Operators
     Plus,

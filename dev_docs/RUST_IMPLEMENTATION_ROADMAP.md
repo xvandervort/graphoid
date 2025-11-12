@@ -3182,9 +3182,465 @@ Core modules implemented in Rust for performance:
 
 **Why Native Rust**: These modules require system calls, performance, or complex algorithms best implemented in Rust.
 
+**Status**: These are TEMPORARY Rust implementations. Phase 14 will translate most modules to pure Graphoid for self-hosting (90%+ goal).
+
 ---
 
-## Phase 13: Testing Framework (7-10 days)
+## Phase 13: Bitwise Operators & Integer Types (5-7 days)
+
+**Goal**: Add bitwise operations and integer types to enable stdlib translation to pure Graphoid.
+
+**Critical for Self-Hosting**: Without bitwise operators, cryptographic algorithms, random number generators, UUIDs, hashing, and compression cannot be implemented in pure Graphoid.
+
+### Operator Changes
+
+**Change Power Operator**:
+```graphoid
+# Old (Phase 0-12): ^ means power
+x = 2 ^ 8  # 256
+
+# New (Phase 13+): ** means power, ^ means XOR
+x = 2 ** 8       # Power: 256
+y = 0b1010 ^ 0b0101  # XOR: 15
+```
+
+**New Bitwise Operators**:
+- `&` - Bitwise AND
+- `|` - Bitwise OR
+- `^` - Bitwise XOR (operator conflict resolved!)
+- `~` - Bitwise NOT (complement)
+- `<<` - Left shift
+- `>>` - Right shift
+
+**Integer Types**:
+- Add `int` type for 64-bit signed integers
+- Add `uint` type for 64-bit unsigned integers
+- Support binary literals: `0b1010`, `0b11111111`
+- Support hex literals: `0xFF`, `0xDEADBEEF`
+
+### Implementation Steps
+
+**Day 1-2: Lexer Updates** (src/lexer/mod.rs)
+```rust
+// Add new tokens
+pub enum TokenType {
+    // ... existing tokens
+
+    // Change: Power now uses **
+    DoubleStar,      // **
+
+    // Bitwise operators
+    Ampersand,       // &
+    Pipe,            // |
+    Caret,           // ^ (now XOR, not power!)
+    Tilde,           // ~
+    LeftShift,       // <<
+    RightShift,      // >>
+
+    // Integer type keywords
+    Int,             // int
+    UInt,            // uint
+}
+
+// Update tokenization for number literals
+fn tokenize_number(&mut self) -> Token {
+    // Support 0b prefix for binary
+    // Support 0x prefix for hex
+    // Default to int if no decimal point
+}
+```
+
+**Tests** (15+ tests):
+- Binary literal parsing: `0b1010`, `0b11111111`
+- Hex literal parsing: `0xFF`, `0xDEADBEEF`
+- Operator tokenization: `&`, `|`, `^`, `~`, `<<`, `>>`
+- Power operator: `**`
+
+**Day 3-4: Parser Updates** (src/parser/mod.rs)
+
+Add operator precedence (lower number = lower precedence):
+```rust
+fn precedence(&self, op: &TokenType) -> u8 {
+    match op {
+        TokenType::Pipe => 30,           // | (bitwise OR)
+        TokenType::Caret => 35,          // ^ (bitwise XOR)
+        TokenType::Ampersand => 40,      // & (bitwise AND)
+        TokenType::LeftShift => 50,      // <<
+        TokenType::RightShift => 50,     // >>
+        TokenType::DoubleStar => 90,     // ** (power)
+        // ... rest of operators
+    }
+}
+```
+
+**Tests** (20+ tests):
+- Precedence: `2 + 3 & 4` vs `(2 + 3) & 4`
+- Associativity: `16 >> 2 >> 1` = `(16 >> 2) >> 1` = 2
+- Power operator: `2 ** 3 ** 2` = `2 ** (3 ** 2)` = 512 (right-associative)
+- Complex expressions: `(a & 0xFF) | (b << 8)`
+
+**Day 5-6: Executor Implementation** (src/execution/executor.rs, src/values/mod.rs)
+
+Add Value variants:
+```rust
+pub enum ValueKind {
+    Number(f64),          // Existing floating point
+    Integer(i64),         // NEW: 64-bit signed integer
+    UInteger(u64),        // NEW: 64-bit unsigned integer
+    // ... rest
+}
+```
+
+Implement operations:
+```rust
+fn eval_binary_op(&mut self, left: Value, op: TokenType, right: Value) -> Result<Value> {
+    match op {
+        TokenType::Ampersand => {
+            // Bitwise AND - requires integer operands
+            let l = left.to_integer()?;
+            let r = right.to_integer()?;
+            Ok(Value::integer(l & r))
+        }
+        TokenType::Pipe => {
+            // Bitwise OR
+            let l = left.to_integer()?;
+            let r = right.to_integer()?;
+            Ok(Value::integer(l | r))
+        }
+        TokenType::Caret => {
+            // Bitwise XOR
+            let l = left.to_integer()?;
+            let r = right.to_integer()?;
+            Ok(Value::integer(l ^ r))
+        }
+        TokenType::LeftShift => {
+            // Left shift
+            let l = left.to_integer()?;
+            let r = right.to_integer()? as u32;
+            Ok(Value::integer(l << r))
+        }
+        TokenType::RightShift => {
+            // Right shift (arithmetic for signed, logical for unsigned)
+            let l = left.to_integer()?;
+            let r = right.to_integer()? as u32;
+            Ok(Value::integer(l >> r))
+        }
+        TokenType::DoubleStar => {
+            // Power operation (moved from Caret)
+            Ok(Value::number(left.to_number()?.powf(right.to_number()?)))
+        }
+        // ... rest
+    }
+}
+
+fn eval_unary_op(&mut self, op: TokenType, operand: Value) -> Result<Value> {
+    match op {
+        TokenType::Tilde => {
+            // Bitwise NOT
+            let val = operand.to_integer()?;
+            Ok(Value::integer(!val))
+        }
+        // ... rest
+    }
+}
+```
+
+**Tests** (40+ tests):
+- Bitwise AND: `0b1100 & 0b1010` = `0b1000` = 8
+- Bitwise OR: `0b1100 | 0b1010` = `0b1110` = 14
+- Bitwise XOR: `0b1100 ^ 0b1010` = `0b0110` = 6
+- Bitwise NOT: `~0b1010` = `-11` (two's complement)
+- Left shift: `5 << 2` = 20
+- Right shift: `20 >> 2` = 5
+- Rotate left: `(x << k) | (x >> (64 - k))`
+- Rotate right: `(x >> k) | (x << (64 - k))`
+- Power operator migration: `2 ** 8` = 256
+- Type conversions: num to int, int to num
+
+**Day 7: Integration & Examples**
+
+Create examples demonstrating use cases:
+- `examples/bitwise_basics.gr` - Basic bitwise operations
+- `examples/bit_manipulation.gr` - Flags, masks, permissions
+- `examples/rotate_operations.gr` - Bit rotations
+- `examples/uuid_manual.gr` - Manual UUID generation using bitwise ops
+
+**Success Criteria**:
+- ✅ All bitwise operators working (`&`, `|`, `^`, `~`, `<<`, `>>`)
+- ✅ Power operator migrated to `**`
+- ✅ Integer types (int, uint) supported
+- ✅ Binary and hex literals parsed correctly
+- ✅ 75+ tests passing (15 lexer + 20 parser + 40 executor)
+- ✅ Zero compiler warnings
+- ✅ Example files demonstrate all operators
+- ✅ Operator precedence and associativity correct
+
+**Blocks**: Phase 14 (cannot translate RNG/crypto without bitwise ops)
+
+---
+
+## Phase 14: Stdlib Translation to Pure Graphoid (7-10 days)
+
+**Goal**: Translate Rust stdlib modules to pure Graphoid, achieving 90%+ self-hosting.
+
+**Vision**: Only lexer, parser, and core executor remain in Rust. All standard library code written in Graphoid itself.
+
+### Translation Priority
+
+**Immediate (Can Translate Now)**:
+1. **Constants** → `stdlib/constants.gr`
+   - Pure data, no algorithms
+   - 15 constants: pi, e, tau, phi, sqrt2, ln2, etc.
+   - **Effort**: 1 day
+
+**After Phase 13 (Requires Bitwise Operators)**:
+2. **Random** → `stdlib/random.gr`
+   - Implement xoshiro256** PRNG in pure Graphoid
+   - Requires bitwise: `^`, `<<`, `>>`, `|`
+   - **Effort**: 2 days
+
+3. **UUID** → `stdlib/uuid.gr`
+   - UUID v4 generation
+   - Requires bitwise: `&`, `|` for version/variant bits
+   - **Effort**: 1 day
+
+4. **Crypto** → `stdlib/crypto.gr`
+   - SHA-256, MD5 hashing
+   - HMAC authentication
+   - Requires extensive bitwise operations
+   - **Effort**: 3 days
+
+**Keep in Rust (Core System Functions)**:
+- **I/O** - File system operations (system calls)
+- **OS** - Process management, environment variables
+- **Time** (partial) - System time access (rest can be Graphoid)
+- **Regex** - Complex parsing (for now)
+
+### Implementation Strategy
+
+**Day 1: Constants Module**
+```graphoid
+# stdlib/constants.gr
+# Pure Graphoid implementation of constants module
+
+export const.pi = 3.141592653589793
+export const.e = 2.718281828459045
+export const.tau = 6.283185307179586
+export const.phi = 1.618033988749895
+export const.sqrt2 = 1.4142135623730951
+export const.sqrt3 = 1.7320508075688772
+export const.ln2 = 0.6931471805599453
+export const.ln10 = 2.302585092994046
+export const.log2e = 1.4426950408889634
+export const.log10e = 0.4342944819032518
+export const.euler_gamma = 0.5772156649015329
+export const.speed_of_light = 299792458.0
+export const.planck_constant = 6.62607015e-34
+export const.avogadro_number = 6.02214076e23
+export const.boltzmann_constant = 1.380649e-23
+```
+
+**Day 2-3: Random Module**
+```graphoid
+# stdlib/random.gr
+# Pure Graphoid implementation of random number generation
+
+class XoShiRo256StarStar {
+    priv state = [0, 0, 0, 0]  # Four 64-bit integers
+
+    fn seed(seed_value) {
+        # Initialize state from seed using SplitMix64
+        self.state = self.splitmix64_init(seed_value)
+    }
+
+    fn next() {
+        # xoshiro256** algorithm
+        result = self.rotl(self.state[1] * 5, 7) * 9
+        t = self.state[1] << 17
+
+        self.state[2] = self.state[2] ^ self.state[0]
+        self.state[3] = self.state[3] ^ self.state[1]
+        self.state[1] = self.state[1] ^ self.state[2]
+        self.state[0] = self.state[0] ^ self.state[3]
+
+        self.state[2] = self.state[2] ^ t
+        self.state[3] = self.rotl(self.state[3], 45)
+
+        return result
+    }
+
+    fn rotl(x, k) {
+        return (x << k) | (x >> (64 - k))
+    }
+}
+
+# Global RNG instance
+priv _global_rng = XoShiRo256StarStar()
+_global_rng.seed(os.system_time_nanos())
+
+export fn random() {
+    return _global_rng.next() / (2 ** 64)
+}
+
+export fn randint(a, b) {
+    range = b - a + 1
+    return a + (_global_rng.next() % range)
+}
+
+export fn choice(list) {
+    return list[randint(0, list.length() - 1)]
+}
+
+# ... rest of random functions
+```
+
+**Day 4: UUID Module**
+```graphoid
+# stdlib/uuid.gr
+import "random"
+
+export fn uuid4() {
+    # Generate random bytes
+    bytes = []
+    for i in 0..16 {
+        bytes.append(rand.randint(0, 255))
+    }
+
+    # Set version 4 bits
+    bytes[6] = (bytes[6] & 0x0F) | 0x40
+
+    # Set variant bits (RFC 4122)
+    bytes[8] = (bytes[8] & 0x3F) | 0x80
+
+    # Format as UUID string
+    return format_uuid(bytes)
+}
+
+priv fn format_uuid(bytes) {
+    # Convert to hex and format with hyphens
+    hex = bytes.map(b => to_hex(b, 2))
+    return hex[0..4].join("") + "-" +
+           hex[4..6].join("") + "-" +
+           hex[6..8].join("") + "-" +
+           hex[8..10].join("") + "-" +
+           hex[10..16].join("")
+}
+
+priv fn to_hex(num, width) {
+    # Convert number to hex string
+    hex_digits = "0123456789abcdef"
+    result = ""
+    for i in 0..width {
+        digit = (num >> ((width - i - 1) * 4)) & 0xF
+        result = result + hex_digits[digit]
+    }
+    return result
+}
+```
+
+**Day 5-7: Crypto Module (Hashing)**
+```graphoid
+# stdlib/crypto.gr
+# Pure Graphoid implementation of SHA-256
+
+class SHA256 {
+    priv K = [  # SHA-256 constants
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
+        # ... 60 more constants
+    ]
+
+    fn hash(message) {
+        # SHA-256 algorithm
+        # 1. Padding
+        padded = self.pad_message(message)
+
+        # 2. Initialize hash values
+        h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+             0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]
+
+        # 3. Process 512-bit blocks
+        for block in padded.chunks(64) {
+            w = self.prepare_schedule(block)
+            h = self.compress(h, w)
+        }
+
+        # 4. Return hex digest
+        return h.map(x => to_hex(x, 8)).join("")
+    }
+
+    priv fn ch(x, y, z) {
+        return (x & y) ^ (~x & z)
+    }
+
+    priv fn maj(x, y, z) {
+        return (x & y) ^ (x & z) ^ (y & z)
+    }
+
+    priv fn rotr(x, n) {
+        return (x >> n) | (x << (32 - n))
+    }
+
+    priv fn sigma0(x) {
+        return self.rotr(x, 2) ^ self.rotr(x, 13) ^ self.rotr(x, 22)
+    }
+
+    priv fn sigma1(x) {
+        return self.rotr(x, 6) ^ self.rotr(x, 11) ^ self.rotr(x, 25)
+    }
+
+    # ... rest of SHA-256 implementation
+}
+
+export fn sha256(message) {
+    hasher = SHA256()
+    return hasher.hash(message)
+}
+```
+
+**Day 8-10: Integration & Testing**
+
+Update module system to prefer `.gr` implementations:
+```rust
+// In module_manager.rs
+pub fn resolve_module_path(&self, module_name: &str) -> Result<PathBuf> {
+    // 1. Check for .gr implementation in stdlib/
+    let stdlib_gr = PathBuf::from("stdlib").join(module_name).with_extension("gr");
+    if stdlib_gr.exists() {
+        return Ok(stdlib_gr);
+    }
+
+    // 2. Fall back to native Rust implementation
+    if self.is_native_module(module_name) {
+        return Ok(PathBuf::from(format!("<native:{}>", module_name)));
+    }
+
+    // ... rest of resolution
+}
+```
+
+Create comprehensive tests:
+- `tests/stdlib_gr/constants_tests.gr`
+- `tests/stdlib_gr/random_tests.gr`
+- `tests/stdlib_gr/uuid_tests.gr`
+- `tests/stdlib_gr/crypto_tests.gr`
+
+**Success Criteria**:
+- ✅ Constants, Random, UUID, Crypto translated to pure .gr
+- ✅ All functionality matches Rust implementation
+- ✅ 150+ tests passing for .gr stdlib
+- ✅ Module system prefers .gr over native when available
+- ✅ 90%+ of stdlib in pure Graphoid (by line count)
+- ✅ Only I/O, OS, Time (partial), Regex remain in Rust
+- ✅ Self-hosting goal achieved!
+
+**Documentation**:
+- Update CLAUDE.md to reflect self-hosting status
+- Document translation guidelines for future modules
+- Show performance comparison (Rust vs .gr implementations)
+
+---
+
+## Phase 15: Testing Framework (7-10 days)
 
 Built-in RSpec-style testing framework:
 
@@ -3199,7 +3655,7 @@ Built-in RSpec-style testing framework:
 
 ---
 
-## Phase 14: Debugger (10-14 days)
+## Phase 16: Debugger (10-14 days)
 
 Interactive debugging and profiling tools:
 
@@ -3214,7 +3670,7 @@ Interactive debugging and profiling tools:
 
 ---
 
-## Phase 15: Package Manager (14-21 days)
+## Phase 17: Package Manager (14-21 days)
 
 Graph-based dependency management:
 
@@ -3274,8 +3730,8 @@ Graph-based dependency management:
 - **WHY LONGER**: Mutation operator convention doubles method surface area
 
 ### Feature Complete (Updated - Revised Phase Ordering)
-**18-23 weeks** - Full language specification (+6-7 weeks from original)
-- Phases 0-12 complete (includes pattern matching in Phases 7 & 9)
+**20-25 weeks** - Full language specification (+8-9 weeks from original)
+- Phases 0-14 complete (includes pattern matching in Phases 7 & 9)
 - Phase 6.5: Standard graph types (BST, DAG, Heap, AVL, Trie)
 - Function pattern matching (Phase 7) + Graph pattern matching (Phase 9)
 - Complete behavior system (Phase 8)
@@ -3284,34 +3740,37 @@ Graph-based dependency management:
 - Module system complete (Phase 10)
 - Pure Graphoid stdlib (Phase 11)
 - Native stdlib modules (Phase 12)
+- Bitwise operators & integer types (Phase 13)
+- Stdlib translation to pure Graphoid (Phase 14) - 90%+ self-hosting!
 - Documentation Milestones 1-4 complete
-- **WHY LONGER**: Graph querying is massive (+7 days), pattern matching is critical (+12 days), behaviors complete
+- **WHY LONGER**: Graph querying is massive (+7 days), pattern matching is critical (+12 days), behaviors complete, bitwise operators (+7 days), stdlib translation (+10 days)
 
 ### Production Tools Complete (Updated - Revised Phase Ordering)
-**22-29 weeks** - Professional tooling added (+6-7 weeks from original)
-- Phases 0-15 complete
-- Testing framework operational (Phase 13 - RSpec-style)
-- Debugger functional (Phase 14)
-- Package manager working (Phase 15)
-- **WHY LONGER**: More features to test, REPL/CLI parity for everything
+**24-32 weeks** - Professional tooling added (+8-10 weeks from original)
+- Phases 0-17 complete
+- Testing framework operational (Phase 15 - RSpec-style)
+- Debugger functional (Phase 16)
+- Package manager working (Phase 17)
+- **WHY LONGER**: More features to test, REPL/CLI parity for everything, self-hosting validation
 
 ### Production Ready (Updated)
-**30-37 weeks** - Optimized, polished, and professional (+6-9 weeks from original)
-- All phases complete
+**32-40 weeks** - Optimized, polished, and professional (+8-12 weeks from original)
+- All phases complete (0-17)
 - Performance tuning done
 - Comprehensive testing (500+ tests)
 - Full documentation with samples
 - Examples and tutorials
 - Package registry live
+- 90%+ self-hosting with pure .gr stdlib
 
 ### Comparison
 
 | Milestone | Old Estimate | New Estimate | Increase |
 |-----------|-------------|--------------|----------|
 | Basic Language | 6-8 weeks | 8-11 weeks | +2-3 weeks |
-| Feature Complete | 12-16 weeks | 18-23 weeks | +6-7 weeks |
-| Production Tools | 16-22 weeks | 22-29 weeks | +6-7 weeks |
-| **Production Ready** | **24-28 weeks** | **30-37 weeks** | **+6-9 weeks** |
+| Feature Complete | 12-16 weeks | 20-25 weeks | +8-9 weeks |
+| Production Tools | 16-22 weeks | 24-32 weeks | +8-10 weeks |
+| **Production Ready** | **24-28 weeks** | **32-40 weeks** | **+8-12 weeks** |
 
 **We're building this right, not fast.**
 

@@ -33,5 +33,6 @@ mod unit {
     pub mod priv_keyword_tests;
     pub mod constants_module_tests;
     pub mod random_module_tests;
+    pub mod os_module_tests;
     pub mod bst_ordering_tests;
 }

@@ -628,7 +628,6 @@ impl Lexer {
             "tree" => TokenType::TreeType,
             "graph" => TokenType::GraphType,
             "data" => TokenType::DataType,
-            "time" => TokenType::TimeType,
 
             // Otherwise it's an identifier
             _ => TokenType::Identifier(lexeme.clone()),
