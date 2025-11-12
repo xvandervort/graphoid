@@ -83,13 +83,49 @@ This is as far as type constraints go. No exceptions.
   - `+`, `-`, `*`, `/` - Standard arithmetic (division returns float)
   - `//` - **Integer division** (returns integer, truncates toward zero)
   - `%` - Modulo (remainder)
-  - `^` - Exponentiation
+  - `**` - **Exponentiation** (right-associative, e.g., `2 ** 3 ** 2` = `2 ** (3 ** 2)` = 512)
+- **Bitwise Operators** (Phase 13):
+  - `&` - Bitwise AND
+  - `|` - Bitwise OR
+  - `^` - Bitwise XOR (**Note**: Changed from exponentiation; use `**` for power)
+  - `~` - Bitwise NOT (unary)
+  - `<<` - Left shift
+  - `>>` - Right shift (signed by default, use `configure { :unsigned }` for logical shift)
+- **Number Literals** (Phase 13):
+  - Binary: `0b1010`, `0b1111_0000` (underscores for readability)
+  - Hexadecimal: `0xFF`, `0xDEAD_BEEF`
 - **Integer Division Examples**:
   ```graphoid
   10 / 3      # 3.333333 (float division)
   10 // 3     # 3 (integer division)
   -10 // 3    # -3 (truncates toward zero)
   10.5 // 2   # 5 (works on floats too)
+  ```
+- **Bitwise Operator Examples**:
+  ```graphoid
+  # Bitwise operations
+  12 & 10           # 8 (AND: 1100 & 1010 = 1000)
+  12 | 10           # 14 (OR: 1100 | 1010 = 1110)
+  12 ^ 10           # 6 (XOR: 1100 ^ 1010 = 0110)
+  ~5                # -6 (NOT: inverts all bits)
+
+  # Shifts
+  3 << 2            # 12 (multiply by 4)
+  16 >> 2           # 4 (divide by 4, signed)
+
+  # Unsigned right shift
+  configure { :unsigned } {
+      -16 >> 2      # 4611686018427387904 (logical shift, zero-fill)
+  }
+
+  # Number literals
+  0b1010            # 10 (binary)
+  0xFF              # 255 (hexadecimal)
+  0b1111_0000       # 240 (with underscores)
+
+  # Power operator
+  2 ** 3            # 8
+  2 ** 3 ** 2       # 512 (right-associative: 2 ** (3 ** 2))
   ```
 - Methods:
   - `sqrt()` - Square root
@@ -3942,19 +3978,27 @@ GraphProperty ::= "type" ":" Symbol
 From highest to lowest:
 
 1. Method call, index access: `.`, `[]`
-2. Unary: `-`, `not`
-3. Power: `^`
+2. Unary: `-`, `not`, `~` (bitwise NOT)
+3. Power: `**` (right-associative)
 4. Multiplicative: `*`, `/`, `//`, `%`
 5. Additive: `+`, `-`
-6. Comparison: `<`, `>`, `<=`, `>=`, `!<` (equiv to `>=`), `!>` (equiv to `<=`)
-7. Equality: `==`, `!=`
-8. Regex match: `=~`, `!~`
-9. Logical AND: `and`, `&&`
-10. Logical OR: `or`, `||`
+6. Bitwise shift: `<<`, `>>`
+7. Bitwise AND: `&`
+8. Bitwise XOR: `^`
+9. Bitwise OR: `|`
+10. Comparison: `<`, `>`, `<=`, `>=`, `!<` (equiv to `>=`), `!>` (equiv to `<=`)
+11. Equality: `==`, `!=`
+12. Regex match: `=~`, `!~`
+13. Logical AND: `and`, `&&`
+14. Logical OR: `or`, `||`
 
 **Notes**:
 - `//` is integer division (truncates toward zero), while `/` is float division
 - `!<` (not less than) is syntactic sugar for `>=`, and `!>` (not greater than) is syntactic sugar for `<=`
+- `**` is right-associative: `2 ** 3 ** 2` evaluates as `2 ** (3 ** 2)` = 512
+- **Phase 13 Breaking Change**: `^` changed from exponentiation to bitwise XOR; use `**` for power
+- Bitwise operators operate on i64 internally (numbers truncated to integers)
+- Right shift `>>` is signed by default; use `configure { :unsigned }` for logical shift
 
 ### Appendix C: Reserved Keywords
 

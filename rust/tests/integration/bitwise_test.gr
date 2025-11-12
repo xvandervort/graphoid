@@ -1,0 +1,165 @@
+# Integration Test for Phase 13: Bitwise Operators
+# Comprehensive test of all bitwise operators, power operator, and number literals
+
+print("=== Phase 13 Integration Test ===")
+print("")
+
+# Test all bitwise AND operations
+print("Testing Bitwise AND (&)...")
+test1 = (12 & 10) == 8
+test2 = (0xFF & 0x0F) == 15
+test3 = (0b1100 & 0b1010) == 8
+test4 = (-1 & 0xFF) == 255
+test5 = (42 & 0) == 0
+and_passed = test1 and test2 and test3 and test4 and test5
+print("  Bitwise AND: " + (and_passed if "PASS" else "FAIL"))
+
+# Test all bitwise OR operations
+print("Testing Bitwise OR (|)...")
+test1 = (12 | 10) == 14
+test2 = (0xF0 | 0x0F) == 255
+test3 = (0b1100 | 0b1010) == 14
+test4 = (42 | 0) == 42
+test5 = (0 | 0 | 0) == 0
+or_passed = test1 and test2 and test3 and test4 and test5
+print("  Bitwise OR: " + (or_passed if "PASS" else "FAIL"))
+
+# Test all bitwise XOR operations
+print("Testing Bitwise XOR (^)...")
+test1 = (12 ^ 10) == 6
+test2 = (0xFF ^ 0xFF) == 0
+test3 = (42 ^ 0) == 42
+test4 = (0b1100 ^ 0b1010) == 6
+test5 = (0xF0 ^ 0x0F) == 255
+xor_passed = test1 and test2 and test3 and test4 and test5
+print("  Bitwise XOR: " + (xor_passed if "PASS" else "FAIL"))
+
+# Test all bitwise NOT operations
+print("Testing Bitwise NOT (~)...")
+test1 = (~5) == -6
+test2 = (~(-1)) == 0
+test3 = (~0) == -1
+test4 = (~(-6)) == 5
+not_passed = test1 and test2 and test3 and test4
+print("  Bitwise NOT: " + (not_passed if "PASS" else "FAIL"))
+
+# Test all left shift operations
+print("Testing Left Shift (<<)...")
+test1 = (3 << 2) == 12
+test2 = (1 << 0) == 1
+test3 = (1 << 8) == 256
+test4 = (7 << 3) == 56
+test5 = (-4 << 2) == -16
+lshift_passed = test1 and test2 and test3 and test4 and test5
+print("  Left Shift: " + (lshift_passed if "PASS" else "FAIL"))
+
+# Test signed right shift operations
+print("Testing Right Shift - Signed (>>)...")
+test1 = (12 >> 2) == 3
+test2 = (64 >> 3) == 8
+test3 = (42 >> 0) == 42
+test4 = (-16 >> 2) == -4
+test5 = (-8 >> 1) == -4
+rshift_signed_passed = test1 and test2 and test3 and test4 and test5
+print("  Right Shift (Signed): " + (rshift_signed_passed if "PASS" else "FAIL"))
+
+# Test unsigned right shift operations
+print("Testing Right Shift - Unsigned (>>)...")
+configure { :unsigned } {
+    test1_val = -16 >> 2
+    test1 = test1_val > 0
+    test2 = (16 >> 2) == 4
+    rshift_unsigned_passed = test1 and test2
+}
+print("  Right Shift (Unsigned): " + (rshift_unsigned_passed if "PASS" else "FAIL"))
+
+# Test power operator
+print("Testing Power Operator (**)...")
+test1 = (2 ** 3) == 8
+test2 = (2 ** 10) == 1024
+test3 = (10 ** 2) == 100
+test4 = (5 ** 0) == 1
+test5 = (0 ** 5) == 0
+test6 = (2 ** (-2)) == 0.25
+test7 = (9 ** 0.5) == 3
+test8 = (2 ** 3 ** 2) == 512
+power_passed = test1 and test2 and test3 and test4 and test5 and test6 and test7 and test8
+print("  Power Operator: " + (power_passed if "PASS" else "FAIL"))
+
+# Test binary literals
+print("Testing Binary Literals...")
+test1 = 0b1010 == 10
+test2 = 0b11111111 == 255
+test3 = 0b0 == 0
+test4 = 0b1111_0000 == 240
+binary_passed = test1 and test2 and test3 and test4
+print("  Binary Literals: " + (binary_passed if "PASS" else "FAIL"))
+
+# Test hexadecimal literals
+print("Testing Hexadecimal Literals...")
+test1 = 0xFF == 255
+test2 = 0x10 == 16
+test3 = 0x0 == 0
+test4 = 0xDEAD == 57005
+test5 = 0xFF_00 == 65280
+hex_passed = test1 and test2 and test3 and test4 and test5
+print("  Hexadecimal Literals: " + (hex_passed if "PASS" else "FAIL"))
+
+# Test complex expressions
+print("Testing Complex Expressions...")
+test1 = ((12 & 10) | (12 ^ 10)) == 14
+test2 = (~(0xFF) & 0xFFFF) == 65280
+test3 = ((1 << 4) | (1 << 2) | (1 << 0)) == 21
+test4 = (((0xFF << 16) | (0x42 << 8) | 0x13) & 0xFF) == 19
+complex_passed = test1 and test2 and test3 and test4
+print("  Complex Expressions: " + (complex_passed if "PASS" else "FAIL"))
+
+# Test operator precedence
+print("Testing Operator Precedence...")
+test1 = (8 | 4 & 2) == 8
+test2 = (2 * 3 ** 2) == 18
+test3 = (3 << 2 + 1) == 24
+precedence_passed = test1 and test2 and test3
+print("  Operator Precedence: " + (precedence_passed if "PASS" else "FAIL"))
+
+# Test configure block scoping
+print("Testing Configure Block Scoping...")
+outer_before_val = -8 >> 1
+test1 = outer_before_val == -4
+configure { :unsigned } {
+    inner_val = -8 >> 1
+    test2 = inner_val > 0
+}
+outer_after_val = -8 >> 1
+test3 = outer_after_val == -4
+scoping_passed = test1 and test2 and test3
+print("  Configure Scoping: " + (scoping_passed if "PASS" else "FAIL"))
+
+# Test combined operations
+print("Testing Combined Operations...")
+test1 = ((3 << 2) + 4) == 16
+test2 = ((16 >> 2) * 3) == 12
+test3 = (2 ** 3 + 2 ** 2) == 12
+combined_passed = test1 and test2 and test3
+print("  Combined Operations: " + (combined_passed if "PASS" else "FAIL"))
+
+# Test edge cases
+print("Testing Edge Cases...")
+test1 = (0 & 0xFF) == 0
+test2 = (0 | 0xFF) == 255
+test3 = (0 ^ 0xFF) == 255
+test4 = (1 ** 100) == 1
+edge_passed = test1 and test2 and test3 and test4
+print("  Edge Cases: " + (edge_passed if "PASS" else "FAIL"))
+
+# Summary
+print("")
+print("=== Summary ===")
+all_passed = and_passed and or_passed and xor_passed and not_passed and lshift_passed and rshift_signed_passed and rshift_unsigned_passed and power_passed and binary_passed and hex_passed and complex_passed and precedence_passed and scoping_passed and combined_passed and edge_passed
+
+if all_passed {
+    print("✓ All Phase 13 features working correctly!")
+    print("  All 15 test categories passed")
+} else {
+    print("✗ Some tests failed - see above for details")
+}

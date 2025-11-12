@@ -1,0 +1,329 @@
+# Bitwise Operations - Phase 13 Complete Feature Demonstration
+# Showcases all bitwise operators, power operator, and number literals
+
+print("=== BITWISE OPERATORS ===")
+print("")
+
+# =============================================================================
+# BITWISE AND (&) - Sets bit to 1 only if both operands have 1
+# =============================================================================
+
+print("--- Bitwise AND (&) ---")
+result_and = 12 & 10
+print("12 & 10 = " + result_and)
+print("Binary: 1100 & 1010 = 1000 (8)")
+
+# Use case: Extracting specific bits with a mask
+flags = 0b11010110
+mask = 0b00001111
+lower_nibble = flags & mask
+print("Extract lower 4 bits: " + flags + " & " + mask + " = " + lower_nibble)
+print("")
+
+# =============================================================================
+# BITWISE OR (|) - Sets bit to 1 if either operand has 1
+# =============================================================================
+
+print("--- Bitwise OR (|) ---")
+result_or = 12 | 10
+print("12 | 10 = " + result_or)
+print("Binary: 1100 | 1010 = 1110 (14)")
+
+# Use case: Setting specific bits
+settings = 0b00000000
+flag_enabled = 0b00000001
+flag_debug = 0b00000010
+all_flags = settings | flag_enabled | flag_debug
+print("Set flags: " + settings + " | " + flag_enabled + " | " + flag_debug + " = " + all_flags)
+print("")
+
+# =============================================================================
+# BITWISE XOR (^) - Sets bit to 1 if operands differ
+# =============================================================================
+
+print("--- Bitwise XOR (^) ---")
+result_xor = 12 ^ 10
+print("12 ^ 10 = " + result_xor)
+print("Binary: 1100 ^ 1010 = 0110 (6)")
+
+# Use case: Toggle bits
+state = 0b11110000
+toggle_mask = 0b00001111
+toggled = state ^ toggle_mask
+print("Toggle bits: " + state + " ^ " + toggle_mask + " = " + toggled)
+
+# XOR properties: x ^ x = 0, x ^ 0 = x
+same = 42 ^ 42
+with_zero = 42 ^ 0
+print("XOR properties: 42 ^ 42 = " + same + ", 42 ^ 0 = " + with_zero)
+print("")
+
+# =============================================================================
+# BITWISE NOT (~) - Inverts all bits
+# =============================================================================
+
+print("--- Bitwise NOT (~) ---")
+result_not = ~5
+print("~5 = " + result_not)
+print("Inverts all bits (two's complement): ~0101 = ...1010 (-6)")
+
+result_not_neg = ~(-1)
+print("~(-1) = " + result_not_neg)
+
+# Use case: Creating masks
+pattern = 0xFF
+inverted = ~pattern
+print("Invert mask: ~" + pattern + " = " + inverted)
+print("")
+
+# =============================================================================
+# LEFT SHIFT (<<) - Shifts bits left, fills with zeros
+# =============================================================================
+
+print("--- Left Shift (<<) ---")
+result_left = 3 << 2
+print("3 << 2 = " + result_left)
+print("Binary: 0011 << 2 = 1100 (12)")
+
+# Use case: Multiplication by powers of 2
+multiply_by_4 = 7 << 2
+multiply_by_8 = 7 << 3
+print("Fast multiply: 7 << 2 = 7*4 = " + multiply_by_4)
+print("Fast multiply: 7 << 3 = 7*8 = " + multiply_by_8)
+
+# Creating bit positions
+bit_0 = 1 << 0
+bit_3 = 1 << 3
+bit_7 = 1 << 7
+print("Bit positions: (1<<0)=" + bit_0 + ", (1<<3)=" + bit_3 + ", (1<<7)=" + bit_7)
+print("")
+
+# =============================================================================
+# RIGHT SHIFT (>>) - Shifts bits right (signed by default)
+# =============================================================================
+
+print("--- Right Shift (>>) - Signed (Default) ---")
+result_right = 12 >> 2
+print("12 >> 2 = " + result_right)
+print("Binary: 1100 >> 2 = 0011 (3)")
+
+# Use case: Division by powers of 2
+divide_by_4 = 20 >> 2
+divide_by_8 = 64 >> 3
+print("Fast divide: 20 >> 2 = 20/4 = " + divide_by_4)
+print("Fast divide: 64 >> 3 = 64/8 = " + divide_by_8)
+
+# Signed shift preserves sign for negative numbers
+negative_shift = -16 >> 2
+print("Signed: -16 >> 2 = " + negative_shift + " (sign preserved)")
+print("")
+
+# =============================================================================
+# UNSIGNED RIGHT SHIFT
+# =============================================================================
+
+print("--- Right Shift (>>) - Unsigned Mode ---")
+configure { :unsigned } {
+    unsigned_shift = -16 >> 2
+    print("Unsigned: -16 >> 2 = " + unsigned_shift + " (zero-fill)")
+
+    # Positive numbers behave the same
+    pos_shift = 16 >> 2
+    print("Unsigned: 16 >> 2 = " + pos_shift + " (same as signed)")
+}
+print("")
+
+# =============================================================================
+# POWER OPERATOR (**) - Exponentiation (NEW in Phase 13!)
+# =============================================================================
+
+print("--- Power Operator (**) ---")
+power_basic = 2 ** 3
+print("2 ** 3 = " + power_basic)
+
+power_large = 2 ** 10
+print("2 ** 10 = " + power_large)
+
+# Right-associative: 2 ** 3 ** 2 = 2 ** (3 ** 2) = 2 ** 9 = 512
+power_chain = 2 ** 3 ** 2
+print("2 ** 3 ** 2 = " + power_chain + " (right-associative)")
+
+# Negative exponents
+power_negative = 2 ** (-3)
+print("2 ** (-3) = " + power_negative + " (1/8)")
+
+# Fractional exponents (square root)
+square_root = 9 ** 0.5
+print("9 ** 0.5 = " + square_root + " (square root)")
+print("")
+
+# =============================================================================
+# NUMBER LITERALS - Binary and Hexadecimal
+# =============================================================================
+
+print("--- Binary Literals (0b prefix) ---")
+binary_val = 0b1010
+print("0b1010 = " + binary_val)
+
+binary_with_underscores = 0b1111_0000
+print("0b1111_0000 = " + binary_with_underscores + " (underscores for readability)")
+
+print("")
+print("--- Hexadecimal Literals (0x prefix) ---")
+hex_val = 0xFF
+print("0xFF = " + hex_val)
+
+hex_color = 0xFF00AB
+print("0xFF00AB = " + hex_color + " (RGB color value)")
+
+hex_with_underscores = 0xDEAD_BEEF
+print("0xDEAD_BEEF = " + hex_with_underscores)
+print("")
+
+# =============================================================================
+# COMBINING OPERATORS - Practical Examples
+# =============================================================================
+
+print("=== PRACTICAL EXAMPLES ===")
+print("")
+
+# Example 1: Color channel extraction (RGB)
+print("--- RGB Color Extraction ---")
+color = 0xFF4500  # Orange Red
+
+configure { :unsigned } {
+    red = (color >> 16) & 0xFF
+    green = (color >> 8) & 0xFF
+    blue = color & 0xFF
+
+    print("Color: 0xFF4500")
+    print("  Red:   " + red)
+    print("  Green: " + green)
+    print("  Blue:  " + blue)
+}
+print("")
+
+# Example 2: Checking if a bit is set
+print("--- Bit Testing ---")
+permissions = 0b00101101
+read_bit = 1 << 0
+write_bit = 1 << 1
+execute_bit = 1 << 2
+
+has_read = (permissions & read_bit) != 0
+has_write = (permissions & write_bit) != 0
+has_execute = (permissions & execute_bit) != 0
+
+print("Permissions: " + permissions + " (binary: 00101101)")
+print("  Read:    " + has_read)
+print("  Write:   " + has_write)
+print("  Execute: " + has_execute)
+print("")
+
+# Example 3: Setting and clearing bits
+print("--- Bit Manipulation ---")
+status = 0b00000000
+
+# Set bit 2 (add flag)
+status = status | (1 << 2)
+print("After setting bit 2: " + status + " (binary: 00000100)")
+
+# Set bit 5
+status = status | (1 << 5)
+print("After setting bit 5: " + status + " (binary: 00100100)")
+
+# Clear bit 2
+status = status & ~(1 << 2)
+print("After clearing bit 2: " + status + " (binary: 00100000)")
+
+# Toggle bit 5
+status = status ^ (1 << 5)
+print("After toggling bit 5: " + status + " (binary: 00000000)")
+print("")
+
+# Example 4: Fast powers of 2 calculations
+print("--- Powers of 2 (Using Shifts vs **) ---")
+shift_method = 1 << 10
+power_method = 2 ** 10
+print("1 << 10 = " + shift_method)
+print("2 ** 10 = " + power_method)
+print("Both produce: 1024")
+print("")
+
+# Example 5: Bit packing (storing multiple values in one number)
+print("--- Bit Packing ---")
+# Pack three 8-bit values into one 24-bit number
+val_a = 0xFF
+val_b = 0x42
+val_c = 0x13
+
+packed = (val_a << 16) | (val_b << 8) | val_c
+print("Packing values: A=" + val_a + ", B=" + val_b + ", C=" + val_c)
+print("Packed result: " + packed)
+
+# Unpack
+configure { :unsigned } {
+    unpacked_a = (packed >> 16) & 0xFF
+    unpacked_b = (packed >> 8) & 0xFF
+    unpacked_c = packed & 0xFF
+
+    print("Unpacked: A=" + unpacked_a + ", B=" + unpacked_b + ", C=" + unpacked_c)
+}
+print("")
+
+# =============================================================================
+# OPERATOR PRECEDENCE
+# =============================================================================
+
+print("=== OPERATOR PRECEDENCE ===")
+print("")
+
+# & has higher precedence than |
+precedence_test1 = 8 | 4 & 2
+print("8 | 4 & 2 = " + precedence_test1 + " (evaluates as 8 | (4 & 2) = 8)")
+
+# << and >> have lower precedence than arithmetic
+precedence_test2 = 3 << 2 + 1
+print("3 << 2 + 1 = " + precedence_test2 + " (evaluates as 3 << (2+1) = 3 << 3 = 24)")
+
+# ** has higher precedence than multiplication
+precedence_test3 = 2 * 3 ** 2
+print("2 * 3 ** 2 = " + precedence_test3 + " (evaluates as 2 * (3**2) = 2 * 9 = 18)")
+
+# Use parentheses for clarity
+clear_expr = (3 << 2) + 1
+print("(3 << 2) + 1 = " + clear_expr + " (explicit: 12 + 1 = 13)")
+print("")
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+
+print("=== PHASE 13 FEATURES SUMMARY ===")
+print("")
+print("Bitwise Operators:")
+print("  &   - AND (both bits set)")
+print("  |   - OR (either bit set)")
+print("  ^   - XOR (bits differ) - NOTE: Changed from power in earlier phases!")
+print("  ~   - NOT (invert all bits)")
+print("  <<  - Left shift (multiply by 2^n)")
+print("  >>  - Right shift (divide by 2^n, signed by default)")
+print("")
+print("Power Operator:")
+print("  **  - Exponentiation (right-associative)")
+print("")
+print("Number Literals:")
+print("  0b  - Binary prefix (e.g., 0b1010)")
+print("  0x  - Hexadecimal prefix (e.g., 0xFF)")
+print("  _   - Digit separator for readability")
+print("")
+print("Configuration:")
+print("  configure { :unsigned } - Enable unsigned right shift")
+print("")
+print("Common Use Cases:")
+print("  - Bit flags and permissions")
+print("  - Color channel extraction")
+print("  - Fast multiplication/division by powers of 2")
+print("  - Bit packing and unpacking")
+print("  - Masking and toggling bits")
+print("  - Cryptographic operations")
