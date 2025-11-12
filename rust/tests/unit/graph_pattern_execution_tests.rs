@@ -1,7 +1,7 @@
-use graphoid::values::{Graph, GraphType, Value, ValueKind};
-use std::collections::HashMap;
+use graphoid::values::Value;
 
 /// Helper function to create a pattern node value
+#[allow(dead_code)]
 fn create_pattern_node(variable: &str, node_type: Option<&str>) -> Value {
     Value::pattern_node(
         Some(variable.to_string()),
@@ -10,6 +10,7 @@ fn create_pattern_node(variable: &str, node_type: Option<&str>) -> Value {
 }
 
 /// Helper function to create a pattern edge value
+#[allow(dead_code)]
 fn create_pattern_edge(edge_type: Option<&str>, direction: Option<&str>) -> Value {
     Value::pattern_edge(
         edge_type.map(|s| s.to_string()),

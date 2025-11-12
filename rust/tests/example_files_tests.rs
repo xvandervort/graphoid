@@ -1,12 +1,12 @@
 use std::process::Command;
 
-/// Integration tests for example .gr files
-/// These tests verify that all example files execute successfully
+/// Integration tests for sample .gr files
+/// These tests verify that all sample files execute successfully
 
 #[test]
 fn test_example_hello_world() {
     let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
-        .arg("examples/hello_world.gr")
+        .arg("samples/hello_world.gr")
         .output()
         .expect("Failed to execute hello_world.gr");
 
@@ -25,7 +25,7 @@ fn test_example_hello_world() {
 #[test]
 fn test_example_behaviors() {
     let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
-        .arg("examples/behaviors.gr")
+        .arg("samples/behaviors.gr")
         .output()
         .expect("Failed to execute behaviors.gr");
 
@@ -46,7 +46,7 @@ fn test_example_behaviors() {
 #[test]
 fn test_example_collections() {
     let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
-        .arg("examples/collections.gr")
+        .arg("samples/collections.gr")
         .output()
         .expect("Failed to execute collections.gr");
 
@@ -67,7 +67,7 @@ fn test_example_collections() {
 #[test]
 fn test_example_modules_basic() {
     let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
-        .arg("examples/modules_basic.gr")
+        .arg("samples/modules_basic.gr")
         .output()
         .expect("Failed to execute modules_basic.gr");
 
@@ -86,7 +86,7 @@ fn test_example_modules_basic() {
 #[test]
 fn test_example_modules_main() {
     let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
-        .arg("examples/modules_main.gr")
+        .arg("samples/modules_main.gr")
         .output()
         .expect("Failed to execute modules_main.gr");
 
@@ -114,7 +114,7 @@ fn test_example_modules_main() {
 #[test]
 fn test_example_functions() {
     let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
-        .arg("examples/functions.gr")
+        .arg("samples/functions.gr")
         .output()
         .expect("Failed to execute functions.gr");
 
@@ -134,7 +134,7 @@ fn test_example_functions() {
 #[test]
 fn test_example_graphs() {
     let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
-        .arg("examples/graphs.gr")
+        .arg("samples/graphs.gr")
         .output()
         .expect("Failed to execute graphs.gr");
 
@@ -155,7 +155,7 @@ fn test_example_graphs() {
 #[test]
 fn test_modules_example_demonstrates_all_features() {
     let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
-        .arg("examples/modules_main.gr")
+        .arg("samples/modules_main.gr")
         .output()
         .expect("Failed to execute modules_main.gr");
 

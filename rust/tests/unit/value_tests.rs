@@ -53,8 +53,8 @@ fn test_create_list() {
 #[test]
 fn test_create_map() {
     let mut hash = Hash::new();
-    hash.insert("name".to_string(), Value::string("Alice".to_string()));
-    hash.insert("age".to_string(), Value::number(30.0));
+    let _ = hash.insert("name".to_string(), Value::string("Alice".to_string()));
+    let _ = hash.insert("age".to_string(), Value::number(30.0));
     let val = Value::map(hash);
     assert!(matches!(val.kind, ValueKind::Map(_)));
     assert_eq!(val.type_name(), "map");
@@ -142,7 +142,7 @@ fn test_truthiness_map() {
     assert!(!empty_map.is_truthy());
 
     let mut hash = Hash::new();
-    hash.insert("key".to_string(), Value::number(1.0));
+    let _ = hash.insert("key".to_string(), Value::number(1.0));
     let non_empty_map = Value::map(hash);
     assert!(non_empty_map.is_truthy());
 }
@@ -216,7 +216,7 @@ fn test_to_string_value_list() {
 #[test]
 fn test_to_string_value_map() {
     let mut hash = Hash::new();
-    hash.insert("a".to_string(), Value::number(1.0));
+    let _ = hash.insert("a".to_string(), Value::number(1.0));
     let val = Value::map(hash);
     let s = val.to_string_value();
     assert!(s.starts_with("{") && s.ends_with("}"));
@@ -252,7 +252,7 @@ fn test_frozen_list_propagates() {
 #[test]
 fn test_frozen_map_propagates() {
     let mut hash = Hash::new();
-    hash.insert("key".to_string(), Value::number(1.0));
+    let _ = hash.insert("key".to_string(), Value::number(1.0));
     let mut val = Value::map(hash);
 
     val.freeze();

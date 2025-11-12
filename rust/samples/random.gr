@@ -1,0 +1,106 @@
+# Random Module Demo
+# Demonstrates using the native random module
+
+print("=== Graphoid Random Module Demo ===")
+print("")
+
+# Import random module (can use full name or 'rand' alias)
+import "random"
+
+print("Basic Random Numbers:")
+r1 = rand.random()
+r2 = rand.random()
+r3 = rand.random()
+print("  random() = " + r1 + " (float in [0.0, 1.0))")
+print("  random() = " + r2)
+print("  random() = " + r3)
+print("")
+
+print("Random Integers:")
+dice1 = rand.randint(1, 6)
+dice2 = rand.randint(1, 6)
+dice3 = rand.randint(1, 6)
+print("  Roll die: " + dice1)
+print("  Roll die: " + dice2)
+print("  Roll die: " + dice3)
+print("  Total: " + (dice1 + dice2 + dice3))
+print("")
+
+print("Uniform Distribution (floats):")
+temp1 = rand.uniform(20.0, 30.0)
+temp2 = rand.uniform(20.0, 30.0)
+temp3 = rand.uniform(20.0, 30.0)
+print("  Temperature: " + temp1 + "°C")
+print("  Temperature: " + temp2 + "°C")
+print("  Temperature: " + temp3 + "°C")
+print("")
+
+print("Random Choice:")
+colors = ["red", "blue", "green", "yellow", "purple"]
+c1 = rand.choice(colors)
+c2 = rand.choice(colors)
+c3 = rand.choice(colors)
+print("  Random color: " + c1)
+print("  Random color: " + c2)
+print("  Random color: " + c3)
+print("")
+
+print("Random Sample (without replacement):")
+numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+lottery = rand.sample(numbers, 3)
+print("  Lottery numbers: " + lottery)
+print("")
+
+print("Shuffle:")
+deck = ["A", "K", "Q", "J", "10"]
+shuffled = rand.shuffle(deck)
+print("  Original deck: [A, K, Q, J, 10]")
+print("  Shuffled deck: " + shuffled)
+print("")
+
+print("Normal Distribution:")
+n1 = rand.normal(100.0, 15.0)
+n2 = rand.normal(100.0, 15.0)
+n3 = rand.normal(100.0, 15.0)
+print("  IQ score: " + n1 + " (mean=100, std=15)")
+print("  IQ score: " + n2)
+print("  IQ score: " + n3)
+print("")
+
+print("Exponential Distribution:")
+e1 = rand.exponential(0.5)
+e2 = rand.exponential(0.5)
+print("  Wait time: " + e1 + " minutes (lambda=0.5)")
+print("  Wait time: " + e2 + " minutes")
+print("")
+
+print("Deterministic (Seeded) Random:")
+rand.seed(42)
+d1 = rand.det_random()
+d2 = rand.det_random()
+rand.seed(42)
+d3 = rand.det_random()
+d4 = rand.det_random()
+print("  With seed 42, first value: " + d1)
+print("  With seed 42, second value: " + d2)
+print("  Re-seed 42, first value: " + d3 + " (same as " + d1 + ")")
+print("  Re-seed 42, second value: " + d4 + " (same as " + d2 + ")")
+print("")
+
+print("UUID Generation:")
+id1 = rand.uuid4()
+id2 = rand.uuid4()
+id3 = rand.uuid4()
+print("  UUID: " + id1)
+print("  UUID: " + id2)
+print("  UUID: " + id3)
+print("")
+
+print("Secure Tokens:")
+hex_token = rand.token(16)
+url_token = rand.token_urlsafe(16)
+print("  Hex token (16 bytes): " + hex_token)
+print("  URL-safe token (16 bytes): " + url_token)
+print("")
+
+print("=== Demo Complete ===")

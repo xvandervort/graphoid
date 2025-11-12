@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use crate::error::{Result, GraphoidError, SourcePosition};
 use crate::execution::environment::Environment;
+use crate::stdlib::NativeModule;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module {
@@ -45,11 +46,14 @@ pub struct ModuleManager {
 
     /// Module search paths
     search_paths: Vec<PathBuf>,
+
+    /// Native modules: name → NativeModule
+    native_modules: HashMap<String, Box<dyn NativeModule>>,
 }
 
 impl ModuleManager {
     pub fn new() -> Self {
-        Self {
+        let mut manager = Self {
             modules: HashMap::new(),
             import_stack: Vec::new(),
             loading: HashSet::new(),
@@ -58,7 +62,56 @@ impl ModuleManager {
                 PathBuf::from("lib"),
                 Self::get_stdlib_path(),
             ],
-        }
+            native_modules: HashMap::new(),
+        };
+
+        // Register built-in native modules
+        manager.register_native_modules();
+        manager
+    }
+
+    /// Register all built-in native modules
+    fn register_native_modules(&mut self) {
+        use crate::stdlib::{ConstantsModule, RandomModule};
+
+        self.register_native_module(Box::new(ConstantsModule));
+        self.register_native_module(Box::new(RandomModule::new()));
+    }
+
+    /// Register a native module
+    pub fn register_native_module(&mut self, module: Box<dyn NativeModule>) {
+        let name = module.name().to_string();
+        self.native_modules.insert(name, module);
+    }
+
+    /// Check if a module name refers to a native module
+    pub fn is_native_module(&self, name: &str) -> bool {
+        self.native_modules.contains_key(name)
+    }
+
+    /// Get a native module's environment (constants and functions as bindings)
+    pub fn get_native_module_env(&self, name: &str) -> Option<(Environment, Option<String>)> {
+        self.native_modules.get(name).map(|module| {
+            let mut env = Environment::new();
+
+            // Add all constants
+            for (const_name, value) in module.constants() {
+                env.define(const_name, value);
+            }
+
+            // Add all functions wrapped as NativeFunction values
+            for (func_name, func) in module.functions() {
+                use crate::values::{Value, ValueKind};
+                let func_value = Value {
+                    kind: ValueKind::NativeFunction(func),
+                    frozen: false,
+                };
+                env.define(func_name, func_value);
+            }
+
+            // Return environment and alias
+            (env, module.alias().map(|s| s.to_string()))
+        })
     }
 
     pub fn search_paths(&self) -> &[PathBuf] {

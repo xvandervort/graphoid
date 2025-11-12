@@ -4,17 +4,18 @@ use graphoid::execution::Executor;
 use graphoid::lexer::Lexer;
 use graphoid::parser::Parser;
 
+#[allow(dead_code)]
 fn eval_source(source: &str) -> Result<String, String> {
     let mut lexer = Lexer::new(source);
     let tokens = lexer.tokenize().map_err(|e| e.to_string())?;
     let mut parser = Parser::new(tokens);
     let program = parser.parse().map_err(|e| e.to_string())?;
-    
+
     let mut executor = Executor::new();
     for stmt in &program.statements {
         executor.eval_stmt(stmt).map_err(|e| e.to_string())?;
     }
-    
+
     Ok("success".to_string())
 }
 

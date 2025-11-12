@@ -996,6 +996,10 @@ impl Executor {
                 // Evaluate argument expressions
                 let arg_values = self.eval_arguments(args)?;
                 return self.call_function(&func, &arg_values);
+            } else if let ValueKind::NativeFunction(native_func) = &member.kind {
+                // Native function - call it with evaluated args
+                let arg_values = self.eval_arguments(args)?;
+                return native_func(&arg_values);
             } else {
                 // If it's a variable and no args, return it directly
                 if args.is_empty() {
@@ -4866,7 +4870,33 @@ impl Executor {
     fn load_module(&mut self, module_path: &str, _alias: Option<&String>) -> Result<Value> {
         use std::fs;
 
-        // Resolve the module path
+        // Check for native modules first (before file resolution)
+        if self.module_manager.is_native_module(module_path) {
+            // Check if already cached
+            let cache_key = format!("native:{}", module_path);
+            if let Some(module) = self.module_manager.get_module(&cache_key) {
+                return Ok(Value::module(module.clone()));
+            }
+
+            // Load native module
+            if let Some((native_env, native_alias)) = self.module_manager.get_native_module_env(module_path) {
+                let module = Module {
+                    name: module_path.to_string(),
+                    alias: native_alias,
+                    namespace: native_env,
+                    file_path: PathBuf::from(format!("<native:{}>", module_path)),
+                    config: None,
+                    private_symbols: std::collections::HashSet::new(),
+                };
+
+                // Cache native module
+                self.module_manager.register_module(cache_key, module.clone());
+
+                return Ok(Value::module(module));
+            }
+        }
+
+        // Resolve the module path for file-based modules
         let resolved_path = if let Some(ref current) = self.current_file {
             self.module_manager.resolve_module_path(module_path, Some(current))?
         } else {

@@ -371,7 +371,7 @@ impl<'a> IntoIterator for &'a PatternMatchResults {
 }
 
 /// The actual data/kind of a value
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum ValueKind {
     /// Numeric value (64-bit floating point)
     Number(f64),
@@ -389,6 +389,8 @@ pub enum ValueKind {
     Map(Hash),
     /// Function value (Phase 4)
     Function(Function),
+    /// Native function (Phase 11) - Rust-implemented stdlib function
+    NativeFunction(crate::stdlib::NativeFunction),
     /// Graph value (Phase 6)
     Graph(Graph),
     /// Module value (Phase 8) - imported module namespace
@@ -403,6 +405,32 @@ pub enum ValueKind {
     PatternPath(PatternPath),
     /// Pattern match results (Phase 9) - results from graph pattern matching
     PatternMatchResults(PatternMatchResults),
+}
+
+// Manual PartialEq implementation for ValueKind
+// NativeFunction cannot be compared (function pointers don't have meaningful equality)
+impl PartialEq for ValueKind {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ValueKind::Number(a), ValueKind::Number(b)) => a == b,
+            (ValueKind::String(a), ValueKind::String(b)) => a == b,
+            (ValueKind::Boolean(a), ValueKind::Boolean(b)) => a == b,
+            (ValueKind::None, ValueKind::None) => true,
+            (ValueKind::Symbol(a), ValueKind::Symbol(b)) => a == b,
+            (ValueKind::List(a), ValueKind::List(b)) => a == b,
+            (ValueKind::Map(a), ValueKind::Map(b)) => a == b,
+            (ValueKind::Function(a), ValueKind::Function(b)) => a == b,
+            (ValueKind::NativeFunction(_), ValueKind::NativeFunction(_)) => false, // Never equal
+            (ValueKind::Graph(a), ValueKind::Graph(b)) => a == b,
+            (ValueKind::Module(a), ValueKind::Module(b)) => a == b,
+            (ValueKind::Error(a), ValueKind::Error(b)) => a == b,
+            (ValueKind::PatternNode(a), ValueKind::PatternNode(b)) => a == b,
+            (ValueKind::PatternEdge(a), ValueKind::PatternEdge(b)) => a == b,
+            (ValueKind::PatternPath(a), ValueKind::PatternPath(b)) => a == b,
+            (ValueKind::PatternMatchResults(a), ValueKind::PatternMatchResults(b)) => a == b,
+            _ => false, // Different variants are not equal
+        }
+    }
 }
 
 /// A value with freeze tracking
@@ -517,6 +545,7 @@ impl Value {
             ValueKind::Map(h) => !h.is_empty(),
             ValueKind::Symbol(_) => true,
             ValueKind::Function(_) => true, // Functions are always truthy
+            ValueKind::NativeFunction(_) => true, // Native functions are always truthy
             ValueKind::Graph(g) => g.node_count() > 0,
             ValueKind::Module(_) => true, // Modules are always truthy
             ValueKind::Error(_) => true, // Errors are always truthy
@@ -572,6 +601,9 @@ impl Value {
                     format!("<lambda({})>", func.params.join(", "))
                 }
             }
+            ValueKind::NativeFunction(_) => {
+                "<native function>".to_string()
+            }
             ValueKind::Graph(g) => {
                 format!("<graph: {} nodes, {} edges>", g.node_count(), g.edge_count())
             }
@@ -614,6 +646,7 @@ impl Value {
             ValueKind::List(_) => "list",
             ValueKind::Map(_) => "map",
             ValueKind::Function(_) => "function",
+            ValueKind::NativeFunction(_) => "function",
             ValueKind::Graph(_) => "graph",
             ValueKind::Module(_) => "module",
             ValueKind::Error(_) => "error",

@@ -1,0 +1,74 @@
+# Constants Module Demo
+# Demonstrates using the native constants module
+
+print("=== Graphoid Constants Module Demo ===")
+print("")
+
+# Import constants module (can use full name or alias)
+import "constants"
+
+print("Mathematical Constants:")
+print("  π (pi) = " + const.pi)
+print("  e = " + const.e)
+print("  τ (tau) = " + const.tau)
+print("  φ (phi, golden ratio) = " + const.phi)
+print("  √2 = " + const.sqrt2)
+print("  √3 = " + const.sqrt3)
+print("")
+
+print("Logarithmic Constants:")
+print("  ln(2) = " + const.ln2)
+print("  ln(10) = " + const.ln10)
+print("  log₂(e) = " + const.log2e)
+print("  log₁₀(e) = " + const.log10e)
+print("")
+
+print("Angle Conversion Constants:")
+print("  Degrees to Radians = " + const.deg_to_rad)
+print("  Radians to Degrees = " + const.rad_to_deg)
+print("")
+
+print("Physical Constants:")
+print("  c (speed of light) = " + const.c + " m/s")
+print("  G (gravitational constant) = " + const.G + " N⋅m²/kg²")
+print("  h (Planck constant) = " + const.h + " J⋅s")
+print("")
+
+# Use constants in calculations
+print("=== Example Calculations ===")
+print("")
+
+# Circle calculations
+radius = 5.0
+circumference = 2.0 * const.pi * radius
+area = const.pi * radius * radius
+print("Circle with radius " + radius + ":")
+print("  Circumference = " + circumference)
+print("  Area = " + area)
+print("")
+
+# Convert 90 degrees to radians
+degrees = 90.0
+radians = degrees * const.deg_to_rad
+print("Angle Conversion:")
+print("  " + degrees + "° = " + radians + " radians")
+print("")
+
+# Golden ratio properties
+print("Golden Ratio Properties:")
+phi = const.phi
+phi_squared = phi * phi
+phi_plus_one = phi + 1.0
+print("  φ = " + phi)
+print("  φ² = " + phi_squared)
+print("  φ + 1 = " + phi_plus_one)
+print("  (φ² ≈ φ + 1)")
+print("")
+
+# Using e
+print("Exponential:")
+print("  e = " + const.e)
+print("  e² ≈ " + (const.e * const.e))
+print("")
+
+print("=== Demo Complete ===")
