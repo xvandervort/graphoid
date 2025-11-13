@@ -1,0 +1,112 @@
+# I/O Module - High-level file operations
+# Built on fs primitives (fs.open, fs.read, fs.write, fs.close)
+#
+# Functions:
+# - read_file(path) -> string - Read entire file
+# - write_file(path, content) -> bool - Write to file
+# - append_file(path, content) -> bool - Append to file
+# - read_lines(path) -> list - Read file as list of lines
+# - write_lines(path, lines) -> bool - Write list of lines to file
+
+import "fs"
+
+# Read entire file as string
+fn read_file(path) {
+    fh = fs.open(path, "r")
+
+    # Read in chunks until we get everything
+    # (assuming reasonable file size, read 1MB at a time)
+    content = ""
+    chunk_size = 1048576  # 1MB
+
+    while true {
+        chunk = fs.read(fh, chunk_size)
+        if chunk == "" {
+            break
+        }
+        content = content + chunk
+    }
+
+    fs.close(fh)
+    return content
+}
+
+# Write string to file (overwrites existing)
+fn write_file(path, content) {
+    fh = fs.open(path, "w")
+    fs.write(fh, content)
+    fs.close(fh)
+    return true
+}
+
+# Append string to file
+fn append_file(path, content) {
+    fh = fs.open(path, "a")
+    fs.write(fh, content)
+    fs.close(fh)
+    return true
+}
+
+# Read file as list of lines
+fn read_lines(path) {
+    content = read_file(path)
+    lines = []
+    current_line = ""
+
+    i = 0
+    size = content.size()
+
+    while i < size {
+        char = content[i]
+
+        if char == "\n" {
+            lines = lines.append(current_line)
+            current_line = ""
+        } else {
+            # Handle Windows line endings (\r\n)
+            if char == "\r" {
+                if i + 1 < size {
+                    next_char = content[i + 1]
+                    if next_char == "\n" {
+                        lines = lines.append(current_line)
+                        current_line = ""
+                        i = i + 1  # Skip the \n
+                    } else {
+                        current_line = current_line + char
+                    }
+                } else {
+                    lines = lines.append(current_line)
+                    current_line = ""
+                }
+            } else {
+                current_line = current_line + char
+            }
+        }
+
+        i = i + 1
+    }
+
+    # Add final line if there's content without trailing newline
+    if current_line != "" {
+        lines = lines.append(current_line)
+    }
+
+    return lines
+}
+
+# Write list of lines to file (adds newlines)
+fn write_lines(path, lines) {
+    content = ""
+
+    # Build content string from lines
+    i = 0
+    size = lines.size()
+
+    while i < size {
+        line = lines[i]
+        content = content + line + "\n"
+        i = i + 1
+    }
+
+    return write_file(path, content)
+}

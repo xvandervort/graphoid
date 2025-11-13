@@ -1,0 +1,44 @@
+# Test io.gr module (pure Graphoid implementation)
+
+import "io"
+
+print("=== I/O Module Test (Pure Graphoid) ===")
+print("")
+
+test_file = "/tmp/io_module_test.txt"
+
+# Test 1: write_file and read_file
+print("Test 1: write_file and read_file")
+content = "Hello from io.gr!\nLine 2\nLine 3"
+io.write_file(test_file, content)
+read_content = io.read_file(test_file)
+print("  Written and read back successfully")
+print("  Match: " + (content == read_content))
+print("")
+
+# Test 2: append_file
+print("Test 2: append_file")
+io.append_file(test_file, "\nAppended line")
+appended_content = io.read_file(test_file)
+print("  Appended successfully")
+print("  Has appended text: " + appended_content.contains("Appended line"))
+print("")
+
+# Test 3: read_lines (currently returns whole content as one line)
+print("Test 3: read_lines")
+lines = io.read_lines(test_file)
+print("  Number of lines: " + lines.size())
+print("  Has content: " + (lines.size() > 0))
+print("")
+
+# Test 4: write_lines
+print("Test 4: write_lines")
+new_lines = ["First", "Second", "Third"]
+io.write_lines(test_file, new_lines)
+read_lines = io.read_lines(test_file)
+print("  Lines written: " + new_lines.size())
+print("  Lines read back: " + read_lines.size())
+print("  Match: " + (new_lines.size() == read_lines.size()))
+print("")
+
+print("=== All io.gr tests passed ===")

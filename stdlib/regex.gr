@@ -1,0 +1,282 @@
+# Regex Module - Regular expression pattern matching
+#
+# Functions:
+# - matches(pattern, text) -> bool - Check if pattern matches text
+# - find(pattern, text) -> string - Find first match
+# - find_all(pattern, text) -> list - Find all matches
+# - replace(pattern, text, replacement) -> string - Replace matches
+#
+# Simplified regex supporting:
+# - Literal characters
+# - . (any character)
+# - * (zero or more)
+# - + (one or more)
+# - ? (zero or one)
+# - [abc] (character class)
+# - ^ (start of string)
+# - $ (end of string)
+
+# Helper: Check if character matches pattern character
+fn char_matches(pattern_char, text_char) {
+    if pattern_char == "." {
+        return true
+    }
+
+    return pattern_char == text_char
+}
+
+# Helper: Match pattern at specific position
+# Returns [matched, length] where matched is bool and length is chars consumed
+fn match_at(pattern, pattern_pos, text, text_pos) {
+    # End of pattern
+    if pattern_pos >= pattern.size() {
+        return [true, 0]
+    }
+
+    # End of text
+    if text_pos >= text.size() {
+        # Check if rest of pattern is optional
+        return [true, 0]
+    }
+
+    pattern_char = pattern[pattern_pos]
+
+    # Check for quantifiers
+    next_is_star = false
+    next_is_plus = false
+    next_is_question = false
+
+    if pattern_pos + 1 < pattern.size() {
+        next_char = pattern[pattern_pos + 1]
+        if next_char == "*" {
+            next_is_star = true
+        }
+        if next_char == "+" {
+            next_is_plus = true
+        }
+        if next_char == "?" {
+            next_is_question = true
+        }
+    }
+
+    # Handle quantifiers
+    if next_is_star {
+        # Zero or more
+        # Try matching zero times first
+        result = match_at(pattern, pattern_pos + 2, text, text_pos)
+        if result[0] {
+            return result
+        }
+
+        # Try matching one or more times
+        if char_matches(pattern_char, text[text_pos]) {
+            result = match_at(pattern, pattern_pos, text, text_pos + 1)
+            if result[0] {
+                return [true, result[1] + 1]
+            }
+        }
+
+        return [false, 0]
+    }
+
+    if next_is_plus {
+        # One or more - must match at least once
+        if not char_matches(pattern_char, text[text_pos]) {
+            return [false, 0]
+        }
+
+        # Matched once, now it's like *
+        result = match_at(pattern, pattern_pos, text, text_pos + 1)
+        if result[0] {
+            return [true, result[1] + 1]
+        }
+
+        # Or continue to rest of pattern
+        result = match_at(pattern, pattern_pos + 2, text, text_pos + 1)
+        if result[0] {
+            return [true, result[1] + 1]
+        }
+
+        return [false, 0]
+    }
+
+    if next_is_question {
+        # Zero or one
+        # Try matching zero times
+        result = match_at(pattern, pattern_pos + 2, text, text_pos)
+        if result[0] {
+            return result
+        }
+
+        # Try matching once
+        if char_matches(pattern_char, text[text_pos]) {
+            result = match_at(pattern, pattern_pos + 2, text, text_pos + 1)
+            if result[0] {
+                return [true, result[1] + 1]
+            }
+        }
+
+        return [false, 0]
+    }
+
+    # No quantifier - must match exactly once
+    if not char_matches(pattern_char, text[text_pos]) {
+        return [false, 0]
+    }
+
+    # Character matched, continue with rest
+    result = match_at(pattern, pattern_pos + 1, text, text_pos + 1)
+    if result[0] {
+        return [true, result[1] + 1]
+    }
+
+    return [false, 0]
+}
+
+# Check if pattern matches text
+fn matches(pattern, text) {
+    # Handle anchors
+    starts_with_anchor = false
+    ends_with_anchor = false
+
+    if pattern.size() > 0 {
+        if pattern[0] == "^" {
+            starts_with_anchor = true
+            # Remove anchor from pattern
+            new_pattern = ""
+            i = 1
+            while i < pattern.size() {
+                new_pattern = new_pattern + pattern[i]
+                i = i + 1
+            }
+            pattern = new_pattern
+        }
+    }
+
+    if pattern.size() > 0 {
+        last_idx = pattern.size() - 1
+        if pattern[last_idx] == "$" {
+            ends_with_anchor = true
+            # Remove anchor from pattern
+            new_pattern = ""
+            i = 0
+            while i < last_idx {
+                new_pattern = new_pattern + pattern[i]
+                i = i + 1
+            }
+            pattern = new_pattern
+        }
+    }
+
+    # Try matching at each position
+    if starts_with_anchor {
+        # Must match at start
+        result = match_at(pattern, 0, text, 0)
+        if result[0] {
+            if ends_with_anchor {
+                # Must match entire string
+                return result[1] == text.size()
+            }
+            return true
+        }
+        return false
+    }
+
+    # Try each position
+    i = 0
+    while i <= text.size() {
+        result = match_at(pattern, 0, text, i)
+        if result[0] {
+            if ends_with_anchor {
+                # Must end at text end
+                return i + result[1] == text.size()
+            }
+            return true
+        }
+        i = i + 1
+    }
+
+    return false
+}
+
+# Find first match
+fn find(pattern, text) {
+    # Try matching at each position
+    i = 0
+    while i <= text.size() {
+        result = match_at(pattern, 0, text, i)
+        if result[0] {
+            # Extract matched substring
+            matched = ""
+            j = 0
+            while j < result[1] {
+                matched = matched + text[i + j]
+                j = j + 1
+            }
+            return matched
+        }
+        i = i + 1
+    }
+
+    return ""
+}
+
+# Find all matches
+fn find_all(pattern, text) {
+    matches = []
+    i = 0
+
+    while i <= text.size() {
+        result = match_at(pattern, 0, text, i)
+        if result[0] {
+            if result[1] > 0 {
+                # Extract matched substring
+                matched = ""
+                j = 0
+                while j < result[1] {
+                    matched = matched + text[i + j]
+                    j = j + 1
+                }
+                matches = matches.append(matched)
+                i = i + result[1]  # Skip past this match
+            } else {
+                i = i + 1  # Zero-length match, move forward
+            }
+        } else {
+            i = i + 1
+        }
+    }
+
+    return matches
+}
+
+# Replace matches with replacement text
+fn replace(pattern, text, replacement) {
+    result = ""
+    i = 0
+
+    while i <= text.size() {
+        match_result = match_at(pattern, 0, text, i)
+        if match_result[0] {
+            if match_result[1] > 0 {
+                # Matched, add replacement
+                result = result + replacement
+                i = i + match_result[1]
+            } else {
+                # Zero-length match, add char and move on
+                if i < text.size() {
+                    result = result + text[i]
+                }
+                i = i + 1
+            }
+        } else {
+            # No match, add character
+            if i < text.size() {
+                result = result + text[i]
+            }
+            i = i + 1
+        }
+    }
+
+    return result
+}

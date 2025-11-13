@@ -1,0 +1,278 @@
+# HTTP Module - HTTP client implementation
+# Built on net module for TCP socket operations
+#
+# Functions:
+# - get(url) -> response - Perform HTTP GET request
+# - post(url, body, content_type) -> response - Perform HTTP POST request
+# - parse_url(url) -> {host, port, path} - Parse URL into components
+# - parse_response(response_text) -> {status, headers, body} - Parse HTTP response
+
+import "net"
+
+# Parse URL into components
+fn parse_url(url) {
+    # Simple URL parsing for http://host:port/path
+    # Remove http:// or https:// prefix
+    cleaned = url
+
+    # Check for http://
+    if url.size() > 7 {
+        if url[0] == "h" {
+            if url[1] == "t" {
+                if url[2] == "t" {
+                    if url[3] == "p" {
+                        if url[4] == ":" {
+                            if url[5] == "/" {
+                                if url[6] == "/" {
+                                    # Found http://
+                                    cleaned = ""
+                                    i = 7
+                                    while i < url.size() {
+                                        cleaned = cleaned + url[i]
+                                        i = i + 1
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    # Check for https://
+    if url.size() > 8 {
+        if url[0] == "h" {
+            if url[1] == "t" {
+                if url[2] == "t" {
+                    if url[3] == "p" {
+                        if url[4] == "s" {
+                            if url[5] == ":" {
+                                if url[6] == "/" {
+                                    if url[7] == "/" {
+                                        # Found https://
+                                        cleaned = ""
+                                        i = 8
+                                        while i < url.size() {
+                                            cleaned = cleaned + url[i]
+                                            i = i + 1
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    # Find first slash for path
+    path_start = 0 - 1
+    i = 0
+    while i < cleaned.size() {
+        if cleaned[i] == "/" {
+            path_start = i
+            i = cleaned.size()  # Break
+        }
+        i = i + 1
+    }
+
+    host = ""
+    port = 80
+    path = "/"
+
+    if path_start < 0 {
+        # No path, entire thing is host:port
+        host = cleaned
+    } else {
+        # Extract host and path
+        i = 0
+        while i < path_start {
+            host = host + cleaned[i]
+            i = i + 1
+        }
+
+        # Extract path
+        path = ""
+        i = path_start
+        while i < cleaned.size() {
+            path = path + cleaned[i]
+            i = i + 1
+        }
+    }
+
+    # Check for port in host
+    port_start = 0 - 1
+    i = 0
+    while i < host.size() {
+        if host[i] == ":" {
+            port_start = i
+            i = host.size()  # Break
+        }
+        i = i + 1
+    }
+
+    if port_start >= 0 {
+        # Extract port
+        host_only = ""
+        i = 0
+        while i < port_start {
+            host_only = host_only + host[i]
+            i = i + 1
+        }
+
+        # Port string (simplified - just use default 80 for now)
+        # TODO: Need string-to-number conversion
+        port = 80
+
+        host = host_only
+    }
+
+    return {
+        "host": host,
+        "port": port,
+        "path": path
+    }
+}
+
+# Parse HTTP response
+fn parse_response(response_text) {
+    lines = []
+    current_line = ""
+    i = 0
+    size = response_text.size()
+
+    # Split into lines
+    while i < size {
+        char = response_text[i]
+
+        if char == "\n" {
+            lines = lines.append(current_line)
+            current_line = ""
+        } else {
+            if char != "\r" {
+                current_line = current_line + char
+            }
+        }
+
+        i = i + 1
+    }
+
+    if current_line != "" {
+        lines = lines.append(current_line)
+    }
+
+    # Parse status line
+    status = 0
+    if lines.size() > 0 {
+        status_line = lines[0]
+        # Extract status code (simplified)
+        status = 200  # Default
+    }
+
+    # Find empty line separating headers and body
+    body_start = 0 - 1
+    i = 0
+    while i < lines.size() {
+        if lines[i] == "" {
+            body_start = i + 1
+            i = lines.size()  # Break
+        }
+        i = i + 1
+    }
+
+    # Extract body
+    body = ""
+    if body_start >= 0 {
+        i = body_start
+        while i < lines.size() {
+            if i > body_start {
+                body = body + "\n"
+            }
+            body = body + lines[i]
+            i = i + 1
+        }
+    }
+
+    return {
+        "status": status,
+        "headers": {},
+        "body": body
+    }
+}
+
+# Perform HTTP GET request
+fn get(url) {
+    parsed = parse_url(url)
+    host = parsed["host"]
+    port = parsed["port"]
+    path = parsed["path"]
+
+    # Connect to server
+    socket = net.connect(host, port)
+
+    # Build HTTP request
+    request = "GET " + path + " HTTP/1.1\r\n"
+    request = request + "Host: " + host + "\r\n"
+    request = request + "Connection: close\r\n"
+    request = request + "\r\n"
+
+    # Send request
+    net.send(socket, request)
+
+    # Receive response
+    response = ""
+    while true {
+        chunk = net.recv(socket, 4096)
+        if chunk == "" {
+            break
+        }
+        response = response + chunk
+    }
+
+    # Close connection
+    net.close(socket)
+
+    # Parse and return response
+    return parse_response(response)
+}
+
+# Perform HTTP POST request
+fn post(url, body, content_type) {
+    parsed = parse_url(url)
+    host = parsed["host"]
+    port = parsed["port"]
+    path = parsed["path"]
+
+    # Connect to server
+    socket = net.connect(host, port)
+
+    # Build HTTP request
+    request = "POST " + path + " HTTP/1.1\r\n"
+    request = request + "Host: " + host + "\r\n"
+    request = request + "Content-Type: " + content_type + "\r\n"
+    request = request + "Content-Length: " + body.size() + "\r\n"
+    request = request + "Connection: close\r\n"
+    request = request + "\r\n"
+    request = request + body
+
+    # Send request
+    net.send(socket, request)
+
+    # Receive response
+    response = ""
+    while true {
+        chunk = net.recv(socket, 4096)
+        if chunk == "" {
+            break
+        }
+        response = response + chunk
+    }
+
+    # Close connection
+    net.close(socket)
+
+    # Parse and return response
+    return parse_response(response)
+}

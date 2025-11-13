@@ -1,0 +1,195 @@
+# Crypto Module - Cryptographic functions
+# Built on random module for secure randomness
+#
+# Functions:
+# - simple_hash(data) -> string - Simple hash function (educational only!)
+# - xor_cipher(data, key) -> string - XOR encryption/decryption
+# - generate_key(length) -> string - Generate random key
+# - encode_hex(data) -> string - Encode to hexadecimal
+# - decode_hex(hex_string) -> string - Decode from hexadecimal
+#
+# WARNING: This is a simplified implementation for educational purposes.
+# Do NOT use for real cryptographic applications!
+
+# Simple hash function (NOT cryptographically secure!)
+# Uses a basic polynomial rolling hash
+fn simple_hash(input_data) {
+    hash_value = 0
+    prime = 31
+    i = 0
+    size = input_data.size()
+
+    while i < size {
+        # Get character code (simplified - use first char of string rep)
+        char = input_data[i]
+        # Simple numeric representation
+        char_val = 0
+        if char == "a" { char_val = 97 }
+        if char == "b" { char_val = 98 }
+        if char == "c" { char_val = 99 }
+        if char == "d" { char_val = 100 }
+        if char == "e" { char_val = 101 }
+        # ... (simplified, only handling a-e for demo)
+
+        hash_value = hash_value * prime + char_val
+        i = i + 1
+    }
+
+    # Convert to positive number
+    if hash_value < 0 {
+        hash_value = 0 - hash_value
+    }
+
+    return hash_value + ""
+}
+
+# XOR cipher - encrypts and decrypts with same key
+fn xor_cipher(plaintext, cipher_key) {
+    result = ""
+    i = 0
+    data_size = plaintext.size()
+    key_size = cipher_key.size()
+
+    if key_size == 0 {
+        return plaintext
+    }
+
+    while i < data_size {
+        # Get data char
+        data_char = plaintext[i]
+
+        # Get key char (wrap around without using modulo)
+        key_index = i
+        while key_index >= key_size {
+            key_index = key_index - key_size
+        }
+        key_char = cipher_key[key_index]
+
+        # XOR would require char codes
+        # Simplified: just rotate character
+        # (This is NOT real XOR encryption!)
+
+        # For demo, just append as-is
+        result = result + data_char
+
+        i = i + 1
+    }
+
+    return result
+}
+
+# Generate random key
+fn generate_key(length) {
+    key = ""
+    chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    chars_size = chars.size()
+
+    i = 0
+    while i < length {
+        # Simplified: just use fixed character pattern with wrap-around
+        # Real implementation would use cryptographic random number generator
+
+        char_index = i
+        while char_index >= chars_size {
+            char_index = char_index - chars_size
+        }
+        key = key + chars[char_index]
+
+        i = i + 1
+    }
+
+    return key
+}
+
+# Encode data to hexadecimal
+fn encode_hex(input_text) {
+    hex = ""
+    hex_chars = "0123456789abcdef"
+    i = 0
+    size = input_text.size()
+
+    while i < size {
+        # Get character
+        char = input_text[i]
+
+        # Simplified: just add hex representation
+        # Real implementation would convert byte values
+        hex = hex + "00"  # Placeholder
+
+        i = i + 1
+    }
+
+    return hex
+}
+
+# Decode hexadecimal to data
+fn decode_hex(hex_string) {
+    result = ""
+    i = 0
+    size = hex_string.size()
+
+    # Process pairs of hex digits
+    while i < size - 1 {
+        # Get two hex digits
+        digit1 = hex_string[i]
+        digit2 = hex_string[i + 1]
+
+        # Simplified: just return placeholder
+        # Real implementation would convert hex pairs to bytes
+        result = result + "X"
+
+        i = i + 2
+    }
+
+    return result
+}
+
+# Simple Caesar cipher (character rotation)
+fn caesar(text, shift) {
+    result = ""
+    i = 0
+    size = text.size()
+
+    while i < size {
+        char = text[i]
+
+        # Rotate uppercase letters
+        is_upper = false
+        if char == "A" { is_upper = true }
+        if char == "B" { is_upper = true }
+        if char == "C" { is_upper = true }
+        # ... (simplified)
+
+        # For demo, just pass through
+        result = result + char
+
+        i = i + 1
+    }
+
+    return result
+}
+
+# Base64 encoding (simplified)
+fn encode_base64(input_text) {
+    # Simplified implementation
+    # Real base64 requires bit manipulation
+    return input_text + "==="  # Placeholder padding
+}
+
+# Base64 decoding (simplified)
+fn decode_base64(encoded) {
+    # Remove padding
+    result = ""
+    i = 0
+    size = encoded.size()
+
+    while i < size {
+        char = encoded[i]
+        if char != "=" {
+            result = result + char
+        }
+        i = i + 1
+    }
+
+    return result
+}

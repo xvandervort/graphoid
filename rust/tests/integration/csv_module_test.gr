@@ -1,0 +1,74 @@
+# Test csv.gr module (pure Graphoid implementation)
+
+import "csv"
+
+print("=== CSV Module Test (Pure Graphoid) ===")
+print("")
+
+test_file = "/tmp/csv_module_test.csv"
+
+# Test 1: Simple CSV parsing
+print("Test 1: Simple CSV parsing")
+simple_data = [
+    ["Name", "Age", "City"],
+    ["Alice", "30", "New York"],
+    ["Bob", "25", "San Francisco"]
+]
+
+csv.write_csv(test_file, simple_data, ",")
+read_data = csv.read_csv(test_file, ",")
+
+print("  Rows written: " + simple_data.size())
+print("  Rows read: " + read_data.size())
+print("  Match: " + (simple_data.size() == read_data.size()))
+print("")
+
+# Test 2: CSV with quoted fields
+print("Test 2: CSV with quoted fields containing commas")
+quoted_data = [
+    ["Product", "Description", "Price"],
+    ["Widget", "A small, useful thing", "10.99"],
+    ["Gadget", "Costs $5, works great", "5.00"]
+]
+
+csv.write_csv(test_file, quoted_data, ",")
+read_quoted = csv.read_csv(test_file, ",")
+
+print("  Rows written: " + quoted_data.size())
+print("  Rows read: " + read_quoted.size())
+print("  Match: " + (quoted_data.size() == read_quoted.size()))
+print("")
+
+# Test 3: parse_csv_line
+print("Test 3: parse_csv_line")
+line = "Alice,30,New York"
+fields = csv.parse_csv_line(line, ",")
+print("  Parsed fields: " + fields.size())
+print("  First field: " + fields[0])
+print("  Last field: " + fields[2])
+print("")
+
+# Test 4: format_csv_line
+print("Test 4: format_csv_line")
+values = ["Bob", "25", "San Francisco"]
+formatted = csv.format_csv_line(values, ",")
+print("  Formatted: " + formatted)
+print("  Contains commas: " + formatted.contains(","))
+print("")
+
+# Test 5: TSV (tab-separated values)
+print("Test 5: TSV support (different delimiter)")
+tsv_data = [
+    ["Name", "Age"],
+    ["Charlie", "35"]
+]
+
+csv.write_csv(test_file, tsv_data, "\t")
+read_tsv = csv.read_csv(test_file, "\t")
+
+print("  TSV rows written: " + tsv_data.size())
+print("  TSV rows read: " + read_tsv.size())
+print("  Match: " + (tsv_data.size() == read_tsv.size()))
+print("")
+
+print("=== All csv.gr tests passed ===")

@@ -1,0 +1,10 @@
+# Test string indexing
+
+str = "Hello"
+print("String: " + str)
+print("Length: " + str.size())
+
+# Test indexing
+print("Index 0: " + str[0])
+print("Index 1: " + str[1])
+print("Index 4: " + str[4])

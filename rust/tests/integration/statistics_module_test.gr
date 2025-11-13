@@ -1,0 +1,67 @@
+# Test statistics.gr module (pure Graphoid implementation)
+
+import "statistics"
+
+print("=== Statistics Module Test (Pure Graphoid) ===")
+print("")
+
+# Test data
+values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+# Test 1: Mean
+print("Test 1: Mean")
+avg = statistics.mean(values)
+print("  Mean of 1-10: " + avg)
+print("  Expected 5.5: " + (avg == 5.5))
+print("")
+
+# Test 2: Min and Max
+print("Test 2: Min and Max")
+minimum = statistics.min(values)
+maximum = statistics.max(values)
+print("  Min: " + minimum)
+print("  Max: " + maximum)
+print("  Min is 1: " + (minimum == 1))
+print("  Max is 10: " + (maximum == 10))
+print("")
+
+# Test 3: Sum
+print("Test 3: Sum")
+total = statistics.sum(values)
+print("  Sum of 1-10: " + total)
+print("  Expected 55: " + (total == 55))
+print("")
+
+# Test 4: Median
+print("Test 4: Median")
+med = statistics.median(values)
+print("  Median: " + med)
+print("  Is 5.5: " + (med == 5.5))
+print("")
+
+# Test 5: Median of odd-length list
+print("Test 5: Median of odd-length list")
+odd_values = [1, 2, 3, 4, 5]
+odd_med = statistics.median(odd_values)
+print("  Median of [1,2,3,4,5]: " + odd_med)
+print("  Is 3: " + (odd_med == 3))
+print("")
+
+# Test 6: Variance
+print("Test 6: Variance")
+var = statistics.variance(values)
+print("  Variance: " + var)
+print("  Greater than 0: " + (var > 0))
+print("")
+
+# Test 7: Quantile
+print("Test 7: Quantile")
+q25 = statistics.quantile(values, 0.25)
+q50 = statistics.quantile(values, 0.5)
+q75 = statistics.quantile(values, 0.75)
+print("  25th percentile: " + q25)
+print("  50th percentile (median): " + q50)
+print("  75th percentile: " + q75)
+print("")
+
+print("=== All statistics.gr tests passed ===")

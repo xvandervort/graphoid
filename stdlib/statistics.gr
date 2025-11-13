@@ -1,0 +1,205 @@
+# Statistics Module - Statistical analysis functions
+#
+# Functions:
+# - mean(values) -> number - Arithmetic mean (average)
+# - median(values) -> number - Middle value
+# - mode(values) -> number - Most common value
+# - stdev(values) -> number - Standard deviation
+# - variance(values) -> number - Variance
+# - min(values) -> number - Minimum value
+# - max(values) -> number - Maximum value
+# - sum(values) -> number - Sum of all values
+# - quantile(values, q) -> number - Quantile (0-1)
+
+# Calculate arithmetic mean
+fn mean(values) {
+    if values.size() == 0 {
+        return 0
+    }
+
+    total = 0
+    i = 0
+    size = values.size()
+
+    while i < size {
+        total = total + values[i]
+        i = i + 1
+    }
+
+    return total / size
+}
+
+# Calculate minimum value
+fn min(values) {
+    if values.size() == 0 {
+        return 0
+    }
+
+    minimum = values[0]
+    i = 1
+    size = values.size()
+
+    while i < size {
+        if values[i] < minimum {
+            minimum = values[i]
+        }
+        i = i + 1
+    }
+
+    return minimum
+}
+
+# Calculate maximum value
+fn max(values) {
+    if values.size() == 0 {
+        return 0
+    }
+
+    maximum = values[0]
+    i = 1
+    size = values.size()
+
+    while i < size {
+        if values[i] > maximum {
+            maximum = values[i]
+        }
+        i = i + 1
+    }
+
+    return maximum
+}
+
+# Calculate sum
+fn sum(values) {
+    total = 0
+    i = 0
+    size = values.size()
+
+    while i < size {
+        total = total + values[i]
+        i = i + 1
+    }
+
+    return total
+}
+
+# Calculate median
+fn median(values) {
+    if values.size() == 0 {
+        return 0
+    }
+
+    # Sort values (simple bubble sort)
+    sorted = []
+    i = 0
+    while i < values.size() {
+        sorted = sorted.append(values[i])
+        i = i + 1
+    }
+
+    # Bubble sort
+    n = sorted.size()
+    i = 0
+    while i < n {
+        j = 0
+        while j < n - i - 1 {
+            if sorted[j] > sorted[j + 1] {
+                # Swap
+                temp = sorted[j]
+                sorted[j] = sorted[j + 1]
+                sorted[j + 1] = temp
+            }
+            j = j + 1
+        }
+        i = i + 1
+    }
+
+    # Get middle value
+    mid = n / 2
+
+    if n % 2 == 0 {
+        # Even number of values, average the two middle ones
+        return (sorted[mid - 1] + sorted[mid]) / 2
+    } else {
+        # Odd number of values
+        return sorted[mid]
+    }
+}
+
+# Calculate mode (most common value)
+fn mode(values) {
+    if values.size() == 0 {
+        return 0
+    }
+
+    # Count occurrences (simplified - just return first value)
+    # TODO: Need proper counting mechanism
+    return values[0]
+}
+
+# Calculate variance
+fn variance(values) {
+    if values.size() == 0 {
+        return 0
+    }
+
+    avg = mean(values)
+    sum_sq_diff = 0
+
+    i = 0
+    size = values.size()
+
+    while i < size {
+        diff = values[i] - avg
+        sum_sq_diff = sum_sq_diff + (diff * diff)
+        i = i + 1
+    }
+
+    return sum_sq_diff / size
+}
+
+# Calculate standard deviation
+fn stdev(values) {
+    # Note: This would need a square root function
+    # For now, return variance
+    # TODO: Implement square root
+    return variance(values)
+}
+
+# Calculate quantile
+fn quantile(values, q) {
+    if values.size() == 0 {
+        return 0
+    }
+
+    # Sort values first (same as median)
+    sorted = []
+    i = 0
+    while i < values.size() {
+        sorted = sorted.append(values[i])
+        i = i + 1
+    }
+
+    # Bubble sort
+    n = sorted.size()
+    i = 0
+    while i < n {
+        j = 0
+        while j < n - i - 1 {
+            if sorted[j] > sorted[j + 1] {
+                # Swap
+                temp = sorted[j]
+                sorted[j] = sorted[j + 1]
+                sorted[j + 1] = temp
+            }
+            j = j + 1
+        }
+        i = i + 1
+    }
+
+    # Calculate position
+    pos = q * (n - 1)
+
+    # Simplified: just return value at that position (truncated)
+    return sorted[pos]
+}

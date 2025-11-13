@@ -1,0 +1,31 @@
+# Test http.gr module (pure Graphoid implementation)
+
+import "http"
+
+print("=== HTTP Module Test (Pure Graphoid) ===")
+print("")
+
+# Test 1: Parse URL
+print("Test 1: Parse URL")
+parsed = http.parse_url("http://example.com/path/to/page")
+print("  Host: " + parsed["host"])
+print("  Port: " + parsed["port"])
+print("  Path: " + parsed["path"])
+print("")
+
+# Test 2: Parse URL with port
+print("Test 2: Parse URL with port")
+parsed2 = http.parse_url("http://localhost:8080/api")
+print("  Host: " + parsed2["host"])
+print("  Path: " + parsed2["path"])
+print("")
+
+# Test 3: HTTP GET request
+print("Test 3: HTTP GET request to example.com")
+response = http.get("http://example.com")
+print("  Status: " + response["status"])
+print("  Body length: " + response["body"].size())
+print("  Body not empty: " + (response["body"] != ""))
+print("")
+
+print("=== All http.gr tests passed ===")

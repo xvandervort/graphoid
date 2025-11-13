@@ -1,0 +1,166 @@
+# CSV Module - CSV parsing and writing
+# Built on io module for file operations
+#
+# Functions:
+# - read_csv(path, delimiter) -> list - Read CSV file as list of rows
+# - write_csv(path, rows, delimiter) -> bool - Write list of rows to CSV file
+# - parse_csv_line(line, delimiter) -> list - Parse a single CSV line
+# - format_csv_line(values, delimiter) -> string - Format values as CSV line
+
+import "io"
+
+# Parse a single CSV line into fields
+# Handles quoted fields with commas inside
+fn parse_csv_line(line, delimiter) {
+    fields = []
+    current_field = ""
+    in_quotes = false
+    i = 0
+    size = line.size()
+
+    while i < size {
+        char = line[i]
+
+        if char == "\"" {
+            # Toggle quote state
+            if in_quotes {
+                # Check for escaped quote ("")
+                if i + 1 < size {
+                    next_char = line[i + 1]
+                    if next_char == "\"" {
+                        current_field = current_field + "\""
+                        i = i + 1  # Skip the second quote
+                    } else {
+                        in_quotes = false
+                    }
+                } else {
+                    in_quotes = false
+                }
+            } else {
+                in_quotes = true
+            }
+        } else {
+            if char == delimiter {
+                if in_quotes {
+                    # Comma inside quotes, treat as regular character
+                    current_field = current_field + char
+                } else {
+                    # End of field
+                    fields = fields.append(current_field)
+                    current_field = ""
+                }
+            } else {
+                current_field = current_field + char
+            }
+        }
+
+        i = i + 1
+    }
+
+    # Add final field
+    fields = fields.append(current_field)
+
+    return fields
+}
+
+# Format a list of values as a CSV line
+fn format_csv_line(values, delimiter) {
+    line = ""
+    i = 0
+    size = values.size()
+
+    while i < size {
+        value = values[i]
+
+        # Convert value to string
+        value_str = value + ""
+
+        # Check if value needs quoting (contains delimiter, quotes, or newlines)
+        needs_quotes = false
+        j = 0
+        value_size = value_str.size()
+
+        while j < value_size {
+            char = value_str[j]
+            if char == delimiter {
+                needs_quotes = true
+            }
+            if char == "\"" {
+                needs_quotes = true
+            }
+            if char == "\n" {
+                needs_quotes = true
+            }
+            j = j + 1
+        }
+
+        # Add field to line
+        if needs_quotes {
+            # Escape quotes by doubling them
+            escaped = ""
+            k = 0
+            while k < value_size {
+                char = value_str[k]
+                if char == "\"" {
+                    escaped = escaped + "\"\""
+                } else {
+                    escaped = escaped + char
+                }
+                k = k + 1
+            }
+            line = line + "\"" + escaped + "\""
+        } else {
+            line = line + value_str
+        }
+
+        # Add delimiter between fields (but not after last field)
+        if i < size - 1 {
+            line = line + delimiter
+        }
+
+        i = i + 1
+    }
+
+    return line
+}
+
+# Read CSV file as list of rows (each row is a list of fields)
+fn read_csv(path, delimiter) {
+    lines = io.read_lines(path)
+    rows = []
+
+    i = 0
+    size = lines.size()
+
+    while i < size {
+        line = lines[i]
+
+        # Skip empty lines
+        if line != "" {
+            row = parse_csv_line(line, delimiter)
+            rows = rows.append(row)
+        }
+
+        i = i + 1
+    }
+
+    return rows
+}
+
+# Write list of rows to CSV file
+fn write_csv(path, rows, delimiter) {
+    lines = []
+
+    i = 0
+    size = rows.size()
+
+    while i < size {
+        row = rows[i]
+        line = format_csv_line(row, delimiter)
+        lines = lines.append(line)
+        i = i + 1
+    }
+
+    io.write_lines(path, lines)
+    return true
+}

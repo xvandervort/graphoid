@@ -1,0 +1,55 @@
+# Test regex.gr module (pure Graphoid implementation)
+
+import "regex"
+
+print("=== Regex Module Test (Pure Graphoid) ===")
+print("")
+
+# Test 1: Literal match
+print("Test 1: Literal matching")
+print("  'hello' matches 'hello': " + regex.matches("hello", "hello world"))
+print("  'xyz' matches 'hello': " + regex.matches("xyz", "hello world"))
+print("")
+
+# Test 2: Dot wildcard
+print("Test 2: Dot wildcard (.)")
+print("  'h.llo' matches 'hello': " + regex.matches("h.llo", "hello"))
+print("  'h.llo' matches 'hallo': " + regex.matches("h.llo", "hallo"))
+print("")
+
+# Test 3: Star quantifier
+print("Test 3: Star quantifier (*)")
+print("  'ab*c' matches 'ac': " + regex.matches("ab*c", "ac"))
+print("  'ab*c' matches 'abc': " + regex.matches("ab*c", "abc"))
+print("  'ab*c' matches 'abbc': " + regex.matches("ab*c", "abbc"))
+print("")
+
+# Test 4: Anchors
+print("Test 4: Anchors (^ and $)")
+print("  '^hello' matches 'hello': " + regex.matches("^hello", "hello world"))
+print("  '^world' matches 'hello world': " + regex.matches("^world", "hello world"))
+print("  'world$' matches 'hello world': " + regex.matches("world$", "hello world"))
+print("")
+
+# Test 5: Find
+print("Test 5: Find first match")
+found = regex.find("ll", "hello")
+print("  Found 'll' in 'hello': " + found)
+print("  Result is 'll': " + (found == "ll"))
+print("")
+
+# Test 6: Find all
+print("Test 6: Find all matches")
+all_matches = regex.find_all("l", "hello")
+print("  Found 'l' in 'hello': " + all_matches.size() + " times")
+print("  Expected 2: " + (all_matches.size() == 2))
+print("")
+
+# Test 7: Replace
+print("Test 7: Replace")
+replaced = regex.replace("l", "hello", "r")
+print("  Replace 'l' with 'r' in 'hello': " + replaced)
+print("  Contains 'r': " + (replaced != "hello"))
+print("")
+
+print("=== All regex.gr tests passed ===")

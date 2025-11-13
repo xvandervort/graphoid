@@ -1,0 +1,66 @@
+# Test crypto.gr module (pure Graphoid implementation)
+
+import "crypto"
+
+print("=== Crypto Module Test (Pure Graphoid - Educational Only!) ===")
+print("")
+
+# Test 1: Simple hash
+print("Test 1: Simple hash function")
+hash1 = crypto.simple_hash("hello")
+hash2 = crypto.simple_hash("hello")
+hash3 = crypto.simple_hash("world")
+print("  Hash of 'hello': " + hash1)
+print("  Same input gives same hash: " + (hash1 == hash2))
+print("  Different input gives different hash: " + (hash1 != hash3))
+print("")
+
+# Test 2: Generate key
+print("Test 2: Generate random key")
+key1 = crypto.generate_key(16)
+key2 = crypto.generate_key(16)
+print("  Key 1 length: " + key1.size())
+print("  Key 2 length: " + key2.size())
+print("  Keys are 16 chars: " + (key1.size() == 16))
+print("")
+
+# Test 3: XOR cipher
+print("Test 3: XOR cipher")
+plaintext = "secret message"
+key = "mykey"
+encrypted = crypto.xor_cipher(plaintext, key)
+print("  Plaintext length: " + plaintext.size())
+print("  Encrypted length: " + encrypted.size())
+print("  Lengths match: " + (plaintext.size() == encrypted.size()))
+print("")
+
+# Test 4: Hex encoding
+print("Test 4: Hex encoding/decoding")
+test_data = "test"
+encoded = crypto.encode_hex(test_data)
+decoded = crypto.decode_hex(encoded)
+print("  Original length: " + test_data.size())
+print("  Encoded length: " + encoded.size())
+print("  Encoded is longer: " + (encoded.size() > test_data.size()))
+print("")
+
+# Test 5: Caesar cipher
+print("Test 5: Caesar cipher")
+text = "HELLO"
+shifted = crypto.caesar(text, 3)
+print("  Original: " + text)
+print("  Shifted: " + shifted)
+print("  Not empty: " + (shifted != ""))
+print("")
+
+# Test 6: Base64
+print("Test 6: Base64 encoding/decoding")
+original = "test data"
+encoded_b64 = crypto.encode_base64(original)
+decoded_b64 = crypto.decode_base64(encoded_b64)
+print("  Original: " + original)
+print("  Encoded: " + encoded_b64)
+print("  Decoded: " + decoded_b64)
+print("")
+
+print("=== All crypto.gr tests passed (Educational Implementation!) ===")

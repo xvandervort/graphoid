@@ -1,0 +1,62 @@
+# Test json.gr module (pure Graphoid implementation)
+
+import "json"
+
+print("=== JSON Module Test (Pure Graphoid) ===")
+print("")
+
+# Test 1: Parse simple string
+print("Test 1: Parse simple string")
+result = json.parse("\"hello\"")
+print("  Result: " + result)
+print("  Is string: " + (result == "hello"))
+print("")
+
+# Test 2: Parse array
+print("Test 2: Parse array")
+arr = json.parse("[1, 2, 3]")
+print("  Array size: " + arr.size())
+print("  First element: " + arr[0])
+print("  Last element: " + arr[2])
+print("")
+
+# Test 3: Parse object
+print("Test 3: Parse object")
+obj = json.parse("{\"name\": \"Alice\", \"age\": \"30\"}")
+print("  Name value: " + obj["name"])
+print("  Age value: " + obj["age"])
+print("")
+
+# Test 4: Parse nested array
+print("Test 4: Parse nested array")
+nested = json.parse("[[1, 2], [3, 4]]")
+print("  Outer array size: " + nested.size())
+print("  First inner array size: " + nested[0].size())
+print("  First element of first array: " + nested[0][0])
+print("")
+
+# Test 5: Parse boolean and null
+print("Test 5: Parse boolean and null")
+bool_true = json.parse("true")
+bool_false = json.parse("false")
+null_val = json.parse("null")
+print("  True is true: " + bool_true)
+print("  False is false: " + (bool_false == false))
+print("  Null is none: " + (null_val == none))
+print("")
+
+# Test 6: Parse with whitespace
+print("Test 6: Parse with whitespace")
+spaced = json.parse("  [ 1 , 2 , 3 ]  ")
+print("  Array size: " + spaced.size())
+print("  First element: " + spaced[0])
+print("")
+
+# Test 7: Parse escaped strings
+print("Test 7: Parse escaped strings")
+escaped = json.parse("\"Line 1\\nLine 2\\tTabbed\"")
+print("  Length: " + escaped.size())
+print("  Not empty: " + (escaped != ""))
+print("")
+
+print("=== All json.gr tests passed ===")

@@ -950,6 +950,45 @@ impl Executor {
                     }
                 }
             }
+            ValueKind::String(ref s) => {
+                // Index must be a number for strings
+                let idx = match &index_value.kind {
+                    ValueKind::Number(n) => n,
+                    _other => {
+                        return Err(GraphoidError::type_error(
+                            "number",
+                            index_value.type_name(),
+                        ));
+                    }
+                };
+
+                // Handle fractional indices by truncating to integer
+                let idx_int = *idx as i64;
+
+                // Get string as chars
+                let chars: Vec<char> = s.chars().collect();
+
+                // Calculate actual index (handle negative indices)
+                let actual_index = if idx_int < 0 {
+                    // Negative index: count from end
+                    let len = chars.len() as i64;
+                    len + idx_int
+                } else {
+                    idx_int
+                };
+
+                // Check bounds
+                if actual_index < 0 || actual_index >= chars.len() as i64 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String index out of bounds: index {} for string of length {}",
+                        idx_int,
+                        chars.len()
+                    )));
+                }
+
+                // Return character as a string
+                Ok(Value::string(chars[actual_index as usize].to_string()))
+            }
             ValueKind::Graph(ref graph) => {
                 // Index must be a string for graphs (node ID)
                 let node_id = match &index_value.kind {
