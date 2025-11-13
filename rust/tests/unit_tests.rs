@@ -37,4 +37,5 @@ mod unit {
     pub mod bst_ordering_tests;
     pub mod bitwise_tests;
     pub mod bitwise_unsigned_debug;
+    pub mod string_methods_tests;
 }

@@ -1381,7 +1381,7 @@ impl Executor {
             ValueKind::List(list) => self.eval_list_method(&list, method, args),
             ValueKind::Map(hash) => self.eval_map_method(&hash, method, args),
             ValueKind::Graph(graph) => self.eval_graph_method(graph.clone(), method, args, object_expr),
-            ValueKind::String(ref s) => self.eval_string_method(s, method, args),
+            ValueKind::String(ref s) => self.eval_string_method(s, method, args, object_expr),
             ValueKind::Error(ref err) => self.eval_error_method(err, method, args),
             ValueKind::PatternNode(pn) => self.eval_pattern_node_method(pn, method, args),
             ValueKind::PatternEdge(pe) => self.eval_pattern_edge_method(pe, method, args),
@@ -2354,8 +2354,90 @@ impl Executor {
         }
     }
 
+    /// Helper function to extract a pattern symbol from a Value argument.
+    /// Returns an error if the value is not a symbol.
+    fn extract_pattern_symbol(arg: &Value) -> Result<&str> {
+        match &arg.kind {
+            ValueKind::Symbol(p) => Ok(p.as_str()),
+            _ => Err(GraphoidError::runtime(
+                "Expected a pattern symbol (e.g., :digits, :letters)".to_string()
+            ))
+        }
+    }
+
+    /// Helper function to check if a character matches a pattern symbol.
+    /// Used for string pattern matching methods like contains(), extract(), etc.
+    fn matches_pattern(ch: char, pattern: &str) -> bool {
+        match pattern {
+            "digits" | "numbers" => ch.is_numeric(),
+            "letters" => ch.is_alphabetic(),
+            "uppercase" => ch.is_uppercase(),
+            "lowercase" => ch.is_lowercase(),
+            "spaces" | "whitespace" => ch.is_whitespace(),
+            "punctuation" => ch.is_ascii_punctuation(),
+            "alphanumeric" => ch.is_alphanumeric(),
+            "symbols" => !ch.is_alphanumeric() && !ch.is_whitespace(),
+            _ => false,
+        }
+    }
+
+    /// Helper function to extract sequences of characters matching a pattern.
+    /// Used by extract() method for patterns like :words, :numbers, etc.
+    fn extract_sequences<F>(s: &str, matcher: F) -> Vec<String>
+    where
+        F: Fn(char) -> bool,
+    {
+        let mut sequences = Vec::new();
+        let mut current = String::new();
+
+        for ch in s.chars() {
+            if matcher(ch) {
+                current.push(ch);
+            } else if !current.is_empty() {
+                sequences.push(current.clone());
+                current.clear();
+            }
+        }
+
+        if !current.is_empty() {
+            sequences.push(current);
+        }
+
+        sequences
+    }
+
+    /// Helper function to check if a string looks like an email.
+    /// Simple heuristic: word@word.word
+    fn is_email_like(s: &str) -> bool {
+        let parts: Vec<&str> = s.split('@').collect();
+        if parts.len() != 2 {
+            return false;
+        }
+
+        let domain_parts: Vec<&str> = parts[1].split('.').collect();
+        domain_parts.len() >= 2
+            && !parts[0].is_empty()
+            && domain_parts.iter().all(|p| !p.is_empty())
+    }
+
+    /// Helper function to extract email addresses from a string.
+    fn extract_emails(s: &str) -> Vec<String> {
+        let mut emails = Vec::new();
+        let words: Vec<&str> = s.split_whitespace().collect();
+
+        for word in words {
+            // Remove trailing punctuation
+            let cleaned = word.trim_end_matches(|c: char| c.is_ascii_punctuation());
+            if Self::is_email_like(cleaned) {
+                emails.push(cleaned.to_string());
+            }
+        }
+
+        emails
+    }
+
     /// Evaluates a method call on a string.
-    fn eval_string_method(&self, s: &str, method: &str, args: &[Value]) -> Result<Value> {
+    fn eval_string_method(&mut self, s: &str, method: &str, args: &[Value], object_expr: &Expr) -> Result<Value> {
         match method {
             "length" | "size" | "len" => {
                 if !args.is_empty() {
@@ -2486,20 +2568,212 @@ impl Executor {
                 Ok(Value::boolean(s.ends_with(suffix)))
             }
             "contains" => {
+                if args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "String method 'contains' expects at least 1 argument".to_string()
+                    ));
+                }
+
+                // Check first argument to determine mode
+                match &args[0].kind {
+                    // Pattern matching mode: contains(mode, patterns...)
+                    ValueKind::Symbol(mode) => {
+                        if args.len() < 2 {
+                            return Err(GraphoidError::runtime(
+                                "Pattern matching contains() requires mode and at least one pattern".to_string()
+                            ));
+                        }
+
+                        // Extract pattern symbols from remaining args
+                        let mut patterns = Vec::new();
+                        for arg in &args[1..] {
+                            match &arg.kind {
+                                ValueKind::Symbol(pattern) => patterns.push(pattern.as_str()),
+                                _ => {
+                                    return Err(GraphoidError::runtime(
+                                        "Pattern matching contains() expects symbol patterns".to_string()
+                                    ));
+                                }
+                            }
+                        }
+
+                        // Apply the appropriate mode
+                        let result = match mode.as_str() {
+                            "any" => {
+                                // Check if string contains at least one match of any pattern
+                                s.chars().any(|ch| {
+                                    patterns.iter().any(|&pattern| Self::matches_pattern(ch, pattern))
+                                })
+                            }
+                            "all" => {
+                                // Check if string contains at least one match of ALL patterns
+                                patterns.iter().all(|&pattern| {
+                                    s.chars().any(|ch| Self::matches_pattern(ch, pattern))
+                                })
+                            }
+                            "only" => {
+                                // Check if string contains ONLY characters matching patterns
+                                if s.is_empty() {
+                                    true  // Empty string is "only" anything
+                                } else {
+                                    s.chars().all(|ch| {
+                                        patterns.iter().any(|&pattern| Self::matches_pattern(ch, pattern))
+                                    })
+                                }
+                            }
+                            _ => {
+                                return Err(GraphoidError::runtime(format!(
+                                    "Invalid contains() mode '{}'. Expected :any, :all, or :only",
+                                    mode
+                                )));
+                            }
+                        };
+
+                        Ok(Value::boolean(result))
+                    }
+                    // Substring search mode (original behavior): contains(substring)
+                    ValueKind::String(substring) => {
+                        if args.len() != 1 {
+                            return Err(GraphoidError::runtime(format!(
+                                "Substring contains() expects exactly 1 argument, but got {}",
+                                args.len()
+                            )));
+                        }
+                        Ok(Value::boolean(s.contains(substring.as_str())))
+                    }
+                    _ => {
+                        Err(GraphoidError::runtime(
+                            "contains() first argument must be a mode symbol (:any, :all, :only) or a substring".to_string()
+                        ))
+                    }
+                }
+            }
+            "extract" => {
                 if args.len() != 1 {
                     return Err(GraphoidError::runtime(format!(
-                        "String method 'contains' expects 1 argument (substring), but got {}",
+                        "String method 'extract' expects 1 argument (pattern symbol), but got {}",
                         args.len()
                     )));
                 }
-                let substring = match &args[0].kind {
-                    ValueKind::String(sub) => sub,
-                    _other => {
-                        return Err(GraphoidError::type_error("string", args[0].type_name()));
+
+                // Extract pattern symbol
+                let pattern = Self::extract_pattern_symbol(&args[0])?;
+
+                // Extract sequences based on pattern
+                let sequences = match pattern {
+                    "words" => {
+                        // Extract word sequences (letters only)
+                        Self::extract_sequences(s, |ch| ch.is_alphabetic())
+                    }
+                    "numbers" | "digits" => {
+                        // Extract number sequences
+                        Self::extract_sequences(s, |ch| ch.is_numeric())
+                    }
+                    "emails" => {
+                        // Extract email addresses
+                        Self::extract_emails(s)
+                    }
+                    // For other patterns, extract character sequences
+                    _ => {
+                        Self::extract_sequences(s, |ch| Self::matches_pattern(ch, pattern))
                     }
                 };
 
-                Ok(Value::boolean(s.contains(substring.as_str())))
+                // Convert to list of strings
+                let values: Vec<Value> = sequences
+                    .into_iter()
+                    .map(Value::string)
+                    .collect();
+
+                Ok(Value::list(List::from_vec(values)))
+            }
+            "count" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'count' expects 1 argument (pattern symbol), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Extract pattern symbol
+                let pattern = Self::extract_pattern_symbol(&args[0])?;
+
+                // Count based on pattern type
+                let count = match pattern {
+                    "words" => {
+                        // Count word sequences
+                        Self::extract_sequences(s, |ch| ch.is_alphabetic()).len()
+                    }
+                    "numbers" | "digits" => {
+                        // For character-level patterns, count individual characters
+                        s.chars().filter(|ch| ch.is_numeric()).count()
+                    }
+                    "emails" => {
+                        // Count email addresses
+                        Self::extract_emails(s).len()
+                    }
+                    // For other patterns, count individual matching characters
+                    _ => {
+                        s.chars().filter(|ch| Self::matches_pattern(*ch, pattern)).count()
+                    }
+                };
+
+                Ok(Value::number(count as f64))
+            }
+            "find" => {
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'find' expects 1-2 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Extract pattern symbol
+                let pattern = Self::extract_pattern_symbol(&args[0])?;
+
+                // Find all positions matching the pattern
+                let positions: Vec<usize> = s
+                    .chars()
+                    .enumerate()
+                    .filter(|(_i, ch)| Self::matches_pattern(*ch, pattern))
+                    .map(|(i, _ch)| i)
+                    .collect();
+
+                // Handle second argument (limit or mode)
+                if args.len() == 2 {
+                    match &args[1].kind {
+                        ValueKind::Symbol(mode) if mode == "first" => {
+                            // Return first position or -1
+                            if let Some(&pos) = positions.first() {
+                                Ok(Value::number(pos as f64))
+                            } else {
+                                Ok(Value::number(-1.0))
+                            }
+                        }
+                        ValueKind::Number(limit) => {
+                            // Return first N positions
+                            let limit = *limit as usize;
+                            let limited: Vec<Value> = positions
+                                .into_iter()
+                                .take(limit)
+                                .map(|pos| Value::number(pos as f64))
+                                .collect();
+                            Ok(Value::list(List::from_vec(limited)))
+                        }
+                        _ => {
+                            Err(GraphoidError::runtime(
+                                "find() second argument must be :first or a number limit".to_string()
+                            ))
+                        }
+                    }
+                } else {
+                    // No second argument - return all positions
+                    let values: Vec<Value> = positions
+                        .into_iter()
+                        .map(|pos| Value::number(pos as f64))
+                        .collect();
+                    Ok(Value::list(List::from_vec(values)))
+                }
             }
             "replace" => {
                 if args.len() != 2 {
@@ -2541,6 +2815,75 @@ impl Executor {
                     Some(index) => Ok(Value::number(index as f64)),
                     None => Ok(Value::number(-1.0)),
                 }
+            }
+            // Mutating methods
+            "upper!" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'upper!' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Must be called on a variable, not a literal
+                if let Expr::Variable { name, .. } = object_expr {
+                    let new_string = s.to_uppercase();
+                    self.env.set(name, Value::string(new_string))?;
+                    return Ok(Value::none());
+                }
+
+                Err(GraphoidError::runtime("upper!() can only be called on variables, not literals".to_string()))
+            }
+            "lower!" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'lower!' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Must be called on a variable, not a literal
+                if let Expr::Variable { name, .. } = object_expr {
+                    let new_string = s.to_lowercase();
+                    self.env.set(name, Value::string(new_string))?;
+                    return Ok(Value::none());
+                }
+
+                Err(GraphoidError::runtime("lower!() can only be called on variables, not literals".to_string()))
+            }
+            "trim!" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'trim!' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Must be called on a variable, not a literal
+                if let Expr::Variable { name, .. } = object_expr {
+                    let new_string = s.trim().to_string();
+                    self.env.set(name, Value::string(new_string))?;
+                    return Ok(Value::none());
+                }
+
+                Err(GraphoidError::runtime("trim!() can only be called on variables, not literals".to_string()))
+            }
+            "reverse!" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'reverse!' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Must be called on a variable, not a literal
+                if let Expr::Variable { name, .. } = object_expr {
+                    let new_string: String = s.chars().rev().collect();
+                    self.env.set(name, Value::string(new_string))?;
+                    return Ok(Value::none());
+                }
+
+                Err(GraphoidError::runtime("reverse!() can only be called on variables, not literals".to_string()))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "String does not have method '{}'",

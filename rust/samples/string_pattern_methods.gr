@@ -1,0 +1,141 @@
+# String Pattern Methods - Complete Example
+# Demonstrates all advanced pattern matching methods
+
+print("=== String Pattern Methods ===")
+print("")
+
+mixed = "Hello World 123! Contact: test@example.com"
+
+# ===== contains(mode, patterns...) =====
+print("=== contains(mode, patterns...) ===")
+print("Text: '" + mixed + "'")
+print("")
+
+# :any mode - contains at least one match
+if mixed.contains(:any, :digits) {
+    print("contains(:any, :digits): true")
+} else {
+    print("contains(:any, :digits): false")
+}
+
+if mixed.contains(:any, :symbols) {
+    print("contains(:any, :symbols): true")
+} else {
+    print("contains(:any, :symbols): false")
+}
+print("")
+
+# :all mode - contains all patterns
+print("contains(:all, :letters, :digits): " + mixed.contains(:all, :letters, :digits).to_string())
+print("contains(:all, :letters, :punctuation): " + mixed.contains(:all, :letters, :punctuation).to_string())
+print("")
+
+# :only mode - contains ONLY these patterns
+pure_letters = "Hello"
+print("'Hello'.contains(:only, :letters): " + pure_letters.contains(:only, :letters).to_string())
+letters_and_spaces = "Hello World"
+print("'Hello World'.contains(:only, :letters, :spaces): " + letters_and_spaces.contains(:only, :letters, :spaces).to_string())
+print("")
+
+# Pattern aliases
+print("contains(:any, :numbers): " + mixed.contains(:any, :numbers).to_string())
+print("contains(:any, :whitespace): " + mixed.contains(:any, :whitespace).to_string())
+print("")
+
+# ===== extract(pattern) =====
+print("=== extract(pattern) ===")
+print("Text: '" + mixed + "'")
+print("")
+
+# Extract numbers
+numbers = mixed.extract(:numbers)
+print("extract(:numbers): " + numbers.to_string())
+
+# Extract words
+words = mixed.extract(:words)
+print("extract(:words): " + words.to_string())
+
+# Extract emails
+emails = mixed.extract(:emails)
+print("extract(:emails): " + emails.to_string())
+
+# Extract letters
+letter_seqs = "one, two, three".extract(:letters)
+print("'one, two, three'.extract(:letters): " + letter_seqs.to_string())
+print("")
+
+# ===== count(pattern) =====
+print("=== count(pattern) ===")
+print("Text: '" + mixed + "'")
+print("")
+
+# Count individual characters
+digit_count = mixed.count(:digits)
+print("count(:digits): " + digit_count.to_string())
+
+space_count = mixed.count(:spaces)
+print("count(:spaces): " + space_count.to_string())
+
+# Count sequences
+word_count = mixed.count(:words)
+print("count(:words): " + word_count.to_string())
+
+email_count = mixed.count(:emails)
+print("count(:emails): " + email_count.to_string())
+print("")
+
+# ===== find(pattern, options...) =====
+print("=== find(pattern, options...) ===")
+test_str = "Hello123World456"
+print("Text: '" + test_str + "'")
+print("")
+
+# Find all positions
+all_positions = test_str.find(:digits)
+print("find(:digits): " + all_positions.to_string())
+
+# Find with limit
+first_two = test_str.find(:digits, 2)
+print("find(:digits, 2): " + first_two.to_string())
+
+# Find first position
+first_pos = test_str.find(:digits, :first)
+print("find(:digits, :first): " + first_pos.to_string())
+
+# Not found
+no_match = "Hello".find(:digits, :first)
+print("'Hello'.find(:digits, :first): " + no_match.to_string())
+print("")
+
+# ===== Pattern Symbol Coverage =====
+print("=== All Pattern Symbols ===")
+test_patterns = "ABC abc 123 !@# \t"
+print("Text: 'ABC abc 123 !@# \t'")
+print("")
+
+print("contains(:any, :uppercase): " + test_patterns.contains(:any, :uppercase).to_string())
+print("contains(:any, :lowercase): " + test_patterns.contains(:any, :lowercase).to_string())
+print("contains(:any, :digits): " + test_patterns.contains(:any, :digits).to_string())
+print("contains(:any, :punctuation): " + test_patterns.contains(:any, :punctuation).to_string())
+print("contains(:any, :alphanumeric): " + test_patterns.contains(:any, :alphanumeric).to_string())
+print("contains(:any, :symbols): " + test_patterns.contains(:any, :symbols).to_string())
+print("")
+
+# ===== Combined with Mutating Methods =====
+print("=== Combined with Mutating Methods ===")
+text = "  Hello 123  "
+print("Original: '" + text + "'")
+text.trim!()
+print("After trim!(): '" + text + "'")
+
+if text.contains(:all, :letters, :digits) {
+    print("Contains both letters and digits!")
+
+    words_found = text.extract(:words)
+    numbers_found = text.extract(:numbers)
+    print("Words: " + words_found.to_string())
+    print("Numbers: " + numbers_found.to_string())
+}
+print("")
+
+print("=== All String Pattern Methods Working! ===")

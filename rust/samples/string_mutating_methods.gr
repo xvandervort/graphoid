@@ -1,0 +1,61 @@
+# String Mutating Methods Example
+# Phase 1 of String Methods Implementation
+
+print("=== String Mutating Methods ===")
+print("")
+
+# upper!() - Convert to uppercase in place
+text = "hello world"
+print("Original: " + text)
+text.upper!()
+print("After upper!(): " + text)
+print("")
+
+# lower!() - Convert to lowercase in place
+text2 = "HELLO WORLD"
+print("Original: " + text2)
+text2.lower!()
+print("After lower!(): " + text2)
+print("")
+
+# trim!() - Remove whitespace in place
+text3 = "  spaces around  "
+print("Original: '" + text3 + "'")
+text3.trim!()
+print("After trim!(): '" + text3 + "'")
+print("")
+
+# reverse!() - Reverse characters in place
+text4 = "hello"
+print("Original: " + text4)
+text4.reverse!()
+print("After reverse!(): " + text4)
+print("")
+
+# Unicode handling
+text5 = "hello 🌍"
+print("Original: " + text5)
+text5.reverse!()
+print("After reverse!(): " + text5)
+print("")
+
+# Chaining mutations
+text6 = "  hello world  "
+print("Original: '" + text6 + "'")
+text6.trim!()
+print("After trim!(): '" + text6 + "'")
+text6.upper!()
+print("After upper!(): '" + text6 + "'")
+print("")
+
+# Mutating methods return none
+text7 = "test"
+result = text7.upper!()
+if result == none {
+    print("Mutating methods return none: true")
+} else {
+    print("Mutating methods return none: false")
+}
+print("")
+
+print("=== All String Mutating Methods Working! ===")
