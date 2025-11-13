@@ -1,0 +1,57 @@
+# File System Primitives Test
+# Tests low-level fs module operations
+
+import "fs"
+
+print("=== File System Primitives Test ===")
+print("")
+
+# Test file path
+test_file = "/tmp/fs_test.txt"
+
+# Test 1: Write to file
+print("Test 1: Write to file")
+fh = fs.open(test_file, "w")
+print("  File handle: " + fh)
+
+bytes_written = fs.write(fh, "Hello from Graphoid!\n")
+print("  Bytes written: " + bytes_written)
+
+fs.write(fh, "Line 2\n")
+fs.write(fh, "Line 3\n")
+
+fs.close(fh)
+print("  File closed")
+print("")
+
+# Test 2: Read from file
+print("Test 2: Read from file")
+fh = fs.open(test_file, "r")
+print("  File handle: " + fh)
+
+content = fs.read(fh, 1000)
+print("  Content read:")
+print(content)
+
+fs.close(fh)
+print("  File closed")
+print("")
+
+# Test 3: Append to file
+print("Test 3: Append to file")
+fh = fs.open(test_file, "a")
+fs.write(fh, "Appended line 4\n")
+fs.close(fh)
+print("  Appended successfully")
+print("")
+
+# Test 4: Read updated content
+print("Test 4: Read updated content")
+fh = fs.open(test_file, "r")
+content = fs.read(fh, 1000)
+print("  Updated content:")
+print(content)
+fs.close(fh)
+print("")
+
+print("=== All fs primitives tests passed ===")

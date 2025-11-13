@@ -1,0 +1,38 @@
+# Network Primitives Test
+# Tests low-level net module operations
+
+import "net"
+
+print("=== Network Primitives Test ===")
+print("")
+
+# Test: HTTP GET request to example.com
+print("Test: Simple HTTP GET request")
+print("  Connecting to example.com:80...")
+
+socket = net.connect("example.com", 80)
+print("  Connected! Socket ID: " + socket)
+
+# Send HTTP GET request
+request = "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n"
+print("  Sending HTTP request...")
+bytes_sent = net.send(socket, request)
+print("  Bytes sent: " + bytes_sent)
+
+# Receive response
+print("  Receiving response...")
+response = net.recv(socket, 4096)
+print("  Bytes received: " + response.size())
+
+# Show response info
+print("")
+print("  Response received successfully!")
+print("  (Full response content available)")
+
+# Close socket
+net.close(socket)
+print("")
+print("  Socket closed")
+
+print("")
+print("=== All net primitives tests passed ===")

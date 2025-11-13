@@ -72,11 +72,13 @@ impl ModuleManager {
 
     /// Register all built-in native modules
     fn register_native_modules(&mut self) {
-        use crate::stdlib::{ConstantsModule, RandomModule, OSModule};
+        use crate::stdlib::{ConstantsModule, RandomModule, OSModule, FSModule, NetModule};
 
         self.register_native_module(Box::new(ConstantsModule));
         self.register_native_module(Box::new(RandomModule::new()));
         self.register_native_module(Box::new(OSModule));
+        self.register_native_module(Box::new(FSModule));
+        self.register_native_module(Box::new(NetModule));
     }
 
     /// Register a native module
