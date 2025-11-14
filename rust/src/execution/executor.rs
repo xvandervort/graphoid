@@ -1066,6 +1066,7 @@ impl Executor {
     /// Evaluates a method call expression (object.method(args)).
     fn eval_method_call(&mut self, object: &Expr, method: &str, args: &[crate::ast::Argument]) -> Result<Value> {
         // Check for static method calls on type identifiers (e.g., list.generate, time.now)
+        // BUT: Check if the name is defined as a variable/module first!
         if let Expr::Variable { name, .. } = object {
             if name == "list" {
                 // Evaluate argument expressions
@@ -1073,9 +1074,13 @@ impl Executor {
                 return self.eval_list_static_method(method, &arg_values);
             }
             if name == "time" {
-                // Evaluate argument expressions
-                let arg_values = self.eval_arguments(args)?;
-                return self.eval_time_static_method(method, &arg_values);
+                // Check if 'time' is defined as a variable (e.g., imported module)
+                if !self.env.exists("time") {
+                    // Not defined - use built-in static methods
+                    let arg_values = self.eval_arguments(args)?;
+                    return self.eval_time_static_method(method, &arg_values);
+                }
+                // Otherwise fall through to normal module handling
             }
         }
 
