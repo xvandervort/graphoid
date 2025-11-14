@@ -1,0 +1,94 @@
+# Integration Test Runner for Graphoid
+# Pure Graphoid implementation using fs.list_dir() and exec()
+
+import "fs"
+
+print("================================================")
+print("  Graphoid Integration Test Runner")
+print("================================================")
+print("")
+
+# Discover test files dynamically
+test_dir = "tests/integration"
+all_files = fs.list_dir(test_dir)
+
+# Filter for .gr files
+test_files = []
+i = 0
+while i < all_files.size() {
+    filename = all_files[i]
+    if filename.ends_with(".gr") {
+        test_files = test_files.append(filename)
+    }
+    i = i + 1
+}
+
+print("Found " + test_files.size().to_string() + " test files")
+print("")
+
+# Counters
+total = test_files.size()
+passed = 0
+failed = 0
+failed_tests = []
+
+# Run each test
+i = 0
+while i < total {
+    test_name = test_files[i]
+    test_path = test_dir + "/" + test_name
+
+    # Skip files ending with _skip.gr
+    if test_name.ends_with("_skip.gr") {
+        print("⊘ SKIP " + test_name + " (marked as skip)")
+        i = i + 1
+    } else {
+        print("Running " + test_name + " ...")
+
+        # Execute the test file and capture output
+        # If there's an error, exec() will raise it
+        configure { error_mode: :collect } {
+            output = exec(test_path)
+        }
+
+        # Check if there were any errors
+        errors = get_errors()
+        if errors.size() > 0 {
+            print("  ✗ FAIL")
+            failed = failed + 1
+            failed_tests = failed_tests.append(test_name)
+
+            # Show error output
+            print("    Error: " + errors[0].message())
+        } else {
+            print("  ✓ PASS")
+            passed = passed + 1
+        }
+
+        # Clear errors for next test
+        clear_errors()
+
+        i = i + 1
+    }
+}
+
+print("")
+print("================================================")
+print("  Test Summary")
+print("================================================")
+print("Total:   " + total.to_string())
+print("Passed:  " + passed.to_string())
+print("Failed:  " + failed.to_string())
+print("")
+
+if failed > 0 {
+    print("Failed tests:")
+    j = 0
+    while j < failed_tests.size() {
+        print("  ✗ " + failed_tests[j])
+        j = j + 1
+    }
+    print("")
+} else {
+    print("All tests passed!")
+}

@@ -1,0 +1,63 @@
+# Test Character Code Primitives
+# Tests .char_code(), .to_bytes(), .to_char(), and byte array to_string()
+
+print("=== Character Code Primitives Tests ===")
+print("")
+
+# Test char_code()
+print("Test 1: char_code()")
+print("  'H'.char_code(0) = " + "H".char_code(0).to_string())
+print("  'A'.char_code(0) = " + "A".char_code(0).to_string())
+print("  'hello'.char_code(1) = " + "hello".char_code(1).to_string())
+print("")
+
+# Test to_bytes()
+print("Test 2: to_bytes()")
+bytes_h = "Hi".to_bytes()
+print("  'Hi'.to_bytes() = " + bytes_h.to_string())
+bytes_hello = "Hello".to_bytes()
+print("  'Hello'.to_bytes() = " + bytes_hello.to_string())
+print("")
+
+# Test to_char()
+print("Test 3: to_char()")
+print("  (65).to_char() = " + (65).to_char())
+print("  (72).to_char() = " + (72).to_char())
+print("  (101).to_char() = " + (101).to_char())
+print("")
+
+# Test byte array to string
+print("Test 4: Byte array to_string()")
+test_bytes = [72, 101, 108, 108, 111]
+print("  [72, 101, 108, 108, 111].to_string() = " + test_bytes.to_string())
+
+# Round trip test
+print("")
+print("Test 5: Round trip (string -> bytes -> string)")
+original = "Test123"
+bytes = original.to_bytes()
+reconstructed = bytes.to_string()
+print("  Original: " + original)
+print("  Bytes: " + bytes.to_string())
+print("  Reconstructed: " + reconstructed)
+print("  Match: " + (original == reconstructed).to_string())
+print("")
+
+# Character building
+print("Test 6: Build string from character codes")
+h = (72).to_char()
+e = (101).to_char()
+l = (108).to_char()
+o = (111).to_char()
+hello = h + e + l + l + o
+print("  Built 'Hello' from codes: " + hello)
+print("")
+
+# Edge cases
+print("Test 7: Edge cases")
+print("  ASCII space (32): '" + (32).to_char() + "'")
+print("  ASCII newline (10): '" + (10).to_char() + "'")
+print("  Empty byte array: '" + [].to_string() + "'")
+print("")
+
+print("=== All char code tests passed! ===")

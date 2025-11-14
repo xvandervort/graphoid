@@ -43,6 +43,7 @@ impl NativeModule for FSModule {
         functions.insert("read".to_string(), fs_read as NativeFunction);
         functions.insert("write".to_string(), fs_write as NativeFunction);
         functions.insert("close".to_string(), fs_close as NativeFunction);
+        functions.insert("list_dir".to_string(), fs_list_dir as NativeFunction);
 
         functions
     }
@@ -208,4 +209,47 @@ fn fs_close(args: &[Value]) -> Result<Value> {
     }
 
     Ok(Value::boolean(true))
+}
+
+/// List directory contents
+/// fs.list_dir(path) -> list of filenames
+fn fs_list_dir(args: &[Value]) -> Result<Value> {
+    if args.len() != 1 {
+        return Err(GraphoidError::RuntimeError {
+            message: "list_dir() requires exactly 1 argument: path".to_string(),
+        });
+    }
+
+    let path = get_string_arg(args, 0, "list_dir")?;
+
+    // Read directory entries
+    let entries = std::fs::read_dir(&path).map_err(|e| GraphoidError::RuntimeError {
+        message: format!("Failed to read directory '{}': {}", path, e),
+    })?;
+
+    // Collect filenames
+    let mut filenames: Vec<String> = Vec::new();
+
+    for entry in entries {
+        let entry = entry.map_err(|e| GraphoidError::RuntimeError {
+            message: format!("Failed to read directory entry: {}", e),
+        })?;
+
+        let filename = entry
+            .file_name()
+            .to_string_lossy()
+            .to_string();
+
+        filenames.push(filename);
+    }
+
+    // Sort alphabetically
+    filenames.sort();
+
+    // Convert to list of Value::String
+    let values: Vec<Value> = filenames.iter()
+        .map(|name| Value::string(name.clone()))
+        .collect();
+
+    Ok(Value::list(crate::values::List::from_vec(values)))
 }

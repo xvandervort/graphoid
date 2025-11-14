@@ -30,6 +30,9 @@ pub struct Executor {
     global_functions: HashMap<String, Vec<Function>>,
     /// Private symbols (Phase 10: priv keyword support)
     private_symbols: std::collections::HashSet<String>,
+    /// Output capture support for exec()
+    output_capture_enabled: bool,
+    output_buffer: String,
 }
 
 impl Executor {
@@ -46,6 +49,8 @@ impl Executor {
             function_graph: Rc::new(RefCell::new(FunctionGraph::new())),
             global_functions: HashMap::new(),
             private_symbols: std::collections::HashSet::new(),
+            output_capture_enabled: false,
+            output_buffer: String::new(),
         }
     }
 
@@ -62,6 +67,8 @@ impl Executor {
             function_graph: Rc::new(RefCell::new(FunctionGraph::new())),
             global_functions: HashMap::new(),
             private_symbols: std::collections::HashSet::new(),
+            output_capture_enabled: false,
+            output_buffer: String::new(),
         }
     }
 
@@ -355,14 +362,16 @@ impl Executor {
                 // Extract parameter names
                 let param_names: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
 
-                // Create function value
+                // Create function value with PLACEHOLDER environment
+                // We'll update it after adding the function to the environment to support recursion
+                let placeholder_env = Rc::new(RefCell::new(self.env.clone()));
                 let mut func = Function {
                     name: Some(name.clone()),
                     params: param_names,
                     parameters: params.clone(),
                     body: body.clone(),
                     pattern_clauses: pattern_clauses.clone(),
-                    env: Rc::new(RefCell::new(self.env.clone())),
+                    env: placeholder_env.clone(),
                     node_id: None,
                 };
 
@@ -378,7 +387,11 @@ impl Executor {
                     .push(func.clone());
 
                 // Store function in environment (last definition wins for direct calls)
-                self.env.define(name.clone(), Value::function(func));
+                self.env.define(name.clone(), Value::function(func.clone()));
+
+                // NOW update the function's captured environment to include itself for recursion
+                // Since we use Rc<RefCell>, this updates all copies of the function
+                *placeholder_env.borrow_mut() = self.env.clone();
 
                 // Phase 10: Track private symbols
                 if *is_private {
@@ -3085,6 +3098,46 @@ impl Executor {
 
                 Err(GraphoidError::runtime("reverse!() can only be called on variables, not literals".to_string()))
             }
+            // Character code methods (Phase 12 - stdlib robustness)
+            "char_code" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'char_code' expects 1 argument (index), but got {}",
+                        args.len()
+                    )));
+                }
+                let index = match &args[0].kind {
+                    ValueKind::Number(n) => *n as usize,
+                    _other => {
+                        return Err(GraphoidError::type_error("number", args[0].type_name()));
+                    }
+                };
+
+                let bytes = s.as_bytes();
+                if index >= bytes.len() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String index {} out of bounds for string of length {}",
+                        index,
+                        bytes.len()
+                    )));
+                }
+
+                Ok(Value::number(bytes[index] as f64))
+            }
+            "to_bytes" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'to_bytes' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let bytes: Vec<Value> = s.bytes()
+                    .map(|b| Value::number(b as f64))
+                    .collect();
+
+                Ok(Value::list(List::from_vec(bytes)))
+            }
             _ => Err(GraphoidError::runtime(format!(
                 "String does not have method '{}'",
                 method
@@ -3266,6 +3319,31 @@ impl Executor {
                     )))
                 }
             }
+            // Character code conversion (Phase 12 - stdlib robustness)
+            "to_char" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Number method 'to_char' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let code = n.trunc() as i64;
+                if code < 0 || code > 127 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Character code {} out of ASCII range (0-127)",
+                        code
+                    )));
+                }
+
+                let ch = char::from_u32(code as u32)
+                    .ok_or_else(|| GraphoidError::runtime(format!(
+                        "Invalid character code: {}",
+                        code
+                    )))?;
+
+                Ok(Value::string(ch.to_string()))
+            }
             _ => Err(GraphoidError::runtime(format!(
                 "Number does not have method '{}'",
                 method
@@ -3319,10 +3397,10 @@ impl Executor {
             ValueKind::Number(n) => Ok(Value::number(*n)),
             ValueKind::Boolean(b) => Ok(Value::number(if *b { 1.0 } else { 0.0 })),
             ValueKind::String(s) => {
-                // Try to parse string to number, return 0.0 or NaN if invalid
+                // Try to parse string to number, return none if invalid (spec line 3296)
                 match s.parse::<f64>() {
                     Ok(n) => Ok(Value::number(n)),
-                    Err(_) => Ok(Value::number(f64::NAN)), // Invalid strings become NaN
+                    Err(_) => Ok(Value::none()), // Spec: Invalid strings return none
                 }
             }
             ValueKind::None => Ok(Value::number(0.0)), // Spec line 206: none.to_num() => 0
@@ -3362,19 +3440,61 @@ impl Executor {
                 }
             }
             ValueKind::List(list) => {
-                // Convert list to string representation
-                let elements: Vec<String> = list
-                    .to_vec()
-                    .iter()
-                    .map(|v| match &v.kind {
-                        ValueKind::String(s) => format!("\"{}\"", s),
-                        ValueKind::Number(n) => n.to_string(),
-                        ValueKind::Boolean(b) => b.to_string(),
-                        ValueKind::None => "none".to_string(),
-                        _ => v.type_name().to_string(),
-                    })
-                    .collect();
-                Ok(Value::string(format!("[{}]", elements.join(", "))))
+                let items = list.to_vec();
+
+                // Check if this is a byte array (all numbers 0-255)
+                let is_byte_array = items.iter().all(|v| {
+                    if let ValueKind::Number(n) = &v.kind {
+                        let code = n.trunc() as i64;
+                        code >= 0 && code <= 255
+                    } else {
+                        false
+                    }
+                });
+
+                if is_byte_array && !items.is_empty() {
+                    // Convert byte array to string
+                    let bytes: Vec<u8> = items.iter()
+                        .filter_map(|v| {
+                            if let ValueKind::Number(n) = &v.kind {
+                                Some(n.trunc() as u8)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+
+                    match String::from_utf8(bytes) {
+                        Ok(s) => Ok(Value::string(s)),
+                        Err(_) => {
+                            // Invalid UTF-8 - fall back to list representation
+                            let elements: Vec<String> = items
+                                .iter()
+                                .map(|v| match &v.kind {
+                                    ValueKind::String(s) => format!("\"{}\"", s),
+                                    ValueKind::Number(n) => n.to_string(),
+                                    ValueKind::Boolean(b) => b.to_string(),
+                                    ValueKind::None => "none".to_string(),
+                                    _ => v.type_name().to_string(),
+                                })
+                                .collect();
+                            Ok(Value::string(format!("[{}]", elements.join(", "))))
+                        }
+                    }
+                } else {
+                    // Standard list stringification
+                    let elements: Vec<String> = items
+                        .iter()
+                        .map(|v| match &v.kind {
+                            ValueKind::String(s) => format!("\"{}\"", s),
+                            ValueKind::Number(n) => n.to_string(),
+                            ValueKind::Boolean(b) => b.to_string(),
+                            ValueKind::None => "none".to_string(),
+                            _ => v.type_name().to_string(),
+                        })
+                        .collect();
+                    Ok(Value::string(format!("[{}]", elements.join(", "))))
+                }
             }
             ValueKind::Map(hash) => {
                 // Convert hash to string representation
@@ -4675,7 +4795,12 @@ impl Executor {
                         output.push_str(&str_repr);
                     }
 
-                    println!("{}", output);
+                    // Output to console or buffer depending on capture mode
+                    if self.output_capture_enabled {
+                        self.capture_print(&output);
+                    } else {
+                        println!("{}", output);
+                    }
                     return Ok(Value::none());
                 }
                 "RuntimeError" | "ValueError" | "TypeError" | "IOError" | "NetworkError" | "ParseError" => {
@@ -4747,6 +4872,52 @@ impl Executor {
 
                     self.error_collector.clear();
                     return Ok(Value::none());
+                }
+                "exec" => {
+                    // exec(path) - execute a .gr file and return its stdout output as string
+                    if args.len() != 1 {
+                        return Err(GraphoidError::runtime(format!(
+                            "exec() expects 1 argument (file path), got {}",
+                            args.len()
+                        )));
+                    }
+
+                    let path_value = match &args[0] {
+                        Argument::Positional(expr) => self.eval_expr(expr)?,
+                        Argument::Named { .. } => {
+                            return Err(GraphoidError::runtime(
+                                "exec() does not accept named arguments".to_string()
+                            ));
+                        }
+                    };
+
+                    let path = match &path_value.kind {
+                        ValueKind::String(s) => s.clone(),
+                        _ => {
+                            return Err(GraphoidError::runtime(format!(
+                                "exec() path must be a string, got {}",
+                                path_value.type_name()
+                            )));
+                        }
+                    };
+
+                    // Read the file
+                    let source = std::fs::read_to_string(&path).map_err(|e| {
+                        GraphoidError::runtime(format!("exec(): failed to read file '{}': {}", path, e))
+                    })?;
+
+                    // Create a new executor with output capture enabled
+                    let mut file_executor = Executor::new();
+                    file_executor.enable_output_capture();
+                    file_executor.set_current_file(Some(std::path::PathBuf::from(&path)));
+
+                    // Execute the file
+                    file_executor.execute_source(&source)?;
+
+                    // Get captured output
+                    let output = file_executor.get_captured_output();
+
+                    return Ok(Value::string(output));
                 }
                 "node" => {
                     // node(variable, type: optional) - creates a pattern node object
@@ -6804,6 +6975,27 @@ impl Executor {
                 }
             }
         }
+    }
+
+    /// Enable output capture for exec() - print statements go to buffer instead of stdout
+    pub fn enable_output_capture(&mut self) {
+        self.output_capture_enabled = true;
+        self.output_buffer.clear();
+    }
+
+    /// Get captured output and clear the buffer
+    pub fn get_captured_output(&mut self) -> String {
+        let output = self.output_buffer.clone();
+        self.output_buffer.clear();
+        output
+    }
+
+    /// Capture print output (called by print builtin when capture is enabled)
+    fn capture_print(&mut self, text: &str) {
+        if !self.output_buffer.is_empty() {
+            self.output_buffer.push('\n');
+        }
+        self.output_buffer.push_str(text);
     }
 }
 

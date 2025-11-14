@@ -1,0 +1,58 @@
+# Test JSON Number Parsing Fix
+
+import "json"
+
+print("=== JSON Number Parsing Tests ===")
+print("")
+
+# Test integers
+print("Test 1: Integer parsing")
+data1 = '{"age": 30, "count": 100}'
+parsed1 = json.parse(data1)
+print("  JSON: " + data1)
+print("  Parsed age: " + parsed1["age"].to_string())
+print("  age + 5 = " + (parsed1["age"] + 5).to_string())
+print("  Is age a number? " + ((parsed1["age"] + 0) == parsed1["age"]).to_string())
+print("")
+
+# Test floats
+print("Test 2: Float parsing")
+data2 = '{"pi": 3.14159, "e": 2.71828}'
+parsed2 = json.parse(data2)
+print("  JSON: " + data2)
+print("  Parsed pi: " + parsed2["pi"].to_string())
+print("  pi * 2 = " + (parsed2["pi"] * 2).to_string())
+print("")
+
+# Test negative numbers
+print("Test 3: Negative numbers")
+data3 = '{"temp": -5, "balance": -123.45}'
+parsed3 = json.parse(data3)
+print("  JSON: " + data3)
+print("  Temp: " + parsed3["temp"].to_string())
+print("  Balance: " + parsed3["balance"].to_string())
+print("  temp < 0? " + (parsed3["temp"] < 0).to_string())
+print("")
+
+# Test scientific notation
+print("Test 4: Scientific notation")
+data4 = '{"small": 1.5e-10, "big": 3e8}'
+parsed4 = json.parse(data4)
+print("  JSON: " + data4)
+print("  Small: " + parsed4["small"].to_string())
+print("  Big: " + parsed4["big"].to_string())
+print("")
+
+# Test mixed types
+print("Test 5: Mixed types")
+data5 = '{"name": "Alice", "age": 30, "score": 95.5, "active": true}'
+parsed5 = json.parse(data5)
+print("  JSON: " + data5)
+print("  name: " + parsed5["name"])
+print("  age: " + parsed5["age"].to_string())
+print("  score: " + parsed5["score"].to_string())
+print("  active: " + parsed5["active"].to_string())
+print("  Math on age: age * 2 = " + (parsed5["age"] * 2).to_string())
+print("")
+
+print("=== All JSON tests passed! ===")

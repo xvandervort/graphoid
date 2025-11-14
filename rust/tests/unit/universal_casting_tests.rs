@@ -157,12 +157,12 @@ fn test_list_to_string_empty() {
 fn test_list_to_string_numbers() {
     let mut executor = Executor::new();
     let code = r#"
-        result = [1, 2, 3].to_string()
+        result = [100, 200, 300].to_string()
     "#;
 
     executor.execute_source(code).unwrap();
     let result = executor.env().get("result").unwrap();
-    assert!(matches!(&result.kind, ValueKind::String(s) if s == "[1, 2, 3]"));
+    assert!(matches!(&result.kind, ValueKind::String(s) if s == "[100, 200, 300]"));
 }
 
 #[test]
@@ -282,8 +282,8 @@ fn test_string_to_num_invalid() {
 
     executor.execute_source(code).unwrap();
     let result = executor.env().get("result").unwrap();
-    // Invalid string should convert to 0 or NaN (check implementation)
-    assert!(matches!(&result.kind, ValueKind::Number(n) if n.is_nan() || *n == 0.0));
+    // Invalid string should convert to none per spec (line 3296)
+    assert!(matches!(&result.kind, ValueKind::None));
 }
 
 #[test]

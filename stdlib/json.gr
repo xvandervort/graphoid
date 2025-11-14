@@ -122,14 +122,22 @@ fn parse_number(text, pos) {
             result = result + char
             pos = pos + 1
         } else {
-            # End of number
-            # Convert string to number (simplified - just return as string for now)
-            # TODO: Need string-to-number conversion
-            return [result, pos]
+            # End of number - convert string to number using .to_num()
+            num_value = result.to_num()
+            if num_value == none {
+                # Invalid number format - return 0
+                num_value = 0
+            }
+            return [num_value, pos]
         }
     }
 
-    return [result, pos]
+    # End of string - convert final result to number
+    num_value = result.to_num()
+    if num_value == none {
+        num_value = 0
+    }
+    return [num_value, pos]
 }
 
 # Main parse function - returns [value, new_position]

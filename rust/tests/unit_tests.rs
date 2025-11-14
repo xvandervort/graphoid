@@ -41,4 +41,6 @@ mod unit {
     pub mod number_methods_tests;
     pub mod universal_casting_tests;
     pub mod time_tests;
+    pub mod fs_list_dir_tests;
+    pub mod exec_tests;
 }

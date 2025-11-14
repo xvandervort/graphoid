@@ -1,0 +1,35 @@
+# Comprehensive JSON parsing test
+
+import "json"
+
+print("=== JSON Module Tests ===")
+print("")
+
+# Test 1: Empty object
+print("Test 1: Empty object")
+result1 = json.parse("{}")
+print("  Result: " + result1.to_string())
+print("  Keys: " + result1.keys().to_string())
+print("")
+
+# Test 2: Simple number
+print("Test 2: Simple object with number")
+result2 = json.parse("{\"age\": 30}")
+print("  Result: " + result2.to_string())
+print("  Keys: " + result2.keys().to_string())
+if result2.has_key("age") {
+    age_val = result2["age"]
+    print("  Age value: " + age_val.to_string())
+    print("  Age type: " + age_val.type())
+    print("  Age + 5: " + (age_val + 5).to_string())
+}
+print("")
+
+# Test 3: Multiple fields
+print("Test 3: Multiple fields")
+result3 = json.parse("{\"name\": \"Alice\", \"age\": 25}")
+print("  Result: " + result3.to_string())
+print("  Keys: " + result3.keys().to_string())
+print("")
+
+print("=== Tests Complete ===")
