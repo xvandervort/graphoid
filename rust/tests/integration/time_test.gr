@@ -5,17 +5,17 @@ print("")
 
 # Creation
 now = time.now()
-print("Now: " + time.as_datetime(now, none))
+print("Now: " + time.format(now, none))
 
 today = time.today()
-print("Today (start): " + time.as_date(today, none))
+print("Today (start): " + time.format(today, :date))
 
 birthday = time.from_date(1990, 12, 25)
-print("Birthday: " + time.as_date(birthday, "long"))
+print("Birthday: " + time.format(birthday, :long))
 
 # Calendar-aware arithmetic
 jan31 = time.from_date(2025, 1, 31)
-print("Jan 31 + 1 month: " + time.as_date(time.add_months(jan31, 1), none))
+print("Jan 31 + 1 month: " + time.format(time.add_months(jan31, 1), :date))
 
 # Predicates
 monday = time.from_date(2025, 1, 13)
@@ -26,14 +26,14 @@ print("Is Saturday a weekend? " + time.is_weekend(saturday))
 
 # Navigation
 week_start = time.start_of_week(now)
-print("Start of week: " + time.as_date(week_start, none))
+print("Start of week: " + time.format(week_start, :date))
 
 month_end = time.end_of_month(now)
-print("End of month: " + time.as_date(month_end, none))
+print("End of month: " + time.format(month_end, :date))
 
 # Business logic
 business = time.skip_weekends(saturday)
-print("Skip weekend from Saturday: " + time.as_date(business, none))
+print("Skip weekend from Saturday: " + time.format(business, :date))
 
 print("")
 print("=== All Time Features Working! ===")

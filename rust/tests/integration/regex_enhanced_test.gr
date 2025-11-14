@@ -1,0 +1,111 @@
+# Test enhanced regex features (character classes, escapes, shortcuts)
+
+import "regex"
+
+print("=== Enhanced Regex Features Test ===")
+print("")
+
+# Test 1: Simple character classes
+print("Test 1: Simple character classes [abc]")
+print("  '[abc]' matches 'a': " + regex.matches("[abc]", "a"))
+print("  '[abc]' matches 'b': " + regex.matches("[abc]", "b"))
+print("  '[abc]' matches 'c': " + regex.matches("[abc]", "c"))
+print("  '[abc]' matches 'd': " + regex.matches("[abc]", "d"))
+print("  Expected: true, true, true, false")
+print("")
+
+# Test 2: Character class ranges
+print("Test 2: Character class ranges [a-z]")
+print("  '[a-z]' matches 'h': " + regex.matches("[a-z]", "h"))
+print("  '[a-z]' matches 'A': " + regex.matches("[a-z]", "A"))
+print("  '[0-9]' matches '5': " + regex.matches("[0-9]", "5"))
+print("  '[0-9]' matches 'a': " + regex.matches("[0-9]", "a"))
+print("  Expected: true, false, true, false")
+print("")
+
+# Test 3: Negated character classes
+print("Test 3: Negated character classes [^abc]")
+print("  '[^abc]' matches 'a': " + regex.matches("[^abc]", "a"))
+print("  '[^abc]' matches 'd': " + regex.matches("[^abc]", "d"))
+print("  '[^0-9]' matches 'a': " + regex.matches("[^0-9]", "a"))
+print("  '[^0-9]' matches '5': " + regex.matches("[^0-9]", "5"))
+print("  Expected: false, true, true, false")
+print("")
+
+# Test 4: Escape sequences for metacharacters
+print("Test 4: Escape sequences for metacharacters")
+print("  'example\\.com' matches 'example.com': " + regex.matches("example\\.com", "example.com"))
+print("  'example\\.com' matches 'exampleXcom': " + regex.matches("example\\.com", "exampleXcom"))
+print("  'a\\*b' matches 'a*b': " + regex.matches("a\\*b", "a*b"))
+print("  'a\\+b' matches 'a+b': " + regex.matches("a\\+b", "a+b"))
+print("  Expected: true, false, true, true")
+print("")
+
+# Test 5: Digit shortcut \d
+print("Test 5: Digit shortcut \\d")
+print("  '\\d' matches '5': " + regex.matches("\\d", "5"))
+print("  '\\d' matches 'a': " + regex.matches("\\d", "a"))
+print("  '\\d+' matches '123': " + regex.matches("\\d+", "123"))
+print("  '\\d+' matches 'abc': " + regex.matches("\\d+", "abc"))
+print("  Expected: true, false, true, false")
+print("")
+
+# Test 6: Word character shortcut \w
+print("Test 6: Word character shortcut \\w")
+print("  '\\w' matches 'a': " + regex.matches("\\w", "a"))
+print("  '\\w' matches 'Z': " + regex.matches("\\w", "Z"))
+print("  '\\w' matches '5': " + regex.matches("\\w", "5"))
+print("  '\\w' matches '_': " + regex.matches("\\w", "_"))
+print("  '\\w' matches '.': " + regex.matches("\\w", "."))
+print("  Expected: true, true, true, true, false")
+print("")
+
+# Test 7: Whitespace shortcut \s
+print("Test 7: Whitespace shortcut \\s")
+print("  '\\s' matches ' ': " + regex.matches("\\s", " "))
+print("  '\\s' matches tab: " + regex.matches("\\s", "\t"))
+print("  '\\s' matches newline: " + regex.matches("\\s", "\n"))
+print("  '\\s' matches 'a': " + regex.matches("\\s", "a"))
+print("  Expected: true, true, true, false")
+print("")
+
+# Test 8: Negated shortcuts
+print("Test 8: Negated shortcuts (\\D, \\W, \\S)")
+print("  '\\D' matches 'a': " + regex.matches("\\D", "a"))
+print("  '\\D' matches '5': " + regex.matches("\\D", "5"))
+print("  '\\W' matches '.': " + regex.matches("\\W", "."))
+print("  '\\W' matches 'a': " + regex.matches("\\W", "a"))
+print("  '\\S' matches 'a': " + regex.matches("\\S", "a"))
+print("  '\\S' matches ' ': " + regex.matches("\\S", " "))
+print("  Expected: true, false, true, false, true, false")
+print("")
+
+# Test 9: Real-world pattern - email validation
+print("Test 9: Email validation pattern")
+email_pattern = "\\w+@\\w+\\.\\w+"
+print("  Pattern: " + email_pattern)
+print("  Matches 'user@example.com': " + regex.matches(email_pattern, "user@example.com"))
+print("  Matches 'test@site.org': " + regex.matches(email_pattern, "test@site.org"))
+print("  Matches 'invalid': " + regex.matches(email_pattern, "invalid"))
+print("  Expected: true, true, false")
+print("")
+
+# Test 10: Real-world pattern - phone number
+print("Test 10: Phone number pattern")
+phone_pattern = "\\d\\d\\d-\\d\\d\\d-\\d\\d\\d\\d"
+print("  Pattern: " + phone_pattern)
+print("  Matches '123-456-7890': " + regex.matches(phone_pattern, "123-456-7890"))
+print("  Matches '999-888-7777': " + regex.matches(phone_pattern, "999-888-7777"))
+print("  Matches '12-345-6789': " + regex.matches(phone_pattern, "12-345-6789"))
+print("  Expected: true, true, false")
+print("")
+
+# Test 11: Complex patterns with multiple features
+print("Test 11: Complex patterns")
+print("  '[a-z]+\\.[a-z]+' matches 'hello.world': " + regex.matches("[a-z]+\\.[a-z]+", "hello.world"))
+print("  '[0-9]+\\*[0-9]+' matches '12*34': " + regex.matches("[0-9]+\\*[0-9]+", "12*34"))
+print("  '^[A-Z][a-z]+' matches 'Hello': " + regex.matches("^[A-Z][a-z]+", "Hello"))
+print("  Expected: true, true, true")
+print("")
+
+print("=== Enhanced Regex Tests Complete ===")
