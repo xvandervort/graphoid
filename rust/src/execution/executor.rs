@@ -25,8 +25,9 @@ pub struct Executor {
     pub error_collector: ErrorCollector,
     /// Global function graph tracking all function definitions and calls
     pub function_graph: Rc<RefCell<FunctionGraph>>,
-    /// Global function table (for recursion support)
-    global_functions: HashMap<String, Function>,
+    /// Global function table (for recursion support and function overloading)
+    /// Maps function name to list of overloaded functions with different arities
+    global_functions: HashMap<String, Vec<Function>>,
     /// Private symbols (Phase 10: priv keyword support)
     private_symbols: std::collections::HashSet<String>,
 }
@@ -167,8 +168,13 @@ impl Executor {
                     Ok(value) => Ok(value),
                     Err(_) => {
                         // If not in environment, check global functions table
-                        if let Some(func) = self.global_functions.get(name) {
-                            Ok(Value::function(func.clone()))
+                        // For variable lookup (no arity info), return last defined overload
+                        if let Some(funcs) = self.global_functions.get(name) {
+                            if let Some(func) = funcs.last() {
+                                Ok(Value::function(func.clone()))
+                            } else {
+                                Err(GraphoidError::undefined_variable(name))
+                            }
                         } else {
                             Err(GraphoidError::undefined_variable(name))
                         }
@@ -364,10 +370,14 @@ impl Executor {
                 let node_id = self.function_graph.borrow_mut().register_function(func.clone());
                 func.node_id = Some(node_id);
 
-                // Store in global functions table (for recursion support)
-                self.global_functions.insert(name.clone(), func.clone());
+                // Store in global functions table (for recursion support and overloading)
+                // Multiple functions with same name but different arities are supported
+                self.global_functions
+                    .entry(name.clone())
+                    .or_insert_with(Vec::new)
+                    .push(func.clone());
 
-                // Store function in environment
+                // Store function in environment (last definition wins for direct calls)
                 self.env.define(name.clone(), Value::function(func));
 
                 // Phase 10: Track private symbols
@@ -1069,13 +1079,31 @@ impl Executor {
                 )));
             }
 
+            // If there are arguments, evaluate them first to know the arity
+            if !args.is_empty() {
+                let arg_values = self.eval_arguments(args)?;
+                let arity = arg_values.len();
+
+                // Check global_functions for overloaded functions with matching arity
+                if let Some(overloads) = self.global_functions.get(method) {
+                    // Find function with matching arity and clone it to avoid borrow issues
+                    if let Some(func) = overloads.iter().find(|f| f.parameters.len() == arity).cloned() {
+                        return self.call_function(&func, &arg_values);
+                    }
+                }
+            }
+
             // Look up the member in the module's namespace
             let member = module.namespace.get(method)?;
 
             // If it's a function, call it with args
             if let ValueKind::Function(func) = &member.kind {
-                // Evaluate argument expressions
-                let arg_values = self.eval_arguments(args)?;
+                // Evaluate argument expressions if not already done
+                let arg_values = if args.is_empty() {
+                    Vec::new()
+                } else {
+                    self.eval_arguments(args)?
+                };
                 return self.call_function(&func, &arg_values);
             } else if let ValueKind::NativeFunction(native_func) = &member.kind {
                 // Native function - call it with evaluated args
@@ -4883,7 +4911,24 @@ impl Executor {
             }
         }
 
-        // Evaluate the callee to get the function
+        // Special handling for function calls by name (to support overloading)
+        // If callee is a variable, try to find overloaded function with matching arity
+        if let Expr::Variable { name, .. } = callee {
+            // Count arguments to determine arity
+            let arity = args.len();
+
+            // Check if there are overloaded functions with this name
+            if let Some(overloads) = self.global_functions.get(name) {
+                // Find function with matching arity
+                if let Some(func) = overloads.iter().find(|f| f.parameters.len() == arity).cloned() {
+                    // Process arguments and call the matched overload
+                    let arg_values = self.process_arguments(&func, args)?;
+                    return self.call_function(&func, &arg_values);
+                }
+            }
+        }
+
+        // Fallback: Evaluate the callee to get the function (for non-overloaded calls)
         let callee_value = self.eval_expr(callee)?;
 
         // Check if it's a function
@@ -5983,9 +6028,12 @@ impl Executor {
             private_symbols: module_executor.private_symbols.clone(),  // Phase 10: Track private symbols
         };
 
-        // Copy module's global functions to main executor (enables forward references)
-        for (func_name, func) in module_executor.global_functions {
-            self.global_functions.insert(func_name, func);
+        // Copy module's global functions to main executor (enables forward references and overloading)
+        for (func_name, funcs) in module_executor.global_functions {
+            self.global_functions
+                .entry(func_name)
+                .or_insert_with(Vec::new)
+                .extend(funcs);
         }
 
         // Register module in manager

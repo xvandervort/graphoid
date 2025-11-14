@@ -1,0 +1,91 @@
+# Test the approx module (pure Graphoid implementation!)
+
+import "approx"
+
+print("=== Testing Absolute Tolerance ===")
+
+# Basic absolute comparison
+result1 = approx.equal(3.14159, 3.14, 0.01)
+print("3.14159 ≈ 3.14 (±0.01): " + result1.to_string())  # true
+
+result2 = approx.equal(3.14159, 3.14, 0.001)
+print("3.14159 ≈ 3.14 (±0.001): " + result2.to_string())  # false
+
+# Using eq alias
+result3 = approx.eq(1.0, 1.0001, 0.001)
+print("1.0 ≈ 1.0001 (±0.001): " + result3.to_string())  # true
+
+print("=== Testing Relative Tolerance ===")
+
+# Relative/percentage comparison
+result4 = approx.equal(100.0, 99.0, 0.02, :relative)
+print("100.0 ≈ 99.0 (2% relative): " + result4.to_string())  # true
+
+result5 = approx.equal(100.0, 95.0, 0.02, :relative)
+print("100.0 ≈ 95.0 (2% relative): " + result5.to_string())  # false
+
+result6 = approx.equal(1000.0, 990.0, 0.02, :relative)
+print("1000.0 ≈ 990.0 (2% relative): " + result6.to_string())  # true
+
+print("=== Testing Time Comparisons ===")
+
+# Create two times 3 seconds apart
+time1 = time.from_timestamp(1704067200)
+time2 = time.from_timestamp(1704067203)
+
+result7 = approx.equal(time1, time2, 5, :seconds)
+print("Times 3 sec apart, within 5 sec: " + result7.to_string())  # true
+
+result8 = approx.equal(time1, time2, 2, :seconds)
+print("Times 3 sec apart, within 2 sec: " + result8.to_string())  # false
+
+# Minutes comparison
+time3 = time.from_timestamp(1704067200)
+time4 = time.from_timestamp(1704067500)  # 5 minutes later
+
+result9 = approx.equal(time3, time4, 10, :minutes)
+print("Times 5 min apart, within 10 min: " + result9.to_string())  # true
+
+result10 = approx.equal(time3, time4, 3, :minutes)
+print("Times 5 min apart, within 3 min: " + result10.to_string())  # false
+
+print("=== Testing Hours and Days ===")
+
+# Hours
+time5 = time.from_timestamp(1704067200)
+time6 = time.from_timestamp(1704074400)  # 2 hours later
+
+result11 = approx.equal(time5, time6, 3, :hours)
+print("Times 2 hours apart, within 3 hours: " + result11.to_string())  # true
+
+# Days
+time7 = time.from_timestamp(1704067200)
+time8 = time.from_timestamp(1704153600)  # 1 day later
+
+result12 = approx.equal(time7, time8, 2, :days)
+print("Times 1 day apart, within 2 days: " + result12.to_string())  # true
+
+print("=== Testing within() Alias ===")
+
+result13 = approx.within(2.5, 2.501, 0.01)
+print("2.5 within 2.501 (±0.01): " + result13.to_string())  # true
+
+print("=== Practical Use Case ===")
+
+# Floating-point calculation result
+calculated = 0.1 + 0.2  # Might be 0.30000000000000004
+expected = 0.3
+
+if approx.equal(calculated, expected, 0.0001) {
+    print("Floating-point calculation matches expected value!")
+}
+
+# Time-based scheduling
+meeting_time = time.from_numbers(2025, 1, 15, 14, 30, 0)
+arrival_time = time.from_numbers(2025, 1, 15, 14, 27, 0)
+
+if approx.equal(meeting_time, arrival_time, 5, :minutes) {
+    print("Arrived on time for meeting!")
+}
+
+print("=== All tests completed ===")

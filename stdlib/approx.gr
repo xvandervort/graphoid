@@ -1,0 +1,70 @@
+# Approximate Equality Module
+# Provides functions for fuzzy/approximate comparisons
+
+# Main function: Check if two values are approximately equal
+fn equal(a, b, tolerance, mode) {
+    # Handle time comparisons with units
+    if mode == :seconds {
+        time_diff = (a.to_num() - b.to_num()).abs()
+        return time_diff < tolerance
+    }
+
+    if mode == :minutes {
+        time_diff = (a.to_num() - b.to_num()).abs()
+        return time_diff < (tolerance * 60)
+    }
+
+    if mode == :hours {
+        time_diff = (a.to_num() - b.to_num()).abs()
+        return time_diff < (tolerance * 3600)
+    }
+
+    if mode == :days {
+        time_diff = (a.to_num() - b.to_num()).abs()
+        return time_diff < (tolerance * 86400)
+    }
+
+    # Relative/percentage comparison
+    if mode == :relative {
+        diff = (a - b).abs()
+        max_val = a.abs()
+        if b.abs() > max_val {
+            max_val = b.abs()
+        }
+
+        # Avoid division by zero
+        if max_val == 0 {
+            return diff < tolerance
+        }
+
+        return (diff / max_val) < tolerance
+    }
+
+    # Absolute comparison (default)
+    diff = (a - b).abs()
+    return diff < tolerance
+}
+
+# Overload for 3 arguments (absolute tolerance, no mode)
+fn equal(a, b, tolerance) {
+    diff = (a - b).abs()
+    return diff < tolerance
+}
+
+# Alias: shorter name
+fn eq(a, b, tolerance, mode) {
+    return equal(a, b, tolerance, mode)
+}
+
+fn eq(a, b, tolerance) {
+    return equal(a, b, tolerance)
+}
+
+# Alias: more natural for some use cases
+fn within(a, b, tolerance, mode) {
+    return equal(a, b, tolerance, mode)
+}
+
+fn within(a, b, tolerance) {
+    return equal(a, b, tolerance)
+}

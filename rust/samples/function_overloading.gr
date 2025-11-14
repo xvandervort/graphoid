@@ -1,0 +1,73 @@
+# Function Overloading Example
+# Demonstrates that Graphoid supports function overloading by arity
+
+print("=== Function Overloading Demo ===")
+print("")
+
+# Define a function with 1 parameter
+fn greet(name) {
+    return "Hello, " + name + "!"
+}
+
+# Define another function with the same name but 2 parameters (overload)
+fn greet(name, greeting) {
+    return greeting + ", " + name + "!"
+}
+
+# Define a third overload with 3 parameters
+fn greet(name, greeting, punctuation) {
+    return greeting + ", " + name + punctuation
+}
+
+# Test 1-parameter version
+result1 = greet("Alice")
+print("1 param: " + result1)
+
+# Test 2-parameter version
+result2 = greet("Bob", "Hi")
+print("2 params: " + result2)
+
+# Test 3-parameter version
+result3 = greet("Charlie", "Hey", "!!!")
+print("3 params: " + result3)
+
+print("")
+print("=== Overloading with Different Logic ===")
+print("")
+
+# Function to add one number
+fn add(x) {
+    return x + 1
+}
+
+# Overload to add two numbers
+fn add(x, y) {
+    return x + y
+}
+
+# Overload to add three numbers
+fn add(x, y, z) {
+    return x + y + z
+}
+
+# Test the overloads
+print("add(5): " + add(5).to_string())
+print("add(5, 10): " + add(5, 10).to_string())
+print("add(5, 10, 15): " + add(5, 10, 15).to_string())
+
+print("")
+print("=== Module Overloading (from approx.gr) ===")
+print("")
+
+import "approx"
+
+# Test 3-parameter version (absolute tolerance)
+result4 = approx.equal(3.14159, 3.14, 0.01)
+print("3 params (absolute): " + result4.to_string())
+
+# Test 4-parameter version (with mode)
+result5 = approx.equal(100.0, 99.0, 0.02, :relative)
+print("4 params (relative): " + result5.to_string())
+
+print("")
+print("=== All overloading tests passed! ===")

@@ -332,7 +332,33 @@ fn name(param1, param2) {
 fn greet(name, greeting = "Hello") {
     return greeting + ", " + name
 }
+
+# Function overloading by arity (different number of parameters)
+fn format(value) {
+    return value.to_string()
+}
+
+fn format(value, decimals) {
+    return value.round(decimals).to_string()
+}
+
+fn format(value, decimals, prefix) {
+    return prefix + value.round(decimals).to_string()
+}
+
+# Each overload is selected based on the number of arguments
+result1 = format(3.14159)           # Calls 1-parameter version
+result2 = format(3.14159, 2)        # Calls 2-parameter version
+result3 = format(3.14159, 2, "$")   # Calls 3-parameter version
 ```
+
+**Function Overloading Rules:**
+- Multiple functions can share the same name if they have **different arities** (number of parameters)
+- The correct overload is selected at call-time based on the number of arguments passed
+- Overloading works for both direct function calls and module functions
+- When referencing a function as a value (not calling it), the last-defined overload is used
+- Overloading only considers arity, not parameter types (Graphoid is dynamically typed)
+- Common use case: Optional complexity in APIs (e.g., `approx.equal(a, b, tolerance)` vs `approx.equal(a, b, tolerance, mode)`)
 
 #### Lambdas (`lambda`)
 Anonymous functions with arrow syntax:
@@ -1980,6 +2006,49 @@ pi.round(2)     # 3.14 (round to 2 decimal places)
 ```
 
 **Available Symbols**: `:nearest_ten`, `:nearest_hundred`, `:nearest_thousand`, `:nearest_million`
+
+#### Approximate Equality Module
+```Graphoid
+import "approx"
+
+# Absolute tolerance comparison
+approx.equal(3.14159, 3.14, 0.01)      # true (within ±0.01)
+approx.equal(3.14159, 3.14, 0.001)     # false (difference: 0.00159)
+
+# Aliases for convenience
+approx.eq(1.0, 1.0001, 0.001)          # Same as equal()
+approx.within(2.5, 2.501, 0.01)        # Same as equal()
+
+# Relative/percentage tolerance
+approx.equal(100.0, 99.0, 0.02, :relative)   # true (1% difference)
+approx.equal(100.0, 95.0, 0.02, :relative)   # false (5% difference)
+
+# Time comparisons with units
+time1 = time.from_timestamp(1704067200)
+time2 = time.from_timestamp(1704067203)  # 3 seconds later
+
+approx.equal(time1, time2, 5, :seconds)  # true (within 5 seconds)
+approx.equal(time1, time2, 2, :seconds)  # false (exceeds 2 seconds)
+
+# Other time units
+approx.equal(t1, t2, 10, :minutes)       # Within 10 minutes
+approx.equal(t1, t2, 3, :hours)          # Within 3 hours
+approx.equal(t1, t2, 2, :days)           # Within 2 days
+```
+
+**Use Cases:**
+- Floating-point arithmetic comparisons (e.g., `0.1 + 0.2 == 0.3` issues)
+- Scientific measurements with tolerance
+- Time-based scheduling and event timing
+- Financial calculations with acceptable rounding
+- Testing numerical algorithms
+
+**Comparison Modes:**
+- No mode (3 params): Absolute tolerance - `|a - b| < tolerance`
+- `:relative` (4 params): Relative tolerance - `|a - b| / max(|a|, |b|) < tolerance`
+- `:seconds`, `:minutes`, `:hours`, `:days` (4 params): Time difference in specified units
+
+**Implementation Note:** The `approx` module is implemented entirely in pure Graphoid, demonstrating function overloading (3-parameter vs 4-parameter versions).
 
 ### Randomness
 
