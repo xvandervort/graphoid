@@ -1,7 +1,0 @@
-print("Start")
-
-func test(x) {
-    return x
-}
-
-print("End")

@@ -1,7 +1,0 @@
-# Glang program file
-# Generated on 2025-09-04 21:02:26
-
-# Variable declarations
-string name = "Bob"
-num age = 30
-list items = ["a", "b"]

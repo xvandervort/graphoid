@@ -1,9 +1,0 @@
-# Test what string methods are available
-
-string test = "Hello World"
-list<string> methods = test.methods()
-
-print("Available string methods:")
-for method in methods {
-    print("  " + method)
-}
