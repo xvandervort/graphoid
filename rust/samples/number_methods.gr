@@ -1,0 +1,66 @@
+# Number Methods Example
+# Demonstrates sqrt, abs, up, down, round, and log methods
+
+print("=== Square Root ===")
+print((9.0).sqrt())        # 3.0
+print((2.0).sqrt())        # ~1.414
+print((0.0).sqrt())        # 0.0
+
+print("=== Absolute Value ===")
+print((5.5).abs())         # 5.5
+print((-5.5).abs())        # 5.5
+print((0.0).abs())         # 0.0
+
+print("=== Up (Ceiling) ===")
+print((3.2).up())          # 4.0 - ceil to integer
+print((3.14159).up(2))     # 3.15 - ceil to 2 decimal places
+print((23.0).up(:nearest_ten))      # 30.0
+print((250.0).up(:nearest_hundred)) # 300.0
+print((-3.2).up())         # -3.0 - ceil negative
+
+print("=== Down (Floor) ===")
+print((3.8).down())        # 3.0 - floor to integer
+print((3.14159).down(2))   # 3.14 - floor to 2 decimal places
+print((27.0).down(:nearest_ten))    # 20.0
+print((-3.2).down())       # -4.0 - floor negative
+
+print("=== Round ===")
+print((3.5).round())       # 4.0 - round to integer
+print((3.14159).round(2))  # 3.14 - round to 2 decimal places
+print((25.0).round(:nearest_ten))   # 30.0
+print((24.0).round(:nearest_ten))   # 20.0
+print((-3.5).round())      # -4.0 - round negative
+
+print("=== Logarithms ===")
+e = 2.718281828
+print(e.log())             # ~1.0 - natural log
+print((100.0).log(10))     # 2.0 - log base 10
+print((8.0).log(2))        # 3.0 - log base 2
+
+print("=== Practical Examples ===")
+
+# Calculate hypotenuse of right triangle
+a = 3.0
+b = 4.0
+hypotenuse = ((a * a) + (b * b)).sqrt()
+print(hypotenuse)          # 5.0
+
+# Calculate distance from zero
+x = -42.5
+distance = x.abs()
+print(distance)            # 42.5
+
+# Round price to nearest dollar
+price = 19.99
+rounded_price = price.round()
+print(rounded_price)       # 20.0
+
+# Round to cents
+price2 = 19.999
+price_with_cents = price2.round(2)
+print(price_with_cents)    # 20.00
+
+# Round population to nearest thousand
+population = 123456.0
+pop_rounded = (population / 1000.0).round() * 1000.0
+print(pop_rounded)         # 123000.0

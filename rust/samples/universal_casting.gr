@@ -1,0 +1,73 @@
+# Universal Casting Methods Example
+# All types support to_num(), to_string(), and to_bool()
+
+print("=== Boolean Casting ===")
+print(true.to_num())       # 1
+print(false.to_num())      # 0
+print(true.to_string())    # "true"
+print(false.to_string())   # "false"
+print(true.to_bool())      # true
+print(false.to_bool())     # false
+
+print("=== None Casting ===")
+print(none.to_num())       # 0
+print(none.to_string())    # "" (empty string)
+print(none.to_bool())      # false
+
+print("=== Number Casting ===")
+print((42.5).to_string())  # "42.5"
+print((0.0).to_bool())     # false
+print((42.0).to_bool())    # true
+print((42.5).to_num())     # 42.5 (identity)
+
+print("=== String Casting ===")
+print("123.45".to_num())   # 123.45
+print("".to_bool())        # false
+print("hello".to_bool())   # true
+
+print("=== List Casting ===")
+print([].to_bool())        # false
+print([1, 2, 3].to_bool()) # true
+print([1, 2, 3, 4, 5].to_num())     # 5 (length)
+print([].to_string())      # "[]"
+print([1, 2, 3].to_string())        # "[1, 2, 3]"
+
+print("=== Hash Casting ===")
+print({}.to_bool())        # false
+h = {"a": 1, "b": 2}
+print(h.to_bool())         # true
+print(h.to_num())          # 2 (number of keys)
+print({}.to_string())      # "{}"
+
+print("=== Practical Examples ===")
+
+# Check if collection is empty
+items = [1, 2, 3]
+if items.to_bool() {
+    print("Items list is not empty")
+}
+
+# Get size of collection as number
+config = {"host": "localhost", "port": 8080, "debug": true}
+num_settings = config.to_num()
+print("Number of settings: " + num_settings.to_string())
+
+# Convert user input to number
+user_input = "42"
+age = user_input.to_num()
+print("Age: " + age.to_string())
+
+# Check if number is non-zero (truthy)
+count = 10
+if count.to_bool() {
+    print("Count is non-zero")
+}
+
+# Format list as string for display
+scores = [95, 87, 92]
+print("Scores: " + scores.to_string())
+
+# Convert boolean to numeric representation
+is_active = true
+status_code = is_active.to_num()  # 1 for true, 0 for false
+print("Status code: " + status_code.to_string())

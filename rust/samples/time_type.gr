@@ -1,0 +1,114 @@
+# Time Type Example
+# Demonstrates time.now(), time.today(), and all time operations
+
+print("=== Creating Time Values ===")
+
+# Get current time
+current = time.now()
+print("Current time: " + current.to_string())
+
+# Get today at midnight UTC
+today = time.today()
+print("Today (midnight UTC): " + today.to_string())
+
+# Create from components (year, month, day, hour, minute, second)
+birthday = time.from_numbers(2025, 1, 15, 14, 30, 45)
+print("Birthday: " + birthday.to_string())
+
+# Create from ISO 8601 string
+meeting = time.from_string("2025-01-20T10:00:00Z")
+print("Meeting time: " + meeting.to_string())
+
+# Create from Unix timestamp
+epoch = time.from_timestamp(0)
+print("Unix epoch: " + epoch.to_string())
+
+# Create from specific timestamp
+timestamp = time.from_timestamp(1704067200)
+print("From timestamp 1704067200: " + timestamp.to_string())
+
+print("=== Time Type Methods ===")
+
+# Get type
+print("Type: " + birthday.type())
+
+# Convert to Unix timestamp
+ts = birthday.to_num()
+print("Unix timestamp: " + ts.to_string())
+
+# Convert to ISO 8601 string
+iso = birthday.to_string()
+print("ISO 8601: " + iso)
+
+# Check truthiness
+is_truthy = birthday.to_bool()
+print("Is truthy: " + is_truthy.to_string())
+
+print("=== Extract Time Components ===")
+
+# Get time components as a hash
+components = birthday.time_numbers()
+print("Year: " + components["year"].to_string())
+print("Month: " + components["month"].to_string())
+print("Day: " + components["day"].to_string())
+print("Hour: " + components["hour"].to_string())
+print("Minute: " + components["minute"].to_string())
+print("Second: " + components["second"].to_string())
+print("Weekday: " + components["weekday"].to_string())
+print("Day of year: " + components["day_of_year"].to_string())
+
+print("=== Round-trip Conversions ===")
+
+# Timestamp round-trip
+original_ts = 1704067200.5
+t1 = time.from_timestamp(original_ts)
+recovered_ts = t1.to_num()
+print("Original timestamp: " + original_ts.to_string())
+print("Recovered timestamp: " + recovered_ts.to_string())
+
+# String round-trip
+original_str = "2025-01-15T14:30:45Z"
+t2 = time.from_string(original_str)
+recovered_str = t2.to_string()
+print("Original string: " + original_str)
+print("Recovered string: " + recovered_str)
+
+print("=== Practical Examples ===")
+
+# Log current time
+now = time.now()
+print("Application started at: " + now.to_string())
+
+# Schedule event for specific date
+event_date = time.from_numbers(2025, 12, 31, 23, 59, 59)
+print("New Year's Eve countdown: " + event_date.to_string())
+
+# Parse user input
+user_input = "2025-06-15T09:00:00Z"
+scheduled_time = time.from_string(user_input)
+details = scheduled_time.time_numbers()
+print("Scheduled month: " + details["month"].to_string())
+print("Scheduled day: " + details["day"].to_string())
+print("Scheduled year: " + details["year"].to_string())
+print("Scheduled hour: " + details["hour"].to_string())
+
+# Work with epoch
+epoch_time = time.from_timestamp(0)
+epoch_components = epoch_time.time_numbers()
+print("Unix epoch year: " + epoch_components["year"].to_string())
+print("Unix epoch month: " + epoch_components["month"].to_string())
+print("Unix epoch day: " + epoch_components["day"].to_string())
+
+# Get today's date for logging
+log_date = time.today()
+print("Daily log entry for: " + log_date.to_string())
+
+# Create specific moment
+meeting_time = time.from_numbers(2025, 2, 14, 15, 30, 0)
+print("Valentine's Day meeting: " + meeting_time.to_string())
+
+# Parse different formats (with timezone)
+utc_time = time.from_string("2025-01-15T10:00:00Z")
+offset_time = time.from_string("2025-01-15T15:30:00+05:30")
+print("UTC time: " + utc_time.to_string())
+print("With timezone offset: " + offset_time.to_string())

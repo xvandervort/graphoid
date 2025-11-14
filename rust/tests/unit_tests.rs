@@ -38,4 +38,7 @@ mod unit {
     pub mod bitwise_tests;
     pub mod bitwise_unsigned_debug;
     pub mod string_methods_tests;
+    pub mod number_methods_tests;
+    pub mod universal_casting_tests;
+    pub mod time_tests;
 }

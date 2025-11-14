@@ -405,6 +405,8 @@ pub enum ValueKind {
     PatternPath(PatternPath),
     /// Pattern match results (Phase 9) - results from graph pattern matching
     PatternMatchResults(PatternMatchResults),
+    /// Time value (Phase 12) - UTC timestamp internally, ISO 8601 display
+    Time(f64), // UTC timestamp (seconds since Unix epoch)
 }
 
 // Manual PartialEq implementation for ValueKind
@@ -428,6 +430,7 @@ impl PartialEq for ValueKind {
             (ValueKind::PatternEdge(a), ValueKind::PatternEdge(b)) => a == b,
             (ValueKind::PatternPath(a), ValueKind::PatternPath(b)) => a == b,
             (ValueKind::PatternMatchResults(a), ValueKind::PatternMatchResults(b)) => a == b,
+            (ValueKind::Time(a), ValueKind::Time(b)) => a == b,
             _ => false, // Different variants are not equal
         }
     }
@@ -471,6 +474,10 @@ impl Value {
 
     pub fn none() -> Self {
         Value { kind: ValueKind::None, frozen: false }
+    }
+
+    pub fn time(timestamp: f64) -> Self {
+        Value { kind: ValueKind::Time(timestamp), frozen: false }
     }
 
     pub fn symbol(s: String) -> Self {
@@ -553,6 +560,7 @@ impl Value {
             ValueKind::PatternEdge(_) => true,
             ValueKind::PatternPath(_) => true,
             ValueKind::PatternMatchResults(results) => !results.is_empty(), // Empty results are falsy
+            ValueKind::Time(_) => true, // Time values are always truthy
         }
     }
 
@@ -632,6 +640,16 @@ impl Value {
             ValueKind::PatternMatchResults(results) => {
                 format!("<pattern match results: {} matches>", results.len())
             }
+            ValueKind::Time(timestamp) => {
+                use chrono::DateTime;
+                let seconds = timestamp.trunc() as i64;
+                let nanos = ((timestamp - timestamp.trunc()) * 1_000_000_000.0) as u32;
+                if let Some(dt) = DateTime::from_timestamp(seconds, nanos) {
+                    dt.to_rfc3339()
+                } else {
+                    "Invalid Time".to_string()
+                }
+            }
         }
     }
 
@@ -654,6 +672,7 @@ impl Value {
             ValueKind::PatternEdge(_) => "pattern_edge",
             ValueKind::PatternPath(_) => "pattern_path",
             ValueKind::PatternMatchResults(_) => "pattern_match_results",
+            ValueKind::Time(_) => "time",
         }
     }
 

@@ -1042,12 +1042,17 @@ impl Executor {
 
     /// Evaluates a method call expression (object.method(args)).
     fn eval_method_call(&mut self, object: &Expr, method: &str, args: &[crate::ast::Argument]) -> Result<Value> {
-        // Check for static method calls on type identifiers (e.g., list.generate)
+        // Check for static method calls on type identifiers (e.g., list.generate, time.now)
         if let Expr::Variable { name, .. } = object {
             if name == "list" {
                 // Evaluate argument expressions
                 let arg_values = self.eval_arguments(args)?;
                 return self.eval_list_static_method(method, &arg_values);
+            }
+            if name == "time" {
+                // Evaluate argument expressions
+                let arg_values = self.eval_arguments(args)?;
+                return self.eval_time_static_method(method, &arg_values);
             }
         }
 
@@ -1373,11 +1378,55 @@ impl Executor {
                     return Ok(Value::boolean(self.check_has_frozen(&value)));
                 }
             }
+            // Universal casting methods (spec line 3185) - work on all types
+            "to_num" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'to_num' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                return self.value_to_num(&value);
+            }
+            "to_string" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'to_string' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                return self.value_to_string(&value);
+            }
+            "to_bool" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'to_bool' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                return self.value_to_bool(&value);
+            }
+            "type" => {
+                // Note: Error and PatternNode have their own type() methods that return
+                // different information, so we let them handle it in their specific dispatchers
+                if !matches!(&value.kind, ValueKind::Error(_) | ValueKind::PatternNode(_)) {
+                    if !args.is_empty() {
+                        return Err(GraphoidError::runtime(format!(
+                            "Method 'type' takes no arguments, but got {}",
+                            args.len()
+                        )));
+                    }
+                    return Ok(Value::string(value.type_name().to_string()));
+                }
+                // Let Error and PatternNode handle their own type() method
+            }
             _ => {}
         }
 
         // Dispatch to type-specific methods
         match &value.kind {
+            ValueKind::Number(n) => self.eval_number_method(*n, method, args),
+            ValueKind::Time(timestamp) => self.eval_time_method(*timestamp, method, args),
             ValueKind::List(list) => self.eval_list_method(&list, method, args),
             ValueKind::Map(hash) => self.eval_map_method(&hash, method, args),
             ValueKind::Graph(graph) => self.eval_graph_method(graph.clone(), method, args, object_expr),
@@ -1485,6 +1534,129 @@ impl Executor {
             }
             _ => Err(GraphoidError::runtime(format!(
                 "list does not have static method '{}'",
+                method
+            ))),
+        }
+    }
+
+    /// Evaluates static methods on the time type (e.g., time.now, time.today).
+    fn eval_time_static_method(&self, method: &str, args: &[Value]) -> Result<Value> {
+        use chrono::{Utc, TimeZone, Datelike};
+
+        match method {
+            "now" => {
+                // time.now() - current UTC timestamp
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "time.now() expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                let now = Utc::now();
+                let timestamp = now.timestamp() as f64 + (now.timestamp_subsec_nanos() as f64 / 1_000_000_000.0);
+                Ok(Value::time(timestamp))
+            }
+            "today" => {
+                // time.today() - midnight UTC today
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "time.today() expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                let now = Utc::now();
+                let today = Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
+                    .single()
+                    .ok_or_else(|| GraphoidError::runtime("Failed to create today's date".to_string()))?;
+                let timestamp = today.timestamp() as f64;
+                Ok(Value::time(timestamp))
+            }
+            "from_numbers" => {
+                // time.from_numbers(year, month, day, hour, min, sec)
+                if args.len() != 6 {
+                    return Err(GraphoidError::runtime(format!(
+                        "time.from_numbers() expects 6 arguments (year, month, day, hour, min, sec), but got {}",
+                        args.len()
+                    )));
+                }
+
+                let year = match &args[0].kind {
+                    ValueKind::Number(n) => *n as i32,
+                    _ => return Err(GraphoidError::type_error("number", args[0].type_name()))
+                };
+                let month = match &args[1].kind {
+                    ValueKind::Number(n) => *n as u32,
+                    _ => return Err(GraphoidError::type_error("number", args[1].type_name()))
+                };
+                let day = match &args[2].kind {
+                    ValueKind::Number(n) => *n as u32,
+                    _ => return Err(GraphoidError::type_error("number", args[2].type_name()))
+                };
+                let hour = match &args[3].kind {
+                    ValueKind::Number(n) => *n as u32,
+                    _ => return Err(GraphoidError::type_error("number", args[3].type_name()))
+                };
+                let min = match &args[4].kind {
+                    ValueKind::Number(n) => *n as u32,
+                    _ => return Err(GraphoidError::type_error("number", args[4].type_name()))
+                };
+                let sec = match &args[5].kind {
+                    ValueKind::Number(n) => *n as u32,
+                    _ => return Err(GraphoidError::type_error("number", args[5].type_name()))
+                };
+
+                let dt = Utc.with_ymd_and_hms(year, month, day, hour, min, sec)
+                    .single()
+                    .ok_or_else(|| GraphoidError::runtime(format!(
+                        "Invalid date/time: {}-{:02}-{:02} {:02}:{:02}:{:02}",
+                        year, month, day, hour, min, sec
+                    )))?;
+
+                let timestamp = dt.timestamp() as f64;
+                Ok(Value::time(timestamp))
+            }
+            "from_string" => {
+                // time.from_string(iso_string)
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "time.from_string() expects 1 argument (ISO 8601 string), but got {}",
+                        args.len()
+                    )));
+                }
+
+                let iso_string = match &args[0].kind {
+                    ValueKind::String(s) => s,
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name()))
+                };
+
+                // Try to parse as RFC3339/ISO 8601
+                let dt = chrono::DateTime::parse_from_rfc3339(iso_string)
+                    .map_err(|e| GraphoidError::runtime(format!(
+                        "Failed to parse time string '{}': {}",
+                        iso_string, e
+                    )))?;
+
+                let timestamp = dt.timestamp() as f64 + (dt.timestamp_subsec_nanos() as f64 / 1_000_000_000.0);
+                Ok(Value::time(timestamp))
+            }
+            "from_timestamp" => {
+                // time.from_timestamp(number)
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "time.from_timestamp() expects 1 argument (Unix timestamp), but got {}",
+                        args.len()
+                    )));
+                }
+
+                let timestamp = match &args[0].kind {
+                    ValueKind::Number(n) => *n,
+                    _ => return Err(GraphoidError::type_error("number", args[0].type_name()))
+                };
+
+                Ok(Value::time(timestamp))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "time does not have static method '{}'",
                 method
             ))),
         }
@@ -2889,6 +3061,334 @@ impl Executor {
                 "String does not have method '{}'",
                 method
             ))),
+        }
+    }
+
+    /// Evaluates a method call on a number.
+    fn eval_number_method(&self, n: f64, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "sqrt" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Number method 'sqrt' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                Ok(Value::number(n.sqrt()))
+            }
+            "abs" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Number method 'abs' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                Ok(Value::number(n.abs()))
+            }
+            "up" => {
+                // up() - ceil to integer
+                // up(n) - ceil to n decimal places
+                // up(:nearest_ten) - ceil to nearest 10
+                // up(:nearest_hundred) - ceil to nearest 100
+                if args.is_empty() {
+                    return Ok(Value::number(n.ceil()));
+                }
+
+                match &args[0].kind {
+                    ValueKind::Number(decimal_places) => {
+                        if args.len() > 1 {
+                            return Err(GraphoidError::runtime(format!(
+                                "Number method 'up' expects 0 or 1 arguments, but got {}",
+                                args.len()
+                            )));
+                        }
+                        let places = *decimal_places as i32;
+                        let multiplier = 10_f64.powi(places);
+                        Ok(Value::number((n * multiplier).ceil() / multiplier))
+                    }
+                    ValueKind::Symbol(mode) => {
+                        if args.len() > 1 {
+                            return Err(GraphoidError::runtime(format!(
+                                "Number method 'up' expects 0 or 1 arguments, but got {}",
+                                args.len()
+                            )));
+                        }
+                        match mode.as_str() {
+                            "nearest_ten" => Ok(Value::number((n / 10.0).ceil() * 10.0)),
+                            "nearest_hundred" => Ok(Value::number((n / 100.0).ceil() * 100.0)),
+                            _ => Err(GraphoidError::runtime(format!(
+                                "Unknown up() mode: :{}. Valid modes: :nearest_ten, :nearest_hundred",
+                                mode
+                            )))
+                        }
+                    }
+                    _ => Err(GraphoidError::runtime(format!(
+                        "up() argument must be a number (decimal places) or symbol (mode), got {}",
+                        args[0].type_name()
+                    )))
+                }
+            }
+            "down" => {
+                // down() - floor to integer
+                // down(n) - floor to n decimal places
+                // down(:nearest_ten) - floor to nearest 10
+                // down(:nearest_hundred) - floor to nearest 100
+                if args.is_empty() {
+                    return Ok(Value::number(n.floor()));
+                }
+
+                match &args[0].kind {
+                    ValueKind::Number(decimal_places) => {
+                        if args.len() > 1 {
+                            return Err(GraphoidError::runtime(format!(
+                                "Number method 'down' expects 0 or 1 arguments, but got {}",
+                                args.len()
+                            )));
+                        }
+                        let places = *decimal_places as i32;
+                        let multiplier = 10_f64.powi(places);
+                        Ok(Value::number((n * multiplier).floor() / multiplier))
+                    }
+                    ValueKind::Symbol(mode) => {
+                        if args.len() > 1 {
+                            return Err(GraphoidError::runtime(format!(
+                                "Number method 'down' expects 0 or 1 arguments, but got {}",
+                                args.len()
+                            )));
+                        }
+                        match mode.as_str() {
+                            "nearest_ten" => Ok(Value::number((n / 10.0).floor() * 10.0)),
+                            "nearest_hundred" => Ok(Value::number((n / 100.0).floor() * 100.0)),
+                            _ => Err(GraphoidError::runtime(format!(
+                                "Unknown down() mode: :{}. Valid modes: :nearest_ten, :nearest_hundred",
+                                mode
+                            )))
+                        }
+                    }
+                    _ => Err(GraphoidError::runtime(format!(
+                        "down() argument must be a number (decimal places) or symbol (mode), got {}",
+                        args[0].type_name()
+                    )))
+                }
+            }
+            "round" => {
+                // round() - round to integer
+                // round(n) - round to n decimal places
+                // round(:nearest_ten) - round to nearest 10
+                // round(:nearest_hundred) - round to nearest 100
+                if args.is_empty() {
+                    return Ok(Value::number(n.round()));
+                }
+
+                match &args[0].kind {
+                    ValueKind::Number(decimal_places) => {
+                        if args.len() > 1 {
+                            return Err(GraphoidError::runtime(format!(
+                                "Number method 'round' expects 0 or 1 arguments, but got {}",
+                                args.len()
+                            )));
+                        }
+                        let places = *decimal_places as i32;
+                        let multiplier = 10_f64.powi(places);
+                        Ok(Value::number((n * multiplier).round() / multiplier))
+                    }
+                    ValueKind::Symbol(mode) => {
+                        if args.len() > 1 {
+                            return Err(GraphoidError::runtime(format!(
+                                "Number method 'round' expects 0 or 1 arguments, but got {}",
+                                args.len()
+                            )));
+                        }
+                        match mode.as_str() {
+                            "nearest_ten" => Ok(Value::number((n / 10.0).round() * 10.0)),
+                            "nearest_hundred" => Ok(Value::number((n / 100.0).round() * 100.0)),
+                            _ => Err(GraphoidError::runtime(format!(
+                                "Unknown round() mode: :{}. Valid modes: :nearest_ten, :nearest_hundred",
+                                mode
+                            )))
+                        }
+                    }
+                    _ => Err(GraphoidError::runtime(format!(
+                        "round() argument must be a number (decimal places) or symbol (mode), got {}",
+                        args[0].type_name()
+                    )))
+                }
+            }
+            "log" => {
+                // log() - natural logarithm
+                // log(base) - logarithm with specified base
+                if args.is_empty() {
+                    return Ok(Value::number(n.ln()));
+                }
+
+                if args.len() > 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Number method 'log' expects 0 or 1 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                match &args[0].kind {
+                    ValueKind::Number(base) => {
+                        Ok(Value::number(n.log(*base)))
+                    }
+                    _ => Err(GraphoidError::runtime(format!(
+                        "log() base must be a number, got {}",
+                        args[0].type_name()
+                    )))
+                }
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "Number does not have method '{}'",
+                method
+            ))),
+        }
+    }
+
+    /// Evaluates a method call on a time value.
+    fn eval_time_method(&self, timestamp: f64, method: &str, args: &[Value]) -> Result<Value> {
+        use chrono::{DateTime, Datelike, Timelike};
+
+        match method {
+            "time_numbers" => {
+                // time_numbers() - Extract year, month, day, hour, minute, second, weekday, day_of_year
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Time method 'time_numbers' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let seconds = timestamp.trunc() as i64;
+                let nanos = ((timestamp - timestamp.trunc()) * 1_000_000_000.0) as u32;
+
+                let dt = DateTime::from_timestamp(seconds, nanos)
+                    .ok_or_else(|| GraphoidError::runtime("Invalid timestamp".to_string()))?;
+
+                // Create hash with time components
+                let mut hash = crate::values::Hash::new();
+                hash.insert("year".to_string(), Value::number(dt.year() as f64)).ok();
+                hash.insert("month".to_string(), Value::number(dt.month() as f64)).ok();
+                hash.insert("day".to_string(), Value::number(dt.day() as f64)).ok();
+                hash.insert("hour".to_string(), Value::number(dt.hour() as f64)).ok();
+                hash.insert("minute".to_string(), Value::number(dt.minute() as f64)).ok();
+                hash.insert("second".to_string(), Value::number(dt.second() as f64)).ok();
+                hash.insert("weekday".to_string(), Value::number(dt.weekday().num_days_from_sunday() as f64)).ok();
+                hash.insert("day_of_year".to_string(), Value::number(dt.ordinal() as f64)).ok();
+
+                Ok(Value::map(hash))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "Time does not have method '{}'",
+                method
+            ))),
+        }
+    }
+
+    /// Universal type casting: to_num() (spec line 3185)
+    fn value_to_num(&self, value: &Value) -> Result<Value> {
+        match &value.kind {
+            ValueKind::Number(n) => Ok(Value::number(*n)),
+            ValueKind::Boolean(b) => Ok(Value::number(if *b { 1.0 } else { 0.0 })),
+            ValueKind::String(s) => {
+                // Try to parse string to number, return 0.0 or NaN if invalid
+                match s.parse::<f64>() {
+                    Ok(n) => Ok(Value::number(n)),
+                    Err(_) => Ok(Value::number(f64::NAN)), // Invalid strings become NaN
+                }
+            }
+            ValueKind::None => Ok(Value::number(0.0)), // Spec line 206: none.to_num() => 0
+            ValueKind::Time(timestamp) => Ok(Value::number(*timestamp)), // Spec line 221: time.to_num() => Unix timestamp
+            ValueKind::List(list) => {
+                // List to_num() returns its size
+                Ok(Value::number(list.len() as f64))
+            }
+            ValueKind::Map(hash) => {
+                // Hash to_num() returns its size (number of keys)
+                Ok(Value::number(hash.len() as f64))
+            }
+            _ => {
+                // For other types, return 0 as a safe default
+                Ok(Value::number(0.0))
+            }
+        }
+    }
+
+    /// Universal type casting: to_string() (spec line 3185)
+    fn value_to_string(&self, value: &Value) -> Result<Value> {
+        match &value.kind {
+            ValueKind::String(s) => Ok(Value::string(s.clone())),
+            ValueKind::Number(n) => Ok(Value::string(n.to_string())),
+            ValueKind::Boolean(b) => Ok(Value::string(if *b { "true".to_string() } else { "false".to_string() })),
+            ValueKind::None => Ok(Value::string(String::new())), // Spec line 207: none.to_string() => ""
+            ValueKind::Time(timestamp) => {
+                // Spec line 219: time.to_string() => ISO 8601 format
+                use chrono::DateTime;
+                let seconds = timestamp.trunc() as i64;
+                let nanos = ((timestamp - timestamp.trunc()) * 1_000_000_000.0) as u32;
+                if let Some(dt) = DateTime::from_timestamp(seconds, nanos) {
+                    Ok(Value::string(dt.to_rfc3339()))
+                } else {
+                    // Invalid timestamp
+                    Ok(Value::string("Invalid Time".to_string()))
+                }
+            }
+            ValueKind::List(list) => {
+                // Convert list to string representation
+                let elements: Vec<String> = list
+                    .to_vec()
+                    .iter()
+                    .map(|v| match &v.kind {
+                        ValueKind::String(s) => format!("\"{}\"", s),
+                        ValueKind::Number(n) => n.to_string(),
+                        ValueKind::Boolean(b) => b.to_string(),
+                        ValueKind::None => "none".to_string(),
+                        _ => v.type_name().to_string(),
+                    })
+                    .collect();
+                Ok(Value::string(format!("[{}]", elements.join(", "))))
+            }
+            ValueKind::Map(hash) => {
+                // Convert hash to string representation
+                let keys = hash.keys();
+                let mut pairs: Vec<String> = keys
+                    .iter()
+                    .map(|k| {
+                        let v = hash.get(k).unwrap(); // Key came from keys(), must exist
+                        let val_str = match &v.kind {
+                            ValueKind::String(s) => format!("\"{}\"", s),
+                            ValueKind::Number(n) => n.to_string(),
+                            ValueKind::Boolean(b) => b.to_string(),
+                            ValueKind::None => "none".to_string(),
+                            _ => v.type_name().to_string(),
+                        };
+                        format!("\"{}\": {}", k, val_str)
+                    })
+                    .collect();
+                pairs.sort(); // Deterministic order
+                Ok(Value::string(format!("{{{}}}", pairs.join(", "))))
+            }
+            _ => {
+                // For other types, use their type name
+                Ok(Value::string(value.type_name().to_string()))
+            }
+        }
+    }
+
+    /// Universal type casting: to_bool() (spec line 3185)
+    fn value_to_bool(&self, value: &Value) -> Result<Value> {
+        match &value.kind {
+            ValueKind::Boolean(b) => Ok(Value::boolean(*b)),
+            ValueKind::Number(n) => Ok(Value::boolean(*n != 0.0 && !n.is_nan())),
+            ValueKind::String(s) => Ok(Value::boolean(!s.is_empty())),
+            ValueKind::None => Ok(Value::boolean(false)),
+            ValueKind::Time(_) => Ok(Value::boolean(true)), // Time values are always truthy
+            ValueKind::List(list) => Ok(Value::boolean(!list.is_empty())),
+            ValueKind::Map(hash) => Ok(Value::boolean(!hash.is_empty())),
+            _ => {
+                // For other types, default to true (non-empty values are truthy)
+                Ok(Value::boolean(true))
+            }
         }
     }
 
