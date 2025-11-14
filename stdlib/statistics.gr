@@ -1,104 +1,62 @@
-# Statistics Module - Statistical analysis functions
-#
-# Functions:
-# - mean(values) -> number - Arithmetic mean (average)
-# - median(values) -> number - Middle value
-# - mode(values) -> number - Most common value
-# - stdev(values) -> number - Standard deviation
-# - variance(values) -> number - Variance
-# - min(values) -> number - Minimum value
-# - max(values) -> number - Maximum value
-# - sum(values) -> number - Sum of all values
-# - quantile(values, q) -> number - Quantile (0-1)
+# Statistics Module
+# Provides statistical analysis functions for numeric data
+# Alias: stats
 
-# Calculate arithmetic mean
-fn mean(values) {
-    if values.size() == 0 {
-        return 0
-    }
+# ==============================================================================
+# HELPER FUNCTIONS (Private, prefix with underscore by convention)
+# ==============================================================================
 
+# Helper: Calculate sum of a list
+fn _sum(values) {
     total = 0
-    i = 0
-    size = values.size()
-
-    while i < size {
-        total = total + values[i]
-        i = i + 1
+    for value in values {
+        total = total + value
     }
-
-    return total / size
-}
-
-# Calculate minimum value
-fn min(values) {
-    if values.size() == 0 {
-        return 0
-    }
-
-    minimum = values[0]
-    i = 1
-    size = values.size()
-
-    while i < size {
-        if values[i] < minimum {
-            minimum = values[i]
-        }
-        i = i + 1
-    }
-
-    return minimum
-}
-
-# Calculate maximum value
-fn max(values) {
-    if values.size() == 0 {
-        return 0
-    }
-
-    maximum = values[0]
-    i = 1
-    size = values.size()
-
-    while i < size {
-        if values[i] > maximum {
-            maximum = values[i]
-        }
-        i = i + 1
-    }
-
-    return maximum
-}
-
-# Calculate sum
-fn sum(values) {
-    total = 0
-    i = 0
-    size = values.size()
-
-    while i < size {
-        total = total + values[i]
-        i = i + 1
-    }
-
     return total
 }
 
-# Calculate median
-fn median(values) {
-    if values.size() == 0 {
-        return 0
+# Helper: Find minimum value in a list
+fn _min(values) {
+    if values.length() == 0 {
+        return none
     }
 
-    # Sort values (simple bubble sort)
+    min_val = values[0]
+    for value in values {
+        if value < min_val {
+            min_val = value
+        }
+    }
+    return min_val
+}
+
+# Helper: Find maximum value in a list
+fn _max(values) {
+    if values.length() == 0 {
+        return none
+    }
+
+    max_val = values[0]
+    for value in values {
+        if value > max_val {
+            max_val = value
+        }
+    }
+    return max_val
+}
+
+# Helper: Sort a list (simple bubble sort for now)
+fn _sort(values) {
+    # Create a copy to avoid modifying original
     sorted = []
     i = 0
-    while i < values.size() {
+    while i < values.length() {
         sorted = sorted.append(values[i])
         i = i + 1
     }
 
     # Bubble sort
-    n = sorted.size()
+    n = sorted.length()
     i = 0
     while i < n {
         j = 0
@@ -114,92 +72,420 @@ fn median(values) {
         i = i + 1
     }
 
-    # Get middle value
-    mid = n / 2
-
-    if n % 2 == 0 {
-        # Even number of values, average the two middle ones
-        return (sorted[mid - 1] + sorted[mid]) / 2
-    } else {
-        # Odd number of values
-        return sorted[mid]
-    }
+    return sorted
 }
 
-# Calculate mode (most common value)
+# ==============================================================================
+# CENTRAL TENDENCY
+# ==============================================================================
+
+# Function: mean
+# Description: Calculate the arithmetic mean (average) of a list of numbers
+# Parameters:
+#   - values: List of numeric values
+# Returns: The mean value, or none if list is empty
+fn mean(values) {
+    if values.length() == 0 {
+        return none
+    }
+    return _sum(values) / values.length()
+}
+
+# Function: mean (overload)
+# Description: Calculate mean with a default value for empty lists
+# Parameters:
+#   - values: List of numeric values
+#   - default: Value to return if list is empty
+# Returns: The mean value, or default if list is empty
+fn mean(values, default) {
+    if values.length() == 0 {
+        return default
+    }
+    return _sum(values) / values.length()
+}
+
+# Function: median
+# Description: Calculate the median (middle value) of a list of numbers
+# Parameters:
+#   - values: List of numeric values
+# Returns: The median value, or none if list is empty
+fn median(values) {
+    if values.length() == 0 {
+        return none
+    }
+
+    sorted = _sort(values)
+    n = sorted.length()
+
+    # If odd number of elements, return middle one
+    if n % 2 == 1 {
+        return sorted[n / 2]
+    }
+
+    # If even, return average of two middle elements
+    mid1 = sorted[n / 2 - 1]
+    mid2 = sorted[n / 2]
+    return (mid1 + mid2) / 2
+}
+
+# Function: median (overload)
+# Description: Calculate median with a default value for empty lists
+# Parameters:
+#   - values: List of numeric values
+#   - default: Value to return if list is empty
+# Returns: The median value, or default if list is empty
+fn median(values, default) {
+    if values.length() == 0 {
+        return default
+    }
+
+    sorted = _sort(values)
+    n = sorted.length()
+
+    if n % 2 == 1 {
+        return sorted[n / 2]
+    }
+
+    mid1 = sorted[n / 2 - 1]
+    mid2 = sorted[n / 2]
+    return (mid1 + mid2) / 2
+}
+
+# Function: mode
+# Description: Find the most frequently occurring value(s) in a list
+# Parameters:
+#   - values: List of numeric values
+# Returns: The mode value, or none if list is empty
+# Note: If multiple modes exist, returns the first one found
 fn mode(values) {
-    if values.size() == 0 {
-        return 0
+    if values.length() == 0 {
+        return none
     }
 
-    # Count occurrences (simplified - just return first value)
-    # TODO: Need proper counting mechanism
-    return values[0]
+    # Count occurrences using a simple approach
+    # (In real implementation, we'd use a hash/map, but demonstrating pure logic)
+    max_count = 0
+    mode_value = values[0]
+
+    i = 0
+    while i < values.length() {
+        current = values[i]
+        count = 0
+
+        # Count how many times current value appears
+        j = 0
+        while j < values.length() {
+            if values[j] == current {
+                count = count + 1
+            }
+            j = j + 1
+        }
+
+        # Update mode if this value appears more frequently
+        if count > max_count {
+            max_count = count
+            mode_value = current
+        }
+
+        i = i + 1
+    }
+
+    return mode_value
 }
 
-# Calculate variance
-fn variance(values) {
-    if values.size() == 0 {
-        return 0
+# Function: mode (overload)
+# Description: Find mode with a default value for empty lists
+# Parameters:
+#   - values: List of numeric values
+#   - default: Value to return if list is empty
+# Returns: The mode value, or default if list is empty
+fn mode(values, default) {
+    if values.length() == 0 {
+        return default
     }
 
-    avg = mean(values)
+    max_count = 0
+    mode_value = values[0]
+
+    i = 0
+    while i < values.length() {
+        current = values[i]
+        count = 0
+
+        j = 0
+        while j < values.length() {
+            if values[j] == current {
+                count = count + 1
+            }
+            j = j + 1
+        }
+
+        if count > max_count {
+            max_count = count
+            mode_value = current
+        }
+
+        i = i + 1
+    }
+
+    return mode_value
+}
+
+# ==============================================================================
+# SPREAD / VARIABILITY
+# ==============================================================================
+
+# Function: variance
+# Description: Calculate the variance of a list of numbers
+# Parameters:
+#   - values: List of numeric values
+# Returns: The variance, or none if list is empty
+fn variance(values) {
+    if values.length() == 0 {
+        return none
+    }
+
+    m = mean(values)
     sum_sq_diff = 0
 
-    i = 0
-    size = values.size()
-
-    while i < size {
-        diff = values[i] - avg
+    for value in values {
+        diff = value - m
         sum_sq_diff = sum_sq_diff + (diff * diff)
-        i = i + 1
     }
 
-    return sum_sq_diff / size
+    return sum_sq_diff / values.length()
 }
 
-# Calculate standard deviation
+# Function: variance (overload)
+# Description: Calculate variance with a default value for empty lists
+# Parameters:
+#   - values: List of numeric values
+#   - default: Value to return if list is empty
+# Returns: The variance, or default if list is empty
+fn variance(values, default) {
+    if values.length() == 0 {
+        return default
+    }
+
+    m = mean(values)
+    sum_sq_diff = 0
+
+    for value in values {
+        diff = value - m
+        sum_sq_diff = sum_sq_diff + (diff * diff)
+    }
+
+    return sum_sq_diff / values.length()
+}
+
+# Function: std_dev
+# Description: Calculate the standard deviation of a list of numbers
+# Parameters:
+#   - values: List of numeric values
+# Returns: The standard deviation, or none if list is empty
+fn std_dev(values) {
+    v = variance(values)
+    if v == none {
+        return none
+    }
+    return v.sqrt()
+}
+
+# Function: std_dev (overload)
+# Description: Calculate standard deviation with a default value for empty lists
+# Parameters:
+#   - values: List of numeric values
+#   - default: Value to return if list is empty
+# Returns: The standard deviation, or default if list is empty
+fn std_dev(values, default) {
+    if values.length() == 0 {
+        return default
+    }
+    v = variance(values)
+    return v.sqrt()
+}
+
+# Alias: stdev (for compatibility)
 fn stdev(values) {
-    # Note: This would need a square root function
-    # For now, return variance
-    # TODO: Implement square root
-    return variance(values)
+    return std_dev(values)
 }
 
-# Calculate quantile
+fn stdev(values, default) {
+    return std_dev(values, default)
+}
+
+# Function: range
+# Description: Calculate the range (max - min) of a list of numbers
+# Parameters:
+#   - values: List of numeric values
+# Returns: The range, or none if list is empty
+fn range(values) {
+    if values.length() == 0 {
+        return none
+    }
+
+    min_val = _min(values)
+    max_val = _max(values)
+    return max_val - min_val
+}
+
+# Function: range (overload)
+# Description: Calculate range with a default value for empty lists
+# Parameters:
+#   - values: List of numeric values
+#   - default: Value to return if list is empty
+# Returns: The range, or default if list is empty
+fn range(values, default) {
+    if values.length() == 0 {
+        return default
+    }
+
+    min_val = _min(values)
+    max_val = _max(values)
+    return max_val - min_val
+}
+
+# ==============================================================================
+# SUMMARY STATISTICS
+# ==============================================================================
+
+# Function: min
+# Description: Find the minimum value in a list
+# Parameters:
+#   - values: List of numeric values
+# Returns: The minimum value, or none if list is empty
+fn min(values) {
+    return _min(values)
+}
+
+# Function: min (overload)
+# Description: Find minimum with a default value for empty lists
+# Parameters:
+#   - values: List of numeric values
+#   - default: Value to return if list is empty
+# Returns: The minimum value, or default if list is empty
+fn min(values, default) {
+    result = _min(values)
+    if result == none {
+        return default
+    }
+    return result
+}
+
+# Function: max
+# Description: Find the maximum value in a list
+# Parameters:
+#   - values: List of numeric values
+# Returns: The maximum value, or none if list is empty
+fn max(values) {
+    return _max(values)
+}
+
+# Function: max (overload)
+# Description: Find maximum with a default value for empty lists
+# Parameters:
+#   - values: List of numeric values
+#   - default: Value to return if list is empty
+# Returns: The maximum value, or default if list is empty
+fn max(values, default) {
+    result = _max(values)
+    if result == none {
+        return default
+    }
+    return result
+}
+
+# Function: sum
+# Description: Calculate the sum of all values in a list
+# Parameters:
+#   - values: List of numeric values
+# Returns: The sum, or 0 if list is empty
+fn sum(values) {
+    return _sum(values)
+}
+
+# Function: sum (overload)
+# Description: Calculate sum with a default value for empty lists
+# Parameters:
+#   - values: List of numeric values
+#   - default: Value to return if list is empty
+# Returns: The sum, or default if list is empty
+fn sum(values, default) {
+    if values.length() == 0 {
+        return default
+    }
+    return _sum(values)
+}
+
+# Function: count
+# Description: Count the number of elements in a list
+# Parameters:
+#   - values: List of values
+# Returns: The count of elements
+fn count(values) {
+    return values.length()
+}
+
+# Function: quantile
+# Description: Calculate a quantile (percentile) of a list of numbers
+# Parameters:
+#   - values: List of numeric values
+#   - q: Quantile value (0.0 to 1.0), e.g., 0.25 for 25th percentile
+# Returns: The quantile value, or none if list is empty
 fn quantile(values, q) {
-    if values.size() == 0 {
-        return 0
+    if values.length() == 0 {
+        return none
     }
 
-    # Sort values first (same as median)
-    sorted = []
-    i = 0
-    while i < values.size() {
-        sorted = sorted.append(values[i])
-        i = i + 1
-    }
-
-    # Bubble sort
-    n = sorted.size()
-    i = 0
-    while i < n {
-        j = 0
-        while j < n - i - 1 {
-            if sorted[j] > sorted[j + 1] {
-                # Swap
-                temp = sorted[j]
-                sorted[j] = sorted[j + 1]
-                sorted[j + 1] = temp
-            }
-            j = j + 1
-        }
-        i = i + 1
-    }
+    sorted = _sort(values)
+    n = sorted.length()
 
     # Calculate position
     pos = q * (n - 1)
 
-    # Simplified: just return value at that position (truncated)
-    return sorted[pos]
+    # Get lower and upper indices
+    lower_idx = pos
+    upper_idx = lower_idx + 1
+
+    # If at exact index, return that value
+    if upper_idx >= n {
+        return sorted[lower_idx]
+    }
+
+    # Otherwise, interpolate between the two values
+    lower_val = sorted[lower_idx]
+    upper_val = sorted[upper_idx]
+    fraction = pos - lower_idx
+
+    return lower_val + fraction * (upper_val - lower_val)
+}
+
+# Function: quantile (overload)
+# Description: Calculate quantile with a default value for empty lists
+# Parameters:
+#   - values: List of numeric values
+#   - q: Quantile value (0.0 to 1.0)
+#   - default: Value to return if list is empty
+# Returns: The quantile value, or default if list is empty
+fn quantile(values, q, default) {
+    if values.length() == 0 {
+        return default
+    }
+
+    sorted = _sort(values)
+    n = sorted.length()
+
+    pos = q * (n - 1)
+    lower_idx = pos
+    upper_idx = lower_idx + 1
+
+    if upper_idx >= n {
+        return sorted[lower_idx]
+    }
+
+    lower_val = sorted[lower_idx]
+    upper_val = sorted[upper_idx]
+    fraction = pos - lower_idx
+
+    return lower_val + fraction * (upper_val - lower_val)
 }

@@ -1,0 +1,307 @@
+# Test the collections module (pure Graphoid implementation!)
+
+import "collections"
+
+print("=== Testing Collections Module ===")
+print("")
+
+# ==============================================================================
+# LIST UTILITIES
+# ==============================================================================
+
+print("=== List Utilities: chunk ===")
+
+numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+print("Original: [1, 2, 3, 4, 5, 6, 7, 8, 9]")
+
+chunks = collections.chunk(numbers, 3)
+print("Chunk by 3: " + chunks.to_string())  # [[1,2,3], [4,5,6], [7,8,9]]
+
+chunks2 = collections.chunk(numbers, 4)
+print("Chunk by 4: " + chunks2.to_string())  # [[1,2,3,4], [5,6,7,8], [9]]
+
+print("")
+print("=== List Utilities: partition ===")
+
+mixed_numbers = [1, -2, 3, -4, 5, 0, -6]
+print("Data: [1, -2, 3, -4, 5, 0, -6]")
+
+parts = collections.partition(mixed_numbers, :positive)
+print("Partition by positive: " + parts.to_string())
+
+parts2 = collections.partition([1, 2, 3, 4, 5, 6], :even)
+print("Partition [1,2,3,4,5,6] by even: " + parts2.to_string())
+
+print("")
+print("=== List Utilities: zip and unzip ===")
+
+letters = ["a", "b", "c"]
+nums = [1, 2, 3]
+print("Letters: " + letters.to_string())
+print("Numbers: " + nums.to_string())
+
+zipped = collections.zip(letters, nums)
+print("Zipped: " + zipped.to_string())  # [["a", 1], ["b", 2], ["c", 3]]
+
+unzipped = collections.unzip(zipped)
+print("Unzipped: " + unzipped.to_string())  # [["a", "b", "c"], [1, 2, 3]]
+
+print("")
+print("=== List Utilities: take and drop ===")
+
+values = [1, 2, 3, 4, 5]
+print("Data: [1, 2, 3, 4, 5]")
+
+first_three = collections.take(values, 3)
+print("Take 3: " + first_three.to_string())  # [1, 2, 3]
+
+last_three = collections.drop(values, 2)
+print("Drop 2: " + last_three.to_string())  # [3, 4, 5]
+
+print("")
+print("=== List Utilities: rotate ===")
+
+items = [1, 2, 3, 4, 5]
+print("Original: [1, 2, 3, 4, 5]")
+
+rotated_right = collections.rotate(items, 2)
+print("Rotate right 2: " + rotated_right.to_string())  # [4, 5, 1, 2, 3]
+
+rotated_left = collections.rotate(items, -2)
+print("Rotate left 2: " + rotated_left.to_string())  # [3, 4, 5, 1, 2]
+
+print("")
+print("=== List Utilities: unique ===")
+
+duplicates = [1, 2, 2, 3, 1, 4, 3, 5]
+print("With duplicates: [1, 2, 2, 3, 1, 4, 3, 5]")
+
+unique_vals = collections.unique(duplicates)
+print("Unique: " + unique_vals.to_string())  # [1, 2, 3, 4, 5]
+
+print("")
+print("=== List Utilities: reverse ===")
+
+forward = [1, 2, 3, 4, 5]
+print("Forward: [1, 2, 3, 4, 5]")
+
+backward = collections.reverse(forward)
+print("Reversed: " + backward.to_string())  # [5, 4, 3, 2, 1]
+
+print("")
+print("=== List Utilities: interleave ===")
+
+list_a = [1, 2, 3]
+list_b = ["a", "b", "c"]
+print("List A: [1, 2, 3]")
+print("List B: [\"a\", \"b\", \"c\"]")
+
+interleaved = collections.interleave(list_a, list_b)
+print("Interleaved: " + interleaved.to_string())  # [1, "a", 2, "b", 3, "c"]
+
+print("")
+print("=== List Utilities: repeat ===")
+
+repeated = collections.repeat(42, 5)
+print("Repeat 42 five times: " + repeated.to_string())  # [42, 42, 42, 42, 42]
+
+zeros = collections.repeat(0, 3)
+print("Repeat 0 three times: " + zeros.to_string())  # [0, 0, 0]
+
+print("")
+print("=== List Utilities: range ===")
+
+range1 = collections.range(0, 5)
+print("Range 0 to 5: " + range1.to_string())  # [0, 1, 2, 3, 4]
+
+range2 = collections.range(5, 10)
+print("Range 5 to 10: " + range2.to_string())  # [5, 6, 7, 8, 9]
+
+range3 = collections.range(0, 10, 2)
+print("Range 0 to 10 step 2: " + range3.to_string())  # [0, 2, 4, 6, 8]
+
+range4 = collections.range(10, 0, -2)
+print("Range 10 to 0 step -2: " + range4.to_string())  # [10, 8, 6, 4, 2]
+
+print("")
+
+# ==============================================================================
+# MAP UTILITIES
+# ==============================================================================
+
+print("=== Map Utilities: merge ===")
+
+map1 = {"a": 1, "b": 2}
+map2 = {"b": 3, "c": 4}
+print("Map 1: {\"a\": 1, \"b\": 2}")
+print("Map 2: {\"b\": 3, \"c\": 4}")
+
+merged = collections.merge(map1, map2)
+print("Merged (map2 overwrites): " + merged.to_string())
+
+print("")
+print("=== Map Utilities: keys and values ===")
+
+person = {"name": "Alice", "age": 30, "city": "NYC"}
+print("Person: {\"name\": \"Alice\", \"age\": 30, \"city\": \"NYC\"}")
+
+person_keys = collections.get_keys(person)
+print("Keys: " + person_keys.to_string())
+
+person_values = collections.get_values(person)
+print("Values: " + person_values.to_string())
+
+print("")
+print("=== Map Utilities: invert ===")
+
+colors = {"red": 1, "green": 2, "blue": 3}
+print("Colors: {\"red\": 1, \"green\": 2, \"blue\": 3}")
+
+inverted = collections.invert(colors)
+print("Inverted: " + inverted.to_string())
+
+print("")
+print("=== Map Utilities: has_key ===")
+
+config = {"host": "localhost", "port": 8080}
+print("Config: {\"host\": \"localhost\", \"port\": 8080}")
+
+has_host = collections.has_key(config, "host")
+print("Has 'host': " + has_host.to_string())  # true
+
+has_timeout = collections.has_key(config, "timeout")
+print("Has 'timeout': " + has_timeout.to_string())  # false
+
+print("")
+
+# ==============================================================================
+# SET OPERATIONS
+# ==============================================================================
+
+print("=== Set Operations: union ===")
+
+set_a = [1, 2, 3, 4]
+set_b = [3, 4, 5, 6]
+print("Set A: [1, 2, 3, 4]")
+print("Set B: [3, 4, 5, 6]")
+
+union_result = collections.union(set_a, set_b)
+print("Union: " + union_result.to_string())  # [1, 2, 3, 4, 5, 6]
+
+print("")
+print("=== Set Operations: intersection ===")
+
+intersection_result = collections.intersection(set_a, set_b)
+print("Intersection: " + intersection_result.to_string())  # [3, 4]
+
+print("")
+print("=== Set Operations: difference ===")
+
+diff_a_b = collections.difference(set_a, set_b)
+print("A - B: " + diff_a_b.to_string())  # [1, 2]
+
+diff_b_a = collections.difference(set_b, set_a)
+print("B - A: " + diff_b_a.to_string())  # [5, 6]
+
+print("")
+print("=== Set Operations: symmetric_difference ===")
+
+sym_diff = collections.symmetric_difference(set_a, set_b)
+print("Symmetric difference: " + sym_diff.to_string())  # [1, 2, 5, 6]
+
+print("")
+print("=== Set Operations: is_subset / is_superset ===")
+
+subset = [1, 2]
+superset = [1, 2, 3, 4]
+print("Subset: [1, 2]")
+print("Superset: [1, 2, 3, 4]")
+
+is_sub = collections.is_subset(subset, superset)
+print("Is [1,2] subset of [1,2,3,4]? " + is_sub.to_string())  # true
+
+is_super = collections.is_superset(superset, subset)
+print("Is [1,2,3,4] superset of [1,2]? " + is_super.to_string())  # true
+
+not_subset = collections.is_subset([1, 5], superset)
+print("Is [1,5] subset of [1,2,3,4]? " + not_subset.to_string())  # false
+
+print("")
+
+# ==============================================================================
+# EDGE CASES
+# ==============================================================================
+
+print("=== Edge Cases ===")
+
+# Empty lists
+empty = []
+print("Chunk empty list: " + collections.chunk(empty, 2).to_string())
+print("Unique empty list: " + collections.unique(empty).to_string())
+print("Reverse empty list: " + collections.reverse(empty).to_string())
+
+# Single element
+single = [42]
+print("Chunk single element: " + collections.chunk(single, 2).to_string())
+print("Reverse single element: " + collections.reverse(single).to_string())
+
+# Repeat zero times
+no_repeat = collections.repeat("x", 0)
+print("Repeat 0 times: " + no_repeat.to_string())
+
+# Range with same start/end
+empty_range = collections.range(5, 5)
+print("Range 5 to 5: " + empty_range.to_string())
+
+print("")
+
+# ==============================================================================
+# PRACTICAL USE CASES
+# ==============================================================================
+
+print("=== Practical Use Case: Data Processing ===")
+
+# Process data in batches
+raw_data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+batches = collections.chunk(raw_data, 3)
+print("Processing data in batches of 3:")
+print(batches.to_string())
+
+print("")
+print("=== Practical Use Case: Pagination ===")
+
+all_items = collections.range(1, 21)
+page_size = 5
+page_number = 2
+
+# Get page 2 (skip 5, take 5)
+skip_count = (page_number - 1) * page_size
+page_items = collections.take(collections.drop(all_items, skip_count), page_size)
+print("Page 2 (items 6-10): " + page_items.to_string())
+
+print("")
+print("=== Practical Use Case: Deduplication ===")
+
+user_ids = [101, 102, 101, 103, 102, 104, 103]
+print("User IDs with duplicates: " + user_ids.to_string())
+
+unique_users = collections.unique(user_ids)
+print("Unique user IDs: " + unique_users.to_string())
+print("Total unique users: " + unique_users.length().to_string())
+
+print("")
+print("=== Practical Use Case: Finding Common Tags ===")
+
+post_a_tags = ["python", "programming", "web", "tutorial"]
+post_b_tags = ["programming", "web", "javascript", "tutorial"]
+print("Post A tags: " + post_a_tags.to_string())
+print("Post B tags: " + post_b_tags.to_string())
+
+common_tags = collections.intersection(post_a_tags, post_b_tags)
+print("Common tags: " + common_tags.to_string())
+
+all_tags = collections.union(post_a_tags, post_b_tags)
+print("All unique tags: " + all_tags.to_string())
+
+print("")
+print("=== All tests completed successfully! ===")
