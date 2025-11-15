@@ -370,11 +370,60 @@ impl<'a> IntoIterator for &'a PatternMatchResults {
     }
 }
 
+/// High-precision numeric value (Phase 13.5)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BigNum {
+    /// 64-bit signed integer
+    Int64(i64),
+    /// 64-bit unsigned integer
+    UInt64(u64),
+}
+
+impl BigNum {
+    /// Convert to i64 if possible
+    pub fn to_i64(&self) -> Option<i64> {
+        match self {
+            BigNum::Int64(n) => Some(*n),
+            BigNum::UInt64(n) => {
+                if *n <= i64::MAX as u64 {
+                    Some(*n as i64)
+                } else {
+                    None // Overflow
+                }
+            }
+        }
+    }
+
+    /// Convert to u64 if possible
+    pub fn to_u64(&self) -> Option<u64> {
+        match self {
+            BigNum::Int64(n) => {
+                if *n >= 0 {
+                    Some(*n as u64)
+                } else {
+                    None // Negative
+                }
+            }
+            BigNum::UInt64(n) => Some(*n),
+        }
+    }
+
+    /// Convert to f64 (may lose precision)
+    pub fn to_f64(&self) -> f64 {
+        match self {
+            BigNum::Int64(n) => *n as f64,
+            BigNum::UInt64(n) => *n as f64,
+        }
+    }
+}
+
 /// The actual data/kind of a value
 #[derive(Debug, Clone)]
 pub enum ValueKind {
     /// Numeric value (64-bit floating point)
     Number(f64),
+    /// High-precision numeric value (i64/u64) - Phase 13.5
+    BigNumber(BigNum),
     /// String value
     String(String),
     /// Boolean value
@@ -415,6 +464,7 @@ impl PartialEq for ValueKind {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (ValueKind::Number(a), ValueKind::Number(b)) => a == b,
+            (ValueKind::BigNumber(a), ValueKind::BigNumber(b)) => a == b,
             (ValueKind::String(a), ValueKind::String(b)) => a == b,
             (ValueKind::Boolean(a), ValueKind::Boolean(b)) => a == b,
             (ValueKind::None, ValueKind::None) => true,
@@ -462,6 +512,10 @@ impl Value {
     // Constructors
     pub fn number(n: f64) -> Self {
         Value { kind: ValueKind::Number(n), frozen: false }
+    }
+
+    pub fn bignum(bn: BigNum) -> Self {
+        Value { kind: ValueKind::BigNumber(bn), frozen: false }
     }
 
     pub fn string(s: String) -> Self {
@@ -547,6 +601,12 @@ impl Value {
             ValueKind::Boolean(b) => *b,
             ValueKind::None => false,
             ValueKind::Number(n) => *n != 0.0,
+            ValueKind::BigNumber(bn) => {
+                match bn {
+                    BigNum::Int64(n) => *n != 0,
+                    BigNum::UInt64(n) => *n != 0,
+                }
+            }
             ValueKind::String(s) => !s.is_empty(),
             ValueKind::List(l) => !l.is_empty(),
             ValueKind::Map(h) => !h.is_empty(),
@@ -585,6 +645,12 @@ impl Value {
                     format!("{:.0}", n)
                 } else {
                     n.to_string()
+                }
+            }
+            ValueKind::BigNumber(bn) => {
+                match bn {
+                    BigNum::Int64(n) => n.to_string(),
+                    BigNum::UInt64(n) => n.to_string(),
                 }
             }
             ValueKind::String(s) => s.clone(),
@@ -657,6 +723,7 @@ impl Value {
     pub fn type_name(&self) -> &str {
         match &self.kind {
             ValueKind::Number(_) => "num",
+            ValueKind::BigNumber(_) => "bignum",
             ValueKind::String(_) => "string",
             ValueKind::Boolean(_) => "bool",
             ValueKind::None => "none",

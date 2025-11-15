@@ -709,16 +709,23 @@ impl Parser {
                 );
             } else {
                 // Parse key-value pair (key: value)
-                // Parse key (must be identifier)
-                let key = if let TokenType::Identifier(id) = &self.peek().token_type {
-                    let k = id.clone();
-                    self.advance();
-                    k
-                } else {
-                    return Err(GraphoidError::SyntaxError {
-                        message: format!("Expected configuration key or symbol, got {:?}", self.peek().token_type),
-                        position: self.peek().position(),
-                    });
+                // Parse key (must be identifier or precision keyword)
+                let key = match &self.peek().token_type {
+                    TokenType::Identifier(id) => {
+                        let k = id.clone();
+                        self.advance();
+                        k
+                    }
+                    TokenType::Precision => {
+                        self.advance();
+                        "precision".to_string()
+                    }
+                    _ => {
+                        return Err(GraphoidError::SyntaxError {
+                            message: format!("Expected configuration key or symbol, got {:?}", self.peek().token_type),
+                            position: self.peek().position(),
+                        });
+                    }
                 };
 
                 // Expect colon

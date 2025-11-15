@@ -40,6 +40,9 @@ pub struct Config {
 
     // Bitwise operations (Phase 13)
     pub unsigned_mode: bool,  // true = unsigned right shift, false = signed (default)
+
+    // Numeric precision (Phase 13.5 - BigNum)
+    pub precision_mode: PrecisionMode,
 }
 
 /// Error handling mode
@@ -72,6 +75,14 @@ pub enum NoneHandlingMode {
     Error,      // Treat none as an error
 }
 
+/// Numeric precision mode (Phase 13.5 - BigNum)
+#[derive(Debug, Clone, PartialEq)]
+pub enum PrecisionMode {
+    Standard,  // f64 (default)
+    High,      // i64/u64 or f128
+    Extended,  // BigInt (arbitrary precision)
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -89,6 +100,7 @@ impl Default for Config {
             reconnect_strategy: None,
             allow_overrides: None,
             unsigned_mode: false,  // Default to signed right shift
+            precision_mode: PrecisionMode::Standard,  // Default to f64 precision
         }
     }
 }
@@ -181,6 +193,9 @@ impl ConfigStack {
                 }
                 "allow_overrides" => {
                     new_config.allow_overrides = Some(value.is_truthy());
+                }
+                "precision" => {
+                    new_config.precision_mode = parse_precision_mode(&value)?;
                 }
                 _ => {
                     // Check if the value is the :unsigned symbol (standalone directive)
@@ -305,6 +320,21 @@ fn parse_reconnect_strategy(value: &Value) -> Result<ReconnectStrategy> {
         },
         _ => Err(GraphoidError::ConfigError {
             message: format!("reconnect_strategy must be a symbol, got {}", value.type_name()),
+        }),
+    }
+}
+
+fn parse_precision_mode(value: &Value) -> Result<PrecisionMode> {
+    match &value.kind {
+        ValueKind::Symbol(s) => match s.as_str() {
+            "high" => Ok(PrecisionMode::High),
+            "extended" => Ok(PrecisionMode::Extended),
+            _ => Err(GraphoidError::ConfigError {
+                message: format!("Invalid precision: :{}, expected :high or :extended", s),
+            }),
+        },
+        _ => Err(GraphoidError::ConfigError {
+            message: format!("precision must be a symbol, got {}", value.type_name()),
         }),
     }
 }
