@@ -16,12 +16,226 @@
 # - ^ (start of string)
 # - $ (end of string)
 
-# Helper: Check if character matches pattern character
-fn char_matches(pattern_char, text_char) {
+# Helper: Create list of word characters (a-z, A-Z, 0-9, _)
+fn make_word_chars() {
+    chars = []
+
+    # a-z
+    code = 97  # 'a'
+    while code <= 122 {  # 'z'
+        chars = chars.append(code.to_char())
+        code = code + 1
+    }
+
+    # A-Z
+    code = 65  # 'A'
+    while code <= 90 {  # 'Z'
+        chars = chars.append(code.to_char())
+        code = code + 1
+    }
+
+    # 0-9
+    code = 48  # '0'
+    while code <= 57 {  # '9'
+        chars = chars.append(code.to_char())
+        code = code + 1
+    }
+
+    # Underscore
+    chars = chars.append("_")
+
+    return chars
+}
+
+# Helper: Create list of digit characters (0-9)
+fn make_digit_chars() {
+    chars = []
+    code = 48  # '0'
+    while code <= 57 {  # '9'
+        chars = chars.append(code.to_char())
+        code = code + 1
+    }
+    return chars
+}
+
+# Helper: Create list of whitespace characters
+fn make_whitespace_chars() {
+    return [" ", "\t", "\n", "\r"]
+}
+
+# Helper: Check if char is in char list
+fn char_in_list(char, char_list) {
+    i = 0
+    while i < char_list.size() {
+        if char == char_list[i] {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+# Helper: Parse character class [abc] or [a-z] or [^abc]
+# Returns [chars_list, negate, new_pos]
+fn parse_char_class(pattern, pos) {
+    if pos >= pattern.size() {
+        return [none, false, pos]
+    }
+
+    pos = pos + 1  # Skip opening [
+
+    if pos >= pattern.size() {
+        # Empty or unclosed class
+        return [none, false, pos]
+    }
+
+    negate = false
+    if pattern[pos] == "^" {
+        negate = true
+        pos = pos + 1
+    }
+
+    chars = []
+
+    while pos < pattern.size() {
+        if pattern[pos] == "]" {
+            break
+        }
+
+        char = pattern[pos]
+
+        # Check for range (a-z, 0-9, etc.)
+        # Need at least 3 chars: current, -, and end of range
+        if pos + 2 < pattern.size() {
+            if pattern[pos + 1] == "-" {
+                if pattern[pos + 2] != "]" {
+                    # Valid range
+                    start_code = char.char_code(0)
+                    end_code = pattern[pos + 2].char_code(0)
+
+                    code = start_code
+                    while code <= end_code {
+                        chars = chars.append(code.to_char())
+                        code = code + 1
+                    }
+
+                    pos = pos + 3  # Skip char, -, char
+                } else {
+                    # "-" is at end, treat as literal
+                    chars = chars.append(char)
+                    pos = pos + 1
+                }
+            } else {
+                # Not a range
+                chars = chars.append(char)
+                pos = pos + 1
+            }
+        } else {
+            # Not enough chars for a range
+            chars = chars.append(char)
+            pos = pos + 1
+        }
+    }
+
+    if pos >= pattern.size() {
+        # Unclosed character class - return what we have
+        return [chars, negate, pos]
+    }
+
+    pos = pos + 1  # Skip closing ]
+    return [chars, negate, pos]
+}
+
+# Helper: Handle escape sequences like \d, \w, \., \*
+# Returns [char_class_info, is_literal, literal_char, new_pos]
+fn handle_escape(pattern, pos) {
+    if pos + 1 >= pattern.size() {
+        # No character after backslash - treat as literal
+        return [none, true, "\\", pos + 1]
+    }
+
+    pos = pos + 1  # Skip backslash
+    char = pattern[pos]
+
+    # Character shortcuts
+    if char == "d" {
+        # \d = [0-9]
+        return [[make_digit_chars(), false], false, none, pos + 1]
+    }
+
+    if char == "D" {
+        # \D = [^0-9] (negated)
+        return [[make_digit_chars(), true], false, none, pos + 1]
+    }
+
+    if char == "w" {
+        # \w = [a-zA-Z0-9_]
+        return [[make_word_chars(), false], false, none, pos + 1]
+    }
+
+    if char == "W" {
+        # \W = [^a-zA-Z0-9_]
+        return [[make_word_chars(), true], false, none, pos + 1]
+    }
+
+    if char == "s" {
+        # \s = whitespace
+        return [[make_whitespace_chars(), false], false, none, pos + 1]
+    }
+
+    if char == "S" {
+        # \S = non-whitespace
+        return [[make_whitespace_chars(), true], false, none, pos + 1]
+    }
+
+    # Escaped metacharacters - treat as literals
+    is_metachar = false
+    if char == "." || char == "*" || char == "+" || char == "?" {
+        is_metachar = true
+    }
+    if char == "[" || char == "]" || char == "(" || char == ")" {
+        is_metachar = true
+    }
+    if char == "{" || char == "}" || char == "^" || char == "$" {
+        is_metachar = true
+    }
+    if char == "\\" {
+        is_metachar = true
+    }
+
+    if is_metachar {
+        return [none, true, char, pos + 1]
+    }
+
+    # Unknown escape - treat as literal
+    return [none, true, char, pos + 1]
+}
+
+# Helper: Check if character matches pattern character or character class
+fn char_matches(pattern_char, text_char, char_class_info, is_literal) {
+    # If it's a literal escaped character, only match exactly
+    if is_literal {
+        return pattern_char == text_char
+    }
+
+    # If it's a character class
+    if char_class_info != none {
+        chars = char_class_info[0]
+        negate = char_class_info[1]
+        found = char_in_list(text_char, chars)
+
+        if negate {
+            return not found
+        }
+        return found
+    }
+
+    # Special patterns
     if pattern_char == "." {
         return true
     }
 
+    # Literal match
     return pattern_char == text_char
 }
 
@@ -33,21 +247,84 @@ fn match_at(pattern, pattern_pos, text, text_pos) {
         return [true, 0]
     }
 
-    # End of text
+    # End of text but pattern remains
     if text_pos >= text.size() {
-        # Check if rest of pattern is optional
-        return [true, 0]
+        # Can only match if rest of pattern is optional (*, ?)
+        # Check if next element has * or ? quantifier
+        pattern_char = pattern[pattern_pos]
+
+        # Skip character classes and escapes to find quantifier
+        check_pos = pattern_pos
+        if pattern_char == "[" {
+            # Skip to end of character class
+            while check_pos < pattern.size() && pattern[check_pos] != "]" {
+                check_pos = check_pos + 1
+            }
+            check_pos = check_pos + 1
+        }
+        if pattern_char == "\\" {
+            check_pos = check_pos + 2
+        }
+        if pattern_char != "[" && pattern_char != "\\" {
+            check_pos = check_pos + 1
+        }
+
+        # Check for * or ? after element
+        if check_pos < pattern.size() {
+            next_char = pattern[check_pos]
+            if next_char == "*" || next_char == "?" {
+                # Optional element - skip it and continue
+                return match_at(pattern, check_pos + 1, text, text_pos)
+            }
+        }
+
+        # Required element but no text left
+        return [false, 0]
     }
 
+    # Parse next pattern element (could be char, char class, or escape sequence)
     pattern_char = pattern[pattern_pos]
+    char_class_info = none
+    element_size = 1  # How many chars in pattern this element consumes
+    is_escaped_literal = false  # Track if this is an escaped literal like \.
 
-    # Check for quantifiers
+    # Handle character classes [...]
+    if pattern_char == "[" {
+        class_result = parse_char_class(pattern, pattern_pos)
+        if class_result[0] != none {
+            # Valid character class
+            char_class_info = [class_result[0], class_result[1]]
+            element_size = class_result[2] - pattern_pos
+            pattern_char = none  # Not a simple char
+        }
+    }
+
+    # Handle escape sequences \d, \w, \., etc.
+    if pattern_char == "\\" {
+        escape_result = handle_escape(pattern, pattern_pos)
+        char_class_info = escape_result[0]
+        is_literal = escape_result[1]
+        literal_char = escape_result[2]
+        element_size = escape_result[3] - pattern_pos
+
+        if is_literal {
+            # Escaped literal character
+            pattern_char = literal_char
+            is_escaped_literal = true
+        } else {
+            # Character class shortcut
+            pattern_char = none
+        }
+    }
+
+    # Check for quantifiers after this element
+    quantifier_pos = pattern_pos + element_size
     next_is_star = false
     next_is_plus = false
     next_is_question = false
 
-    if pattern_pos + 1 < pattern.size() {
-        next_char = pattern[pattern_pos + 1]
+    if quantifier_pos < pattern.size() {
+        next_char = pattern[quantifier_pos]
         if next_char == "*" {
             next_is_star = true
         }
@@ -63,13 +340,13 @@ fn match_at(pattern, pattern_pos, text, text_pos) {
     if next_is_star {
         # Zero or more
         # Try matching zero times first
-        result = match_at(pattern, pattern_pos + 2, text, text_pos)
+        result = match_at(pattern, quantifier_pos + 1, text, text_pos)
         if result[0] {
             return result
         }
 
         # Try matching one or more times
-        if char_matches(pattern_char, text[text_pos]) {
+        if char_matches(pattern_char, text[text_pos], char_class_info, is_escaped_literal) {
             result = match_at(pattern, pattern_pos, text, text_pos + 1)
             if result[0] {
                 return [true, result[1] + 1]
@@ -81,7 +358,7 @@ fn match_at(pattern, pattern_pos, text, text_pos) {
 
     if next_is_plus {
         # One or more - must match at least once
-        if not char_matches(pattern_char, text[text_pos]) {
+        if not char_matches(pattern_char, text[text_pos], char_class_info, is_escaped_literal) {
             return [false, 0]
         }
 
@@ -92,7 +369,7 @@ fn match_at(pattern, pattern_pos, text, text_pos) {
         }
 
         # Or continue to rest of pattern
-        result = match_at(pattern, pattern_pos + 2, text, text_pos + 1)
+        result = match_at(pattern, quantifier_pos + 1, text, text_pos + 1)
         if result[0] {
             return [true, result[1] + 1]
         }
@@ -103,14 +380,14 @@ fn match_at(pattern, pattern_pos, text, text_pos) {
     if next_is_question {
         # Zero or one
         # Try matching zero times
-        result = match_at(pattern, pattern_pos + 2, text, text_pos)
+        result = match_at(pattern, quantifier_pos + 1, text, text_pos)
         if result[0] {
             return result
         }
 
         # Try matching once
-        if char_matches(pattern_char, text[text_pos]) {
-            result = match_at(pattern, pattern_pos + 2, text, text_pos + 1)
+        if char_matches(pattern_char, text[text_pos], char_class_info, is_escaped_literal) {
+            result = match_at(pattern, quantifier_pos + 1, text, text_pos + 1)
             if result[0] {
                 return [true, result[1] + 1]
             }
@@ -120,12 +397,12 @@ fn match_at(pattern, pattern_pos, text, text_pos) {
     }
 
     # No quantifier - must match exactly once
-    if not char_matches(pattern_char, text[text_pos]) {
+    if not char_matches(pattern_char, text[text_pos], char_class_info, is_escaped_literal) {
         return [false, 0]
     }
 
     # Character matched, continue with rest
-    result = match_at(pattern, pattern_pos + 1, text, text_pos + 1)
+    result = match_at(pattern, pattern_pos + element_size, text, text_pos + 1)
     if result[0] {
         return [true, result[1] + 1]
     }

@@ -1080,5 +1080,29 @@ and character code primitives. No native Rust code required.
 
 ---
 
-**Document Status**: Living document - update as implementation progresses
+---
+
+## CRITICAL UPDATE (November 14, 2025)
+
+**Priority Changed**: Discovered that production crypto module requires high-precision numeric types.
+
+**New Plan**: Implement BigNum type FIRST, then crypto module.
+
+See `dev_docs/BIGNUM_PRECISION_PLAN.md` for complete details.
+
+**Revised Implementation Order:**
+1. ✅ **Phase 1-2 COMPLETE**: Character codes, JSON fixes, bitwise verification
+2. ✅ **Phase 3 COMPLETE**: Regex enhancement (character classes, escapes, shortcuts)
+3. **NEW Phase 4**: BigNum type and precision modes (3-4 weeks)
+4. **Phase 5+**: Crypto module implementation (7-8 weeks)
+
+**Rationale**: Cannot implement SHA-512, RSA, or other modern crypto without exact 64-bit integer arithmetic and arbitrary precision integers. Pure Graphoid multi-precision library would be too slow and unreadable.
+
+**Solution**: Add user-facing `bignum` type with configuration-based precision modes:
+- `configure { precision: :high }` → i64/u64/f128
+- `configure { precision: :extended }` → arbitrary precision (BigInt)
+
+---
+
+**Document Status**: Superseded by BIGNUM_PRECISION_PLAN.md for crypto work
 **Last Updated**: November 14, 2025

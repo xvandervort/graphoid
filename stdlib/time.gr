@@ -138,14 +138,24 @@ fn timestamp_to_date(timestamp) {
     return {"year": year, "month": month, "day": day}
 }
 
-# Format timestamp as date string
-fn as_date(timestamp, format) {
+# Format timestamp according to format specifier
+# format(timestamp, :date) -> "2025-11-14"
+# format(timestamp, :datetime) -> "2025-11-14T23:08:53Z"
+# format(timestamp, :long) -> "November 14, 2025"
+# format(timestamp, none) -> same as :datetime
+fn format(timestamp, format_type) {
     date = timestamp_to_date(timestamp)
     year = date["year"]
     month = date["month"]
     day = date["day"]
 
-    # Format as YYYY-MM-DD
+    # Default to datetime if none
+    actual_format = format_type
+    if actual_format == none {
+        actual_format = :datetime
+    }
+
+    # Format year, month, day strings
     year_str = year.to_string()
 
     month_str = month.to_string()
@@ -158,30 +168,26 @@ fn as_date(timestamp, format) {
         day_str = "0" + day_str
     }
 
-    if format == "long" {
-        # Format as "December 25, 1990"
+    # Handle :long format
+    if actual_format == :long {
         month_names = ["January", "February", "March", "April", "May", "June",
                       "July", "August", "September", "October", "November", "December"]
         month_name = month_names[month - 1]
         return month_name + " " + day.to_string() + ", " + year.to_string()
     }
 
-    return year_str + "-" + month_str + "-" + day_str
-}
+    # Handle :date format
+    if actual_format == :date {
+        return year_str + "-" + month_str + "-" + day_str
+    }
 
-# Format timestamp as datetime string
-fn as_datetime(timestamp, format) {
-    date = timestamp_to_date(timestamp)
-
+    # Handle :datetime format (default)
     # Calculate time of day
     seconds_today = timestamp % SECONDS_PER_DAY
     hours = (seconds_today / SECONDS_PER_HOUR).down()
     remaining = seconds_today % SECONDS_PER_HOUR
     minutes = (remaining / SECONDS_PER_MINUTE).down()
     seconds = (remaining % SECONDS_PER_MINUTE).down()
-
-    # Format date part
-    date_str = as_date(timestamp, format)
 
     # Format time part
     hours_str = hours.to_string()
@@ -199,6 +205,7 @@ fn as_datetime(timestamp, format) {
         seconds_str = "0" + seconds_str
     }
 
+    date_str = year_str + "-" + month_str + "-" + day_str
     return date_str + "T" + hours_str + ":" + minutes_str + ":" + seconds_str + "Z"
 }
 
