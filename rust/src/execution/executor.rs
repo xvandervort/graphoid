@@ -255,11 +255,22 @@ impl Executor {
         match stmt {
             Stmt::VariableDecl {
                 name,
+                type_annotation,
                 value,
                 is_private,
                 ..
             } => {
-                let val = self.eval_expr(value)?;
+                let mut val = self.eval_expr(value)?;
+
+                // Phase 1B: Convert to BigNum if type annotation is bignum
+                if let Some(type_ann) = type_annotation {
+                    if type_ann.base_type == "bignum" {
+                        val = self.convert_to_bignum(val)?;
+                    }
+                }
+
+                // Phase 1A: Truncate if integer mode is active
+                let val = self.truncate_if_integer_mode(val);
                 self.env.define(name.clone(), val);
 
                 // Phase 10: Track private symbols
@@ -271,6 +282,8 @@ impl Executor {
             }
             Stmt::Assignment { target, value, .. } => {
                 let val = self.eval_expr(value)?;
+                // Phase 1A: Truncate if integer mode is active
+                let val = self.truncate_if_integer_mode(val);
                 match target {
                     AssignmentTarget::Variable(name) => {
                         // Try to update existing variable, or create new one if it doesn't exist
@@ -627,26 +640,123 @@ impl Executor {
         }
     }
 
+    /// Phase 1A: Truncates numeric values when integer_mode is active
+    /// This implements truncation-on-assignment for the :integer directive
+    fn truncate_if_integer_mode(&self, value: Value) -> Value {
+        // Check if integer mode is active
+        if !self.config_stack.current().integer_mode {
+            return value;
+        }
+
+        // Truncate numeric values (both Number and BigNumber)
+        match &value.kind {
+            ValueKind::Number(n) => Value::number(n.trunc()),
+            ValueKind::BigNumber(bn) => {
+                // Phase 1B: Truncate BigNumber values in integer mode
+                match bn {
+                    BigNum::Float128(f) => {
+                        // Convert to f64, truncate, convert back to f128
+                        let f64_val: f64 = (*f).into();
+                        use f128::f128;
+                        Value::bignum(BigNum::Float128(f128::from(f64_val.trunc())))
+                    }
+                    // Int64 and UInt64 are already integers, pass through
+                    BigNum::Int64(_) | BigNum::UInt64(_) => value,
+                    // BigInt is already integer, pass through
+                    BigNum::BigInt(_) => value,
+                }
+            }
+            // Non-numeric values pass through unchanged
+            _ => value,
+        }
+    }
+
+    /// Phase 1B: Converts a value to BigNum (Float128).
+    /// Converts Number to BigNum, passes through existing BigNum, errors on other types.
+    fn convert_to_bignum(&self, value: Value) -> Result<Value> {
+        match &value.kind {
+            ValueKind::Number(n) => {
+                // Convert f64 to f128
+                use f128::f128;
+                let f128_val = f128::from(*n);
+                Ok(Value::bignum(BigNum::Float128(f128_val)))
+            }
+            ValueKind::BigNumber(_) => {
+                // Already a bignum, pass through
+                Ok(value)
+            }
+            _ => {
+                Err(GraphoidError::type_error(
+                    "number or bignum",
+                    value.type_name()
+                ))
+            }
+        }
+    }
+
+    /// Phase 1B: Helper to convert a Number (f64) value to BigNum Float128.
+    /// Used for temporary auto-casting in mixed num/bignum operations.
+    fn num_to_bignum_f128(&self, n: f64) -> BigNum {
+        use f128::f128;
+        BigNum::Float128(f128::from(n))
+    }
+
     /// Evaluates a literal value.
     fn eval_literal(&self, lit: &LiteralValue) -> Result<Value> {
         match lit {
             LiteralValue::Number(n) => {
-                // Check if we're in high precision mode
+                // Phase 1B: Large literal detection
+                // Only promote to BigInt if the value exceeds what Int64/UInt64 can represent
+                const I64_MAX: f64 = 9_223_372_036_854_775_807.0; // 2^63 - 1
+                const U64_MAX: f64 = 18_446_744_073_709_551_615.0; // 2^64 - 1
+
+                // Phase 1B: Check if we're in high precision mode
                 match self.config_stack.current().precision_mode {
                     PrecisionMode::High => {
-                        // Convert to i64/u64 based on unsigned mode
-                        if self.config_stack.current().unsigned_mode {
-                            Ok(Value::bignum(BigNum::UInt64(*n as u64)))
+                        // Phase 1B: High precision defaults to Float128
+                        // Only becomes Int64/UInt64 if integer_mode is also active
+                        if self.config_stack.current().integer_mode {
+                            // Check if literal exceeds Int64/UInt64 range
+                            let exceeds_int_range = if self.config_stack.current().unsigned_mode {
+                                n.abs() > U64_MAX
+                            } else {
+                                n.abs() > I64_MAX
+                            };
+
+                            // If too large for Int64/UInt64, use BigInt
+                            if exceeds_int_range && n.fract() == 0.0 {
+                                use num_bigint::BigInt;
+                                let big_int = BigInt::from(*n as i64);
+                                return Ok(Value::bignum(BigNum::BigInt(big_int)));
+                            }
+
+                            // Integer mode: convert to i64/u64 based on unsigned mode
+                            if self.config_stack.current().unsigned_mode {
+                                Ok(Value::bignum(BigNum::UInt64(*n as u64)))
+                            } else {
+                                Ok(Value::bignum(BigNum::Int64(*n as i64)))
+                            }
                         } else {
-                            Ok(Value::bignum(BigNum::Int64(*n as i64)))
+                            // Float mode (default): convert to Float128
+                            use f128::f128;
+                            Ok(Value::bignum(BigNum::Float128(f128::from(*n))))
                         }
                     }
                     PrecisionMode::Extended => {
-                        Err(GraphoidError::runtime(
-                            "Extended precision (BigInt) not yet implemented".to_string()
-                        ))
+                        // Phase 1B: Extended precision uses BigInt
+                        use num_bigint::BigInt;
+                        let big_int = if n.fract() == 0.0 {
+                            // Integer value - convert directly
+                            BigInt::from(*n as i64)
+                        } else {
+                            // Fractional value - truncate to integer for BigInt
+                            BigInt::from(n.trunc() as i64)
+                        };
+                        Ok(Value::bignum(BigNum::BigInt(big_int)))
                     }
                     PrecisionMode::Standard => {
+                        // Standard mode: use f64
+                        // Note: Large values may lose precision, but that's expected in Standard mode
                         Ok(Value::number(*n))
                     }
                 }
@@ -730,6 +840,12 @@ impl Executor {
                     }
                     BigNum::UInt64(_) => {
                         Err(GraphoidError::runtime("Cannot negate unsigned bignum value".to_string()))
+                    }
+                    BigNum::Float128(f) => {
+                        Ok(Value::bignum(BigNum::Float128(-*f)))
+                    }
+                    BigNum::BigInt(bi) => {
+                        Ok(Value::bignum(BigNum::BigInt(-bi)))
                     }
                 },
                 _ => Err(GraphoidError::type_error("number or bignum", val.type_name())),
@@ -1495,6 +1611,16 @@ impl Executor {
                     return Ok(Value::string(value.type_name().to_string()));
                 }
                 // Let Error and PatternNode handle their own type() method
+            }
+            "type_name" => {
+                // Alias for type() method - mirrors Rust API naming
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'type_name' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                return Ok(Value::string(value.type_name().to_string()));
             }
             _ => {}
         }
@@ -5845,8 +5971,16 @@ impl Executor {
                             .map(|result| Value::bignum(BigNum::UInt64(result)))
                             .ok_or_else(|| GraphoidError::runtime("Integer overflow in addition".to_string()))
                     }
+                    (BigNum::Float128(lv), BigNum::Float128(rv)) => {
+                        // Phase 1B: Float128 addition
+                        Ok(Value::bignum(BigNum::Float128(*lv + *rv)))
+                    }
+                    (BigNum::BigInt(lv), BigNum::BigInt(rv)) => {
+                        // Phase 1B: BigInt addition
+                        Ok(Value::bignum(BigNum::BigInt(lv + rv)))
+                    }
                     _ => Err(GraphoidError::runtime(
-                        "Cannot mix signed and unsigned bignum values".to_string()
+                        "Cannot mix different bignum types (Int64, UInt64, Float128, BigInt)".to_string()
                     ))
                 }
             }
@@ -5855,19 +5989,29 @@ impl Executor {
             (ValueKind::Number(l), ValueKind::Number(r)) => {
                 match self.config_stack.current().precision_mode {
                     PrecisionMode::High => {
-                        // Convert to i64/u64 based on unsigned_mode
-                        if self.config_stack.current().unsigned_mode {
-                            let lv = *l as u64;
-                            let rv = *r as u64;
-                            lv.checked_add(rv)
-                                .map(|result| Value::bignum(BigNum::UInt64(result)))
-                                .ok_or_else(|| GraphoidError::runtime("Integer overflow in addition".to_string()))
+                        // Phase 1B: High precision defaults to Float128
+                        // Only becomes Int64/UInt64 if integer_mode is also active
+                        if self.config_stack.current().integer_mode {
+                            // Integer mode: convert to i64/u64 based on unsigned_mode
+                            if self.config_stack.current().unsigned_mode {
+                                let lv = *l as u64;
+                                let rv = *r as u64;
+                                lv.checked_add(rv)
+                                    .map(|result| Value::bignum(BigNum::UInt64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in addition".to_string()))
+                            } else {
+                                let lv = *l as i64;
+                                let rv = *r as i64;
+                                lv.checked_add(rv)
+                                    .map(|result| Value::bignum(BigNum::Int64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in addition".to_string()))
+                            }
                         } else {
-                            let lv = *l as i64;
-                            let rv = *r as i64;
-                            lv.checked_add(rv)
-                                .map(|result| Value::bignum(BigNum::Int64(result)))
-                                .ok_or_else(|| GraphoidError::runtime("Integer overflow in addition".to_string()))
+                            // Float mode (default): convert to Float128
+                            use f128::f128;
+                            let lv = f128::from(*l);
+                            let rv = f128::from(*r);
+                            Ok(Value::bignum(BigNum::Float128(lv + rv)))
                         }
                     }
                     PrecisionMode::Extended => {
@@ -5890,12 +6034,16 @@ impl Executor {
                 Ok(Value::string(format!("{}{}", left_str, right_str)))
             }
 
-            // Mixed num/bignum error
-            (ValueKind::Number(_), ValueKind::BigNumber(_)) |
-            (ValueKind::BigNumber(_), ValueKind::Number(_)) => {
-                Err(GraphoidError::runtime(
-                    "Cannot mix num and bignum types without explicit conversion. Use .to_num() or configure { precision: :high }".to_string()
-                ))
+            // Phase 1B: Mixed num/bignum operations - auto-cast num to bignum (TEMPORARY)
+            // CRITICAL: This creates a TEMPORARY bignum copy for the operation.
+            // The original num variable is NOT mutated!
+            (ValueKind::Number(n), ValueKind::BigNumber(_bn)) => {
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_add(Value::bignum(n_bignum), right)
+            }
+            (ValueKind::BigNumber(_bn), ValueKind::Number(n)) => {
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_add(left, Value::bignum(n_bignum))
             }
 
             (_l, _r) => Err(GraphoidError::type_error(
@@ -5920,8 +6068,16 @@ impl Executor {
                             .map(|result| Value::bignum(BigNum::UInt64(result)))
                             .ok_or_else(|| GraphoidError::runtime("Integer overflow in subtraction".to_string()))
                     }
+                    (BigNum::Float128(lv), BigNum::Float128(rv)) => {
+                        // Phase 1B: Float128 subtraction
+                        Ok(Value::bignum(BigNum::Float128(*lv - *rv)))
+                    }
+                    (BigNum::BigInt(lv), BigNum::BigInt(rv)) => {
+                        // Phase 1B: BigInt subtraction
+                        Ok(Value::bignum(BigNum::BigInt(lv - rv)))
+                    }
                     _ => Err(GraphoidError::runtime(
-                        "Cannot mix signed and unsigned bignum values".to_string()
+                        "Cannot mix different bignum types (Int64, UInt64, Float128, BigInt)".to_string()
                     ))
                 }
             }
@@ -5930,18 +6086,28 @@ impl Executor {
             (ValueKind::Number(l), ValueKind::Number(r)) => {
                 match self.config_stack.current().precision_mode {
                     PrecisionMode::High => {
-                        if self.config_stack.current().unsigned_mode {
-                            let lv = *l as u64;
-                            let rv = *r as u64;
-                            lv.checked_sub(rv)
-                                .map(|result| Value::bignum(BigNum::UInt64(result)))
-                                .ok_or_else(|| GraphoidError::runtime("Integer overflow in subtraction".to_string()))
+                        // Phase 1B: High precision defaults to Float128
+                        if self.config_stack.current().integer_mode {
+                            // Integer mode
+                            if self.config_stack.current().unsigned_mode {
+                                let lv = *l as u64;
+                                let rv = *r as u64;
+                                lv.checked_sub(rv)
+                                    .map(|result| Value::bignum(BigNum::UInt64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in subtraction".to_string()))
+                            } else {
+                                let lv = *l as i64;
+                                let rv = *r as i64;
+                                lv.checked_sub(rv)
+                                    .map(|result| Value::bignum(BigNum::Int64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in subtraction".to_string()))
+                            }
                         } else {
-                            let lv = *l as i64;
-                            let rv = *r as i64;
-                            lv.checked_sub(rv)
-                                .map(|result| Value::bignum(BigNum::Int64(result)))
-                                .ok_or_else(|| GraphoidError::runtime("Integer overflow in subtraction".to_string()))
+                            // Float mode (default): Float128
+                            use f128::f128;
+                            let lv = f128::from(*l);
+                            let rv = f128::from(*r);
+                            Ok(Value::bignum(BigNum::Float128(lv - rv)))
                         }
                     }
                     PrecisionMode::Extended => {
@@ -5955,12 +6121,16 @@ impl Executor {
                 }
             }
 
-            // Mixed num/bignum error
-            (ValueKind::Number(_), ValueKind::BigNumber(_)) |
-            (ValueKind::BigNumber(_), ValueKind::Number(_)) => {
-                Err(GraphoidError::runtime(
-                    "Cannot mix num and bignum types without explicit conversion. Use .to_num() or configure { precision: :high }".to_string()
-                ))
+            // Phase 1B: Mixed num/bignum - auto-cast to Float128
+            (ValueKind::Number(n), ValueKind::BigNumber(_bn)) => {
+                
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_subtract(Value::bignum(n_bignum), right)
+            }
+            (ValueKind::BigNumber(_bn), ValueKind::Number(n)) => {
+                
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_subtract(left, Value::bignum(n_bignum))
             }
 
             (_l, _r) => Err(GraphoidError::type_error(
@@ -5985,8 +6155,16 @@ impl Executor {
                             .map(|result| Value::bignum(BigNum::UInt64(result)))
                             .ok_or_else(|| GraphoidError::runtime("Integer overflow in multiplication".to_string()))
                     }
+                    (BigNum::Float128(lv), BigNum::Float128(rv)) => {
+                        // Phase 1B: Float128 multiplication
+                        Ok(Value::bignum(BigNum::Float128(*lv * *rv)))
+                    }
+                    (BigNum::BigInt(lv), BigNum::BigInt(rv)) => {
+                        // Phase 1B: BigInt multiplication
+                        Ok(Value::bignum(BigNum::BigInt(lv * rv)))
+                    }
                     _ => Err(GraphoidError::runtime(
-                        "Cannot mix signed and unsigned bignum values".to_string()
+                        "Cannot mix different bignum types (Int64, UInt64, Float128, BigInt)".to_string()
                     ))
                 }
             }
@@ -5995,18 +6173,27 @@ impl Executor {
             (ValueKind::Number(l), ValueKind::Number(r)) => {
                 match self.config_stack.current().precision_mode {
                     PrecisionMode::High => {
-                        if self.config_stack.current().unsigned_mode {
-                            let lv = *l as u64;
-                            let rv = *r as u64;
-                            lv.checked_mul(rv)
-                                .map(|result| Value::bignum(BigNum::UInt64(result)))
-                                .ok_or_else(|| GraphoidError::runtime("Integer overflow in multiplication".to_string()))
+                        // Phase 1B: High precision defaults to Float128
+                        if self.config_stack.current().integer_mode {
+                            if self.config_stack.current().unsigned_mode {
+                                let lv = *l as u64;
+                                let rv = *r as u64;
+                                lv.checked_mul(rv)
+                                    .map(|result| Value::bignum(BigNum::UInt64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in multiplication".to_string()))
+                            } else {
+                                let lv = *l as i64;
+                                let rv = *r as i64;
+                                lv.checked_mul(rv)
+                                    .map(|result| Value::bignum(BigNum::Int64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in multiplication".to_string()))
+                            }
                         } else {
-                            let lv = *l as i64;
-                            let rv = *r as i64;
-                            lv.checked_mul(rv)
-                                .map(|result| Value::bignum(BigNum::Int64(result)))
-                                .ok_or_else(|| GraphoidError::runtime("Integer overflow in multiplication".to_string()))
+                            // Float mode (default): Float128
+                            use f128::f128;
+                            let lv = f128::from(*l);
+                            let rv = f128::from(*r);
+                            Ok(Value::bignum(BigNum::Float128(lv * rv)))
                         }
                     }
                     PrecisionMode::Extended => {
@@ -6020,12 +6207,16 @@ impl Executor {
                 }
             }
 
-            // Mixed num/bignum error
-            (ValueKind::Number(_), ValueKind::BigNumber(_)) |
-            (ValueKind::BigNumber(_), ValueKind::Number(_)) => {
-                Err(GraphoidError::runtime(
-                    "Cannot mix num and bignum types without explicit conversion. Use .to_num() or configure { precision: :high }".to_string()
-                ))
+            // Phase 1B: Mixed num/bignum - auto-cast to Float128
+            (ValueKind::Number(n), ValueKind::BigNumber(_bn)) => {
+                
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_multiply(Value::bignum(n_bignum), right)
+            }
+            (ValueKind::BigNumber(_bn), ValueKind::Number(n)) => {
+                
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_multiply(left, Value::bignum(n_bignum))
             }
 
             (_l, _r) => Err(GraphoidError::type_error(
@@ -6056,8 +6247,24 @@ impl Executor {
                             .map(|result| Value::bignum(BigNum::UInt64(result)))
                             .ok_or_else(|| GraphoidError::runtime("Integer overflow in division".to_string()))
                     }
+                    (BigNum::Float128(lv), BigNum::Float128(rv)) => {
+                        // Phase 1B: Float128 division
+                        let f64_rv: f64 = (*rv).into();
+                        if f64_rv == 0.0 {
+                            return Err(GraphoidError::division_by_zero());
+                        }
+                        Ok(Value::bignum(BigNum::Float128(*lv / *rv)))
+                    }
+                    (BigNum::BigInt(lv), BigNum::BigInt(rv)) => {
+                        // Phase 1B: BigInt division
+                        use num_traits::Zero;
+                        if rv.is_zero() {
+                            return Err(GraphoidError::division_by_zero());
+                        }
+                        Ok(Value::bignum(BigNum::BigInt(lv / rv)))
+                    }
                     _ => Err(GraphoidError::runtime(
-                        "Cannot mix signed and unsigned bignum values".to_string()
+                        "Cannot mix different bignum types (Int64, UInt64, Float128, BigInt)".to_string()
                     ))
                 }
             }
@@ -6066,24 +6273,36 @@ impl Executor {
             (ValueKind::Number(l), ValueKind::Number(r)) => {
                 match self.config_stack.current().precision_mode {
                     PrecisionMode::High => {
-                        if self.config_stack.current().unsigned_mode {
-                            let lv = *l as u64;
-                            let rv = *r as u64;
-                            if rv == 0 {
-                                return Err(GraphoidError::division_by_zero());
+                        // Phase 1B: High precision defaults to Float128
+                        if self.config_stack.current().integer_mode {
+                            if self.config_stack.current().unsigned_mode {
+                                let lv = *l as u64;
+                                let rv = *r as u64;
+                                if rv == 0 {
+                                    return Err(GraphoidError::division_by_zero());
+                                }
+                                lv.checked_div(rv)
+                                    .map(|result| Value::bignum(BigNum::UInt64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in division".to_string()))
+                            } else {
+                                let lv = *l as i64;
+                                let rv = *r as i64;
+                                if rv == 0 {
+                                    return Err(GraphoidError::division_by_zero());
+                                }
+                                lv.checked_div(rv)
+                                    .map(|result| Value::bignum(BigNum::Int64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in division".to_string()))
                             }
-                            lv.checked_div(rv)
-                                .map(|result| Value::bignum(BigNum::UInt64(result)))
-                                .ok_or_else(|| GraphoidError::runtime("Integer overflow in division".to_string()))
                         } else {
-                            let lv = *l as i64;
-                            let rv = *r as i64;
-                            if rv == 0 {
+                            // Float mode (default): Float128
+                            use f128::f128;
+                            let lv = f128::from(*l);
+                            let rv = f128::from(*r);
+                            if rv == f128::from(0.0) {
                                 return Err(GraphoidError::division_by_zero());
                             }
-                            lv.checked_div(rv)
-                                .map(|result| Value::bignum(BigNum::Int64(result)))
-                                .ok_or_else(|| GraphoidError::runtime("Integer overflow in division".to_string()))
+                            Ok(Value::bignum(BigNum::Float128(lv / rv)))
                         }
                     }
                     PrecisionMode::Extended => {
@@ -6121,12 +6340,16 @@ impl Executor {
                 }
             }
 
-            // Mixed num/bignum error
-            (ValueKind::Number(_), ValueKind::BigNumber(_)) |
-            (ValueKind::BigNumber(_), ValueKind::Number(_)) => {
-                Err(GraphoidError::runtime(
-                    "Cannot mix num and bignum types without explicit conversion. Use .to_num() or configure { precision: :high }".to_string()
-                ))
+            // Phase 1B: Mixed num/bignum - auto-cast to Float128
+            (ValueKind::Number(n), ValueKind::BigNumber(_bn)) => {
+                
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_divide(Value::bignum(n_bignum), right)
+            }
+            (ValueKind::BigNumber(_bn), ValueKind::Number(n)) => {
+                
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_divide(left, Value::bignum(n_bignum))
             }
 
             (_l, _r) => Err(GraphoidError::type_error(
@@ -6138,33 +6361,141 @@ impl Executor {
 
     fn eval_int_div(&mut self, left: Value, right: Value) -> Result<Value> {
         match (&left.kind, &right.kind) {
-            (ValueKind::Number(l), ValueKind::Number(r)) => {
-                if *r == 0.0 {
-                    // Check error mode
-                    match self.config_stack.current().error_mode {
-                        ErrorMode::Lenient => {
-                            return Ok(Value::none());
-                        }
-                        ErrorMode::Collect => {
-                            let error = GraphoidError::division_by_zero();
-                            self.error_collector.collect(
-                                error,
-                                self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
-                                SourcePosition::unknown(),
-                            );
-                            return Ok(Value::none());
-                        }
-                        ErrorMode::Strict => {
+            // BigNumber // BigNumber
+            (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
+                match (l, r) {
+                    (BigNum::Float128(lv), BigNum::Float128(rv)) => {
+                        // Phase 1B: Float128 integer division
+                        let f64_rv: f64 = (*rv).into();
+                        if f64_rv == 0.0 {
                             return Err(GraphoidError::division_by_zero());
                         }
+                        // Perform division and truncate toward zero
+                        let result_f64: f64 = (*lv / *rv).into();
+                        use f128::f128;
+                        Ok(Value::bignum(BigNum::Float128(f128::from(result_f64.trunc()))))
                     }
-                } else {
-                    // Truncate toward zero (not floor)
-                    Ok(Value::number((l / r).trunc()))
+                    (BigNum::BigInt(lv), BigNum::BigInt(rv)) => {
+                        // Phase 1B: BigInt integer division
+                        use num_traits::Zero;
+                        if rv.is_zero() {
+                            return Err(GraphoidError::division_by_zero());
+                        }
+                        Ok(Value::bignum(BigNum::BigInt(lv / rv)))
+                    }
+                    (BigNum::Int64(lv), BigNum::Int64(rv)) => {
+                        if *rv == 0 {
+                            return Err(GraphoidError::division_by_zero());
+                        }
+                        lv.checked_div(*rv)
+                            .map(|result| Value::bignum(BigNum::Int64(result)))
+                            .ok_or_else(|| GraphoidError::runtime("Integer overflow in integer division".to_string()))
+                    }
+                    (BigNum::UInt64(lv), BigNum::UInt64(rv)) => {
+                        if *rv == 0 {
+                            return Err(GraphoidError::division_by_zero());
+                        }
+                        lv.checked_div(*rv)
+                            .map(|result| Value::bignum(BigNum::UInt64(result)))
+                            .ok_or_else(|| GraphoidError::runtime("Integer overflow in integer division".to_string()))
+                    }
+                    _ => Err(GraphoidError::runtime(
+                        "Cannot mix different bignum types (Int64, UInt64, Float128, BigInt)".to_string()
+                    ))
                 }
             }
+            (ValueKind::Number(l), ValueKind::Number(r)) => {
+                match self.config_stack.current().precision_mode {
+                    PrecisionMode::High => {
+                        // Phase 1B: High precision defaults to Float128
+                        if self.config_stack.current().integer_mode {
+                            // Integer mode: Int64/UInt64 integer division
+                            if self.config_stack.current().unsigned_mode {
+                                let lv = *l as u64;
+                                let rv = *r as u64;
+                                if rv == 0 {
+                                    return Err(GraphoidError::division_by_zero());
+                                }
+                                lv.checked_div(rv)
+                                    .map(|result| Value::bignum(BigNum::UInt64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in integer division".to_string()))
+                            } else {
+                                let lv = *l as i64;
+                                let rv = *r as i64;
+                                if rv == 0 {
+                                    return Err(GraphoidError::division_by_zero());
+                                }
+                                lv.checked_div(rv)
+                                    .map(|result| Value::bignum(BigNum::Int64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in integer division".to_string()))
+                            }
+                        } else {
+                            // Float mode (default): Float128 with truncation
+                            use f128::f128;
+                            let lv = f128::from(*l);
+                            let rv = f128::from(*r);
+                            let f64_rv: f64 = rv.into();
+                            if f64_rv == 0.0 {
+                                return Err(GraphoidError::division_by_zero());
+                            }
+                            // Perform division and truncate toward zero
+                            let result_f64: f64 = (lv / rv).into();
+                            Ok(Value::bignum(BigNum::Float128(f128::from(result_f64.trunc()))))
+                        }
+                    }
+                    PrecisionMode::Standard => {
+                        if *r == 0.0 {
+                            // Check error mode
+                            match self.config_stack.current().error_mode {
+                                ErrorMode::Lenient => {
+                                    return Ok(Value::none());
+                                }
+                                ErrorMode::Collect => {
+                                    let error = GraphoidError::division_by_zero();
+                                    self.error_collector.collect(
+                                        error,
+                                        self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
+                                        SourcePosition::unknown(),
+                                    );
+                                    return Ok(Value::none());
+                                }
+                                ErrorMode::Strict => {
+                                    return Err(GraphoidError::division_by_zero());
+                                }
+                            }
+                        } else {
+                            // Truncate toward zero (not floor)
+                            Ok(Value::number((l / r).trunc()))
+                        }
+                    }
+                    PrecisionMode::Extended => {
+                        // Phase 1B: Extended precision uses BigInt (future)
+                        use num_bigint::BigInt;
+                        let lv = BigInt::from(*l as i64);
+                        let rv = BigInt::from(*r as i64);
+                        use num_traits::Zero;
+                        if rv.is_zero() {
+                            return Err(GraphoidError::division_by_zero());
+                        }
+                        Ok(Value::bignum(BigNum::BigInt(&lv / &rv)))
+                    }
+                }
+            }
+
+            // Phase 1B: Mixed num/bignum - auto-cast num to Float128 temporarily
+            (ValueKind::Number(n), ValueKind::BigNumber(_bn)) => {
+                
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_int_div(Value::bignum(n_bignum), right)
+            }
+            (ValueKind::BigNumber(_bn), ValueKind::Number(n)) => {
+                
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_int_div(left, Value::bignum(n_bignum))
+            }
+
             (_l, _r) => Err(GraphoidError::type_error(
-                "number",
+                "number or bignum",
                 &format!("{} and {}", left.type_name(), right.type_name()),
             )),
         }
@@ -6191,8 +6522,24 @@ impl Executor {
                             .map(|result| Value::bignum(BigNum::UInt64(result)))
                             .ok_or_else(|| GraphoidError::runtime("Integer overflow in modulo".to_string()))
                     }
+                    (BigNum::Float128(lv), BigNum::Float128(rv)) => {
+                        // Phase 1B: Float128 modulo
+                        let f64_rv: f64 = (*rv).into();
+                        if f64_rv == 0.0 {
+                            return Err(GraphoidError::runtime("Modulo by zero".to_string()));
+                        }
+                        Ok(Value::bignum(BigNum::Float128(*lv % *rv)))
+                    }
+                    (BigNum::BigInt(lv), BigNum::BigInt(rv)) => {
+                        // Phase 1B: BigInt modulo
+                        use num_traits::Zero;
+                        if rv.is_zero() {
+                            return Err(GraphoidError::runtime("Modulo by zero".to_string()));
+                        }
+                        Ok(Value::bignum(BigNum::BigInt(lv % rv)))
+                    }
                     _ => Err(GraphoidError::runtime(
-                        "Cannot mix signed and unsigned bignum values".to_string()
+                        "Cannot mix different bignum types (Int64, UInt64, Float128, BigInt)".to_string()
                     ))
                 }
             }
@@ -6201,24 +6548,36 @@ impl Executor {
             (ValueKind::Number(l), ValueKind::Number(r)) => {
                 match self.config_stack.current().precision_mode {
                     PrecisionMode::High => {
-                        if self.config_stack.current().unsigned_mode {
-                            let lv = *l as u64;
-                            let rv = *r as u64;
-                            if rv == 0 {
-                                return Err(GraphoidError::runtime("Modulo by zero".to_string()));
+                        // Phase 1B: High precision defaults to Float128
+                        if self.config_stack.current().integer_mode {
+                            if self.config_stack.current().unsigned_mode {
+                                let lv = *l as u64;
+                                let rv = *r as u64;
+                                if rv == 0 {
+                                    return Err(GraphoidError::runtime("Modulo by zero".to_string()));
+                                }
+                                lv.checked_rem(rv)
+                                    .map(|result| Value::bignum(BigNum::UInt64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in modulo".to_string()))
+                            } else {
+                                let lv = *l as i64;
+                                let rv = *r as i64;
+                                if rv == 0 {
+                                    return Err(GraphoidError::runtime("Modulo by zero".to_string()));
+                                }
+                                lv.checked_rem(rv)
+                                    .map(|result| Value::bignum(BigNum::Int64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in modulo".to_string()))
                             }
-                            lv.checked_rem(rv)
-                                .map(|result| Value::bignum(BigNum::UInt64(result)))
-                                .ok_or_else(|| GraphoidError::runtime("Integer overflow in modulo".to_string()))
                         } else {
-                            let lv = *l as i64;
-                            let rv = *r as i64;
-                            if rv == 0 {
+                            // Float mode (default): Float128
+                            use f128::f128;
+                            let lv = f128::from(*l);
+                            let rv = f128::from(*r);
+                            if rv == f128::from(0.0) {
                                 return Err(GraphoidError::runtime("Modulo by zero".to_string()));
                             }
-                            lv.checked_rem(rv)
-                                .map(|result| Value::bignum(BigNum::Int64(result)))
-                                .ok_or_else(|| GraphoidError::runtime("Integer overflow in modulo".to_string()))
+                            Ok(Value::bignum(BigNum::Float128(lv % rv)))
                         }
                     }
                     PrecisionMode::Extended => {
@@ -6253,12 +6612,16 @@ impl Executor {
                 }
             }
 
-            // Mixed num/bignum error
-            (ValueKind::Number(_), ValueKind::BigNumber(_)) |
-            (ValueKind::BigNumber(_), ValueKind::Number(_)) => {
-                Err(GraphoidError::runtime(
-                    "Cannot mix num and bignum types without explicit conversion. Use .to_num() or configure { precision: :high }".to_string()
-                ))
+            // Phase 1B: Mixed num/bignum - auto-cast to Float128
+            (ValueKind::Number(n), ValueKind::BigNumber(_bn)) => {
+                
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_modulo(Value::bignum(n_bignum), right)
+            }
+            (ValueKind::BigNumber(_bn), ValueKind::Number(n)) => {
+                
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_modulo(left, Value::bignum(n_bignum))
             }
 
             (_l, _r) => Err(GraphoidError::type_error(
@@ -6292,8 +6655,26 @@ impl Executor {
                             .map(|result| Value::bignum(BigNum::UInt64(result)))
                             .ok_or_else(|| GraphoidError::runtime("Integer overflow in power operation".to_string()))
                     }
+                    (BigNum::Float128(lv), BigNum::Float128(rv)) => {
+                        // Phase 1B: Float128 power
+                        // Convert to f64 for power calculation (f128 doesn't have powf)
+                        let lv_f64: f64 = (*lv).into();
+                        let rv_f64: f64 = (*rv).into();
+                        let result = lv_f64.powf(rv_f64);
+                        use f128::f128;
+                        Ok(Value::bignum(BigNum::Float128(f128::from(result))))
+                    }
+                    (BigNum::BigInt(lv), BigNum::BigInt(rv)) => {
+                        // Phase 1B: BigInt power
+                        use num_traits::ToPrimitive;
+                        let exp_usize = rv.to_usize().ok_or_else(||
+                            GraphoidError::runtime("Exponent too large or negative for BigInt power".to_string())
+                        )?;
+                        use num_traits::pow;
+                        Ok(Value::bignum(BigNum::BigInt(pow::pow(lv.clone(), exp_usize))))
+                    }
                     _ => Err(GraphoidError::runtime(
-                        "Cannot mix signed and unsigned bignum values".to_string()
+                        "Cannot mix different bignum types (Int64, UInt64, Float128, BigInt)".to_string()
                     ))
                 }
             }
@@ -6302,30 +6683,43 @@ impl Executor {
             (ValueKind::Number(l), ValueKind::Number(r)) => {
                 match self.config_stack.current().precision_mode {
                     PrecisionMode::High => {
-                        if self.config_stack.current().unsigned_mode {
-                            let lv = *l as u64;
-                            let rv = *r;
-                            if rv < 0.0 {
-                                return Err(GraphoidError::runtime("Negative exponents not supported for integer power".to_string()));
+                        // Phase 1B: High precision defaults to Float128
+                        if self.config_stack.current().integer_mode {
+                            if self.config_stack.current().unsigned_mode {
+                                let lv = *l as u64;
+                                let rv = *r;
+                                if rv < 0.0 {
+                                    return Err(GraphoidError::runtime("Negative exponents not supported for integer power".to_string()));
+                                }
+                                if rv > u32::MAX as f64 {
+                                    return Err(GraphoidError::runtime("Exponent too large".to_string()));
+                                }
+                                lv.checked_pow(rv as u32)
+                                    .map(|result| Value::bignum(BigNum::UInt64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in power operation".to_string()))
+                            } else {
+                                let lv = *l as i64;
+                                let rv = *r;
+                                if rv < 0.0 {
+                                    return Err(GraphoidError::runtime("Negative exponents not supported for integer power".to_string()));
+                                }
+                                if rv > u32::MAX as f64 {
+                                    return Err(GraphoidError::runtime("Exponent too large".to_string()));
+                                }
+                                lv.checked_pow(rv as u32)
+                                    .map(|result| Value::bignum(BigNum::Int64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in power operation".to_string()))
                             }
-                            if rv > u32::MAX as f64 {
-                                return Err(GraphoidError::runtime("Exponent too large".to_string()));
-                            }
-                            lv.checked_pow(rv as u32)
-                                .map(|result| Value::bignum(BigNum::UInt64(result)))
-                                .ok_or_else(|| GraphoidError::runtime("Integer overflow in power operation".to_string()))
                         } else {
-                            let lv = *l as i64;
-                            let rv = *r;
-                            if rv < 0.0 {
-                                return Err(GraphoidError::runtime("Negative exponents not supported for integer power".to_string()));
-                            }
-                            if rv > u32::MAX as f64 {
-                                return Err(GraphoidError::runtime("Exponent too large".to_string()));
-                            }
-                            lv.checked_pow(rv as u32)
-                                .map(|result| Value::bignum(BigNum::Int64(result)))
-                                .ok_or_else(|| GraphoidError::runtime("Integer overflow in power operation".to_string()))
+                            // Float mode (default): Float128
+                            use f128::f128;
+                            let lv = f128::from(*l);
+                            let rv = f128::from(*r);
+                            // Convert to f64 for powf (f128 doesn't have powf)
+                            let lv_f64: f64 = lv.into();
+                            let rv_f64: f64 = rv.into();
+                            let result = lv_f64.powf(rv_f64);
+                            Ok(Value::bignum(BigNum::Float128(f128::from(result))))
                         }
                     }
                     PrecisionMode::Extended => {
@@ -6339,12 +6733,16 @@ impl Executor {
                 }
             }
 
-            // Mixed num/bignum error
-            (ValueKind::Number(_), ValueKind::BigNumber(_)) |
-            (ValueKind::BigNumber(_), ValueKind::Number(_)) => {
-                Err(GraphoidError::runtime(
-                    "Cannot mix num and bignum types without explicit conversion. Use .to_num() or configure { precision: :high }".to_string()
-                ))
+            // Phase 1B: Mixed num/bignum - auto-cast to Float128
+            (ValueKind::Number(n), ValueKind::BigNumber(_bn)) => {
+                
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_power(Value::bignum(n_bignum), right)
+            }
+            (ValueKind::BigNumber(_bn), ValueKind::Number(n)) => {
+                
+                let n_bignum = self.num_to_bignum_f128(*n);
+                self.eval_power(left, Value::bignum(n_bignum))
             }
 
             (_l, _r) => Err(GraphoidError::type_error(
@@ -6537,6 +6935,16 @@ impl Executor {
                             .map(|result| Value::bignum(BigNum::UInt64(result)))
                             .ok_or_else(|| GraphoidError::runtime("Integer overflow in left shift".to_string()))
                     }
+                    BigNum::Float128(_) => {
+                        Err(GraphoidError::runtime("Cannot left shift floating-point bignum".to_string()))
+                    }
+                    BigNum::BigInt(bi) => {
+                        use num_traits::ToPrimitive;
+                        let shift_u32 = (shift_amount as u32).to_usize().ok_or_else(||
+                            GraphoidError::runtime("Shift amount out of range".to_string())
+                        )?;
+                        Ok(Value::bignum(BigNum::BigInt(bi << shift_u32)))
+                    }
                 }
             }
 
@@ -6628,6 +7036,16 @@ impl Executor {
                         // Logical right shift for unsigned
                         Ok(Value::bignum(BigNum::UInt64(lv >> (shift_amount as u32))))
                     }
+                    BigNum::Float128(_) => {
+                        Err(GraphoidError::runtime("Cannot right shift floating-point bignum".to_string()))
+                    }
+                    BigNum::BigInt(bi) => {
+                        use num_traits::ToPrimitive;
+                        let shift_u32 = (shift_amount as u32).to_usize().ok_or_else(||
+                            GraphoidError::runtime("Shift amount out of range".to_string())
+                        )?;
+                        Ok(Value::bignum(BigNum::BigInt(bi >> shift_u32)))
+                    }
                 }
             }
 
@@ -6715,6 +7133,13 @@ impl Executor {
                 match bn {
                     BigNum::Int64(v) => Ok(Value::bignum(BigNum::Int64(!v))),
                     BigNum::UInt64(v) => Ok(Value::bignum(BigNum::UInt64(!v))),
+                    BigNum::Float128(_) => {
+                        Err(GraphoidError::runtime("Cannot apply bitwise NOT to floating-point bignum".to_string()))
+                    }
+                    BigNum::BigInt(bi) => {
+                        // Bitwise NOT on BigInt - flip all bits
+                        Ok(Value::bignum(BigNum::BigInt(!bi)))
+                    }
                 }
             }
             ValueKind::Number(n) => {
@@ -6736,26 +7161,48 @@ impl Executor {
         }
     }
 
+    // Helper: Convert BigNum to f64 for comparison (may lose precision for very large numbers)
+    fn bignum_to_f64(&self, bn: &BigNum) -> Result<f64> {
+        match bn {
+            BigNum::Int64(v) => Ok(*v as f64),
+            BigNum::UInt64(v) => Ok(*v as f64),
+            BigNum::Float128(f) => {
+                let f64_val: f64 = (*f).into();
+                Ok(f64_val)
+            }
+            BigNum::BigInt(bi) => {
+                use num_traits::ToPrimitive;
+                bi.to_f64().ok_or_else(||
+                    GraphoidError::runtime("BigInt too large to convert to f64 for comparison".to_string())
+                )
+            }
+        }
+    }
+
     // Comparison helpers
     fn eval_less(&self, left: Value, right: Value) -> Result<Value> {
         match (&left.kind, &right.kind) {
             (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::boolean(l < r)),
             (ValueKind::String(l), ValueKind::String(r)) => Ok(Value::boolean(l < r)),
+
+            // BigNumber < BigNumber - compare by value
             (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
-                match (l, r) {
-                    (BigNum::Int64(lv), BigNum::Int64(rv)) => Ok(Value::boolean(lv < rv)),
-                    (BigNum::UInt64(lv), BigNum::UInt64(rv)) => Ok(Value::boolean(lv < rv)),
-                    _ => Err(GraphoidError::runtime(
-                        "Cannot compare signed and unsigned bignum values".to_string()
-                    ))
-                }
+                // Convert both to f64 for comparison (may lose precision for very large numbers)
+                let lv = self.bignum_to_f64(l)?;
+                let rv = self.bignum_to_f64(r)?;
+                Ok(Value::boolean(lv < rv))
             }
-            (ValueKind::Number(_), ValueKind::BigNumber(_)) |
-            (ValueKind::BigNumber(_), ValueKind::Number(_)) => {
-                Err(GraphoidError::runtime(
-                    "Cannot compare num and bignum types without explicit conversion".to_string()
-                ))
+
+            // Phase 1B: Mixed num/bignum comparison - compare by value, not type
+            (ValueKind::Number(n), ValueKind::BigNumber(bn)) => {
+                let bn_f64 = self.bignum_to_f64(bn)?;
+                Ok(Value::boolean(*n < bn_f64))
             }
+            (ValueKind::BigNumber(bn), ValueKind::Number(n)) => {
+                let bn_f64 = self.bignum_to_f64(bn)?;
+                Ok(Value::boolean(bn_f64 < *n))
+            }
+
             (_l, _r) => Err(GraphoidError::type_error(
                 "number, string, or bignum",
                 &format!("{} and {}", left.type_name(), right.type_name()),
@@ -6767,21 +7214,24 @@ impl Executor {
         match (&left.kind, &right.kind) {
             (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::boolean(l <= r)),
             (ValueKind::String(l), ValueKind::String(r)) => Ok(Value::boolean(l <= r)),
+
+            // BigNumber <= BigNumber - compare by value
             (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
-                match (l, r) {
-                    (BigNum::Int64(lv), BigNum::Int64(rv)) => Ok(Value::boolean(lv <= rv)),
-                    (BigNum::UInt64(lv), BigNum::UInt64(rv)) => Ok(Value::boolean(lv <= rv)),
-                    _ => Err(GraphoidError::runtime(
-                        "Cannot compare signed and unsigned bignum values".to_string()
-                    ))
-                }
+                let lv = self.bignum_to_f64(l)?;
+                let rv = self.bignum_to_f64(r)?;
+                Ok(Value::boolean(lv <= rv))
             }
-            (ValueKind::Number(_), ValueKind::BigNumber(_)) |
-            (ValueKind::BigNumber(_), ValueKind::Number(_)) => {
-                Err(GraphoidError::runtime(
-                    "Cannot compare num and bignum types without explicit conversion".to_string()
-                ))
+
+            // Phase 1B: Mixed num/bignum comparison
+            (ValueKind::Number(n), ValueKind::BigNumber(bn)) => {
+                let bn_f64 = self.bignum_to_f64(bn)?;
+                Ok(Value::boolean(*n <= bn_f64))
             }
+            (ValueKind::BigNumber(bn), ValueKind::Number(n)) => {
+                let bn_f64 = self.bignum_to_f64(bn)?;
+                Ok(Value::boolean(bn_f64 <= *n))
+            }
+
             (_l, _r) => Err(GraphoidError::type_error(
                 "number, string, or bignum",
                 &format!("{} and {}", left.type_name(), right.type_name()),
@@ -6793,21 +7243,24 @@ impl Executor {
         match (&left.kind, &right.kind) {
             (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::boolean(l > r)),
             (ValueKind::String(l), ValueKind::String(r)) => Ok(Value::boolean(l > r)),
+
+            // BigNumber > BigNumber - compare by value
             (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
-                match (l, r) {
-                    (BigNum::Int64(lv), BigNum::Int64(rv)) => Ok(Value::boolean(lv > rv)),
-                    (BigNum::UInt64(lv), BigNum::UInt64(rv)) => Ok(Value::boolean(lv > rv)),
-                    _ => Err(GraphoidError::runtime(
-                        "Cannot compare signed and unsigned bignum values".to_string()
-                    ))
-                }
+                let lv = self.bignum_to_f64(l)?;
+                let rv = self.bignum_to_f64(r)?;
+                Ok(Value::boolean(lv > rv))
             }
-            (ValueKind::Number(_), ValueKind::BigNumber(_)) |
-            (ValueKind::BigNumber(_), ValueKind::Number(_)) => {
-                Err(GraphoidError::runtime(
-                    "Cannot compare num and bignum types without explicit conversion".to_string()
-                ))
+
+            // Phase 1B: Mixed num/bignum comparison
+            (ValueKind::Number(n), ValueKind::BigNumber(bn)) => {
+                let bn_f64 = self.bignum_to_f64(bn)?;
+                Ok(Value::boolean(*n > bn_f64))
             }
+            (ValueKind::BigNumber(bn), ValueKind::Number(n)) => {
+                let bn_f64 = self.bignum_to_f64(bn)?;
+                Ok(Value::boolean(bn_f64 > *n))
+            }
+
             (_l, _r) => Err(GraphoidError::type_error(
                 "number, string, or bignum",
                 &format!("{} and {}", left.type_name(), right.type_name()),
@@ -6819,21 +7272,24 @@ impl Executor {
         match (&left.kind, &right.kind) {
             (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::boolean(l >= r)),
             (ValueKind::String(l), ValueKind::String(r)) => Ok(Value::boolean(l >= r)),
+
+            // BigNumber >= BigNumber - compare by value
             (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
-                match (l, r) {
-                    (BigNum::Int64(lv), BigNum::Int64(rv)) => Ok(Value::boolean(lv >= rv)),
-                    (BigNum::UInt64(lv), BigNum::UInt64(rv)) => Ok(Value::boolean(lv >= rv)),
-                    _ => Err(GraphoidError::runtime(
-                        "Cannot compare signed and unsigned bignum values".to_string()
-                    ))
-                }
+                let lv = self.bignum_to_f64(l)?;
+                let rv = self.bignum_to_f64(r)?;
+                Ok(Value::boolean(lv >= rv))
             }
-            (ValueKind::Number(_), ValueKind::BigNumber(_)) |
-            (ValueKind::BigNumber(_), ValueKind::Number(_)) => {
-                Err(GraphoidError::runtime(
-                    "Cannot compare num and bignum types without explicit conversion".to_string()
-                ))
+
+            // Phase 1B: Mixed num/bignum comparison
+            (ValueKind::Number(n), ValueKind::BigNumber(bn)) => {
+                let bn_f64 = self.bignum_to_f64(bn)?;
+                Ok(Value::boolean(*n >= bn_f64))
             }
+            (ValueKind::BigNumber(bn), ValueKind::Number(n)) => {
+                let bn_f64 = self.bignum_to_f64(bn)?;
+                Ok(Value::boolean(bn_f64 >= *n))
+            }
+
             (_l, _r) => Err(GraphoidError::type_error(
                 "number, string, or bignum",
                 &format!("{} and {}", left.type_name(), right.type_name()),

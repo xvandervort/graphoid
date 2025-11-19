@@ -233,3 +233,82 @@ fn test_multiple_config_keys() {
     assert_eq!(stack.current().error_mode, ErrorMode::Lenient);
     assert_eq!(stack.current().strict_types, false);
 }
+
+// ===== Phase 1A: :integer Directive Tests =====
+
+#[test]
+fn test_default_config_integer_mode_false() {
+    let config = Config::default();
+    assert_eq!(config.integer_mode, false);
+}
+
+#[test]
+fn test_integer_directive_sets_integer_mode() {
+    let mut stack = ConfigStack::new();
+
+    // Simulate precision { :integer } { ... }
+    let mut changes = HashMap::new();
+    changes.insert("integer".to_string(), Value::symbol("integer".to_string()));
+
+    stack.push_with_changes(changes).unwrap();
+    assert_eq!(stack.current().integer_mode, true);
+    assert_eq!(stack.depth(), 2);
+}
+
+#[test]
+fn test_integer_mode_scoped_correctly() {
+    let mut stack = ConfigStack::new();
+
+    // Base level - integer_mode is false
+    assert_eq!(stack.current().integer_mode, false);
+
+    // Push :integer directive
+    let mut changes = HashMap::new();
+    changes.insert("integer".to_string(), Value::symbol("integer".to_string()));
+    stack.push_with_changes(changes).unwrap();
+    assert_eq!(stack.current().integer_mode, true);
+    assert_eq!(stack.depth(), 2);
+
+    // Pop back to base level
+    stack.pop();
+    assert_eq!(stack.current().integer_mode, false);
+    assert_eq!(stack.depth(), 1);
+}
+
+#[test]
+fn test_integer_directive_combines_with_other_directives() {
+    let mut stack = ConfigStack::new();
+
+    // Combine :integer with :unsigned (both directives)
+    let mut changes = HashMap::new();
+    changes.insert("integer".to_string(), Value::symbol("integer".to_string()));
+    changes.insert("unsigned".to_string(), Value::symbol("unsigned".to_string()));
+
+    stack.push_with_changes(changes).unwrap();
+    assert_eq!(stack.current().integer_mode, true);
+    assert_eq!(stack.current().unsigned_mode, true);
+}
+
+#[test]
+fn test_integer_directive_inherits_other_config() {
+    let mut stack = ConfigStack::new();
+
+    // First level: set skip_none
+    let mut changes1 = HashMap::new();
+    changes1.insert("skip_none".to_string(), Value::boolean(true));
+    stack.push_with_changes(changes1).unwrap();
+    assert_eq!(stack.current().skip_none, true);
+    assert_eq!(stack.current().integer_mode, false);
+
+    // Second level: add :integer directive
+    let mut changes2 = HashMap::new();
+    changes2.insert("integer".to_string(), Value::symbol("integer".to_string()));
+    stack.push_with_changes(changes2).unwrap();
+    assert_eq!(stack.current().skip_none, true);  // Inherited
+    assert_eq!(stack.current().integer_mode, true);  // New setting
+
+    // Pop back to first level
+    stack.pop();
+    assert_eq!(stack.current().skip_none, true);
+    assert_eq!(stack.current().integer_mode, false);  // Back to false
+}

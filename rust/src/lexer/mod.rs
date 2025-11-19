@@ -827,6 +827,7 @@ impl Lexer {
 
             // Type keywords
             "num" => TokenType::NumType,
+            "bignum" => TokenType::BigNumType,  // Phase 1B
             "string" => TokenType::StringType,
             "bool" => TokenType::BoolType,
             "list" => TokenType::ListType,

@@ -72,6 +72,7 @@ impl Parser {
 
         let result = if !is_list_static_call && (
             self.check(&TokenType::NumType)
+            || self.check(&TokenType::BigNumType)  // Phase 1B
             || self.check(&TokenType::StringType)
             || self.check(&TokenType::BoolType)
             || self.check(&TokenType::ListType)
@@ -181,6 +182,7 @@ impl Parser {
     fn type_annotation(&mut self) -> Result<TypeAnnotation> {
         let base_type = match &self.peek().token_type {
             TokenType::NumType => "num",
+            TokenType::BigNumType => "bignum",  // Phase 1B
             TokenType::StringType => "string",
             TokenType::BoolType => "bool",
             TokenType::ListType => "list",
@@ -214,6 +216,7 @@ impl Parser {
             // Parse the constraint type (must be a primitive)
             let constraint_type = match &self.peek().token_type {
                 TokenType::NumType => "num",
+                TokenType::BigNumType => "bignum",  // Phase 1B
                 TokenType::StringType => "string",
                 TokenType::BoolType => "bool",
                 TokenType::Symbol(_) => {

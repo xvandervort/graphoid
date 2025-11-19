@@ -1,7 +1,7 @@
 use graphoid::ast::{Argument, AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Stmt, UnaryOp};
 use graphoid::error::SourcePosition;
 use graphoid::execution::{Executor, ErrorMode};
-use graphoid::values::{Hash, List, Value, ValueKind};
+use graphoid::values::{BigNum, Hash, List, Value, ValueKind};
 use std::collections::HashMap;
 
 // Helper function to create a dummy source position
@@ -7555,4 +7555,805 @@ configure { error_mode: :lenient } {
 
 // ============================================================================
 // Total: 7 lenient mode tests
+// ============================================================================
+
+// ============================================================================
+// PHASE 1A: INTEGER MODE TRUNCATION TESTS
+// ============================================================================
+
+#[test]
+fn test_integer_mode_truncates_positive_float() {
+    let source = r#"
+configure { integer: :integer } {
+    a = 5.7
+}
+result = a
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert_eq!(result, Value::number(5.0));
+}
+
+#[test]
+fn test_integer_mode_truncates_multiple_assignments() {
+    let source = r#"
+configure { integer: :integer } {
+    a = 5.7
+    b = 3.2
+    c = a + b
+}
+result_a = a
+result_b = b
+result_c = c
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result_a = executor.get_variable("result_a").unwrap();
+    let result_b = executor.get_variable("result_b").unwrap();
+    let result_c = executor.get_variable("result_c").unwrap();
+
+    assert_eq!(result_a, Value::number(5.0));  // 5.7 truncated to 5.0
+    assert_eq!(result_b, Value::number(3.0));  // 3.2 truncated to 3.0
+    assert_eq!(result_c, Value::number(8.0));  // 5.0 + 3.0 = 8.0 (not 8.9)
+}
+
+#[test]
+fn test_integer_mode_truncates_negative_numbers() {
+    let source = r#"
+configure { integer: :integer } {
+    a = -5.7
+    b = -3.2
+}
+result_a = a
+result_b = b
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result_a = executor.get_variable("result_a").unwrap();
+    let result_b = executor.get_variable("result_b").unwrap();
+
+    assert_eq!(result_a, Value::number(-5.0));  // -5.7 truncated to -5.0
+    assert_eq!(result_b, Value::number(-3.0));  // -3.2 truncated to -3.0
+}
+
+#[test]
+fn test_integer_mode_preserves_whole_numbers() {
+    let source = r#"
+configure { integer: :integer } {
+    a = 5.0
+    b = 10.0
+}
+result_a = a
+result_b = b
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result_a = executor.get_variable("result_a").unwrap();
+    let result_b = executor.get_variable("result_b").unwrap();
+
+    assert_eq!(result_a, Value::number(5.0));
+    assert_eq!(result_b, Value::number(10.0));
+}
+
+#[test]
+fn test_integer_mode_preserves_non_numeric_values() {
+    let source = r#"
+configure { integer: :integer } {
+    s = "hello"
+    b = true
+    n = none
+}
+result_s = s
+result_b = b
+result_n = n
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result_s = executor.get_variable("result_s").unwrap();
+    let result_b = executor.get_variable("result_b").unwrap();
+    let result_n = executor.get_variable("result_n").unwrap();
+
+    assert_eq!(result_s, Value::string("hello".to_string()));
+    assert_eq!(result_b, Value::boolean(true));
+    assert_eq!(result_n, Value::none());
+}
+
+#[test]
+fn test_integer_mode_works_with_reassignment() {
+    let source = r#"
+configure { integer: :integer } {
+    x = 2.9
+    x = 7.1
+    x = -4.8
+}
+result = x
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert_eq!(result, Value::number(-4.0));  // Final value: -4.8 truncated to -4.0
+}
+
+#[test]
+fn test_integer_mode_does_not_affect_outside_scope() {
+    let source = r#"
+a = 5.7
+configure { integer: :integer } {
+    b = 3.2
+}
+c = 9.9
+result_a = a
+result_b = b
+result_c = c
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result_a = executor.get_variable("result_a").unwrap();
+    let result_b = executor.get_variable("result_b").unwrap();
+    let result_c = executor.get_variable("result_c").unwrap();
+
+    assert_eq!(result_a, Value::number(5.7));  // Outside scope - not truncated
+    assert_eq!(result_b, Value::number(3.0));  // Inside scope - truncated
+    assert_eq!(result_c, Value::number(9.9));  // Outside scope - not truncated
+}
+
+// ============================================================================
+// Total: 7 integer mode truncation tests
+// ============================================================================
+
+// ============================================================================
+// PHASE 1B: BIGNUM VALUE CREATION AND STORAGE TESTS
+// ============================================================================
+
+#[test]
+fn test_bignum_explicit_declaration() {
+    let source = r#"
+bignum a = 2.5
+result = a
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    // Should be stored as BigNumber (Float128)
+    assert!(matches!(result.kind, ValueKind::BigNumber(_)));
+}
+
+#[test]
+fn test_bignum_integer_value() {
+    let source = r#"
+bignum x = 100
+result = x
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    // Even integer values stored as Float128 by default
+    assert!(matches!(result.kind, ValueKind::BigNumber(_)));
+}
+
+#[test]
+fn test_bignum_preserves_precision() {
+    let source = r#"
+bignum precise = 3.141592653589793238
+result = precise
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(_)));
+}
+
+#[test]
+fn test_bignum_type_checking() {
+    let source = r#"
+bignum a = 5.5
+result_type = a.type_name()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result_type = executor.get_variable("result_type").unwrap();
+    assert_eq!(result_type, Value::string("bignum".to_string()));
+}
+
+#[test]
+fn test_bignum_in_expression() {
+    let source = r#"
+bignum x = 10.5
+bignum y = 20.5
+z = x + y
+result = z
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    // Result should also be bignum
+    assert!(matches!(result.kind, ValueKind::BigNumber(_)));
+}
+
+// ============================================================================
+// Total: 5 bignum value creation tests
+// ============================================================================
+
+// ============================================================================
+// Phase 1B: Float128 Arithmetic Tests (12 tests)
+// ============================================================================
+
+#[test]
+fn test_bignum_subtraction() {
+    let source = r#"
+bignum x = 100.5
+bignum y = 30.25
+result = x - y
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // 100.5 - 30.25 = 70.25
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 70.25).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_bignum_multiplication() {
+    let source = r#"
+bignum x = 12.5
+bignum y = 8.0
+result = x * y
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // 12.5 * 8.0 = 100.0
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 100.0).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_bignum_division() {
+    let source = r#"
+bignum x = 100.0
+bignum y = 8.0
+result = x / y
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // 100.0 / 8.0 = 12.5
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 12.5).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_bignum_integer_division() {
+    let source = r#"
+bignum x = 100.0
+bignum y = 8.0
+result = x // y
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // 100.0 // 8.0 = 12.0
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 12.0).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_bignum_modulo() {
+    let source = r#"
+bignum x = 100.0
+bignum y = 30.0
+result = x % y
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // 100.0 % 30.0 = 10.0
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 10.0).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_bignum_power() {
+    let source = r#"
+bignum x = 2.0
+bignum y = 10.0
+result = x ** y
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // 2.0 ** 10.0 = 1024.0
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 1024.0).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_bignum_negation() {
+    let source = r#"
+bignum x = 42.5
+result = -x
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // -42.5
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val + 42.5).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_bignum_complex_expression() {
+    let source = r#"
+bignum a = 10.0
+bignum b = 5.0
+bignum c = 2.0
+result = (a + b) * c - b / c
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // (10.0 + 5.0) * 2.0 - 5.0 / 2.0 = 15.0 * 2.0 - 2.5 = 30.0 - 2.5 = 27.5
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 27.5).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_bignum_high_precision_addition() {
+    let source = r#"
+bignum x = 3.141592653589793238
+bignum y = 2.718281828459045235
+result = x + y
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // Result should maintain higher precision than f64
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        // Verify it's approximately pi + e
+        assert!((f64_val - 5.859874482).abs() < 0.000001);
+    }
+}
+
+#[test]
+fn test_bignum_division_by_zero_error() {
+    let source = r#"
+bignum x = 100.0
+bignum y = 0.0
+result = x / y
+"#;
+    let mut executor = Executor::new();
+    let result = executor.execute_source(source);
+
+    // Should return an error
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_bignum_very_large_multiplication() {
+    let source = r#"
+bignum x = 999999999999999.0
+bignum y = 999999999999999.0
+result = x * y
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // Should handle large values without overflow
+}
+
+#[test]
+fn test_bignum_fractional_power() {
+    let source = r#"
+bignum x = 16.0
+bignum y = 0.5
+result = x ** y
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // 16.0 ** 0.5 = 4.0 (square root)
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 4.0).abs() < 0.0001);
+    }
+}
+
+// ============================================================================
+// Total: 12 Float128 arithmetic tests
+// ============================================================================
+
+// ============================================================================
+// Phase 1B: BigNum + :integer Interaction Tests (5 tests)
+// ============================================================================
+
+#[test]
+fn test_bignum_with_integer_mode_truncates() {
+    let source = r#"
+configure { integer: :integer } {
+    bignum x = 10.7
+    bignum y = 5.3
+    result = x + y
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // With :integer, bignum values should be truncated on assignment
+    // x = 10.0, y = 5.0, result = 15.0
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 15.0).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_bignum_preserves_precision_without_integer_mode() {
+    let source = r#"
+bignum x = 10.7
+bignum y = 5.3
+result = x + y
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+    // Without :integer, bignum preserves full precision
+    // result = 16.0
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 16.0).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_integer_mode_affects_bignum_declarations() {
+    let source = r#"
+configure { integer: :integer } {
+    bignum a = 3.9
+    bignum b = 2.1
+}
+result_a = a
+result_b = b
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result_a = executor.get_variable("result_a").unwrap();
+    let result_b = executor.get_variable("result_b").unwrap();
+
+    // Both should be truncated to integers
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result_a.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 3.0).abs() < 0.0001);  // 3.9 -> 3.0
+    }
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result_b.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 2.0).abs() < 0.0001);  // 2.1 -> 2.0
+    }
+}
+
+#[test]
+fn test_bignum_integer_mode_scoping() {
+    let source = r#"
+bignum outside = 5.5
+
+configure { integer: :integer } {
+    bignum inside = 7.8
+}
+
+result_outside = outside
+result_inside = inside
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result_outside = executor.get_variable("result_outside").unwrap();
+    let result_inside = executor.get_variable("result_inside").unwrap();
+
+    // outside should preserve precision (5.5)
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result_outside.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 5.5).abs() < 0.0001);
+    }
+
+    // inside was truncated within the block (7.8 -> 7.0)
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result_inside.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 7.0).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_bignum_complex_expression_with_integer_mode() {
+    let source = r#"
+configure { integer: :integer } {
+    bignum a = 10.9
+    bignum b = 5.7
+    bignum c = 2.3
+    result = (a + b) * c
+}
+final_result = result
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let final_result = executor.get_variable("final_result").unwrap();
+
+    // a=10.0, b=5.0, c=2.0
+    // (10.0 + 5.0) * 2.0 = 15.0 * 2.0 = 30.0
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = final_result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 30.0).abs() < 0.0001);
+    }
+}
+
+// ============================================================================
+// Total: 5 bignum + :integer interaction tests
+// ============================================================================
+
+// ============================================================================
+// Phase 1B: Mixed num/bignum Mutation Prevention Tests (5 tests)
+// ============================================================================
+// These tests verify that mixing num and bignum in operations does NOT mutate
+// the original num variable. The operation should create a temporary BigNum
+// copy without changing the type of the original variable.
+
+#[test]
+fn test_mixed_addition_no_mutation() {
+    let source = r#"
+num a = 5.0
+bignum b = 10.0
+result = a + b
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Verify result is BigNumber (auto-cast for operation)
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+
+    // CRITICAL: Verify 'a' is still Number (NOT mutated to BigNumber)
+    let a = executor.get_variable("a").unwrap();
+    assert!(matches!(a.kind, ValueKind::Number(_)));
+    if let ValueKind::Number(val) = a.kind {
+        assert!((val - 5.0).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_mixed_reverse_addition_no_mutation() {
+    let source = r#"
+bignum a = 10.0
+num b = 5.0
+result = a + b
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Verify result is BigNumber
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+
+    // CRITICAL: Verify 'b' is still Number (NOT mutated to BigNumber)
+    let b = executor.get_variable("b").unwrap();
+    assert!(matches!(b.kind, ValueKind::Number(_)));
+    if let ValueKind::Number(val) = b.kind {
+        assert!((val - 5.0).abs() < 0.0001);
+    }
+}
+
+#[test]
+fn test_mixed_multiple_operations_no_mutation() {
+    let source = r#"
+num x = 10.0
+bignum y = 20.0
+
+# Multiple operations using x
+sum = x + y
+diff = x - y
+prod = x * y
+quot = x / y
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // CRITICAL: After multiple operations, x should STILL be Number
+    let x = executor.get_variable("x").unwrap();
+    assert!(matches!(x.kind, ValueKind::Number(_)));
+    if let ValueKind::Number(val) = x.kind {
+        assert!((val - 10.0).abs() < 0.0001);
+    }
+
+    // All results should be BigNumber
+    assert!(matches!(
+        executor.get_variable("sum").unwrap().kind,
+        ValueKind::BigNumber(BigNum::Float128(_))
+    ));
+    assert!(matches!(
+        executor.get_variable("diff").unwrap().kind,
+        ValueKind::BigNumber(BigNum::Float128(_))
+    ));
+    assert!(matches!(
+        executor.get_variable("prod").unwrap().kind,
+        ValueKind::BigNumber(BigNum::Float128(_))
+    ));
+    assert!(matches!(
+        executor.get_variable("quot").unwrap().kind,
+        ValueKind::BigNumber(BigNum::Float128(_))
+    ));
+}
+
+#[test]
+fn test_mixed_comparison_no_mutation() {
+    let source = r#"
+num a = 5.0
+bignum b = 10.0
+
+# Comparisons (which auto-cast for comparison but shouldn't mutate)
+less = a < b
+greater = b > a
+equal = a == a
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // CRITICAL: After comparisons, a should STILL be Number
+    let a = executor.get_variable("a").unwrap();
+    assert!(matches!(a.kind, ValueKind::Number(_)));
+    if let ValueKind::Number(val) = a.kind {
+        assert!((val - 5.0).abs() < 0.0001);
+    }
+
+    // Comparison results should be boolean
+    assert_eq!(executor.get_variable("less").unwrap(), Value::boolean(true));
+    assert_eq!(executor.get_variable("greater").unwrap(), Value::boolean(true));
+    assert_eq!(executor.get_variable("equal").unwrap(), Value::boolean(true));
+}
+
+#[test]
+fn test_mixed_complex_expression_no_mutation() {
+    let source = r#"
+num a = 5.0
+num b = 3.0
+bignum c = 2.0
+
+# Complex expression mixing num and bignum
+result = (a + c) * (b - c)
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // CRITICAL: Both a and b should STILL be Number
+    let a = executor.get_variable("a").unwrap();
+    let b = executor.get_variable("b").unwrap();
+
+    assert!(matches!(a.kind, ValueKind::Number(_)));
+    assert!(matches!(b.kind, ValueKind::Number(_)));
+
+    if let ValueKind::Number(val) = a.kind {
+        assert!((val - 5.0).abs() < 0.0001);
+    }
+    if let ValueKind::Number(val) = b.kind {
+        assert!((val - 3.0).abs() < 0.0001);
+    }
+
+    // Result should be BigNumber
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+}
+
+// ============================================================================
+// Total: 5 mutation prevention tests
+// ============================================================================
+
+// ============================================================================
+// Phase 1B: Large Literal Detection Tests (2 tests)
+// ============================================================================
+// Verifies that very large numeric literals automatically use BigInt to avoid
+// precision loss when the value exceeds f64's exact integer range (2^53).
+
+#[test]
+fn test_large_literal_auto_bigint_in_high_mode() {
+    let source = r#"
+configure { precision: :high, integer: :integer } {
+    # This number exceeds i64::MAX (9,223,372,036,854,775,807)
+    # so it should automatically use BigInt
+    very_large = 99999999999999999999.0
+}
+result = very_large
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should automatically be BigInt (not Int64) due to exceeding i64 range
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::BigInt(_))));
+}
+
+#[test]
+fn test_extended_precision_mode_uses_bigint() {
+    let source = r#"
+configure { precision: :extended } {
+    big = 12345.0
+    frac = 67.89
+}
+result_big = big
+result_frac = frac
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result_big = executor.get_variable("result_big").unwrap();
+    let result_frac = executor.get_variable("result_frac").unwrap();
+
+    // Both should be BigInt in Extended mode
+    assert!(matches!(result_big.kind, ValueKind::BigNumber(BigNum::BigInt(_))));
+    assert!(matches!(result_frac.kind, ValueKind::BigNumber(BigNum::BigInt(_))));
+
+    // Fractional value should be truncated
+    if let ValueKind::BigNumber(BigNum::BigInt(bi)) = &result_frac.kind {
+        use num_traits::ToPrimitive;
+        assert_eq!(bi.to_i64().unwrap(), 67);
+    }
+}
+
+// ============================================================================
+// Total: 2 large literal detection tests
 // ============================================================================

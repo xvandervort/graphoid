@@ -53,6 +53,7 @@ pub enum TokenType {
 
     // Types
     NumType,
+    BigNumType,      // Phase 1B: bignum type keyword
     StringType,
     BoolType,
     ListType,

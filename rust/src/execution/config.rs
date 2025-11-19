@@ -43,6 +43,9 @@ pub struct Config {
 
     // Numeric precision (Phase 13.5 - BigNum)
     pub precision_mode: PrecisionMode,
+
+    // Integer mode (Phase 1A - :integer directive)
+    pub integer_mode: bool,  // true = truncate floats on assignment, false = preserve floats (default)
 }
 
 /// Error handling mode
@@ -101,6 +104,7 @@ impl Default for Config {
             allow_overrides: None,
             unsigned_mode: false,  // Default to signed right shift
             precision_mode: PrecisionMode::Standard,  // Default to f64 precision
+            integer_mode: false,  // Default to preserving floats
         }
     }
 }
@@ -198,10 +202,14 @@ impl ConfigStack {
                     new_config.precision_mode = parse_precision_mode(&value)?;
                 }
                 _ => {
-                    // Check if the value is the :unsigned symbol (standalone directive)
+                    // Check if the value is a standalone directive (symbol)
                     if let ValueKind::Symbol(sym) = &value.kind {
                         if sym == "unsigned" {
                             new_config.unsigned_mode = true;
+                            continue;
+                        }
+                        if sym == "integer" {
+                            new_config.integer_mode = true;
                             continue;
                         }
                     }

@@ -1,0 +1,77 @@
+# Integer Mode Demo
+# Phase 1A: Demonstrates the :integer directive for truncation-on-assignment
+
+print("=== Integer Mode Demo ===")
+print("")
+
+# Standard mode - floats are preserved
+print("Standard Mode (floats preserved):")
+a = 5.7
+b = 3.2
+c = a + b
+print("  a = 5.7  => " + a.to_string())
+print("  b = 3.2  => " + b.to_string())
+print("  c = a + b => " + c.to_string())
+print("")
+
+# Integer mode - values truncated on assignment
+print("Integer Mode (values truncated on assignment):")
+configure { integer: :integer } {
+    x = 5.7  # Truncated to 5.0 on assignment
+    y = 3.2  # Truncated to 3.0 on assignment
+    z = x + y  # 5.0 + 3.0 = 8.0 (not 8.9!)
+    print("  x = 5.7  => " + x.to_string() + " (truncated)")
+    print("  y = 3.2  => " + y.to_string() + " (truncated)")
+    print("  z = x + y => " + z.to_string() + " (5.0 + 3.0)")
+}
+print("")
+
+# Negative numbers
+print("Negative Numbers:")
+configure { integer: :integer } {
+    neg1 = -5.7
+    neg2 = -3.2
+    print("  -5.7 => " + neg1.to_string())
+    print("  -3.2 => " + neg2.to_string())
+}
+print("")
+
+# Whole numbers preserved
+print("Whole Numbers (unchanged):")
+configure { integer: :integer } {
+    whole1 = 10.0
+    whole2 = 20.0
+    print("  10.0 => " + whole1.to_string())
+    print("  20.0 => " + whole2.to_string())
+}
+print("")
+
+# Non-numeric values pass through
+print("Non-Numeric Values (pass through unchanged):")
+configure { integer: :integer } {
+    str = "hello"
+    flag = true
+    nothing = none
+    print("  string: " + str)
+    print("  boolean: " + flag.to_string())
+    print("  none: " + nothing.to_string())
+}
+print("")
+
+# Scope demonstration
+print("Scope Demonstration:")
+outside1 = 5.7
+print("  outside1 (before block) = " + outside1.to_string())
+
+configure { integer: :integer } {
+    inside = 3.2
+    print("  inside (in block) = " + inside.to_string())
+}
+
+outside2 = 9.9
+print("  outside1 (after block) = " + outside1.to_string())
+print("  inside (after block) = " + inside.to_string())
+print("  outside2 (after block) = " + outside2.to_string())
+print("")
+
+print("=== All Tests Passed ===")

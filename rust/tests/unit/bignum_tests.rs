@@ -2,7 +2,7 @@
 // Phase 1: :high precision with i64/u64
 
 use graphoid::execution::Executor;
-use graphoid::values::ValueKind;
+use graphoid::values::{BigNum, ValueKind};
 
 // ============================================================================
 // Test 1: Basic High Precision Integer Arithmetic
@@ -195,8 +195,9 @@ fn test_high_precision_unsigned_max() {
 fn test_high_precision_bitwise_and() {
     let mut executor = Executor::new();
 
+    // Phase 1B: Need :integer for bitwise ops (High defaults to Float128)
     let code = r#"
-        configure { precision: :high } {
+        configure { precision: :high, integer: :integer } {
             result = 12 & 10
         }
     "#;
@@ -216,8 +217,9 @@ fn test_high_precision_bitwise_and() {
 fn test_high_precision_bitwise_or() {
     let mut executor = Executor::new();
 
+    // Phase 1B: Need :integer for bitwise ops
     let code = r#"
-        configure { precision: :high } {
+        configure { precision: :high, integer: :integer } {
             result = 12 | 10
         }
     "#;
@@ -237,8 +239,9 @@ fn test_high_precision_bitwise_or() {
 fn test_high_precision_bitwise_xor() {
     let mut executor = Executor::new();
 
+    // Phase 1B: Need :integer for bitwise ops
     let code = r#"
-        configure { precision: :high } {
+        configure { precision: :high, integer: :integer } {
             result = 12 ^ 10
         }
     "#;
@@ -258,8 +261,9 @@ fn test_high_precision_bitwise_xor() {
 fn test_high_precision_bitwise_not() {
     let mut executor = Executor::new();
 
+    // Phase 1B: Need :integer for bitwise ops
     let code = r#"
-        configure { precision: :high } {
+        configure { precision: :high, integer: :integer } {
             result = ~5
         }
     "#;
@@ -279,8 +283,9 @@ fn test_high_precision_bitwise_not() {
 fn test_high_precision_left_shift() {
     let mut executor = Executor::new();
 
+    // Phase 1B: Need :integer for bitwise ops
     let code = r#"
-        configure { precision: :high } {
+        configure { precision: :high, integer: :integer } {
             result = 5 << 2
         }
     "#;
@@ -300,8 +305,9 @@ fn test_high_precision_left_shift() {
 fn test_high_precision_right_shift_signed() {
     let mut executor = Executor::new();
 
+    // Phase 1B: Need :integer for bitwise ops
     let code = r#"
-        configure { precision: :high } {
+        configure { precision: :high, integer: :integer } {
             result = 20 >> 2
         }
     "#;
@@ -321,8 +327,9 @@ fn test_high_precision_right_shift_signed() {
 fn test_high_precision_right_shift_unsigned() {
     let mut executor = Executor::new();
 
+    // Phase 1B: Need :integer for bitwise ops (and :unsigned)
     let code = r#"
-        configure { precision: :high, :unsigned } {
+        configure { precision: :high, :integer, :unsigned } {
             result = 20 >> 2
         }
     "#;
@@ -474,24 +481,28 @@ fn test_bignum_type_name() {
 // ============================================================================
 
 #[test]
-fn test_cannot_mix_num_and_bignum() {
+fn test_can_mix_num_and_bignum() {
+    // Phase 1B: Mixed num/bignum operations are now ALLOWED (auto-cast to bignum)
     let mut executor = Executor::new();
 
     let code = r#"
         configure { precision: :high } {
-            big = 100
+            big = 100.0
         }
-        small = 50
+        small = 50.0
         result = big + small
     "#;
 
-    let result = executor.execute_source(code);
-    assert!(result.is_err(), "Should error when mixing num and bignum");
-    let err_msg = result.unwrap_err().to_string();
-    assert!(
-        err_msg.contains("mix") || err_msg.contains("type"),
-        "Error should mention type mixing"
-    );
+    executor.execute_source(code).unwrap();
+    let result = executor.get_variable("result").unwrap();
+
+    // Result should be bignum (Float128 in Phase 1B)
+    assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::Float128(_))));
+
+    if let ValueKind::BigNumber(BigNum::Float128(f)) = result.kind {
+        let f64_val: f64 = f.into();
+        assert!((f64_val - 150.0).abs() < 0.0001);
+    }
 }
 
 // ============================================================================
@@ -502,8 +513,10 @@ fn test_cannot_mix_num_and_bignum() {
 fn test_high_precision_overflow_error() {
     let mut executor = Executor::new();
 
+    // Phase 1B: Need :integer for Int64 overflow checking
+    // (High alone uses Float128 which doesn't overflow)
     let code = r#"
-        configure { precision: :high } {
+        configure { precision: :high, :integer } {
             max_val = 9223372036854775807
             result = max_val + 1
         }

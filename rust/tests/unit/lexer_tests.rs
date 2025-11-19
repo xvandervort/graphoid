@@ -155,17 +155,36 @@ fn test_keywords() {
 
 #[test]
 fn test_type_keywords() {
-    let mut lexer = Lexer::new("num string bool list map tree graph data");
+    let mut lexer = Lexer::new("num bignum string bool list map tree graph data");
     let tokens = lexer.tokenize().unwrap();
 
     assert_eq!(tokens[0].token_type, TokenType::NumType);
-    assert_eq!(tokens[1].token_type, TokenType::StringType);
-    assert_eq!(tokens[2].token_type, TokenType::BoolType);
-    assert_eq!(tokens[3].token_type, TokenType::ListType);
-    assert_eq!(tokens[4].token_type, TokenType::MapType);
-    assert_eq!(tokens[5].token_type, TokenType::TreeType);
-    assert_eq!(tokens[6].token_type, TokenType::GraphType);
-    assert_eq!(tokens[7].token_type, TokenType::DataType);
+    assert_eq!(tokens[1].token_type, TokenType::BigNumType);  // Phase 1B
+    assert_eq!(tokens[2].token_type, TokenType::StringType);
+    assert_eq!(tokens[3].token_type, TokenType::BoolType);
+    assert_eq!(tokens[4].token_type, TokenType::ListType);
+    assert_eq!(tokens[5].token_type, TokenType::MapType);
+    assert_eq!(tokens[6].token_type, TokenType::TreeType);
+    assert_eq!(tokens[7].token_type, TokenType::GraphType);
+    assert_eq!(tokens[8].token_type, TokenType::DataType);
+}
+
+// Phase 1B: BigNum type keyword tests
+#[test]
+fn test_bignum_type_keyword() {
+    let mut lexer = Lexer::new("bignum");
+    let tokens = lexer.tokenize().unwrap();
+    assert_eq!(tokens[0].token_type, TokenType::BigNumType);
+}
+
+#[test]
+fn test_bignum_variable_declaration() {
+    let mut lexer = Lexer::new("bignum x = 123");
+    let tokens = lexer.tokenize().unwrap();
+    assert_eq!(tokens[0].token_type, TokenType::BigNumType);
+    assert!(matches!(tokens[1].token_type, TokenType::Identifier(_)));
+    assert_eq!(tokens[2].token_type, TokenType::Equal);
+    assert!(matches!(tokens[3].token_type, TokenType::Number(_)));
 }
 
 #[test]

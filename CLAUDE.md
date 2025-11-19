@@ -70,7 +70,8 @@ Graphoid is built on three levels of graph abstraction:
 ## Design Principles
 
 - **KISS Principle** - Keep It Simple, Stupid! Graphoid despises unnecessary verbiage
-- **Practical First** - Must be useful for real-world applications
+- **Practical** - Must be useful for real-world applications (allows experimental features)
+- **No Hidden Side Effects** - Operations never mutate their operands unless explicitly requested with `!` suffix (Principle of Least Surprise)
 - **Graph-Theoretic Foundation** - Graphs are fundamental, not bolted-on
 - **Self-Aware Data Structures** - Collections understand their own structure
 - **Developer Experience** - Excellent error messages, rich tooling, great docs

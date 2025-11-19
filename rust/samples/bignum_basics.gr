@@ -1,0 +1,140 @@
+# BigNum Basics - Phase 1B
+#
+# Demonstrates the bignum type for high-precision arithmetic
+# bignum uses Float128 internally (~34 decimal digits vs ~17 for num)
+
+# ============================================================================
+# Basic BigNum Declaration and Arithmetic
+# ============================================================================
+
+# Declare bignum variables
+bignum pi = 3.141592653589793238
+bignum e = 2.718281828459045235
+
+io.print("BigNum Basics Demo")
+io.print("==================")
+io.print("")
+
+io.print("Pi (bignum):  " + pi.to_string())
+io.print("e (bignum):   " + e.to_string())
+io.print("")
+
+# Basic arithmetic preserves precision
+bignum sum = pi + e
+bignum diff = pi - e
+bignum product = pi * e
+bignum quotient = pi / e
+
+io.print("Arithmetic Operations:")
+io.print("---------------------")
+io.print("pi + e  = " + sum.to_string())
+io.print("pi - e  = " + diff.to_string())
+io.print("pi * e  = " + product.to_string())
+io.print("pi / e  = " + quotient.to_string())
+io.print("")
+
+# ============================================================================
+# Power and Advanced Operations
+# ============================================================================
+
+bignum base = 2.0
+bignum exponent = 10.0
+bignum power = base ** exponent
+
+io.print("Power Operations:")
+io.print("----------------")
+io.print("2^10 = " + power.to_string())
+
+# Square root using fractional power
+bignum sixteen = 16.0
+bignum half = 0.5
+bignum sqrt16 = sixteen ** half
+io.print("sqrt(16) = " + sqrt16.to_string())
+io.print("")
+
+# ============================================================================
+# Integer Division and Modulo
+# ============================================================================
+
+bignum dividend = 100.0
+bignum divisor = 30.0
+
+bignum int_div = dividend // divisor
+bignum remainder = dividend % divisor
+
+io.print("Integer Division:")
+io.print("----------------")
+io.print("100 // 30 = " + int_div.to_string())
+io.print("100 % 30  = " + remainder.to_string())
+io.print("")
+
+# ============================================================================
+# Large Numbers
+# ============================================================================
+
+bignum large1 = 999999999999999.0
+bignum large2 = 888888888888888.0
+bignum large_product = large1 * large2
+
+io.print("Large Number Arithmetic:")
+io.print("------------------------")
+io.print("999,999,999,999,999 * 888,888,888,888,888")
+io.print("= " + large_product.to_string())
+io.print("")
+
+# ============================================================================
+# BigNum with :integer Mode
+# ============================================================================
+
+io.print("BigNum with :integer Mode:")
+io.print("---------------------------")
+
+# Without :integer mode
+bignum a = 10.7
+bignum b = 5.3
+bignum normal_sum = a + b
+io.print("Without :integer: 10.7 + 5.3 = " + normal_sum.to_string())
+
+# With :integer mode (truncates on assignment)
+configure { integer: :integer } {
+    bignum x = 10.7  # Truncated to 10.0
+    bignum y = 5.3   # Truncated to 5.0
+    bignum truncated_sum = x + y
+    io.print("With :integer:    10.7 + 5.3 = " + truncated_sum.to_string() + " (values truncated to 10.0 + 5.0)")
+}
+io.print("")
+
+# ============================================================================
+# Type Information
+# ============================================================================
+
+io.print("Type Information:")
+io.print("-----------------")
+io.print("Type of pi: " + pi.type_name())
+io.print("Type of 3.14: " + (3.14).type_name())
+io.print("")
+
+# ============================================================================
+# Practical Example: Compound Interest
+# ============================================================================
+
+io.print("Practical Example - Compound Interest:")
+io.print("---------------------------------------")
+
+bignum principal = 1000.0
+bignum rate = 0.05  # 5% annual interest
+bignum years = 10.0
+bignum one = 1.0
+
+# A = P(1 + r)^n
+bignum multiplier = one + rate
+bignum amount = principal * (multiplier ** years)
+
+io.print("Principal: $1000")
+io.print("Rate: 5% per year")
+io.print("Time: 10 years")
+io.print("Final amount: $" + amount.to_string())
+io.print("")
+
+io.print("BigNum provides ~34 decimal digits of precision")
+io.print("vs ~17 digits for regular num type")

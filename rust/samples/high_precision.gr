@@ -1,0 +1,178 @@
+# High Precision Arithmetic - Phase 1B
+#
+# Demonstrates the precision advantages of bignum (Float128) over num (f64)
+# Shows where the extra precision matters
+
+io.print("High Precision Arithmetic Demo")
+io.print("================================")
+io.print("")
+
+# ============================================================================
+# Precision Comparison: num vs bignum
+# ============================================================================
+
+io.print("Precision Comparison:")
+io.print("--------------------")
+
+# Regular num (f64) has ~17 decimal digits precision
+num regular_pi = 3.141592653589793238
+io.print("Pi as num:    " + regular_pi.to_string())
+
+# BigNum (Float128) has ~34 decimal digits precision
+bignum precise_pi = 3.141592653589793238
+io.print("Pi as bignum: " + precise_pi.to_string())
+io.print("")
+
+# ============================================================================
+# Scientific Constants with High Precision
+# ============================================================================
+
+io.print("Scientific Constants:")
+io.print("--------------------")
+
+bignum speed_of_light = 299792458.0  # meters/second
+bignum planck_constant = 0.00000000000000000000000000000000066260715  # J⋅s (approximate)
+bignum avogadro = 602214076000000000000000.0  # particles/mol
+
+io.print("Speed of light: " + speed_of_light.to_string() + " m/s")
+io.print("Planck constant: ~6.626×10^-34 J⋅s")
+io.print("Avogadro's number: ~6.022×10^23")
+io.print("")
+
+# ============================================================================
+# Financial Calculations Requiring Precision
+# ============================================================================
+
+io.print("Financial Example - Long-term Investment:")
+io.print("------------------------------------------")
+
+bignum initial_investment = 10000.0
+bignum daily_rate = 0.0001369863  # ~5% annual / 365 days
+bignum days = 365.0 * 30.0  # 30 years
+bignum one = 1.0
+
+# Calculate with high precision
+bignum daily_multiplier = one + daily_rate
+bignum final_value = initial_investment * (daily_multiplier ** days)
+
+io.print("Initial: $10,000")
+io.print("Daily rate: 0.01369863%")
+io.print("Duration: 30 years (10,950 days)")
+io.print("Final value: $" + final_value.to_string())
+io.print("")
+
+# ============================================================================
+# Geometric Series Sum (tests precision in iterative calculations)
+# ============================================================================
+
+io.print("Geometric Series Example:")
+io.print("-------------------------")
+
+# Sum of geometric series: 1 + 1/2 + 1/4 + 1/8 + ...
+# Should approach 2.0
+
+bignum series_sum = 0.0
+bignum term = 1.0
+bignum two = 2.0
+
+# First 50 terms
+bignum i = 0.0
+bignum fifty = 50.0
+
+# Manual loop approximation (since we don't have while yet)
+series_sum = series_sum + term
+term = term / two
+
+series_sum = series_sum + term
+term = term / two
+
+series_sum = series_sum + term
+term = term / two
+
+series_sum = series_sum + term
+term = term / two
+
+series_sum = series_sum + term
+term = term / two
+
+series_sum = series_sum + term
+term = term / two
+
+series_sum = series_sum + term
+term = term / two
+
+series_sum = series_sum + term
+term = term / two
+
+series_sum = series_sum + term
+term = term / two
+
+series_sum = series_sum + term
+term = term / two
+
+io.print("Sum of first 10 terms of 1 + 1/2 + 1/4 + ...")
+io.print("Result: " + series_sum.to_string())
+io.print("Expected: approaches 2.0")
+io.print("")
+
+# ============================================================================
+# Precise Trigonometric-style Calculations
+# ============================================================================
+
+io.print("Circle Calculations with High Precision:")
+io.print("----------------------------------------")
+
+bignum pi_precise = 3.14159265358979323846
+bignum radius = 1000000.0  # 1 million units
+
+# Circumference = 2πr
+bignum circumference = (pi_precise * radius) * (one + one)
+
+# Area = πr²
+bignum area = pi_precise * (radius * radius)
+
+io.print("Circle with radius: 1,000,000 units")
+io.print("Circumference: " + circumference.to_string())
+io.print("Area: " + area.to_string())
+io.print("")
+
+# ============================================================================
+# Demonstrating Integer Mode with BigNum
+# ============================================================================
+
+io.print("Integer Mode Example:")
+io.print("--------------------")
+
+# Precise calculation, then truncate for display
+bignum precise_value = 1234.56789
+
+configure { integer: :integer } {
+    bignum truncated = precise_value
+    io.print("Original: " + precise_value.to_string())
+    io.print("Truncated in :integer mode: " + truncated.to_string())
+}
+io.print("")
+
+# ============================================================================
+# Complex Expression Maintaining Precision
+# ============================================================================
+
+io.print("Complex Expression:")
+io.print("-------------------")
+
+bignum a = 123.456789
+bignum b = 987.654321
+bignum c = 42.0
+
+# ((a + b) * c) / (a - b)
+bignum numerator = (a + b) * c
+bignum denominator = a - b
+bignum complex_result = numerator / denominator
+
+io.print("((123.456789 + 987.654321) * 42) / (123.456789 - 987.654321)")
+io.print("Result: " + complex_result.to_string())
+io.print("")
+
+io.print("BigNum (Float128) maintains precision through")
+io.print("complex calculations that would lose accuracy")
+io.print("with regular num (f64) type.")

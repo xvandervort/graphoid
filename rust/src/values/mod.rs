@@ -6,6 +6,10 @@ use crate::ast::{Stmt, Parameter, PatternClause};
 use crate::execution::Environment;
 use crate::execution::module_manager::Module;
 
+// Phase 1B: BigNum support
+use f128::f128;
+use num_bigint::BigInt;
+
 pub mod graph;
 pub mod list;
 pub mod hash;
@@ -377,6 +381,10 @@ pub enum BigNum {
     Int64(i64),
     /// 64-bit unsigned integer
     UInt64(u64),
+    /// 128-bit floating point (Phase 1B - default for bignum)
+    Float128(f128),
+    /// Arbitrary precision integer (Phase 1B - for very large integers)
+    BigInt(BigInt),
 }
 
 impl BigNum {
@@ -390,6 +398,16 @@ impl BigNum {
                 } else {
                     None // Overflow
                 }
+            }
+            BigNum::Float128(f) => {
+                // Convert f128 -> f64 -> i64
+                let f64_val: f64 = (*f).into();
+                Some(f64_val.trunc() as i64)
+            }
+            BigNum::BigInt(bi) => {
+                // Try to convert BigInt to i64
+                use num_traits::ToPrimitive;
+                bi.to_i64()
             }
         }
     }
@@ -405,6 +423,14 @@ impl BigNum {
                 }
             }
             BigNum::UInt64(n) => Some(*n),
+            BigNum::Float128(f) => {
+                let f64_val: f64 = (*f).into();
+                Some(f64_val.trunc() as u64)
+            }
+            BigNum::BigInt(bi) => {
+                use num_traits::ToPrimitive;
+                bi.to_u64()
+            }
         }
     }
 
@@ -413,6 +439,12 @@ impl BigNum {
         match self {
             BigNum::Int64(n) => *n as f64,
             BigNum::UInt64(n) => *n as f64,
+            BigNum::Float128(f) => (*f).into(),
+            BigNum::BigInt(bi) => {
+                // Convert to f64, may lose precision for very large numbers
+                use num_traits::ToPrimitive;
+                bi.to_f64().unwrap_or(0.0)
+            }
         }
     }
 }
@@ -605,6 +637,14 @@ impl Value {
                 match bn {
                     BigNum::Int64(n) => *n != 0,
                     BigNum::UInt64(n) => *n != 0,
+                    BigNum::Float128(f) => {
+                        let f64_val: f64 = (*f).into();
+                        f64_val != 0.0
+                    }
+                    BigNum::BigInt(bi) => {
+                        use num_traits::Zero;
+                        !bi.is_zero()
+                    }
                 }
             }
             ValueKind::String(s) => !s.is_empty(),
@@ -651,6 +691,15 @@ impl Value {
                 match bn {
                     BigNum::Int64(n) => n.to_string(),
                     BigNum::UInt64(n) => n.to_string(),
+                    BigNum::Float128(f) => {
+                        let f64_val: f64 = (*f).into();
+                        if f64_val.fract() == 0.0 {
+                            format!("{:.0}", f64_val)
+                        } else {
+                            f64_val.to_string()
+                        }
+                    }
+                    BigNum::BigInt(bi) => bi.to_string(),
                 }
             }
             ValueKind::String(s) => s.clone(),
