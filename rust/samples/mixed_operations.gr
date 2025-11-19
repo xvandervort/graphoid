@@ -1,0 +1,154 @@
+# Mixed Operations - Combining num and bignum Types
+#
+# This example demonstrates how Graphoid allows seamless mixing of regular num (f64)
+# and bignum types in arithmetic operations through automatic type promotion.
+
+# ============================================================================
+# Basic Mixed Arithmetic
+# ============================================================================
+
+# Standard num variable (f64 precision)
+num regular = 100.0
+
+# High-precision bignum variable  
+bignum precise = 200.0
+
+# Mixing num and bignum in operations
+# The num is automatically promoted to bignum for the operation
+mixed_sum = regular + precise        # Result: bignum (300.0)
+mixed_product = regular * precise    # Result: bignum (20000.0)
+mixed_division = precise / regular   # Result: bignum (2.0)
+
+# IMPORTANT: The original num variable is NOT modified!
+# 'regular' is still a num with value 100.0
+
+# ============================================================================
+# Order Doesn't Matter
+# ============================================================================
+
+bignum big_value = 50.0
+num small_value = 25.0
+
+# Both orders produce bignum results
+result1 = big_value + small_value  # bignum + num → bignum
+result2 = small_value + big_value  # num + bignum → bignum
+
+# The num operand is temporarily promoted only for the operation
+
+# ============================================================================
+# Complex Expressions with Mixed Types
+# ============================================================================
+
+num a = 10.0
+num b = 20.0
+bignum c = 30.0
+
+# All nums in the expression are promoted as needed
+complex1 = (a + b) * c           # (30.0) * bignum → bignum result
+complex2 = a * c + b * c         # Both products become bignum
+
+# ============================================================================
+# Explicit vs Automatic Type Promotion
+# ============================================================================
+
+num value1 = 42.0
+
+# Automatic promotion in operation
+bignum big1 = 100.0
+auto_promoted = value1 + big1  # value1 temporarily promoted to bignum
+
+# Explicit conversion (not usually needed)
+manually_converted = value1.to_bignum()
+explicit_result = manually_converted + big1
+
+# Both produce the same result, but automatic is more convenient
+
+# ============================================================================
+# Type Preservation After Operations
+# ============================================================================
+
+num original_num = 5.0
+bignum original_bignum = 10.0
+
+# Perform operation
+result = original_num * original_bignum
+
+# Check types after operation
+num_still_num = original_num.is_bignum()      # false - still num!
+bignum_still_bignum = original_bignum.is_bignum()  # true - still bignum!
+result_is_bignum = result.is_bignum()         # true - result is bignum
+
+# The KEY PRINCIPLE: Operations don't mutate operands!
+# original_num remains num, even though it was used in a mixed operation
+
+# ============================================================================
+# When Type Matters: Accumulation
+# ============================================================================
+
+# Starting with num, accumulating with num operations
+num accumulator1 = 0.0
+num increment = 0.1
+# accumulator1 = accumulator1 + increment  # Stays num (f64 precision)
+
+# Starting with bignum, accumulating with bignum operations
+bignum accumulator2 = 0.0
+bignum precise_increment = 0.1
+# accumulator2 = accumulator2 + precise_increment  # Stays bignum (high precision)
+
+# Mixed: num accumulator with bignum increment
+num accumulator3 = 0.0
+bignum big_increment = 0.1
+# accumulator3 = accumulator3 + big_increment  # Result is bignum!
+# Note: Would need to reassign as bignum to keep the precision
+
+# ============================================================================
+# Practical Example: Mixing in Calculations
+# ============================================================================
+
+# You have some measurements in standard precision
+num measurement1 = 1.5
+num measurement2 = 2.3
+
+# But need high-precision result
+configure { precision: :high } {
+    # These are automatically bignum in :high mode
+    bignum factor = 1000000.0
+    
+    # Can still use the regular num measurements
+    bignum precise_result = (measurement1 + measurement2) * factor
+    
+    # The num values were automatically promoted for the calculation
+}
+
+# ============================================================================
+# Conversion Back to num When Needed
+# ============================================================================
+
+bignum precise_calculation = 123.456
+
+# If you need a num (e.g., for an API that expects f64)
+num for_api = precise_calculation.to_num()
+
+# Check if conversion is safe (won't lose critical precision)
+if precise_calculation.fits_in_num() {
+    safe_conversion = precise_calculation.to_num()
+}
+
+# ============================================================================
+# Key Takeaways
+# ============================================================================
+#
+# 1. num and bignum can be freely mixed in operations
+# 2. Result of mixed operations is always bignum (promotes to higher precision)
+# 3. Original num variables are NEVER mutated - only temporarily promoted
+# 4. Automatic promotion is transparent and convenient
+# 5. Use .to_num() when you explicitly need to convert back to num
+# 6. Use .fits_in_num() to check if conversion is safe
+#
+# Benefits:
+# - Write natural arithmetic expressions without type juggling
+# - Precision is preserved where it matters (bignum operands)
+# - Explicit type annotations when you want to force specific behavior
+#
+# Next: See bignum_basics.gr for introduction to bignum
+#       See high_precision.gr for Float128 precision details

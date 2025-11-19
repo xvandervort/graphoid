@@ -513,8 +513,7 @@ fn test_can_mix_num_and_bignum() {
 fn test_high_precision_overflow_error() {
     let mut executor = Executor::new();
 
-    // Phase 1B: Need :integer for Int64 overflow checking
-    // (High alone uses Float128 which doesn't overflow)
+    // Phase 3: With :high precision and :integer, overflow should auto-grow to BigInt
     let code = r#"
         configure { precision: :high, :integer } {
             max_val = 9223372036854775807
@@ -522,12 +521,17 @@ fn test_high_precision_overflow_error() {
         }
     "#;
 
-    let result = executor.execute_source(code);
-    assert!(result.is_err(), "Should error on i64 overflow");
-    assert!(
-        result.unwrap_err().to_string().contains("overflow"),
-        "Error should mention overflow"
-    );
+    // Should succeed and auto-grow to BigInt
+    executor.execute_source(code).unwrap();
+    let result = executor.get_variable("result").unwrap();
+
+    // Verify it auto-grew to BigInt
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        assert!(matches!(bn, BigNum::BigInt(_)),
+            "Expected auto-growth to BigInt, got {:?}", bn);
+    } else {
+        panic!("Expected BigNumber type");
+    }
 }
 
 // ============================================================================

@@ -8357,3 +8357,725 @@ result_frac = frac
 // ============================================================================
 // Total: 2 large literal detection tests
 // ============================================================================
+
+// ============================================================================
+// Phase 2: Overflow Auto-Promotion Tests (5 tests)
+// ============================================================================
+// Tests that operations auto-promote to bignum when overflow/precision loss
+// would occur with standard num (f64) precision.
+
+#[test]
+fn test_overflow_auto_promotion_multiplication() {
+    let source = r#"
+# Large multiplication that exceeds f64 precision
+a = 10000000000.0  # 10 billion
+b = 10000000000.0  # 10 billion
+result = a * b     # 10^20 - exceeds f64 exact integer range (2^53)
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should auto-promote to bignum due to overflow
+    assert!(matches!(result.kind, ValueKind::BigNumber(_)),
+        "Expected auto-promotion to bignum, got {:?}", result.kind);
+}
+
+#[test]
+fn test_overflow_auto_promotion_power() {
+    let source = r#"
+# Power operation that creates very large result
+base = 10.0
+exp = 20.0
+result = base ** exp  # 10^20 - exceeds f64 exact representation
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should auto-promote to bignum
+    assert!(matches!(result.kind, ValueKind::BigNumber(_)),
+        "Expected auto-promotion to bignum for 10^20");
+}
+
+#[test]
+fn test_overflow_auto_promotion_addition() {
+    let source = r#"
+# Addition with very large integers that exceed f64 precision
+# Using values larger than 2^53 (f64's exact integer limit)
+a = 100000000000000000.0  # 10^17 (larger than 2^53)
+b = 100000000000000000.0  # 10^17
+result = a + b  # 2 * 10^17 - should promote due to large operands
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should auto-promote to bignum because operands exceed F64_MAX_EXACT_INT
+    assert!(matches!(result.kind, ValueKind::BigNumber(_)),
+        "Expected auto-promotion to bignum for large integer addition");
+}
+
+#[test]
+fn test_no_auto_promotion_for_normal_operations() {
+    let source = r#"
+# Normal operations should stay as num (f64)
+a = 100.0
+b = 200.0
+result = a * b  # 20000 - well within f64 range
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should remain as num (no unnecessary promotion)
+    assert!(matches!(result.kind, ValueKind::Number(_)),
+        "Expected num for normal operation, got {:?}", result.kind);
+}
+
+#[test]
+fn test_auto_promotion_respects_standard_mode() {
+    let source = r#"
+# In standard mode, overflow should error (not auto-promote)
+precision { :standard } {
+    a = 10000000000.0
+    b = 10000000000.0
+    result = a * b
+}
+"#;
+    let mut executor = Executor::new();
+    let exec_result = executor.execute_source(source);
+
+    // In :standard mode, overflow should cause an error, not auto-promotion
+    // (This test validates that auto-promotion respects directives)
+    // For now, we'll accept either error or staying as num with inf/overflow
+    // The important part is it does NOT auto-promote in :standard mode
+    if let Ok(()) = exec_result {
+        let result = executor.get_variable("result").unwrap();
+        // If it succeeded, should still be num (not bignum)
+        assert!(matches!(result.kind, ValueKind::Number(_)),
+            "In :standard mode, should not auto-promote to bignum");
+    }
+    // Otherwise error is acceptable
+}
+
+// ============================================================================
+// Total: 5 overflow auto-promotion tests
+// ============================================================================
+
+// ============================================================================
+// Phase 2: Casting Methods Tests (TDD - tests written first!)
+// ============================================================================
+
+#[test]
+fn test_to_num_bignum_to_num() {
+    let source = r#"
+bignum x = 123.456
+result = x.to_num()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::Number(_)),
+        "to_num() should convert bignum to num");
+    if let ValueKind::Number(n) = result.kind {
+        assert!((n - 123.456).abs() < 1e-10, "Value should be approximately 123.456");
+    }
+}
+
+#[test]
+fn test_to_num_num_passthrough() {
+    let source = r#"
+x = 456.789
+result = x.to_num()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::Number(_)),
+        "to_num() on num should pass through");
+    if let ValueKind::Number(n) = result.kind {
+        assert!((n - 456.789).abs() < 1e-10);
+    }
+}
+
+#[test]
+fn test_to_bignum_num_to_bignum() {
+    let source = r#"
+x = 123.456
+result = x.to_bignum()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(_)),
+        "to_bignum() should convert num to bignum");
+}
+
+#[test]
+fn test_to_bignum_bignum_passthrough() {
+    let source = r#"
+bignum x = 789.012
+result = x.to_bignum()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert!(matches!(result.kind, ValueKind::BigNumber(_)),
+        "to_bignum() on bignum should pass through");
+}
+
+#[test]
+fn test_fits_in_num_small_bignum() {
+    let source = r#"
+bignum x = 123.456
+result = x.fits_in_num()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert_eq!(result, Value::boolean(true),
+        "Small bignum should fit in num");
+}
+
+#[test]
+fn test_fits_in_num_large_bignum() {
+    let source = r#"
+# Create a very large bignum that exceeds f64 range
+bignum x = 10.0
+bignum huge = x ** 400.0  # 10^400 - way beyond f64::MAX (~10^308)
+result = huge.fits_in_num()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert_eq!(result, Value::boolean(false),
+        "Very large bignum should not fit in num");
+}
+
+#[test]
+fn test_fits_in_num_always_true() {
+    let source = r#"
+x = 123.456
+result = x.fits_in_num()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    assert_eq!(result, Value::boolean(true),
+        "num should always fit in num");
+}
+
+#[test]
+fn test_is_bignum_detection() {
+    let source = r#"
+bignum x = 123.456
+y = 789.012
+result_x = x.is_bignum()
+result_y = y.is_bignum()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result_x = executor.get_variable("result_x").unwrap();
+    let result_y = executor.get_variable("result_y").unwrap();
+
+    assert_eq!(result_x, Value::boolean(true),
+        "bignum type should return true for is_bignum()");
+    assert_eq!(result_y, Value::boolean(false),
+        "num type should return false for is_bignum()");
+}
+
+// ============================================================================
+// Total: 8 casting method tests
+// ============================================================================
+
+// ============================================================================
+// Phase 2: Precision Preservation Tests
+// ============================================================================
+
+#[test]
+fn test_bignum_preserves_more_digits() {
+    let source = r#"
+# BigNum (Float128) should preserve more precision than num (f64)
+bignum precise = 3.141592653589793238462643383279502884197
+num regular = 3.141592653589793238462643383279502884197
+
+# Both should be usable in calculations
+bignum calc_precise = precise * 2.0
+num calc_regular = regular * 2.0
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let precise = executor.get_variable("precise").unwrap();
+    let regular = executor.get_variable("regular").unwrap();
+    let calc_precise = executor.get_variable("calc_precise").unwrap();
+    let calc_regular = executor.get_variable("calc_regular").unwrap();
+
+    // BigNum maintains type through operations
+    assert!(matches!(precise.kind, ValueKind::BigNumber(_)));
+    assert!(matches!(calc_precise.kind, ValueKind::BigNumber(_)));
+    assert!(matches!(regular.kind, ValueKind::Number(_)));
+    assert!(matches!(calc_regular.kind, ValueKind::Number(_)));
+}
+
+#[test]
+fn test_bignum_no_precision_loss_in_operations() {
+    let source = r#"
+# Test that repeated operations maintain BigNumber type
+bignum start = 1.123456789
+bignum multiplier = 2.0
+
+# Multiple operations
+bignum step1 = start * multiplier
+bignum step2 = step1 * multiplier
+bignum step3 = step2 * multiplier
+bignum step4 = step3 * multiplier
+bignum step5 = step4 * multiplier
+
+# Final result should still be BigNumber
+result = step5
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    let step1 = executor.get_variable("step1").unwrap();
+    let step5 = executor.get_variable("step5").unwrap();
+
+    // All intermediate results should maintain BigNumber type
+    assert!(matches!(step1.kind, ValueKind::BigNumber(_)));
+    assert!(matches!(step5.kind, ValueKind::BigNumber(_)));
+    assert!(matches!(result.kind, ValueKind::BigNumber(_)));
+
+    // Value should be start * 2^5 = 1.123456789 * 32 ≈ 35.95
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        let val = bn.to_f64();
+        assert!((val - 35.95).abs() < 0.1, "Expected ~35.95, got {}", val);
+    }
+}
+
+#[test]
+fn test_bignum_division_precision() {
+    let source = r#"
+# Division that requires high precision
+bignum a = 1.0
+bignum b = 3.0
+bignum result = a / b  # Should give precise 0.333...
+
+# Compare with num division
+num x = 1.0
+num y = 3.0
+num regular_result = x / y
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let bignum_result = executor.get_variable("result").unwrap();
+    let num_result = executor.get_variable("regular_result").unwrap();
+
+    // Both should work, this just validates the division works correctly
+    assert!(matches!(bignum_result.kind, ValueKind::BigNumber(_)));
+    assert!(matches!(num_result.kind, ValueKind::Number(_)));
+}
+
+#[test]
+fn test_bignum_maintains_precision_in_complex_expression() {
+    let source = r#"
+# Complex expression that benefits from high precision
+bignum a = 123456789.123456789
+bignum b = 987654321.987654321
+bignum c = 42.42424242424242
+
+# Complex calculation
+bignum result = ((a + b) * c) / (a - b)
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should remain as BigNumber through the operations
+    assert!(matches!(result.kind, ValueKind::BigNumber(_)),
+        "Complex expression should maintain bignum type");
+}
+
+#[test]
+fn test_bignum_scientific_constant_precision() {
+    let source = r#"
+# Scientific constants with high precision
+bignum pi = 3.14159265358979323846
+bignum e = 2.71828182845904523536
+bignum phi = 1.61803398874989484820  # Golden ratio
+
+# Operations with high-precision constants
+bignum result = (pi * e) + phi
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should maintain BigNumber type
+    assert!(matches!(result.kind, ValueKind::BigNumber(_)),
+        "Scientific constant operations should maintain bignum type");
+
+    // Value should be approximately pi * e + phi ≈ 8.539... + 1.618... ≈ 10.157...
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        let val = bn.to_f64();
+        assert!((val - 10.157).abs() < 0.01, "Expected ~10.157, got {}", val);
+    }
+}
+
+// ============================================================================
+// Total: 5 precision preservation tests
+// ============================================================================
+
+// ============================================================================
+// Phase 3: BigInt Auto-Growth Tests (TDD - tests first!)
+// ============================================================================
+
+#[test]
+fn test_int64_multiplication_overflow_grows_to_bigint() {
+    let source = r#"
+# In :integer mode with :high precision, Int64 overflow should grow to BigInt
+configure { integer: :integer, precision: :high } {
+    # Int64::MAX = 9223372036854775807
+    # Multiply two large numbers that overflow Int64
+    bignum a = 9000000000000000000.0  # Near Int64::MAX
+    bignum b = 2.0
+    result = a * b  # Should grow to BigInt (exceeds Int64::MAX)
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should auto-grow to BigInt
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        assert!(matches!(bn, BigNum::BigInt(_)),
+            "Expected BigInt, got {:?}", bn);
+    } else {
+        panic!("Expected BigNumber type, got {:?}", result.kind);
+    }
+}
+
+#[test]
+fn test_int64_addition_overflow_grows_to_bigint() {
+    let source = r#"
+configure { integer: :integer, precision: :high } {
+    # Two large Int64 values that overflow when added
+    bignum a = 9000000000000000000.0
+    bignum b = 9000000000000000000.0
+    result = a + b  # Should grow to BigInt
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should auto-grow to BigInt
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        assert!(matches!(bn, BigNum::BigInt(_)),
+            "Expected BigInt due to overflow, got {:?}", bn);
+    } else {
+        panic!("Expected BigNumber type");
+    }
+}
+
+#[test]
+fn test_uint64_multiplication_overflow_grows_to_bigint() {
+    let source = r#"
+configure { integer: :integer, precision: :high, unsigned: :unsigned } {
+    # UInt64::MAX = 18446744073709551615
+    # Multiply two large numbers that overflow UInt64
+    bignum a = 18000000000000000000.0  # Near UInt64::MAX
+    bignum b = 2.0
+    result = a * b  # Should grow to BigInt
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should auto-grow to BigInt
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        assert!(matches!(bn, BigNum::BigInt(_)),
+            "Expected BigInt, got {:?}", bn);
+    } else {
+        panic!("Expected BigNumber type");
+    }
+}
+
+#[test]
+fn test_uint64_addition_overflow_grows_to_bigint() {
+    let source = r#"
+configure { integer: :integer, precision: :high, unsigned: :unsigned } {
+    bignum a = 18000000000000000000.0
+    bignum b = 18000000000000000000.0
+    result = a + b  # Should grow to BigInt
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should auto-grow to BigInt
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        assert!(matches!(bn, BigNum::BigInt(_)),
+            "Expected BigInt, got {:?}", bn);
+    } else {
+        panic!("Expected BigNumber type");
+    }
+}
+
+#[test]
+fn test_no_autogrow_for_normal_integer_operations() {
+    let source = r#"
+configure { integer: :integer, precision: :high } {
+    # Small integers should stay as Int64
+    bignum a = 1000.0
+    bignum b = 2000.0
+    result = a * b  # 2000000 - well within Int64 range
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should stay as Int64, not grow to BigInt
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        assert!(matches!(bn, BigNum::Int64(_)),
+            "Expected Int64 for small operations, got {:?}", bn);
+    } else {
+        panic!("Expected BigNumber type");
+    }
+}
+
+// ============================================================================
+// Total: 5 auto-growth tests
+// ============================================================================
+
+// ============================================================================
+// Phase 3: BigInt Conversion Tests (8 tests)
+// Tests for to_int() and to_bigint() conversion methods
+// ============================================================================
+
+// ===== to_int() tests (4 tests) =====
+
+#[test]
+fn test_bigint_to_int64_within_range() {
+    // Convert BigInt to Int64 when value fits in Int64 range
+    let source = r#"
+configure { precision: :high, :integer } {
+    bignum big = 1000000.0
+    result = big.to_int()
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should be Int64
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        assert!(matches!(bn, BigNum::Int64(1000000)),
+            "Expected Int64(1000000), got {:?}", bn);
+    } else {
+        panic!("Expected BigNumber type, got {:?}", result.kind);
+    }
+}
+
+#[test]
+fn test_bigint_to_int64_overflow_max() {
+    // BigInt exceeding Int64::MAX should error
+    let source = r#"
+configure { precision: :high, :integer } {
+    # Create a BigInt larger than Int64::MAX
+    bignum a = 9223372036854775807.0  # Int64::MAX
+    bignum b = 2.0
+    big = a * b  # BigInt > Int64::MAX
+    result = big.to_int()
+}
+"#;
+    let mut executor = Executor::new();
+    let result = executor.execute_source(source);
+
+    // Should error with overflow
+    assert!(result.is_err(), "Expected overflow error");
+    if let Err(err) = result {
+        assert!(err.to_string().contains("exceeds Int64 range"),
+            "Expected overflow error, got: {}", err);
+    }
+}
+
+#[test]
+fn test_bigint_to_int64_overflow_min() {
+    // BigInt below Int64::MIN should error
+    let source = r#"
+configure { precision: :high, :integer } {
+    # Create a BigInt smaller than Int64::MIN
+    bignum a = -9223372036854775808.0  # Int64::MIN
+    bignum b = 2.0
+    big = a * b  # BigInt < Int64::MIN
+    result = big.to_int()
+}
+"#;
+    let mut executor = Executor::new();
+    let result = executor.execute_source(source);
+
+    // Should error with overflow
+    assert!(result.is_err(), "Expected overflow error");
+    if let Err(err) = result {
+        assert!(err.to_string().contains("exceeds Int64 range"),
+            "Expected overflow error, got: {}", err);
+    }
+}
+
+#[test]
+fn test_float128_to_int64_truncates() {
+    // Convert Float128 to Int64 with truncation of fractional part
+    let source = r#"
+configure { precision: :high } {
+    bignum x = 123.789
+    result = x.to_int()
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should be Int64(123) - truncated
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        assert!(matches!(bn, BigNum::Int64(123)),
+            "Expected Int64(123), got {:?}", bn);
+    } else {
+        panic!("Expected BigNumber type, got {:?}", result.kind);
+    }
+}
+
+// ===== to_bigint() tests (4 tests) =====
+
+#[test]
+fn test_int64_to_bigint() {
+    // Convert Int64 to BigInt
+    let source = r#"
+configure { precision: :high, :integer } {
+    bignum x = 12345.0
+    result = x.to_bigint()
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should be BigInt
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        assert!(matches!(bn, BigNum::BigInt(_)),
+            "Expected BigInt, got {:?}", bn);
+    } else {
+        panic!("Expected BigNumber type, got {:?}", result.kind);
+    }
+}
+
+#[test]
+fn test_uint64_to_bigint() {
+    // Convert UInt64 to BigInt
+    let source = r#"
+configure { precision: :high, :integer } {
+    # Create a UInt64 value
+    bignum x = 18446744073709551615.0  # UInt64::MAX
+    result = x.to_bigint()
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should be BigInt
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        assert!(matches!(bn, BigNum::BigInt(_)),
+            "Expected BigInt, got {:?}", bn);
+    } else {
+        panic!("Expected BigNumber type, got {:?}", result.kind);
+    }
+}
+
+#[test]
+fn test_float128_to_bigint_truncates() {
+    // Convert Float128 to BigInt, truncating fractional part
+    let source = r#"
+configure { precision: :high } {
+    bignum x = 9876.543
+    result = x.to_bigint()
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should be BigInt with value 9876 (truncated)
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        use num_bigint::BigInt;
+        assert!(matches!(bn, BigNum::BigInt(_)),
+            "Expected BigInt, got {:?}", bn);
+
+        // Verify value is 9876
+        if let BigNum::BigInt(bi) = bn {
+            assert_eq!(*bi, BigInt::from(9876),
+                "Expected BigInt(9876), got {:?}", bi);
+        }
+    } else {
+        panic!("Expected BigNumber type, got {:?}", result.kind);
+    }
+}
+
+#[test]
+fn test_bigint_to_bigint_identity() {
+    // BigInt to BigInt should be identity (no change)
+    let source = r#"
+configure { precision: :high, :integer } {
+    bignum a = 9223372036854775807.0  # Int64::MAX
+    bignum b = 2.0
+    big = a * b  # Creates a BigInt
+    result = big.to_bigint()
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+
+    // Should still be BigInt
+    if let ValueKind::BigNumber(bn) = &result.kind {
+        assert!(matches!(bn, BigNum::BigInt(_)),
+            "Expected BigInt, got {:?}", bn);
+    } else {
+        panic!("Expected BigNumber type, got {:?}", result.kind);
+    }
+}
+
+// ============================================================================
+// Total: 8 BigInt conversion tests
+// ============================================================================

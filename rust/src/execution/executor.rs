@@ -701,6 +701,108 @@ impl Executor {
         BigNum::Float128(f128::from(n))
     }
 
+    /// Phase 2: Checks if a result should be auto-promoted to bignum due to
+    /// overflow or precision loss.
+    ///
+    /// Auto-promotion happens ONLY in Standard mode to prevent precision loss.
+    /// High/Extended modes don't need this since they already use bignum types.
+    fn should_promote_to_bignum(&self, left: f64, right: f64, result: f64) -> bool {
+        // Only auto-promote in Standard mode (High/Extended already use bignum)
+        if !matches!(self.config_stack.current().precision_mode, PrecisionMode::Standard) {
+            return false;
+        }
+
+        // Check for infinity (overflow)
+        if result.is_infinite() {
+            return true;
+        }
+
+        // Check if result exceeds f64's exact integer representation range (2^53)
+        // When result is this large, we've likely lost precision
+        const F64_MAX_EXACT_INT: f64 = 9_007_199_254_740_992.0; // 2^53
+        if result.is_finite() && result.abs() > F64_MAX_EXACT_INT {
+            // For very large results, check if inputs appear to be integer-like
+            // (This distinguishes integer arithmetic from intentional float operations)
+            if left.fract() == 0.0 && right.fract() == 0.0 {
+                return true;
+            }
+        }
+
+        // Check for significant precision loss in the operation
+        // If operands are large and result is suspiciously different, precision may be lost
+        let max_operand = left.abs().max(right.abs());
+        if max_operand > F64_MAX_EXACT_INT {
+            return true;
+        }
+
+        false
+    }
+
+    /// Phase 2: Promotes a f64 result to bignum (Float128).
+    fn promote_to_bignum(&self, result: f64) -> Value {
+        use f128::f128;
+        Value::bignum(BigNum::Float128(f128::from(result)))
+    }
+
+    /// Phase 3: Checks if integer operation should grow to BigInt due to overflow.
+    /// This applies to Int64 and UInt64 operations in :integer mode with :high or :extended precision.
+    fn should_grow_to_bigint_i64(&self, _left: i64, _right: i64, would_overflow: bool) -> bool {
+        // Only auto-grow in :high or :extended precision modes
+        if !matches!(
+            self.config_stack.current().precision_mode,
+            PrecisionMode::High | PrecisionMode::Extended
+        ) {
+            return false;
+        }
+
+        // Check if the operation would overflow
+        would_overflow
+    }
+
+    /// Phase 3: Checks if UInt64 operation should grow to BigInt.
+    fn should_grow_to_bigint_u64(&self, _left: u64, _right: u64, would_overflow: bool) -> bool {
+        // Only auto-grow in :high or :extended precision modes
+        if !matches!(
+            self.config_stack.current().precision_mode,
+            PrecisionMode::High | PrecisionMode::Extended
+        ) {
+            return false;
+        }
+
+        // Check if the operation would overflow
+        would_overflow
+    }
+
+    /// Phase 3: Grows an Int64 operation to BigInt.
+    fn grow_i64_to_bigint(&self, left: i64, right: i64, op: &str) -> Result<Value> {
+        use num_bigint::BigInt;
+        let left_big = BigInt::from(left);
+        let right_big = BigInt::from(right);
+
+        let result = match op {
+            "add" => left_big + right_big,
+            "mul" => left_big * right_big,
+            _ => return Err(GraphoidError::runtime(format!("Unsupported operation for BigInt growth: {}", op))),
+        };
+
+        Ok(Value::bignum(BigNum::BigInt(result)))
+    }
+
+    /// Phase 3: Grows a UInt64 operation to BigInt.
+    fn grow_u64_to_bigint(&self, left: u64, right: u64, op: &str) -> Result<Value> {
+        use num_bigint::BigInt;
+        let left_big = BigInt::from(left);
+        let right_big = BigInt::from(right);
+
+        let result = match op {
+            "add" => left_big + right_big,
+            "mul" => left_big * right_big,
+            _ => return Err(GraphoidError::runtime(format!("Unsupported operation for BigInt growth: {}", op))),
+        };
+
+        Ok(Value::bignum(BigNum::BigInt(result)))
+    }
+
     /// Evaluates a literal value.
     fn eval_literal(&self, lit: &LiteralValue) -> Result<Value> {
         match lit {
@@ -1580,6 +1682,34 @@ impl Executor {
                 }
                 return self.value_to_num(&value);
             }
+            // Phase 2: BigNum casting methods
+            "to_bignum" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'to_bignum' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                return self.value_to_bignum(&value);
+            }
+            "fits_in_num" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'fits_in_num' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                return self.value_fits_in_num(&value);
+            }
+            "is_bignum" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'is_bignum' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                return Ok(Value::boolean(matches!(&value.kind, ValueKind::BigNumber(_))));
+            }
             "to_string" => {
                 if !args.is_empty() {
                     return Err(GraphoidError::runtime(format!(
@@ -1628,6 +1758,7 @@ impl Executor {
         // Dispatch to type-specific methods
         match &value.kind {
             ValueKind::Number(n) => self.eval_number_method(*n, method, args),
+            ValueKind::BigNumber(bn) => self.eval_bignum_method(bn, method, args),
             ValueKind::Time(timestamp) => self.eval_time_method(*timestamp, method, args),
             ValueKind::List(list) => self.eval_list_method(&list, method, args),
             ValueKind::Map(hash) => self.eval_map_method(&hash, method, args),
@@ -3512,6 +3643,91 @@ impl Executor {
         }
     }
 
+    /// Phase 3: Evaluates a method call on a bignum value.
+    fn eval_bignum_method(&self, bn: &BigNum, method: &str, args: &[Value]) -> Result<Value> {
+        use num_bigint::BigInt;
+
+        match method {
+            "to_int" => {
+                // Convert BigNum to Int64, checking for overflow
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'to_int' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                match bn {
+                    BigNum::Int64(i) => Ok(Value::bignum(BigNum::Int64(*i))),
+                    BigNum::UInt64(u) => {
+                        // Try to convert UInt64 to Int64
+                        if *u > i64::MAX as u64 {
+                            return Err(GraphoidError::runtime(format!(
+                                "UInt64 value {} exceeds Int64::MAX, cannot convert to int",
+                                u
+                            )));
+                        }
+                        Ok(Value::bignum(BigNum::Int64(*u as i64)))
+                    }
+                    BigNum::Float128(f) => {
+                        // Convert to f64, truncate, then check range
+                        let f64_val: f64 = (*f).into();
+                        let truncated = f64_val.trunc();
+
+                        // Check if it fits in Int64 range
+                        if truncated > i64::MAX as f64 || truncated < i64::MIN as f64 {
+                            return Err(GraphoidError::runtime(format!(
+                                "Float128 value exceeds Int64 range, cannot convert to int"
+                            )));
+                        }
+
+                        // Convert to i64
+                        Ok(Value::bignum(BigNum::Int64(truncated as i64)))
+                    }
+                    BigNum::BigInt(bi) => {
+                        // Try to convert BigInt to Int64
+                        use num_traits::ToPrimitive;
+
+                        match bi.to_i64() {
+                            Some(i) => Ok(Value::bignum(BigNum::Int64(i))),
+                            None => Err(GraphoidError::runtime(format!(
+                                "BigInt value exceeds Int64 range, cannot convert to int"
+                            ))),
+                        }
+                    }
+                }
+            }
+            "to_bigint" => {
+                // Convert BigNum to BigInt
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'to_bigint' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                match bn {
+                    BigNum::Int64(i) => Ok(Value::bignum(BigNum::BigInt(BigInt::from(*i)))),
+                    BigNum::UInt64(u) => Ok(Value::bignum(BigNum::BigInt(BigInt::from(*u)))),
+                    BigNum::Float128(f) => {
+                        // Convert to f64, truncate
+                        let f64_val: f64 = (*f).into();
+                        let truncated = f64_val.trunc();
+
+                        // Convert to BigInt via i64 (safer than i128 from f64)
+                        let as_i64 = truncated as i64;
+                        Ok(Value::bignum(BigNum::BigInt(BigInt::from(as_i64))))
+                    }
+                    BigNum::BigInt(bi) => Ok(Value::bignum(BigNum::BigInt(bi.clone()))),
+                }
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "BigNumber does not have method '{}'",
+                method
+            ))),
+        }
+    }
+
     /// Evaluates a method call on a time value.
     fn eval_time_method(&self, timestamp: f64, method: &str, args: &[Value]) -> Result<Value> {
         use chrono::{DateTime, Datelike, Timelike};
@@ -3684,6 +3900,65 @@ impl Executor {
             _ => {
                 // For other types, use their type name
                 Ok(Value::string(value.type_name().to_string()))
+            }
+        }
+    }
+
+    /// Phase 2: BigNum casting - to_bignum()
+    /// Converts a value to BigNum (Float128)
+    fn value_to_bignum(&self, value: &Value) -> Result<Value> {
+        match &value.kind {
+            ValueKind::Number(n) => {
+                // Convert f64 to Float128
+                use f128::f128;
+                Ok(Value::bignum(BigNum::Float128(f128::from(*n))))
+            }
+            ValueKind::BigNumber(_) => {
+                // Already a bignum, pass through
+                Ok(value.clone())
+            }
+            ValueKind::String(s) => {
+                // Try to parse string to bignum
+                match s.parse::<f64>() {
+                    Ok(n) => {
+                        use f128::f128;
+                        Ok(Value::bignum(BigNum::Float128(f128::from(n))))
+                    }
+                    Err(_) => Ok(Value::none()), // Invalid strings return none
+                }
+            }
+            _ => {
+                Err(GraphoidError::type_error(
+                    "number, bignum, or string",
+                    value.type_name()
+                ))
+            }
+        }
+    }
+
+    /// Phase 2: BigNum casting - fits_in_num()
+    /// Returns true if value can fit in f64 without overflow/underflow
+    fn value_fits_in_num(&self, value: &Value) -> Result<Value> {
+        match &value.kind {
+            ValueKind::Number(_) => {
+                // Numbers always fit in num
+                Ok(Value::boolean(true))
+            }
+            ValueKind::BigNumber(bn) => {
+                // Check if BigNumber can be represented in f64 without overflow
+                let f64_val = bn.to_f64();
+
+                // Check for infinity (overflow)
+                if f64_val.is_infinite() {
+                    return Ok(Value::boolean(false));
+                }
+
+                // Value fits in f64
+                Ok(Value::boolean(true))
+            }
+            _ => {
+                // Other types can be converted to num, so they "fit"
+                Ok(Value::boolean(true))
             }
         }
     }
@@ -5962,14 +6237,30 @@ impl Executor {
             (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
                 match (l, r) {
                     (BigNum::Int64(lv), BigNum::Int64(rv)) => {
-                        lv.checked_add(*rv)
-                            .map(|result| Value::bignum(BigNum::Int64(result)))
-                            .ok_or_else(|| GraphoidError::runtime("Integer overflow in addition".to_string()))
+                        match lv.checked_add(*rv) {
+                            Some(result) => Ok(Value::bignum(BigNum::Int64(result))),
+                            None => {
+                                // Phase 3: Check if we should auto-grow to BigInt
+                                if self.should_grow_to_bigint_i64(*lv, *rv, true) {
+                                    self.grow_i64_to_bigint(*lv, *rv, "add")
+                                } else {
+                                    Err(GraphoidError::runtime("Integer overflow in addition".to_string()))
+                                }
+                            }
+                        }
                     }
                     (BigNum::UInt64(lv), BigNum::UInt64(rv)) => {
-                        lv.checked_add(*rv)
-                            .map(|result| Value::bignum(BigNum::UInt64(result)))
-                            .ok_or_else(|| GraphoidError::runtime("Integer overflow in addition".to_string()))
+                        match lv.checked_add(*rv) {
+                            Some(result) => Ok(Value::bignum(BigNum::UInt64(result))),
+                            None => {
+                                // Phase 3: Check if we should auto-grow to BigInt
+                                if self.should_grow_to_bigint_u64(*lv, *rv, true) {
+                                    self.grow_u64_to_bigint(*lv, *rv, "add")
+                                } else {
+                                    Err(GraphoidError::runtime("Integer overflow in addition".to_string()))
+                                }
+                            }
+                        }
                     }
                     (BigNum::Float128(lv), BigNum::Float128(rv)) => {
                         // Phase 1B: Float128 addition
@@ -6020,8 +6311,15 @@ impl Executor {
                         ))
                     }
                     PrecisionMode::Standard => {
-                        // Standard f64 arithmetic
-                        Ok(Value::number(l + r))
+                        // Standard f64 arithmetic with optional auto-promotion
+                        let result = l + r;
+
+                        // Phase 2: Check if we should auto-promote due to overflow
+                        if self.should_promote_to_bignum(*l, *r, result) {
+                            Ok(self.promote_to_bignum(result))
+                        } else {
+                            Ok(Value::number(result))
+                        }
                     }
                 }
             }
@@ -6146,14 +6444,30 @@ impl Executor {
             (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
                 match (l, r) {
                     (BigNum::Int64(lv), BigNum::Int64(rv)) => {
-                        lv.checked_mul(*rv)
-                            .map(|result| Value::bignum(BigNum::Int64(result)))
-                            .ok_or_else(|| GraphoidError::runtime("Integer overflow in multiplication".to_string()))
+                        match lv.checked_mul(*rv) {
+                            Some(result) => Ok(Value::bignum(BigNum::Int64(result))),
+                            None => {
+                                // Phase 3: Check if we should auto-grow to BigInt
+                                if self.should_grow_to_bigint_i64(*lv, *rv, true) {
+                                    self.grow_i64_to_bigint(*lv, *rv, "mul")
+                                } else {
+                                    Err(GraphoidError::runtime("Integer overflow in multiplication".to_string()))
+                                }
+                            }
+                        }
                     }
                     (BigNum::UInt64(lv), BigNum::UInt64(rv)) => {
-                        lv.checked_mul(*rv)
-                            .map(|result| Value::bignum(BigNum::UInt64(result)))
-                            .ok_or_else(|| GraphoidError::runtime("Integer overflow in multiplication".to_string()))
+                        match lv.checked_mul(*rv) {
+                            Some(result) => Ok(Value::bignum(BigNum::UInt64(result))),
+                            None => {
+                                // Phase 3: Check if we should auto-grow to BigInt
+                                if self.should_grow_to_bigint_u64(*lv, *rv, true) {
+                                    self.grow_u64_to_bigint(*lv, *rv, "mul")
+                                } else {
+                                    Err(GraphoidError::runtime("Integer overflow in multiplication".to_string()))
+                                }
+                            }
+                        }
                     }
                     (BigNum::Float128(lv), BigNum::Float128(rv)) => {
                         // Phase 1B: Float128 multiplication
@@ -6202,7 +6516,15 @@ impl Executor {
                         ))
                     }
                     PrecisionMode::Standard => {
-                        Ok(Value::number(l * r))
+                        // Standard f64 arithmetic with optional auto-promotion
+                        let result = l * r;
+
+                        // Phase 2: Check if we should auto-promote due to overflow
+                        if self.should_promote_to_bignum(*l, *r, result) {
+                            Ok(self.promote_to_bignum(result))
+                        } else {
+                            Ok(Value::number(result))
+                        }
                     }
                 }
             }
@@ -6728,7 +7050,15 @@ impl Executor {
                         ))
                     }
                     PrecisionMode::Standard => {
-                        Ok(Value::number(l.powf(*r)))
+                        // Standard f64 arithmetic with optional auto-promotion
+                        let result = l.powf(*r);
+
+                        // Phase 2: Check if we should auto-promote due to overflow
+                        if self.should_promote_to_bignum(*l, *r, result) {
+                            Ok(self.promote_to_bignum(result))
+                        } else {
+                            Ok(Value::number(result))
+                        }
                     }
                 }
             }

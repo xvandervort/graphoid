@@ -1,178 +1,119 @@
-# High Precision Arithmetic - Phase 1B
+# High Precision Arithmetic - Float128 Demonstration
 #
-# Demonstrates the precision advantages of bignum (Float128) over num (f64)
-# Shows where the extra precision matters
-
-io.print("High Precision Arithmetic Demo")
-io.print("================================")
-io.print("")
+# This example shows how Graphoid's :high precision mode provides significantly
+# more precision than standard f64 floating-point arithmetic.
 
 # ============================================================================
-# Precision Comparison: num vs bignum
+# Standard Precision vs High Precision Comparison
 # ============================================================================
 
-io.print("Precision Comparison:")
-io.print("--------------------")
+# Standard precision uses f64 (~15-17 decimal digits)
+standard_pi = 3.141592653589793
 
-# Regular num (f64) has ~17 decimal digits precision
-num regular_pi = 3.141592653589793238
-io.print("Pi as num:    " + regular_pi.to_string())
-
-# BigNum (Float128) has ~34 decimal digits precision
-bignum precise_pi = 3.141592653589793238
-io.print("Pi as bignum: " + precise_pi.to_string())
-io.print("")
-
-# ============================================================================
-# Scientific Constants with High Precision
-# ============================================================================
-
-io.print("Scientific Constants:")
-io.print("--------------------")
-
-bignum speed_of_light = 299792458.0  # meters/second
-bignum planck_constant = 0.00000000000000000000000000000000066260715  # J⋅s (approximate)
-bignum avogadro = 602214076000000000000000.0  # particles/mol
-
-io.print("Speed of light: " + speed_of_light.to_string() + " m/s")
-io.print("Planck constant: ~6.626×10^-34 J⋅s")
-io.print("Avogadro's number: ~6.022×10^23")
-io.print("")
-
-# ============================================================================
-# Financial Calculations Requiring Precision
-# ============================================================================
-
-io.print("Financial Example - Long-term Investment:")
-io.print("------------------------------------------")
-
-bignum initial_investment = 10000.0
-bignum daily_rate = 0.0001369863  # ~5% annual / 365 days
-bignum days = 365.0 * 30.0  # 30 years
-bignum one = 1.0
-
-# Calculate with high precision
-bignum daily_multiplier = one + daily_rate
-bignum final_value = initial_investment * (daily_multiplier ** days)
-
-io.print("Initial: $10,000")
-io.print("Daily rate: 0.01369863%")
-io.print("Duration: 30 years (10,950 days)")
-io.print("Final value: $" + final_value.to_string())
-io.print("")
-
-# ============================================================================
-# Geometric Series Sum (tests precision in iterative calculations)
-# ============================================================================
-
-io.print("Geometric Series Example:")
-io.print("-------------------------")
-
-# Sum of geometric series: 1 + 1/2 + 1/4 + 1/8 + ...
-# Should approach 2.0
-
-bignum series_sum = 0.0
-bignum term = 1.0
-bignum two = 2.0
-
-# First 50 terms
-bignum i = 0.0
-bignum fifty = 50.0
-
-# Manual loop approximation (since we don't have while yet)
-series_sum = series_sum + term
-term = term / two
-
-series_sum = series_sum + term
-term = term / two
-
-series_sum = series_sum + term
-term = term / two
-
-series_sum = series_sum + term
-term = term / two
-
-series_sum = series_sum + term
-term = term / two
-
-series_sum = series_sum + term
-term = term / two
-
-series_sum = series_sum + term
-term = term / two
-
-series_sum = series_sum + term
-term = term / two
-
-series_sum = series_sum + term
-term = term / two
-
-series_sum = series_sum + term
-term = term / two
-
-io.print("Sum of first 10 terms of 1 + 1/2 + 1/4 + ...")
-io.print("Result: " + series_sum.to_string())
-io.print("Expected: approaches 2.0")
-io.print("")
-
-# ============================================================================
-# Precise Trigonometric-style Calculations
-# ============================================================================
-
-io.print("Circle Calculations with High Precision:")
-io.print("----------------------------------------")
-
-bignum pi_precise = 3.14159265358979323846
-bignum radius = 1000000.0  # 1 million units
-
-# Circumference = 2πr
-bignum circumference = (pi_precise * radius) * (one + one)
-
-# Area = πr²
-bignum area = pi_precise * (radius * radius)
-
-io.print("Circle with radius: 1,000,000 units")
-io.print("Circumference: " + circumference.to_string())
-io.print("Area: " + area.to_string())
-io.print("")
-
-# ============================================================================
-# Demonstrating Integer Mode with BigNum
-# ============================================================================
-
-io.print("Integer Mode Example:")
-io.print("--------------------")
-
-# Precise calculation, then truncate for display
-bignum precise_value = 1234.56789
-
-configure { integer: :integer } {
-    bignum truncated = precise_value
-    io.print("Original: " + precise_value.to_string())
-    io.print("Truncated in :integer mode: " + truncated.to_string())
+# High precision uses Float128 (~34 decimal digits)
+configure { precision: :high } {
+    bignum precise_pi = 3.14159265358979323846264338327950288
+    
+    # Operations maintain the higher precision
+    bignum radius = 10.0
+    bignum circumference = 2.0 * precise_pi * radius
+    bignum area = precise_pi * radius * radius
 }
-io.print("")
 
 # ============================================================================
-# Complex Expression Maintaining Precision
+# Precision Matters in Repeated Operations
 # ============================================================================
 
-io.print("Complex Expression:")
-io.print("-------------------")
+# Without :high mode: standard f64 precision
+value_standard = 0.0
+# In practice, repeated additions like value = value + 0.1
+# would accumulate rounding errors with f64
 
-bignum a = 123.456789
-bignum b = 987.654321
-bignum c = 42.0
+# With :high mode: Float128 precision minimizes errors
+configure { precision: :high } {
+    bignum value = 0.0
+    bignum increment = 0.1
+    # Same operations maintain much better precision
+    # (Note: 0.1 still can't be represented exactly even in Float128,
+    #  but error is much smaller)
+}
 
-# ((a + b) * c) / (a - b)
-bignum numerator = (a + b) * c
-bignum denominator = a - b
-bignum complex_result = numerator / denominator
+# ============================================================================
+# Division Precision
+# ============================================================================
 
-io.print("((123.456789 + 987.654321) * 42) / (123.456789 - 987.654321)")
-io.print("Result: " + complex_result.to_string())
-io.print("")
+# Standard precision division
+third_standard = 1.0 / 3.0  # ~0.3333333333333333 (limited by f64)
 
-io.print("BigNum (Float128) maintains precision through")
-io.print("complex calculations that would lose accuracy")
-io.print("with regular num (f64) type.")
+# High precision division
+configure { precision : :high } {
+    bignum third_precise = 1.0 / 3.0  # ~34 decimal digits of precision
+    
+    # Multiply back - high precision maintains accuracy
+    bignum back_to_one = third_precise * 3.0
+}
+
+# ============================================================================
+# Scientific Calculations Requiring High Precision
+# ============================================================================
+
+configure { precision: :high } {
+    # Avogadro's number (with more precision)
+    bignum avogadro = 602214076000000000000000.0
+    
+    # Planck's constant (6.62607015 × 10^-34 J⋅Hz^-1)
+    bignum planck = 0.000000000000000000000000000000000662607015
+    
+    # Speed of light in m/s
+    bignum speed_of_light = 299792458.0
+    
+    # E = mc² with high precision
+    bignum mass = 1.0  # kg
+    bignum energy = mass * speed_of_light * speed_of_light
+}
+
+# ============================================================================
+# When to Use High Precision
+# ============================================================================
+#
+# Use :high precision mode when:
+#
+# 1. Working with very small or very large numbers
+# 2. Performing many successive operations (reduces error accumulation)
+# 3. Scientific calculations requiring high accuracy
+# 4. Financial calculations requiring exact decimal representation
+# 5. Cryptographic operations needing precise arithmetic
+#
+# Standard precision is fine for:
+#
+# 1. General-purpose arithmetic
+# 2. Graphics and game development
+# 3. When performance is more critical than precision
+# 4. Working with sensors/hardware that provide limited precision
+#
+# ============================================================================
+
+# ============================================================================
+# Combining Integer Mode with High Precision
+# ============================================================================
+
+configure { precision: :high, :integer } {
+    # High-precision integers (Int64, auto-grows to BigInt on overflow)
+    bignum large_int = 9223372036854775807.0  # Int64::MAX
+    
+    # Adding 1 causes auto-growth to BigInt (unlimited precision integers)
+    bignum even_larger = large_int + 1.0
+}
+
+# ============================================================================
+# Key Takeaways
+# ============================================================================
+#
+# 1. :high precision provides ~34 decimal digits vs ~17 for standard
+# 2. Float128 reduces rounding error in repeated operations
+# 3. Essential for scientific/financial calculations needing accuracy
+# 4. Can combine with :integer for high-precision integer arithmetic
+# 5. Trade-off: higher precision uses more memory and is slower
+#
+# Next: See mixed_operations.gr for combining num and bignum types
+#       See large_integer_arithmetic.gr for overflow handling

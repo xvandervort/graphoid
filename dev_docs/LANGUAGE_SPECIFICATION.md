@@ -142,6 +142,137 @@ This is as far as type constraints go. No exceptions.
   - `log()` - Natural logarithm
   - `log(base)` - Logarithm with specified base
 
+#### BigNum (`bignum`)
+- High-precision and arbitrary-precision numeric type
+- Provides ~34 decimal digits of precision (Float128) vs ~17 for standard `num` (f64)
+- Supports arbitrary-precision integers (BigInt) for numbers beyond 64-bit limits
+- **Four Internal Variants** (automatically managed):
+  - `Int64` - 64-bit signed integer (when using `:integer` mode)
+  - `UInt64` - 64-bit unsigned integer (when using `:unsigned` mode)
+  - `Float128` - 128-bit floating-point (~34 decimal digits, in `:high` precision mode)
+  - `BigInt` - Arbitrary-precision integer (auto-grows from Int64/UInt64 on overflow)
+
+**Declaration**:
+```graphoid
+# Explicit bignum declaration
+bignum precise_value = 3.14159265358979323846264338327950288
+bignum large_integer = 9223372036854775807.0
+
+# Automatic bignum in :high precision mode
+configure { precision: :high } {
+    pi = 3.14159265358979323846264338327950288  # Automatically bignum (Float128)
+    radius = 10.0  # Automatically bignum
+    circumference = 2.0 * pi * radius  # High precision maintained
+}
+
+# Automatic bignum in :integer mode
+configure { precision: :high, :integer } {
+    max_val = 9223372036854775807.0  # Int64::MAX
+    overflow = max_val + 1.0  # Auto-grows to BigInt!
+}
+```
+
+**Precision Modes**:
+- `:high` - Use Float128 for high-precision floating-point (~34 decimal digits)
+- `:integer` - Use Int64 integers (truncates decimals on assignment, auto-grows to BigInt on overflow)
+- `:unsigned` - Use UInt64 unsigned integers (0 and positive only, auto-grows to BigInt on overflow)
+- `:extended` - Synonym for `:high` (both enable auto-growth)
+
+**Auto-Promotion on Overflow** (Phase 3):
+When using `:high` or `:extended` precision modes with `:integer` or `:unsigned`, integer operations automatically promote to BigInt on overflow:
+
+```graphoid
+configure { precision: :high, :integer } {
+    bignum a = 9223372036854775807.0  # Int64::MAX
+    bignum b = 1.0
+    result = a + b  # Automatically grows to BigInt (no overflow error!)
+}
+```
+
+**Mixed Operations with `num`**:
+You can freely mix `num` (f64) and `bignum` types in arithmetic. The `num` operand is automatically promoted to `bignum` for the operation:
+
+```graphoid
+num regular = 100.0
+bignum precise = 200.0
+
+# num is temporarily promoted to bignum for operation
+sum = regular + precise  # Result: bignum (300.0)
+
+# IMPORTANT: Original num variable is NOT mutated!
+# 'regular' is still a num with value 100.0
+is_num = regular.is_bignum()  # false - still num!
+```
+
+**Conversion Methods**:
+- `to_num()` - Convert bignum to num (may lose precision)
+- `to_int()` - Convert to Int64 (truncates decimals, errors if out of range)
+- `to_bignum()` - Convert num to bignum (explicit promotion)
+- `to_bigint()` - Convert to arbitrary-precision integer (truncates decimals)
+- `to_string()` - Convert to string representation
+- `fits_in_num()` - Check if conversion to num is safe (no critical precision loss)
+- `is_bignum()` - Type checking (returns true for bignum, false for num)
+
+**Conversion Examples**:
+```graphoid
+bignum precise = 123.456
+
+# Convert to num
+regular = precise.to_num()  # May lose precision
+
+# Safe conversion check
+if precise.fits_in_num() {
+    safe = precise.to_num()
+}
+
+# Convert to integer types
+int_version = precise.to_int()      # 123 (truncates to Int64)
+bigint_version = precise.to_bigint()  # 123 (arbitrary precision integer)
+
+# Convert num to bignum
+num small = 42.0
+bignum large = small.to_bignum()
+```
+
+**Type Preservation (No Mutation)**:
+Operations never mutate operands. When mixing `num` and `bignum`, the `num` is temporarily promoted only for the operation:
+
+```graphoid
+num a = 5.0
+bignum b = 10.0
+c = a + b  # Result is bignum
+
+# Verify: a is still num (not mutated)
+assert(a.is_bignum() == false)  # a is still num!
+assert(b.is_bignum() == true)   # b is still bignum
+assert(c.is_bignum() == true)   # c is bignum (result of mixed operation)
+```
+
+**When to Use BigNum**:
+- **High Precision**: Scientific calculations requiring more than 17 decimal digits
+- **Large Integers**: Numbers beyond ±9,223,372,036,854,775,807 (Int64 limits)
+- **Financial Calculations**: When exact decimal representation matters
+- **Cryptography**: RSA key generation, large modular arithmetic
+- **Repeated Operations**: Minimizes error accumulation vs standard f64
+
+**When to Use Standard `num`**:
+- General-purpose arithmetic (most cases)
+- Graphics and game development
+- Performance is critical
+- Hardware sensors with limited precision
+
+**Performance Considerations**:
+- `num` (f64) is faster and uses less memory than `bignum`
+- `Float128` is slower than f64 but provides better precision
+- `BigInt` operations are slower for very large numbers but prevent overflow
+- Auto-growth has minimal overhead (only occurs on overflow)
+
+**See Examples**:
+- `samples/bignum_basics.gr` - Introduction to bignum types
+- `samples/high_precision.gr` - Float128 precision demonstration
+- `samples/mixed_operations.gr` - Mixing num and bignum types
+- `samples/large_integer_arithmetic.gr` - Overflow handling and conversions
+
 #### Strings (`string`)
 - Internally represented as character node graphs
 - Unicode-aware grapheme cluster support
