@@ -1,0 +1,190 @@
+# sql.gr - SQL Query Building Utilities
+# Provides functions for constructing SQL queries safely
+
+# Helper: Join list items with separator
+fn _join(items, sep) {
+    if items.length() == 0 {
+        return ""
+    }
+
+    result = items[0].to_string()
+    i = 1
+    while i < items.length() {
+        result = result + sep + items[i].to_string()
+        i = i + 1
+    }
+    return result
+}
+
+# Helper: Escape single quotes in strings for SQL
+fn _escape_string(str) {
+    # Replace ' with ''
+    result = ""
+    i = 0
+    while i < str.length() {
+        char = str.substring(i, i + 1)
+        if char == "'" {
+            result = result + "''"
+        } else {
+            result = result + char
+        }
+        i = i + 1
+    }
+    return result
+}
+
+# Helper: Quote a value for SQL
+fn _quote_value(value) {
+    str = value.to_string()
+
+    # Check if it's a number (simple check - all digits optionally with dot)
+    is_number = true
+    has_dot = false
+    i = 0
+    while i < str.length() {
+        char = str.substring(i, i + 1)
+
+        # Check if character is a digit
+        is_digit = false
+        if char == "0" { is_digit = true }
+        if char == "1" { is_digit = true }
+        if char == "2" { is_digit = true }
+        if char == "3" { is_digit = true }
+        if char == "4" { is_digit = true }
+        if char == "5" { is_digit = true }
+        if char == "6" { is_digit = true }
+        if char == "7" { is_digit = true }
+        if char == "8" { is_digit = true }
+        if char == "9" { is_digit = true }
+
+        is_dot = (char == ".")
+
+        if is_dot {
+            if has_dot {
+                is_number = false  # Two dots = not a number
+            }
+            has_dot = true
+        } else if is_digit == false {
+            is_number = false
+        }
+        i = i + 1
+    }
+
+    if is_number {
+        return str
+    } else {
+        # Quote and escape string
+        return "'" + _escape_string(str) + "'"
+    }
+}
+
+# Build a SELECT query
+# Example: select(["name", "age"], "users", "age > 18", ["name"])
+fn select(columns, table, where_clause, order_by) {
+    query = "SELECT "
+
+    # Add columns
+    if columns.length() == 0 {
+        query = query + "*"
+    } else {
+        query = query + _join(columns, ", ")
+    }
+
+    query = query + " FROM " + table
+
+    # Add WHERE clause if provided
+    if where_clause != none {
+        where_str = where_clause.to_string()
+        if where_str != "none" {
+            query = query + " WHERE " + where_str
+        }
+    }
+
+    # Add ORDER BY if provided
+    if order_by != none {
+        if order_by.length() > 0 {
+            query = query + " ORDER BY " + _join(order_by, ", ")
+        }
+    }
+
+    return query
+}
+
+# Build an INSERT query
+# Example: insert("users", ["name", "age"], ["Alice", 30])
+fn insert(table, columns, values) {
+    query = "INSERT INTO " + table
+
+    # Add columns
+    query = query + " (" + _join(columns, ", ") + ")"
+
+    # Add values
+    quoted_values = []
+    for value in values {
+        quoted_values = quoted_values.append(_quote_value(value))
+    }
+
+    query = query + " VALUES (" + _join(quoted_values, ", ") + ")"
+
+    return query
+}
+
+# Build an UPDATE query
+# Example: update("users", {"name": "Bob", "age": 25}, "id = 1")
+fn update(table, values_map, where_clause) {
+    query = "UPDATE " + table + " SET "
+
+    # Build SET clause
+    keys = values_map.keys()
+    set_parts = []
+
+    for key in keys {
+        value = values_map[key]
+        set_part = key + " = " + _quote_value(value)
+        set_parts = set_parts.append(set_part)
+    }
+
+    query = query + _join(set_parts, ", ")
+
+    # Add WHERE clause
+    if where_clause != none {
+        where_str = where_clause.to_string()
+        if where_str != "none" {
+            query = query + " WHERE " + where_str
+        }
+    }
+
+    return query
+}
+
+# Build a DELETE query
+# Example: delete("users", "age < 18")
+fn delete_from(table, where_clause) {
+    query = "DELETE FROM " + table
+
+    # Add WHERE clause
+    if where_clause != none {
+        where_str = where_clause.to_string()
+        if where_str != "none" {
+            query = query + " WHERE " + where_str
+        }
+    }
+
+    return query
+}
+
+# Build a CREATE TABLE query
+# Example: create_table("users", [{"name": "id", "type": "INTEGER PRIMARY KEY"}, ...])
+fn create_table(table, columns_def) {
+    query = "CREATE TABLE " + table + " ("
+
+    col_parts = []
+    for col in columns_def {
+        col_str = col["name"] + " " + col["type"]
+        col_parts = col_parts.append(col_str)
+    }
+
+    query = query + _join(col_parts, ", ") + ")"
+
+    return query
+}

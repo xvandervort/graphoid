@@ -1,0 +1,52 @@
+# Test suite for optparse (Command-Line Option Parsing) module
+import "optparse"
+
+print("=== Testing Optparse Module ===")
+print("")
+
+# Test 1: Parse basic options
+print("Testing parse_args() with mixed options...")
+args = ["--output", "file.txt", "-v", "--count", "42", "input.txt", "data.csv"]
+parsed = optparse.parse_args(args)
+
+print("  Args: [--output file.txt -v --count 42 input.txt data.csv]")
+print("  Parsed options: " + parsed["options"].to_string())
+print("  Positional args: " + parsed["args"].to_string())
+print("")
+
+# Test 2: Get option values
+print("Testing get_option()...")
+output = optparse.get_option(parsed, "output", "default.txt")
+count = optparse.get_option(parsed, "count", "0")
+missing = optparse.get_option(parsed, "missing", "not_found")
+print("  get_option(parsed, 'output', 'default.txt') = " + output)
+print("  get_option(parsed, 'count', '0') = " + count)
+print("  get_option(parsed, 'missing', 'not_found') = " + missing)
+print("")
+
+# Test 3: Check flags
+print("Testing has_flag()...")
+has_v = optparse.has_flag(parsed, "v")
+has_x = optparse.has_flag(parsed, "x")
+print("  has_flag(parsed, 'v') = " + has_v.to_string())
+print("  has_flag(parsed, 'x') = " + has_x.to_string())
+print("")
+
+# Test 4: Get positional arguments
+print("Testing get_args()...")
+positional = optparse.get_args(parsed)
+print("  Positional arguments: " + positional.to_string())
+print("")
+
+# Test 5: Build help message
+print("Testing build_help()...")
+options_def = [
+    {"name": "output", "short": "o", "help": "Output file path", "default": "out.txt"},
+    {"name": "verbose", "short": "v", "help": "Enable verbose mode"},
+    {"name": "count", "help": "Number of iterations", "default": 10}
+]
+
+help_msg = optparse.build_help("mytool", "A sample command-line tool", options_def)
+print(help_msg)
+
+print("=== Optparse Module: ALL TESTS PASSED ✓ ===")

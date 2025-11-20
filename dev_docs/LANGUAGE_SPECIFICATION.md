@@ -305,6 +305,17 @@ assert(c.is_bignum() == true)   # c is bignum (result of mixed operation)
 
 **Pattern Types**: `:digits`/`:numbers`, `:letters`, `:uppercase`, `:lowercase`, `:spaces`/`:whitespace`, `:punctuation`, `:symbols`, `:alphanumeric`, `:words`, `:emails`
 
+**String Static Methods** (generators, mirror list.generate pattern):
+- `string.generate(str, count)` - **Repetition mode**: Repeat `str` exactly `count` times
+  - Example: `string.generate(" ", 10)` → `"          "` (10 spaces)
+  - Example: `string.generate("abc", 3)` → `"abcabcabc"`
+- `string.generate(from_char, to_char)` - **Sequence mode**: Generate character sequence from `from_char` to `to_char` (inclusive)
+  - Uses Unicode codepoints for range
+  - Example: `string.generate("a", "z")` → `"abcdefghijklmnopqrstuvwxyz"`
+  - Example: `string.generate("0", "9")` → `"0123456789"`
+  - Example: `string.generate("A", "Z")` → `"ABCDEFGHIJKLMNOPQRSTUVWXYZ"`
+  - Supports reverse ranges: `string.generate("z", "a")` → `"zyxwvutsrqponmlkjihgfedcba"`
+
 #### Booleans (`bool`)
 - Values: `true`, `false`
 - Methods: `to_num()`, `to_string()`

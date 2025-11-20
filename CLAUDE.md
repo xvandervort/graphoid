@@ -364,6 +364,28 @@ numbers.map(x => x * 3)
 numbers.filter(x => x > 10)
 ```
 
+### String Generators
+
+Graphoid provides string generation static methods mirroring list generators:
+
+```graphoid
+# Repetition mode: string.generate(str, count)
+padding = string.generate(" ", 10)        # "          " (10 spaces)
+separator = string.generate("-", 20)      # "--------------------"
+bar = string.generate("#", count)         # Dynamic repetition
+
+# Sequence mode: string.generate(from_char, to_char)
+lowercase = string.generate("a", "z")     # "abcdefghijklmnopqrstuvwxyz"
+uppercase = string.generate("A", "Z")     # "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+digits = string.generate("0", "9")        # "0123456789"
+
+# Use in formatting
+fn center(text, width) {
+    padding = (width - text.length()) / 2
+    return string.generate(" ", padding) + text + string.generate(" ", padding)
+}
+```
+
 ### Optional Type System
 
 **IMPORTANT**: Graphoid does NOT have generics. See `dev_docs/NO_GENERICS_POLICY.md`

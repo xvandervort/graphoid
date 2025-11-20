@@ -67,10 +67,11 @@ impl Parser {
         }
 
         // Check for type annotations or keywords
-        // BUT: If ListType is followed by dot, it's a static method call, not a declaration
+        // BUT: If ListType or StringType is followed by dot, it's a static method call, not a declaration
         let is_list_static_call = self.check(&TokenType::ListType) && self.check_next(&TokenType::Dot);
+        let is_string_static_call = self.check(&TokenType::StringType) && self.check_next(&TokenType::Dot);
 
-        let result = if !is_list_static_call && (
+        let result = if !is_list_static_call && !is_string_static_call && (
             self.check(&TokenType::NumType)
             || self.check(&TokenType::BigNumType)  // Phase 1B
             || self.check(&TokenType::StringType)
@@ -2039,6 +2040,24 @@ impl Parser {
             }
 
             return Ok(Expr::List { elements, position });
+        }
+
+        // String static method calls: string.generate()
+        if self.match_token(&TokenType::StringType) {
+            // Check if this is a static method call (string.method())
+            if self.check(&TokenType::Dot) {
+                // Treat "string" as a variable/type identifier for static method calls
+                return Ok(Expr::Variable {
+                    name: "string".to_string(),
+                    position,
+                });
+            }
+
+            // If not a static method call, this is an error - string literals use quotes
+            return Err(GraphoidError::SyntaxError {
+                message: "Unexpected 'string' keyword. Did you mean a string literal (\"text\") or string.generate()?".to_string(),
+                position,
+            });
         }
 
         // Graphs: graph { type: :directed }

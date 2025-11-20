@@ -1,0 +1,162 @@
+# String Generators - Demonstration
+# Shows string.generate() static method with two modes
+
+print("=== String Generators Demo ===")
+print("")
+
+# ===================================================================
+# MODE 1: REPETITION - string.generate(str, count)
+# ===================================================================
+
+print("--- Repetition Mode ---")
+print("")
+
+# Basic repetition
+padding = string.generate(" ", 10)
+print("Padding (10 spaces): [" + padding + "]")
+
+separator = string.generate("-", 40)
+print("Separator: " + separator)
+
+# Dynamic repetition for formatting
+fn format_title(title) {
+    border = string.generate("=", title.length() + 4)
+    print(border)
+    print("| " + title + " |")
+    print(border)
+}
+
+format_title("Welcome to Graphoid")
+print("")
+
+# Bar chart visualization
+fn simple_bar_chart(label, value, max_width) {
+    bar = string.generate("#", value)
+    spaces = string.generate(" ", max_width - value)
+    print(label + ": " + bar + spaces + " (" + value.to_string() + ")")
+}
+
+print("Sales Data:")
+simple_bar_chart("Q1", 25, 50)
+simple_bar_chart("Q2", 38, 50)
+simple_bar_chart("Q3", 45, 50)
+simple_bar_chart("Q4", 50, 50)
+print("")
+
+# ===================================================================
+# MODE 2: SEQUENCE - string.generate(from_char, to_char)
+# ===================================================================
+
+print("--- Sequence Mode ---")
+print("")
+
+# Character ranges
+lowercase = string.generate("a", "z")
+print("Lowercase alphabet: " + lowercase)
+
+uppercase = string.generate("A", "Z")
+print("Uppercase alphabet: " + uppercase)
+
+digits = string.generate("0", "9")
+print("Digits: " + digits)
+
+# Partial ranges
+hex_lower = string.generate("a", "f")
+print("Hex digits (lower): " + hex_lower)
+
+# Reverse ranges
+reverse_alpha = string.generate("z", "a")
+print("Reverse alphabet: " + reverse_alpha)
+print("")
+
+# ===================================================================
+# PRACTICAL EXAMPLES
+# ===================================================================
+
+print("--- Practical Examples ---")
+print("")
+
+# Password character sets
+fn show_password_charset() {
+    lower = string.generate("a", "z")
+    upper = string.generate("A", "Z")
+    nums = string.generate("0", "9")
+    charset = lower + upper + nums
+    print("Password charset (" + charset.length().to_string() + " chars):")
+    print("  Lowercase: " + lower)
+    print("  Uppercase: " + upper)
+    print("  Digits: " + nums)
+}
+
+show_password_charset()
+print("")
+
+# Text box drawing
+fn draw_box(text) {
+    width = text.length() + 2
+    top = "+" + string.generate("-", width) + "+"
+    middle = "| " + text + " |"
+    bottom = top
+
+    print(top)
+    print(middle)
+    print(bottom)
+}
+
+draw_box("Important Message")
+print("")
+
+# Table formatting
+fn format_table_row(cols, widths) {
+    row = "|"
+    i = 0
+    for col in cols {
+        col_str = col.to_string()
+        padding_needed = widths[i] - col_str.length()
+        # Handle case where content is longer than width
+        if padding_needed < 0 {
+            padding_needed = 0
+        }
+        row = row + " " + col_str + string.generate(" ", padding_needed) + " |"
+        i = i + 1
+    }
+    print(row)
+}
+
+fn format_table_separator(widths) {
+    sep = "+"
+    for width in widths {
+        sep = sep + string.generate("-", width + 2) + "+"
+    }
+    print(sep)
+}
+
+print("Data Table:")
+widths = [10, 8, 12]
+format_table_separator(widths)
+format_table_row(["Name", "Age", "City"], widths)
+format_table_separator(widths)
+format_table_row(["Alice", 30, "New York"], widths)
+format_table_row(["Bob", 25, "San Francisco"], widths)
+format_table_row(["Charlie", 35, "Los Angeles"], widths)
+format_table_separator(widths)
+print("")
+
+# ===================================================================
+# COMPARISON WITH list.generate()
+# ===================================================================
+
+print("--- Comparison: string.generate() vs list.generate() ---")
+print("")
+
+# Both use static method pattern
+list_nums = list.generate(0, 5, 1)
+string_chars = string.generate("a", "f")
+
+print("list.generate(0, 5, 1) = " + list_nums.to_string())
+print("string.generate(\"a\", \"f\") = " + string_chars)
+print("")
+print("Both follow the same static method pattern!")
+print("")
+
+print("=== Demo Complete ===")

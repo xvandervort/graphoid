@@ -1,6 +1,13 @@
 #!/bin/bash
 # Run all stdlib module tests
-# Usage: bash tests/stdlib/run_all_tests.sh
+# Usage: cd rust && bash ../tests/stdlib/run_all_tests.sh
+
+# Check that we're in the rust directory
+if [ ! -f "Cargo.toml" ]; then
+    echo "ERROR: This script must be run from the rust/ directory"
+    echo "Usage: cd rust && bash ../tests/stdlib/run_all_tests.sh"
+    exit 1
+fi
 
 STDLIB_PATH="/home/irv/work/grang/stdlib"
 CARGO="$HOME/.cargo/bin/cargo"
@@ -21,6 +28,10 @@ TESTS=(
     "test_time"
     "test_collections"
     "test_http"
+    "test_pp"
+    "test_optparse"
+    "test_sql"
+    "test_html"
 )
 
 PASSED=0

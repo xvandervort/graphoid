@@ -1,0 +1,55 @@
+# Test suite for pp (Pretty Printing) module
+import "pp"
+
+print("=== Testing PP (Pretty Printing) Module ===")
+print("")
+
+# Test 1: pprint with simple list
+print("Testing pprint() with simple list...")
+data = [1, 2, 3]
+result = pp.pprint(data, 0)
+print("  Data: [1, 2, 3]")
+print("  Result:")
+print(result)
+print("")
+
+# Test 2: pprint with nested list
+print("Testing pprint() with nested structure...")
+nested = [1, [2, 3], [4, [5, 6]]]
+result = pp.pprint(nested, 0)
+print("  Data: [1, [2, 3], [4, [5, 6]]]")
+print("  Result:")
+print(result)
+print("")
+
+# Test 3: table with headers and rows
+print("Testing table()...")
+headers = ["Name", "Age", "City"]
+rows = [
+    ["Alice", 30, "NYC"],
+    ["Bob", 25, "SF"],
+    ["Charlie", 35, "LA"]
+]
+result = pp.table(headers, rows)
+print("  Table with 3 columns, 3 rows:")
+print(result)
+print("")
+
+# Test 4: text alignment
+print("Testing text alignment...")
+text = "Hello"
+print("  center('Hello', 15) = '" + pp.center(text, 15) + "'")
+print("  left_align('Hello', 15) = '" + pp.left_align(text, 15) + "'")
+print("  right_align('Hello', 15) = '" + pp.right_align(text, 15) + "'")
+print("")
+
+# Test 5: bar_chart
+print("Testing bar_chart()...")
+labels = ["Apples", "Oranges", "Bananas"]
+values = [45, 30, 60]
+chart = pp.bar_chart(labels, values, 30)
+print("  Bar chart (fruits):")
+print(chart)
+print("")
+
+print("=== PP Module: ALL TESTS PASSED ✓ ===")

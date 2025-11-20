@@ -1,0 +1,198 @@
+# html.gr - HTML Generation and Escaping
+# Provides functions for generating and escaping HTML content
+
+# Escape HTML special characters
+fn escape(text) {
+    str = text.to_string()
+    result = ""
+    i = 0
+    while i < str.length() {
+        char = str.substring(i, i + 1)
+
+        if char == "<" {
+            result = result + "&lt;"
+        } else if char == ">" {
+            result = result + "&gt;"
+        } else if char == "&" {
+            result = result + "&amp;"
+        } else if char == "\"" {
+            result = result + "&quot;"
+        } else if char == "'" {
+            result = result + "&#39;"
+        } else {
+            result = result + char
+        }
+
+        i = i + 1
+    }
+    return result
+}
+
+# Create an HTML element
+# Example: element("div", {"class": "container", "id": "main"}, "Hello")
+fn element(tag, attrs, content) {
+    html = "<" + tag
+
+    # Add attributes if provided
+    if attrs != none {
+        keys = attrs.keys()
+        for key in keys {
+            value = attrs[key]
+            html = html + " " + key + "=\"" + escape(value) + "\""
+        }
+    }
+
+    # Check if it's a self-closing tag
+    is_self_closing = false
+    if tag == "br" { is_self_closing = true }
+    if tag == "hr" { is_self_closing = true }
+    if tag == "img" { is_self_closing = true }
+    if tag == "input" { is_self_closing = true }
+    if tag == "meta" { is_self_closing = true }
+    if tag == "link" { is_self_closing = true }
+
+    if is_self_closing {
+        html = html + " />"
+    } else {
+        html = html + ">"
+
+        # Add content if provided
+        if content != none {
+            content_str = content.to_string()
+            if content_str != "none" {
+                html = html + content_str
+            }
+        }
+
+        html = html + "</" + tag + ">"
+    }
+
+    return html
+}
+
+# Helper: Create common elements
+fn div(attrs, content) {
+    return element("div", attrs, content)
+}
+
+fn span(attrs, content) {
+    return element("span", attrs, content)
+}
+
+fn p(attrs, content) {
+    return element("p", attrs, content)
+}
+
+fn a(href, content) {
+    attrs = {"href": href}
+    return element("a", attrs, content)
+}
+
+fn img(src, alt) {
+    attrs = {"src": src, "alt": alt}
+    return element("img", attrs, none)
+}
+
+# Create an unordered list
+fn ul(items, attrs) {
+    html = "<ul"
+
+    # Add attributes if provided
+    if attrs != none {
+        keys = attrs.keys()
+        for key in keys {
+            value = attrs[key]
+            html = html + " " + key + "=\"" + escape(value) + "\""
+        }
+    }
+
+    html = html + ">"
+
+    # Add list items
+    for item in items {
+        html = html + "<li>" + item.to_string() + "</li>"
+    }
+
+    html = html + "</ul>"
+    return html
+}
+
+# Create an ordered list
+fn ol(items, attrs) {
+    html = "<ol"
+
+    # Add attributes if provided
+    if attrs != none {
+        keys = attrs.keys()
+        for key in keys {
+            value = attrs[key]
+            html = html + " " + key + "=\"" + escape(value) + "\""
+        }
+    }
+
+    html = html + ">"
+
+    # Add list items
+    for item in items {
+        html = html + "<li>" + item.to_string() + "</li>"
+    }
+
+    html = html + "</ol>"
+    return html
+}
+
+# Create a table
+# Example: table([["Name", "Age"], ["Alice", 30], ["Bob", 25]], {"class": "data-table"})
+fn table(rows, attrs) {
+    html = "<table"
+
+    # Add attributes if provided
+    if attrs != none {
+        keys = attrs.keys()
+        for key in keys {
+            value = attrs[key]
+            html = html + " " + key + "=\"" + escape(value) + "\""
+        }
+    }
+
+    html = html + ">"
+
+    # Add rows
+    is_first = true
+    for row in rows {
+        if is_first {
+            # First row is headers
+            html = html + "<tr>"
+            for cell in row {
+                html = html + "<th>" + escape(cell) + "</th>"
+            }
+            html = html + "</tr>"
+            is_first = false
+        } else {
+            # Data rows
+            html = html + "<tr>"
+            for cell in row {
+                html = html + "<td>" + escape(cell) + "</td>"
+            }
+            html = html + "</tr>"
+        }
+    }
+
+    html = html + "</table>"
+    return html
+}
+
+# Create a complete HTML document
+fn document(title, body_content) {
+    html = "<!DOCTYPE html>\n"
+    html = html + "<html>\n"
+    html = html + "<head>\n"
+    html = html + "  <meta charset=\"UTF-8\">\n"
+    html = html + "  <title>" + escape(title) + "</title>\n"
+    html = html + "</head>\n"
+    html = html + "<body>\n"
+    html = html + body_content
+    html = html + "\n</body>\n"
+    html = html + "</html>"
+    return html
+}

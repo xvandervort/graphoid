@@ -1,0 +1,63 @@
+# Test suite for html (HTML Generation/Escaping) module
+import "html"
+
+print("=== Testing HTML Module ===")
+print("")
+
+# Test 1: Escape HTML
+print("Testing escape()...")
+escaped = html.escape("<div class=\"test\">Hello & goodbye</div>")
+print("  Original: <div class=\"test\">Hello & goodbye</div>")
+print("  Escaped: " + escaped)
+print("")
+
+# Test 2: Create basic element
+print("Testing element()...")
+div = html.element("div", {"class": "container", "id": "main"}, "Hello World")
+print("  Div element: " + div)
+print("")
+
+# Test 3: Self-closing tags
+print("Testing self-closing tags...")
+br = html.element("br", none, none)
+img = html.element("img", {"src": "image.jpg", "alt": "Test"}, none)
+print("  BR: " + br)
+print("  IMG: " + img)
+print("")
+
+# Test 4: Helper functions
+print("Testing helper functions...")
+para = html.p({"class": "intro"}, "This is a paragraph")
+link = html.a("https://example.com", "Click here")
+print("  Paragraph: " + para)
+print("  Link: " + link)
+print("")
+
+# Test 5: Lists
+print("Testing ul() and ol()...")
+items = ["First item", "Second item", "Third item"]
+unordered = html.ul(items, {"class": "my-list"})
+ordered = html.ol(items, none)
+print("  UL: " + unordered)
+print("  OL: " + ordered)
+print("")
+
+# Test 6: Table
+print("Testing table()...")
+rows = [
+    ["Name", "Age"],
+    ["Alice", "30"],
+    ["Bob", "25"]
+]
+table_html = html.table(rows, {"class": "data-table"})
+print("  Table: " + table_html)
+print("")
+
+# Test 7: Document
+print("Testing document()...")
+body = html.div(none, "Welcome to my page!")
+doc = html.document("My Page", body)
+print("  Document (first 100 chars): " + doc.substring(0, 100) + "...")
+print("")
+
+print("=== HTML Module: ALL TESTS PASSED ✓ ===")

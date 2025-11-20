@@ -1321,6 +1321,11 @@ impl Executor {
                 let arg_values = self.eval_arguments(args)?;
                 return self.eval_list_static_method(method, &arg_values);
             }
+            if name == "string" {
+                // Evaluate argument expressions
+                let arg_values = self.eval_arguments(args)?;
+                return self.eval_string_static_method(method, &arg_values);
+            }
             if name == "time" {
                 // Check if 'time' is defined as a variable (e.g., imported module)
                 if !self.env.exists("time") {
@@ -1867,6 +1872,100 @@ impl Executor {
             }
             _ => Err(GraphoidError::runtime(format!(
                 "list does not have static method '{}'",
+                method
+            ))),
+        }
+    }
+
+    /// Evaluates static methods on the string type (e.g., string.generate).
+    fn eval_string_static_method(&self, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "generate" => {
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "string.generate() expects 2 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Mode detection: Check second argument type
+                match &args[1].kind {
+                    ValueKind::Number(count) => {
+                        // Repetition mode: string.generate(str, count)
+                        let str_to_repeat = match &args[0].kind {
+                            ValueKind::String(s) => s,
+                            _other => {
+                                return Err(GraphoidError::type_error("string", args[0].type_name()));
+                            }
+                        };
+
+                        if *count < 0.0 {
+                            return Err(GraphoidError::runtime(
+                                "string.generate() count cannot be negative".to_string()
+                            ));
+                        }
+
+                        let count_usize = *count as usize;
+                        Ok(Value::string(str_to_repeat.repeat(count_usize)))
+                    }
+                    ValueKind::String(to_char) => {
+                        // Sequence mode: string.generate(from_char, to_char)
+                        let from_char = match &args[0].kind {
+                            ValueKind::String(s) => s,
+                            _other => {
+                                return Err(GraphoidError::type_error("string", args[0].type_name()));
+                            }
+                        };
+
+                        // Validate single characters
+                        if from_char.chars().count() != 1 {
+                            return Err(GraphoidError::runtime(format!(
+                                "string.generate() sequence mode requires single character, got '{}' ({} chars)",
+                                from_char,
+                                from_char.chars().count()
+                            )));
+                        }
+                        if to_char.chars().count() != 1 {
+                            return Err(GraphoidError::runtime(format!(
+                                "string.generate() sequence mode requires single character, got '{}' ({} chars)",
+                                to_char,
+                                to_char.chars().count()
+                            )));
+                        }
+
+                        let from = from_char.chars().next().unwrap() as u32;
+                        let to = to_char.chars().next().unwrap() as u32;
+
+                        // Generate character sequence
+                        let mut result = String::new();
+                        if from <= to {
+                            // Forward sequence
+                            for code in from..=to {
+                                if let Some(ch) = char::from_u32(code) {
+                                    result.push(ch);
+                                }
+                            }
+                        } else {
+                            // Reverse sequence
+                            for code in (to..=from).rev() {
+                                if let Some(ch) = char::from_u32(code) {
+                                    result.push(ch);
+                                }
+                            }
+                        }
+
+                        Ok(Value::string(result))
+                    }
+                    _other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "string.generate() expects second argument to be number (repetition mode) or string (sequence mode), got {}",
+                            args[1].type_name()
+                        )));
+                    }
+                }
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "string does not have static method '{}'",
                 method
             ))),
         }

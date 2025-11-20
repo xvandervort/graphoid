@@ -1,0 +1,204 @@
+# pp.gr - Pretty Printing Utilities
+# Provides functions for formatted output and data visualization
+
+# Pretty print a value with optional indentation
+# Note: Simplified version - just pretty prints lists, returns to_string() for everything else
+fn pprint(value, indent) {
+    if indent == none {
+        indent = 0
+    }
+    spaces = string.generate(" ", indent)
+
+    # Try to treat as list - if it has .length(), it's probably a list
+    # This is a simple approach since Graphoid doesn't have type checking methods
+    str_val = value.to_string()
+
+    # Check if it starts with "[" - it's a list representation
+    if str_val.length() > 0 {
+        first_char = str_val.substring(0, 1)
+        if first_char == "[" {
+            # It's a list - format it nicely
+            if value.length() == 0 {
+                return "[]"
+            }
+
+            result = "[\n"
+            i = 0
+            for item in value {
+                result = result + spaces + "  " + pprint(item, indent + 2)
+                if i < value.length() - 1 {
+                    result = result + ",\n"
+                } else {
+                    result = result + "\n"
+                }
+                i = i + 1
+            }
+            result = result + spaces + "]"
+            return result
+        }
+    }
+
+    # Not a list, just return string representation
+    return str_val
+}
+
+# Format a value as a table row
+fn table_row(values, widths) {
+    if values.length() != widths.length() {
+        return "Error: values and widths must have same length"
+    }
+
+    row = "| "
+    i = 0
+    for item in values {
+        val = item.to_string()
+        width = widths[i]
+
+        # Pad or truncate to width
+        if val.length() < width {
+            # Pad with spaces
+            padding = string.generate(" ", width - val.length())
+            val = val + padding
+        } else if val.length() > width {
+            # Truncate
+            val = val.substring(0, width - 3) + "..."
+        }
+
+        row = row + val + " | "
+        i = i + 1
+    }
+
+    return row
+}
+
+# Create a table separator line
+fn table_separator(widths) {
+    sep = "+-"
+    for width in widths {
+        sep = sep + string.generate("-", width) + "-+-"
+    }
+    # Remove trailing "+-"
+    return sep.substring(0, sep.length() - 2)
+}
+
+# Print a formatted table
+fn table(headers, rows) {
+    if headers.length() == 0 {
+        return "Error: headers cannot be empty"
+    }
+
+    # Calculate column widths (max of header and content)
+    widths = []
+    i = 0
+    for header in headers {
+        max_width = header.to_string().length()
+
+        for row in rows {
+            if i < row.length() {
+                cell_width = row[i].to_string().length()
+                if cell_width > max_width {
+                    max_width = cell_width
+                }
+            }
+        }
+
+        widths = widths.append(max_width)
+        i = i + 1
+    }
+
+    # Build table
+    result = table_separator(widths) + "\n"
+    result = result + table_row(headers, widths) + "\n"
+    result = result + table_separator(widths) + "\n"
+
+    for row in rows {
+        result = result + table_row(row, widths) + "\n"
+    }
+
+    result = result + table_separator(widths)
+
+    return result
+}
+
+# Center text within a given width
+fn center(text, width) {
+    text_str = text.to_string()
+    if text_str.length() >= width {
+        return text_str
+    }
+
+    total_padding = width - text_str.length()
+    left_padding = total_padding / 2
+    right_padding = total_padding - left_padding
+
+    return string.generate(" ", left_padding) + text_str + string.generate(" ", right_padding)
+}
+
+# Right-align text within a given width
+fn right_align(text, width) {
+    text_str = text.to_string()
+    if text_str.length() >= width {
+        return text_str
+    }
+
+    padding = width - text_str.length()
+    return string.generate(" ", padding) + text_str
+}
+
+# Left-align text within a given width (pad right)
+fn left_align(text, width) {
+    text_str = text.to_string()
+    if text_str.length() >= width {
+        return text_str
+    }
+
+    padding = width - text_str.length()
+    return text_str + string.generate(" ", padding)
+}
+
+# Create a horizontal bar chart
+fn bar_chart(labels, values, max_width) {
+    if max_width == none {
+        max_width = 40
+    }
+
+    # Find max value for scaling
+    max_val = values[0]
+    for val in values {
+        if val > max_val {
+            max_val = val
+        }
+    }
+
+    # Find longest label for alignment
+    max_label_len = 0
+    for label in labels {
+        label_len = label.to_string().length()
+        if label_len > max_label_len {
+            max_label_len = label_len
+        }
+    }
+
+    result = ""
+    i = 0
+    for label in labels {
+        label_str = left_align(label, max_label_len)
+        val = values[i]
+
+        # Calculate bar length
+        bar_len = 0
+        if max_val > 0 {
+            bar_len = (val * max_width) / max_val
+        }
+
+        bar = string.generate("#", bar_len)
+        result = result + label_str + " | " + bar + " " + val.to_string()
+
+        if i < labels.length() - 1 {
+            result = result + "\n"
+        }
+        i = i + 1
+    }
+
+    return result
+}

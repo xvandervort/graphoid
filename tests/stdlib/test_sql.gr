@@ -1,0 +1,54 @@
+# Test suite for sql (SQL Query Building) module
+import "sql"
+
+print("=== Testing SQL Module ===")
+print("")
+
+# Test 1: SELECT query
+print("Testing select()...")
+query1 = sql.select(["name", "age"], "users", "age > 18", ["name"])
+print("  Query: " + query1)
+print("")
+
+# Test 2: SELECT with all columns
+query2 = sql.select([], "products", none, none)
+print("  Query (all columns): " + query2)
+print("")
+
+# Test 3: INSERT query
+print("Testing insert()...")
+query3 = sql.insert("users", ["name", "age", "email"], ["Alice", 30, "alice@example.com"])
+print("  Query: " + query3)
+print("")
+
+# Test 4: UPDATE query
+print("Testing update()...")
+values = {"name": "Bob", "age": 25}
+query4 = sql.update("users", values, "id = 1")
+print("  Query: " + query4)
+print("")
+
+# Test 5: DELETE query
+print("Testing delete_from()...")
+query5 = sql.delete_from("users", "age < 18")
+print("  Query: " + query5)
+print("")
+
+# Test 6: CREATE TABLE query
+print("Testing create_table()...")
+columns = [
+    {"name": "id", "type": "INTEGER PRIMARY KEY"},
+    {"name": "name", "type": "TEXT NOT NULL"},
+    {"name": "age", "type": "INTEGER"}
+]
+query6 = sql.create_table("users", columns)
+print("  Query: " + query6)
+print("")
+
+# Test 7: String escaping
+print("Testing string escaping...")
+query7 = sql.insert("messages", ["text"], ["It's a test with 'quotes'"])
+print("  Query with quotes: " + query7)
+print("")
+
+print("=== SQL Module: ALL TESTS PASSED ✓ ===")

@@ -1,0 +1,167 @@
+# optparse.gr - Command-Line Option Parsing
+# Provides functions for parsing command-line arguments
+
+# Parse command-line arguments into a map of options and values
+# Args format: ["--name", "value", "-f", "--flag", "arg1", "arg2"]
+# Returns: { "options": {"name": "value", "f": true, "flag": true}, "args": ["arg1", "arg2"] }
+fn parse_args(args) {
+    options = {}
+    positional = []
+
+    i = 0
+    while i < args.length() {
+        arg = args[i]
+
+        # Check if it's an option (starts with - or --)
+        if arg.length() > 0 {
+            first_char = arg.substring(0, 1)
+
+            if first_char == "-" {
+                # It's an option
+                option_name = none
+
+                # Check if it's long form (--name) or short form (-n)
+                if arg.length() > 1 {
+                    second_char = arg.substring(1, 2)
+                    if second_char == "-" {
+                        # Long form: --name
+                        option_name = arg.substring(2, arg.length())
+                    } else {
+                        # Short form: -n
+                        option_name = arg.substring(1, arg.length())
+                    }
+                }
+
+                # Check if next arg is a value (doesn't start with -)
+                has_value = false
+                if i + 1 < args.length() {
+                    next_arg = args[i + 1]
+                    if next_arg.length() > 0 {
+                        next_first = next_arg.substring(0, 1)
+                        if next_first != "-" {
+                            has_value = true
+                        }
+                    }
+                }
+
+                if has_value {
+                    # Option with value
+                    options[option_name] = args[i + 1]
+                    i = i + 2
+                } else {
+                    # Boolean flag
+                    options[option_name] = true
+                    i = i + 1
+                }
+            } else {
+                # Positional argument
+                positional = positional.append(arg)
+                i = i + 1
+            }
+        } else {
+            # Empty string, skip
+            i = i + 1
+        }
+    }
+
+    result = {}
+    result["options"] = options
+    result["args"] = positional
+    return result
+}
+
+# Get an option value with a default
+fn get_option(parsed, name, default_value) {
+    opts = parsed["options"]
+
+    # Check if option exists
+    keys = opts.keys()
+    for key in keys {
+        if key == name {
+            return opts[key]
+        }
+    }
+
+    return default_value
+}
+
+# Check if a flag is set
+fn has_flag(parsed, name) {
+    opts = parsed["options"]
+
+    keys = opts.keys()
+    for key in keys {
+        if key == name {
+            val = opts[key]
+            # Check if it's true
+            val_str = val.to_string()
+            return val_str == "true"
+        }
+    }
+
+    return false
+}
+
+# Get positional arguments
+fn get_args(parsed) {
+    return parsed["args"]
+}
+
+# Build a help message from option definitions
+# Format: [{"name": "output", "short": "o", "help": "Output file", "default": "out.txt"}, ...]
+fn build_help(program_name, description, options) {
+    help = program_name + " - " + description + "\n\n"
+    help = help + "Usage: " + program_name + " [options] [arguments]\n\n"
+    help = help + "Options:\n"
+
+    for opt in options {
+        # Build option line
+        line = "  "
+
+        # Add short form if exists
+        keys = opt.keys()
+        has_short = false
+        for key in keys {
+            if key == "short" {
+                has_short = true
+            }
+        }
+
+        if has_short {
+            line = line + "-" + opt["short"] + ", "
+        }
+
+        # Add long form
+        line = line + "--" + opt["name"]
+
+        # Add default if exists
+        has_default = false
+        for key in keys {
+            if key == "default" {
+                has_default = true
+            }
+        }
+
+        if has_default {
+            line = line + " (default: " + opt["default"].to_string() + ")"
+        }
+
+        line = line + "\n"
+
+        # Add help text
+        has_help = false
+        for key in keys {
+            if key == "help" {
+                has_help = true
+            }
+        }
+
+        if has_help {
+            line = line + "      " + opt["help"] + "\n"
+        }
+
+        help = help + line
+    }
+
+    return help
+}
