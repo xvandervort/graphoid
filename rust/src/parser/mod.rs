@@ -79,7 +79,6 @@ impl Parser {
             || self.check(&TokenType::MapType)
             || self.check(&TokenType::TreeType)
             || self.check(&TokenType::GraphType)
-            || self.check(&TokenType::DataType)
         ) {
             self.variable_declaration(is_private)
         } else if self.match_token(&TokenType::Func) {

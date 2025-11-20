@@ -10,6 +10,9 @@
 //! - Secure random number generation
 //! - Modern, audited algorithms
 
+// Suppress deprecation warnings for generic-array methods (dependency issue)
+#![allow(deprecated)]
+
 use super::{NativeFunction, NativeModule};
 use crate::error::{GraphoidError, Result};
 use crate::values::{Hash, Value, ValueKind};
@@ -17,9 +20,9 @@ use std::collections::HashMap;
 
 // Hashing
 use sha2::{Sha256, Sha512, Digest};
-use sha1::{Sha1, Digest as Sha1Digest};
-use md5::{Md5, Digest as Md5Digest};
-use blake2::{Blake2b512, Digest as Blake2Digest};
+use sha1::Sha1;
+use md5::Md5;
+use blake2::Blake2b512;
 use blake3::Hasher as Blake3Hasher;
 
 // Encoding
@@ -27,7 +30,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 // Encryption
 use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng},
+    aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
 use chacha20poly1305::{ChaCha20Poly1305, Key as ChaChaKey};
@@ -38,7 +41,7 @@ use hmac::Mac as HmacMac;
 
 // Key derivation
 use pbkdf2::pbkdf2_hmac_array;
-use argon2::{Argon2, PasswordHasher, PasswordHash, PasswordVerifier};
+// Note: argon2 imports removed - not currently used in exported functions
 
 // Digital signatures
 use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
@@ -334,16 +337,16 @@ fn aes_encrypt(args: &[Value]) -> Result<Value> {
         return Err(GraphoidError::runtime("AES-256 requires 32-byte (256-bit) key".to_string()));
     }
 
-    let key = aes_gcm::Key::<Aes256Gcm>::from_slice(&key_bytes);
-    let cipher = Aes256Gcm::new(key);
+    let key = aes_gcm::Key::<Aes256Gcm>::clone_from_slice(&key_bytes);
+    let cipher = Aes256Gcm::new(&key);
 
     // Generate random nonce (12 bytes for GCM)
     use rand::RngCore;
     let mut nonce_bytes = [0u8; 12];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    let nonce = Nonce::clone_from_slice(&nonce_bytes);
 
-    let ciphertext = cipher.encrypt(nonce, plaintext)
+    let ciphertext = cipher.encrypt(&nonce, plaintext)
         .map_err(|e| GraphoidError::runtime(format!("Encryption failed: {}", e)))?;
 
     // Return nonce + ciphertext as hex
@@ -384,13 +387,13 @@ fn aes_decrypt(args: &[Value]) -> Result<Value> {
     }
 
     // Extract nonce and ciphertext
-    let nonce = Nonce::from_slice(&combined[..12]);
+    let nonce = Nonce::clone_from_slice(&combined[..12]);
     let ciphertext = &combined[12..];
 
-    let key = aes_gcm::Key::<Aes256Gcm>::from_slice(&key_bytes);
-    let cipher = Aes256Gcm::new(key);
+    let key = aes_gcm::Key::<Aes256Gcm>::clone_from_slice(&key_bytes);
+    let cipher = Aes256Gcm::new(&key);
 
-    let plaintext = cipher.decrypt(nonce, ciphertext)
+    let plaintext = cipher.decrypt(&nonce, ciphertext)
         .map_err(|e| GraphoidError::runtime(format!("Decryption failed: {}", e)))?;
 
     let result = String::from_utf8_lossy(&plaintext).to_string();
@@ -424,16 +427,16 @@ fn chacha20_encrypt(args: &[Value]) -> Result<Value> {
         return Err(GraphoidError::runtime("ChaCha20 requires 32-byte (256-bit) key".to_string()));
     }
 
-    let key = ChaChaKey::from_slice(&key_bytes);
-    let cipher = ChaCha20Poly1305::new(key);
+    let key = ChaChaKey::clone_from_slice(&key_bytes);
+    let cipher = ChaCha20Poly1305::new(&key);
 
     // Generate random nonce (12 bytes)
     use rand::RngCore;
     let mut nonce_bytes = [0u8; 12];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
-    let nonce = chacha20poly1305::Nonce::from_slice(&nonce_bytes);
+    let nonce = chacha20poly1305::Nonce::clone_from_slice(&nonce_bytes);
 
-    let ciphertext = cipher.encrypt(nonce, plaintext)
+    let ciphertext = cipher.encrypt(&nonce, plaintext)
         .map_err(|e| GraphoidError::runtime(format!("Encryption failed: {}", e)))?;
 
     // Return nonce + ciphertext as hex
@@ -477,10 +480,10 @@ fn chacha20_decrypt(args: &[Value]) -> Result<Value> {
     let nonce = chacha20poly1305::Nonce::from_slice(&combined[..12]);
     let ciphertext = &combined[12..];
 
-    let key = ChaChaKey::from_slice(&key_bytes);
-    let cipher = ChaCha20Poly1305::new(key);
+    let key = ChaChaKey::clone_from_slice(&key_bytes);
+    let cipher = ChaCha20Poly1305::new(&key);
 
-    let plaintext = cipher.decrypt(nonce, ciphertext)
+    let plaintext = cipher.decrypt(&nonce, ciphertext)
         .map_err(|e| GraphoidError::runtime(format!("Decryption failed: {}", e)))?;
 
     let result = String::from_utf8_lossy(&plaintext).to_string();
@@ -604,8 +607,8 @@ fn generate_keypair(_args: &[Value]) -> Result<Value> {
     let verifying_key = signing_key.verifying_key();
 
     let mut result = Hash::new();
-    result.insert("public".to_string(), Value::string(hex::encode(verifying_key.as_bytes())));
-    result.insert("secret".to_string(), Value::string(hex::encode(signing_key.to_bytes())));
+    let _ = result.insert("public".to_string(), Value::string(hex::encode(verifying_key.as_bytes())));
+    let _ = result.insert("secret".to_string(), Value::string(hex::encode(signing_key.to_bytes())));
 
     Ok(Value::map(result))
 }

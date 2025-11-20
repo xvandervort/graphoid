@@ -835,9 +835,7 @@ impl Lexer {
             "hash" => TokenType::MapType,  // Alias for map
             "tree" => TokenType::TreeType,
             "graph" => TokenType::GraphType,
-            "data" => TokenType::DataType,
 
-            // Otherwise it's an identifier
             _ => TokenType::Identifier(lexeme.clone()),
         };
 

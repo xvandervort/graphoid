@@ -155,7 +155,8 @@ fn test_keywords() {
 
 #[test]
 fn test_type_keywords() {
-    let mut lexer = Lexer::new("num bignum string bool list map tree graph data");
+    // Note: "data" was removed as a keyword (Bug Fix #1) - it's now a regular identifier
+    let mut lexer = Lexer::new("num bignum string bool list map tree graph");
     let tokens = lexer.tokenize().unwrap();
 
     assert_eq!(tokens[0].token_type, TokenType::NumType);
@@ -166,7 +167,7 @@ fn test_type_keywords() {
     assert_eq!(tokens[5].token_type, TokenType::MapType);
     assert_eq!(tokens[6].token_type, TokenType::TreeType);
     assert_eq!(tokens[7].token_type, TokenType::GraphType);
-    assert_eq!(tokens[8].token_type, TokenType::DataType);
+    // "data" removed - see bug_fix_tests.rs for regression tests
 }
 
 // Phase 1B: BigNum type keyword tests

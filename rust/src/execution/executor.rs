@@ -3823,59 +3823,29 @@ impl Executor {
             ValueKind::List(list) => {
                 let items = list.to_vec();
 
-                // Check if this is a byte array (all numbers 0-255)
-                let is_byte_array = items.iter().all(|v| {
-                    if let ValueKind::Number(n) = &v.kind {
-                        let code = n.trunc() as i64;
-                        code >= 0 && code <= 255
-                    } else {
-                        false
-                    }
-                });
-
-                if is_byte_array && !items.is_empty() {
-                    // Convert byte array to string
-                    let bytes: Vec<u8> = items.iter()
-                        .filter_map(|v| {
-                            if let ValueKind::Number(n) = &v.kind {
-                                Some(n.trunc() as u8)
+                // Standard list stringification (removed byte array auto-conversion)
+                // Note: Byte array conversion was too aggressive - it converted any numeric
+                // list with values 0-255 to a string, causing [1,2,3] to display as empty
+                // control characters. If byte array conversion is needed, it should be
+                // explicit via a method like .to_bytes() or .to_utf8()
+                let elements: Vec<String> = items
+                    .iter()
+                    .map(|v| match &v.kind {
+                        ValueKind::String(s) => format!("\"{}\"", s),
+                        ValueKind::Number(n) => {
+                            // Format numbers nicely (no .0 for integers)
+                            if n.fract() == 0.0 {
+                                format!("{:.0}", n)
                             } else {
-                                None
+                                n.to_string()
                             }
-                        })
-                        .collect();
-
-                    match String::from_utf8(bytes) {
-                        Ok(s) => Ok(Value::string(s)),
-                        Err(_) => {
-                            // Invalid UTF-8 - fall back to list representation
-                            let elements: Vec<String> = items
-                                .iter()
-                                .map(|v| match &v.kind {
-                                    ValueKind::String(s) => format!("\"{}\"", s),
-                                    ValueKind::Number(n) => n.to_string(),
-                                    ValueKind::Boolean(b) => b.to_string(),
-                                    ValueKind::None => "none".to_string(),
-                                    _ => v.type_name().to_string(),
-                                })
-                                .collect();
-                            Ok(Value::string(format!("[{}]", elements.join(", "))))
                         }
-                    }
-                } else {
-                    // Standard list stringification
-                    let elements: Vec<String> = items
-                        .iter()
-                        .map(|v| match &v.kind {
-                            ValueKind::String(s) => format!("\"{}\"", s),
-                            ValueKind::Number(n) => n.to_string(),
-                            ValueKind::Boolean(b) => b.to_string(),
-                            ValueKind::None => "none".to_string(),
-                            _ => v.type_name().to_string(),
-                        })
-                        .collect();
-                    Ok(Value::string(format!("[{}]", elements.join(", "))))
-                }
+                        ValueKind::Boolean(b) => b.to_string(),
+                        ValueKind::None => "none".to_string(),
+                        _ => v.type_name().to_string(),
+                    })
+                    .collect();
+                Ok(Value::string(format!("[{}]", elements.join(", "))))
             }
             ValueKind::Map(hash) => {
                 // Convert hash to string representation
