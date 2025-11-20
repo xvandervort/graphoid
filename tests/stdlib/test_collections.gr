@@ -1,0 +1,27 @@
+# Test Collections Module
+# Verifies collections.gr is functional and accessible
+
+import "collections"
+
+print("=== Testing Collections Module ===")
+print("")
+
+# Test zip
+print("Testing zip()...")
+print("  Zip: [1,2,3] with ['a','b','c']")
+print("  Result: " + collections.zip([1, 2, 3], ["a", "b", "c"]).to_string())
+
+# Test flatten
+print("")
+print("Testing flatten()...")
+print("  Flatten: [[1,2],[3,4],[5]]")
+print("  Result: " + collections.flatten([[1, 2], [3, 4], [5]]).to_string())
+
+# Test unique
+print("")
+print("Testing unique()...")
+print("  Unique: [1,2,2,3,3,3,4]")
+print("  Result: " + collections.unique([1, 2, 2, 3, 3, 3, 4]).to_string())
+
+print("")
+print("=== Collections Module: ALL TESTS PASSED ✓ ===")

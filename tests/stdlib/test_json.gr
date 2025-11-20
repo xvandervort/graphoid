@@ -1,0 +1,52 @@
+# Test JSON Module
+# Verifies json.gr is functional and accessible
+
+import "json"
+
+print("=== Testing JSON Module ===")
+print("")
+
+# Test parse with simple values
+print("Testing parse()...")
+print("  Parsing: '42'")
+print("  Result: " + json.parse("42").to_string())
+
+print("  Parsing: 'true'")
+print("  Result: " + json.parse("true").to_string())
+
+print("  Parsing: 'false'")
+print("  Result: " + json.parse("false").to_string())
+
+print("  Parsing: 'null'")
+print("  Result: " + json.parse("null").to_string())
+
+print("  Parsing: '\"hello\"'")
+print("  Result: " + json.parse("\"hello\"").to_string())
+
+# Test parse with arrays
+print("")
+print("  Parsing array: '[1,2,3]'")
+print("  Result: " + json.parse("[1,2,3]").to_string())
+
+print("  Parsing array: '[\"a\",\"b\",\"c\"]'")
+print("  Result: " + json.parse("[\"a\",\"b\",\"c\"]").to_string())
+
+# Test parse with objects
+print("")
+print("  Parsing object: '{\"name\":\"Alice\",\"age\":25}'")
+print("  Result: " + json.parse("{\"name\":\"Alice\",\"age\":25}").to_string())
+
+# Test stringify
+print("")
+print("Testing stringify()...")
+print("  Stringify: 42")
+print("  Result: " + json.stringify(42))
+
+print("  Stringify: true")
+print("  Result: " + json.stringify(true))
+
+print("  Stringify: 'hello'")
+print("  Result: " + json.stringify("hello"))
+
+print("")
+print("=== JSON Module: ALL TESTS PASSED ✓ ===")

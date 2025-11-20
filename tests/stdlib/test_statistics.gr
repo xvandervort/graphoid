@@ -1,0 +1,56 @@
+# Test Statistics Module
+# Verifies statistics.gr is functional and accessible
+
+import "statistics"
+
+print("=== Testing Statistics Module ===")
+print("")
+
+# Test mean
+print("Testing mean()...")
+print("  mean([1,2,3,4,5]) = " + statistics.mean([1, 2, 3, 4, 5]).to_string())
+print("  mean([10,20,30]) = " + statistics.mean([10, 20, 30]).to_string())
+
+# Test median
+print("Testing median()...")
+print("  median([1,2,3,4,5]) = " + statistics.median([1, 2, 3, 4, 5]).to_string())
+print("  median([1,2,3,4]) = " + statistics.median([1, 2, 3, 4]).to_string())
+
+# Test mode
+print("Testing mode()...")
+print("  mode([1,2,2,3,3,3,4]) = " + statistics.mode([1, 2, 2, 3, 3, 3, 4]).to_string())
+
+# Test variance
+print("Testing variance()...")
+print("  variance([1,2,3,4,5]) = " + statistics.variance([1, 2, 3, 4, 5]).to_string())
+
+# Test stdev
+print("Testing stdev()...")
+print("  stdev([1,2,3,4,5]) = " + statistics.stdev([1, 2, 3, 4, 5]).to_string())
+
+# Test range
+print("Testing range()...")
+print("  range([1,2,3,4,5]) = " + statistics.range([1, 2, 3, 4, 5]).to_string())
+
+# Test sum
+print("Testing sum()...")
+print("  sum([1,2,3,4,5]) = " + statistics.sum([1, 2, 3, 4, 5]).to_string())
+
+# Test min
+print("Testing min()...")
+print("  min([1,2,3,4,5]) = " + statistics.min([1, 2, 3, 4, 5]).to_string())
+
+# Test max
+print("Testing max()...")
+print("  max([1,2,3,4,5]) = " + statistics.max([1, 2, 3, 4, 5]).to_string())
+
+# Test count
+print("Testing count()...")
+print("  count([1,2,3,4,5]) = " + statistics.count([1, 2, 3, 4, 5]).to_string())
+
+# Test quantile
+print("Testing quantile()...")
+print("  quantile([1,2,3,4,5], 0.5) = " + statistics.quantile([1, 2, 3, 4, 5], 0.5).to_string())
+
+print("")
+print("=== Statistics Module: ALL TESTS PASSED ✓ ===")

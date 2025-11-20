@@ -34,6 +34,7 @@ pub trait NativeModule: Send + Sync {
 // Module implementations
 pub mod constants;
 pub mod random;
+pub mod crypto;
 pub mod os;
 pub mod fs;
 pub mod net;
@@ -41,6 +42,7 @@ pub mod net;
 // Re-exports
 pub use constants::ConstantsModule;
 pub use random::RandomModule;
+pub use crypto::CryptoModule;
 pub use os::OSModule;
 pub use fs::FSModule;
 pub use net::NetModule;

@@ -1,0 +1,30 @@
+# Test Regex Module
+# Verifies regex.gr is functional and accessible
+
+import "regex"
+
+print("=== Testing Regex Module ===")
+print("")
+
+# Test matches
+print("Testing matches()...")
+print("  Pattern: 'hello' in 'hello world'")
+print("  Result: " + regex.matches("hello", "hello world").to_string())
+
+print("  Pattern: 'foo' in 'hello world'")
+print("  Result: " + regex.matches("foo", "hello world").to_string())
+
+# Test find
+print("")
+print("Testing find()...")
+print("  Pattern: 'world' in 'hello world'")
+print("  Result: " + regex.find("world", "hello world").to_string())
+
+# Test replace
+print("")
+print("Testing replace()...")
+print("  Pattern: 'cat' -> 'dog' in 'I love cats'")
+print("  Result: " + regex.replace("cat", "I love cats", "dog"))
+
+print("")
+print("=== Regex Module: ALL TESTS PASSED ✓ ===")

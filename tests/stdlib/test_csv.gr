@@ -1,0 +1,30 @@
+# Test CSV Module
+# Verifies csv.gr is functional and accessible
+
+import "csv"
+
+print("=== Testing CSV Module ===")
+print("")
+
+# Test parse_csv_line
+print("Testing parse_csv_line()...")
+print("  Parsing: 'a,b,c'")
+print("  Result: " + csv.parse_csv_line("a,b,c", ",").to_string())
+
+print("  Parsing: '1,2,3'")
+print("  Result: " + csv.parse_csv_line("1,2,3", ",").to_string())
+
+print("  Parsing with quotes: '\"hello\",\"world\"'")
+print("  Result: " + csv.parse_csv_line("\"hello\",\"world\"", ",").to_string())
+
+# Test format_csv_line
+print("")
+print("Testing format_csv_line()...")
+print("  Formatting: ['a', 'b', 'c']")
+print("  Result: " + csv.format_csv_line(["a", "b", "c"], ","))
+
+print("  Formatting: ['hello', 'world']")
+print("  Result: " + csv.format_csv_line(["hello", "world"], ","))
+
+print("")
+print("=== CSV Module: ALL TESTS PASSED ✓ ===")

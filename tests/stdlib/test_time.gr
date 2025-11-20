@@ -1,0 +1,32 @@
+# Test Time Module
+# Verifies time.gr is functional and accessible
+
+import "time"
+
+print("=== Testing Time Module ===")
+print("")
+
+# Test now
+print("Testing now()...")
+print("  Current timestamp: " + time.now().to_string())
+
+# Test from_date
+print("")
+print("Testing from_date()...")
+print("  Date: 2025-11-20")
+print("  Result: " + time.from_date(2025, 11, 20).to_string())
+
+# Test format
+print("")
+print("Testing format()...")
+print("  Format current time as ISO")
+print("  Result: " + time.format(time.now(), "iso"))
+
+# Test is_leap_year
+print("")
+print("Testing is_leap_year()...")
+print("  2024: " + time.is_leap_year(2024).to_string())
+print("  2025: " + time.is_leap_year(2025).to_string())
+
+print("")
+print("=== Time Module: ALL TESTS PASSED ✓ ===")

@@ -1,0 +1,5 @@
+# Simple statistics test
+import "statistics"
+
+print("Testing statistics import...")
+print("Module imported successfully!")
