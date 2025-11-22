@@ -1,0 +1,25 @@
+# Verify :32bit wrapping works correctly
+
+print("Test 1: 0xffffffff + 1")
+configure { :unsigned, :32bit } {
+    x = 4294967295  # 0xffffffff
+    y = 1
+    result = x + y
+    print(result == 0)  # Should print true
+}
+
+print("Test 2: 0x80000000 + 0x80000000")
+configure { :unsigned, :32bit } {
+    a = 2147483648  # 0x80000000
+    b = 2147483648
+    result = a + b
+    print(result == 0)  # Should wrap to 0
+}
+
+print("Test 3: 64-bit mode (no wrapping)")
+configure { :unsigned } {
+    x = 4294967295
+    y = 1
+    result = x + y
+    print(result == 4294967296)  # Should be true (no wrapping)
+}

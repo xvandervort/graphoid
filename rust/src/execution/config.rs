@@ -46,6 +46,9 @@ pub struct Config {
 
     // Integer mode (Phase 1A - :integer directive)
     pub integer_mode: bool,  // true = truncate floats on assignment, false = preserve floats (default)
+
+    // Bit width for wrapping arithmetic (Phase 13 - :32bit directive)
+    pub bit_width: BitWidth,  // Controls wrapping behavior for arithmetic/bitwise ops
 }
 
 /// Error handling mode
@@ -86,6 +89,13 @@ pub enum PrecisionMode {
     Extended,  // BigInt (arbitrary precision)
 }
 
+/// Bit width for integer wrapping (Phase 13)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BitWidth {
+    Bits32,  // 32-bit wrapping (for crypto, binary protocols)
+    Bits64,  // 64-bit (default, no wrapping)
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -105,6 +115,7 @@ impl Default for Config {
             unsigned_mode: false,  // Default to signed right shift
             precision_mode: PrecisionMode::Standard,  // Default to f64 precision
             integer_mode: false,  // Default to preserving floats
+            bit_width: BitWidth::Bits64,  // Default to 64-bit (no wrapping)
         }
     }
 }
@@ -212,6 +223,13 @@ impl ConfigStack {
                             new_config.integer_mode = true;
                             continue;
                         }
+                        if sym == "32bit" {
+                            new_config.bit_width = BitWidth::Bits32;
+                            // :32bit requires integer mode to actually wrap values
+                            new_config.integer_mode = true;
+                            new_config.precision_mode = PrecisionMode::High;
+                            continue;
+                        }
                     }
                     return Err(GraphoidError::ConfigError {
                         message: format!("Unknown configuration key: {}", key),
@@ -233,6 +251,18 @@ impl ConfigStack {
 impl Default for ConfigStack {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Config {
+    /// Wrap a value according to the current bit width setting
+    /// For 32-bit mode, masks to lower 32 bits
+    /// For 64-bit mode, returns value unchanged
+    pub fn wrap_value(&self, value: i64) -> i64 {
+        match self.bit_width {
+            BitWidth::Bits32 => value & 0xFFFFFFFF,
+            BitWidth::Bits64 => value,
+        }
     }
 }
 

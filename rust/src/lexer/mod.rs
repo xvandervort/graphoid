@@ -244,7 +244,8 @@ impl Lexer {
             }
             ':' => {
                 // Could be : or :symbol
-                if self.peek().is_alphabetic() || self.peek() == '_' {
+                // Allow symbols starting with letters, digits, or underscore
+                if self.peek().is_alphanumeric() || self.peek() == '_' {
                     return self.symbol();
                 }
                 TokenType::Colon

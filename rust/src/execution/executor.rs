@@ -6306,27 +6306,49 @@ impl Executor {
             (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
                 match (l, r) {
                     (BigNum::Int64(lv), BigNum::Int64(rv)) => {
-                        match lv.checked_add(*rv) {
-                            Some(result) => Ok(Value::bignum(BigNum::Int64(result))),
-                            None => {
-                                // Phase 3: Check if we should auto-grow to BigInt
-                                if self.should_grow_to_bigint_i64(*lv, *rv, true) {
-                                    self.grow_i64_to_bigint(*lv, *rv, "add")
-                                } else {
-                                    Err(GraphoidError::runtime("Integer overflow in addition".to_string()))
+                        // In 32-bit mode: use wrapping arithmetic
+                        // In 64-bit mode: use checked arithmetic (may grow to BigInt)
+                        use crate::execution::config::BitWidth;
+                        match self.config_stack.current().bit_width {
+                            BitWidth::Bits32 => {
+                                let result = lv.wrapping_add(*rv);
+                                let wrapped = self.config_stack.current().wrap_value(result);
+                                Ok(Value::bignum(BigNum::Int64(wrapped)))
+                            }
+                            BitWidth::Bits64 => {
+                                match lv.checked_add(*rv) {
+                                    Some(result) => Ok(Value::bignum(BigNum::Int64(result))),
+                                    None => {
+                                        // Phase 3: Check if we should auto-grow to BigInt
+                                        if self.should_grow_to_bigint_i64(*lv, *rv, true) {
+                                            self.grow_i64_to_bigint(*lv, *rv, "add")
+                                        } else {
+                                            Err(GraphoidError::runtime("Integer overflow in addition".to_string()))
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                     (BigNum::UInt64(lv), BigNum::UInt64(rv)) => {
-                        match lv.checked_add(*rv) {
-                            Some(result) => Ok(Value::bignum(BigNum::UInt64(result))),
-                            None => {
-                                // Phase 3: Check if we should auto-grow to BigInt
-                                if self.should_grow_to_bigint_u64(*lv, *rv, true) {
-                                    self.grow_u64_to_bigint(*lv, *rv, "add")
-                                } else {
-                                    Err(GraphoidError::runtime("Integer overflow in addition".to_string()))
+                        use crate::execution::config::BitWidth;
+                        match self.config_stack.current().bit_width {
+                            BitWidth::Bits32 => {
+                                let result = lv.wrapping_add(*rv);
+                                let wrapped = self.config_stack.current().wrap_value(result as i64) as u64;
+                                Ok(Value::bignum(BigNum::UInt64(wrapped)))
+                            }
+                            BitWidth::Bits64 => {
+                                match lv.checked_add(*rv) {
+                                    Some(result) => Ok(Value::bignum(BigNum::UInt64(result))),
+                                    None => {
+                                        // Phase 3: Check if we should auto-grow to BigInt
+                                        if self.should_grow_to_bigint_u64(*lv, *rv, true) {
+                                            self.grow_u64_to_bigint(*lv, *rv, "add")
+                                        } else {
+                                            Err(GraphoidError::runtime("Integer overflow in addition".to_string()))
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -6356,15 +6378,17 @@ impl Executor {
                             if self.config_stack.current().unsigned_mode {
                                 let lv = *l as u64;
                                 let rv = *r as u64;
-                                lv.checked_add(rv)
-                                    .map(|result| Value::bignum(BigNum::UInt64(result)))
-                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in addition".to_string()))
+                                // Use wrapping_add for 32-bit mode, checked_add for 64-bit
+                                let result = lv.wrapping_add(rv);
+                                let wrapped = self.config_stack.current().wrap_value(result as i64) as u64;
+                                Ok(Value::bignum(BigNum::UInt64(wrapped)))
                             } else {
                                 let lv = *l as i64;
                                 let rv = *r as i64;
-                                lv.checked_add(rv)
-                                    .map(|result| Value::bignum(BigNum::Int64(result)))
-                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in addition".to_string()))
+                                // Use wrapping_add for 32-bit mode, checked_add for 64-bit
+                                let result = lv.wrapping_add(rv);
+                                let wrapped = self.config_stack.current().wrap_value(result);
+                                Ok(Value::bignum(BigNum::Int64(wrapped)))
                             }
                         } else {
                             // Float mode (default): convert to Float128
@@ -6426,14 +6450,34 @@ impl Executor {
             (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
                 match (l, r) {
                     (BigNum::Int64(lv), BigNum::Int64(rv)) => {
-                        lv.checked_sub(*rv)
-                            .map(|result| Value::bignum(BigNum::Int64(result)))
-                            .ok_or_else(|| GraphoidError::runtime("Integer overflow in subtraction".to_string()))
+                        use crate::execution::config::BitWidth;
+                        match self.config_stack.current().bit_width {
+                            BitWidth::Bits32 => {
+                                let result = lv.wrapping_sub(*rv);
+                                let wrapped = self.config_stack.current().wrap_value(result);
+                                Ok(Value::bignum(BigNum::Int64(wrapped)))
+                            }
+                            BitWidth::Bits64 => {
+                                lv.checked_sub(*rv)
+                                    .map(|result| Value::bignum(BigNum::Int64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in subtraction".to_string()))
+                            }
+                        }
                     }
                     (BigNum::UInt64(lv), BigNum::UInt64(rv)) => {
-                        lv.checked_sub(*rv)
-                            .map(|result| Value::bignum(BigNum::UInt64(result)))
-                            .ok_or_else(|| GraphoidError::runtime("Integer overflow in subtraction".to_string()))
+                        use crate::execution::config::BitWidth;
+                        match self.config_stack.current().bit_width {
+                            BitWidth::Bits32 => {
+                                let result = lv.wrapping_sub(*rv);
+                                let wrapped = self.config_stack.current().wrap_value(result as i64) as u64;
+                                Ok(Value::bignum(BigNum::UInt64(wrapped)))
+                            }
+                            BitWidth::Bits64 => {
+                                lv.checked_sub(*rv)
+                                    .map(|result| Value::bignum(BigNum::UInt64(result)))
+                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in subtraction".to_string()))
+                            }
+                        }
                     }
                     (BigNum::Float128(lv), BigNum::Float128(rv)) => {
                         // Phase 1B: Float128 subtraction
@@ -6459,15 +6503,15 @@ impl Executor {
                             if self.config_stack.current().unsigned_mode {
                                 let lv = *l as u64;
                                 let rv = *r as u64;
-                                lv.checked_sub(rv)
-                                    .map(|result| Value::bignum(BigNum::UInt64(result)))
-                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in subtraction".to_string()))
+                                let result = lv.wrapping_sub(rv);
+                                let wrapped = self.config_stack.current().wrap_value(result as i64) as u64;
+                                Ok(Value::bignum(BigNum::UInt64(wrapped)))
                             } else {
                                 let lv = *l as i64;
                                 let rv = *r as i64;
-                                lv.checked_sub(rv)
-                                    .map(|result| Value::bignum(BigNum::Int64(result)))
-                                    .ok_or_else(|| GraphoidError::runtime("Integer overflow in subtraction".to_string()))
+                                let result = lv.wrapping_sub(rv);
+                                let wrapped = self.config_stack.current().wrap_value(result);
+                                Ok(Value::bignum(BigNum::Int64(wrapped)))
                             }
                         } else {
                             // Float mode (default): Float128
@@ -6513,27 +6557,45 @@ impl Executor {
             (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
                 match (l, r) {
                     (BigNum::Int64(lv), BigNum::Int64(rv)) => {
-                        match lv.checked_mul(*rv) {
-                            Some(result) => Ok(Value::bignum(BigNum::Int64(result))),
-                            None => {
-                                // Phase 3: Check if we should auto-grow to BigInt
-                                if self.should_grow_to_bigint_i64(*lv, *rv, true) {
-                                    self.grow_i64_to_bigint(*lv, *rv, "mul")
-                                } else {
-                                    Err(GraphoidError::runtime("Integer overflow in multiplication".to_string()))
+                        use crate::execution::config::BitWidth;
+                        match self.config_stack.current().bit_width {
+                            BitWidth::Bits32 => {
+                                let result = lv.wrapping_mul(*rv);
+                                let wrapped = self.config_stack.current().wrap_value(result);
+                                Ok(Value::bignum(BigNum::Int64(wrapped)))
+                            }
+                            BitWidth::Bits64 => {
+                                match lv.checked_mul(*rv) {
+                                    Some(result) => Ok(Value::bignum(BigNum::Int64(result))),
+                                    None => {
+                                        if self.should_grow_to_bigint_i64(*lv, *rv, true) {
+                                            self.grow_i64_to_bigint(*lv, *rv, "mul")
+                                        } else {
+                                            Err(GraphoidError::runtime("Integer overflow in multiplication".to_string()))
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                     (BigNum::UInt64(lv), BigNum::UInt64(rv)) => {
-                        match lv.checked_mul(*rv) {
-                            Some(result) => Ok(Value::bignum(BigNum::UInt64(result))),
-                            None => {
-                                // Phase 3: Check if we should auto-grow to BigInt
-                                if self.should_grow_to_bigint_u64(*lv, *rv, true) {
-                                    self.grow_u64_to_bigint(*lv, *rv, "mul")
-                                } else {
-                                    Err(GraphoidError::runtime("Integer overflow in multiplication".to_string()))
+                        use crate::execution::config::BitWidth;
+                        match self.config_stack.current().bit_width {
+                            BitWidth::Bits32 => {
+                                let result = lv.wrapping_mul(*rv);
+                                let wrapped = self.config_stack.current().wrap_value(result as i64) as u64;
+                                Ok(Value::bignum(BigNum::UInt64(wrapped)))
+                            }
+                            BitWidth::Bits64 => {
+                                match lv.checked_mul(*rv) {
+                                    Some(result) => Ok(Value::bignum(BigNum::UInt64(result))),
+                                    None => {
+                                        if self.should_grow_to_bigint_u64(*lv, *rv, true) {
+                                            self.grow_u64_to_bigint(*lv, *rv, "mul")
+                                        } else {
+                                            Err(GraphoidError::runtime("Integer overflow in multiplication".to_string()))
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -7159,10 +7221,14 @@ impl Executor {
             (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
                 match (l, r) {
                     (BigNum::Int64(lv), BigNum::Int64(rv)) => {
-                        Ok(Value::bignum(BigNum::Int64(lv & rv)))
+                        let result = lv & rv;
+                        let wrapped = self.config_stack.current().wrap_value(result);
+                        Ok(Value::bignum(BigNum::Int64(wrapped)))
                     }
                     (BigNum::UInt64(lv), BigNum::UInt64(rv)) => {
-                        Ok(Value::bignum(BigNum::UInt64(lv & rv)))
+                        let result = lv & rv;
+                        let wrapped = self.config_stack.current().wrap_value(result as i64) as u64;
+                        Ok(Value::bignum(BigNum::UInt64(wrapped)))
                     }
                     _ => Err(GraphoidError::runtime(
                         "Cannot mix signed and unsigned bignum values".to_string()
@@ -7175,16 +7241,17 @@ impl Executor {
                 let l_int = l.trunc() as i64;
                 let r_int = r.trunc() as i64;
                 let result = l_int & r_int;
+                let wrapped = self.config_stack.current().wrap_value(result);
 
                 match self.config_stack.current().precision_mode {
                     PrecisionMode::High => {
                         if self.config_stack.current().unsigned_mode {
-                            Ok(Value::bignum(BigNum::UInt64(result as u64)))
+                            Ok(Value::bignum(BigNum::UInt64(wrapped as u64)))
                         } else {
-                            Ok(Value::bignum(BigNum::Int64(result)))
+                            Ok(Value::bignum(BigNum::Int64(wrapped)))
                         }
                     }
-                    _ => Ok(Value::number(result as f64))
+                    _ => Ok(Value::number(wrapped as f64))
                 }
             }
 
@@ -7209,10 +7276,14 @@ impl Executor {
             (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
                 match (l, r) {
                     (BigNum::Int64(lv), BigNum::Int64(rv)) => {
-                        Ok(Value::bignum(BigNum::Int64(lv | rv)))
+                        let result = lv | rv;
+                        let wrapped = self.config_stack.current().wrap_value(result);
+                        Ok(Value::bignum(BigNum::Int64(wrapped)))
                     }
                     (BigNum::UInt64(lv), BigNum::UInt64(rv)) => {
-                        Ok(Value::bignum(BigNum::UInt64(lv | rv)))
+                        let result = lv | rv;
+                        let wrapped = self.config_stack.current().wrap_value(result as i64) as u64;
+                        Ok(Value::bignum(BigNum::UInt64(wrapped)))
                     }
                     _ => Err(GraphoidError::runtime(
                         "Cannot mix signed and unsigned bignum values".to_string()
@@ -7225,16 +7296,17 @@ impl Executor {
                 let l_int = l.trunc() as i64;
                 let r_int = r.trunc() as i64;
                 let result = l_int | r_int;
+                let wrapped = self.config_stack.current().wrap_value(result);
 
                 match self.config_stack.current().precision_mode {
                     PrecisionMode::High => {
                         if self.config_stack.current().unsigned_mode {
-                            Ok(Value::bignum(BigNum::UInt64(result as u64)))
+                            Ok(Value::bignum(BigNum::UInt64(wrapped as u64)))
                         } else {
-                            Ok(Value::bignum(BigNum::Int64(result)))
+                            Ok(Value::bignum(BigNum::Int64(wrapped)))
                         }
                     }
-                    _ => Ok(Value::number(result as f64))
+                    _ => Ok(Value::number(wrapped as f64))
                 }
             }
 
@@ -7259,10 +7331,14 @@ impl Executor {
             (ValueKind::BigNumber(l), ValueKind::BigNumber(r)) => {
                 match (l, r) {
                     (BigNum::Int64(lv), BigNum::Int64(rv)) => {
-                        Ok(Value::bignum(BigNum::Int64(lv ^ rv)))
+                        let result = lv ^ rv;
+                        let wrapped = self.config_stack.current().wrap_value(result);
+                        Ok(Value::bignum(BigNum::Int64(wrapped)))
                     }
                     (BigNum::UInt64(lv), BigNum::UInt64(rv)) => {
-                        Ok(Value::bignum(BigNum::UInt64(lv ^ rv)))
+                        let result = lv ^ rv;
+                        let wrapped = self.config_stack.current().wrap_value(result as i64) as u64;
+                        Ok(Value::bignum(BigNum::UInt64(wrapped)))
                     }
                     _ => Err(GraphoidError::runtime(
                         "Cannot mix signed and unsigned bignum values".to_string()
@@ -7275,16 +7351,17 @@ impl Executor {
                 let l_int = l.trunc() as i64;
                 let r_int = r.trunc() as i64;
                 let result = l_int ^ r_int;
+                let wrapped = self.config_stack.current().wrap_value(result);
 
                 match self.config_stack.current().precision_mode {
                     PrecisionMode::High => {
                         if self.config_stack.current().unsigned_mode {
-                            Ok(Value::bignum(BigNum::UInt64(result as u64)))
+                            Ok(Value::bignum(BigNum::UInt64(wrapped as u64)))
                         } else {
-                            Ok(Value::bignum(BigNum::Int64(result)))
+                            Ok(Value::bignum(BigNum::Int64(wrapped)))
                         }
                     }
-                    _ => Ok(Value::number(result as f64))
+                    _ => Ok(Value::number(wrapped as f64))
                 }
             }
 
@@ -7325,14 +7402,14 @@ impl Executor {
 
                 match l {
                     BigNum::Int64(lv) => {
-                        lv.checked_shl(shift_amount as u32)
-                            .map(|result| Value::bignum(BigNum::Int64(result)))
-                            .ok_or_else(|| GraphoidError::runtime("Integer overflow in left shift".to_string()))
+                        let result = lv.wrapping_shl(shift_amount as u32);
+                        let wrapped = self.config_stack.current().wrap_value(result);
+                        Ok(Value::bignum(BigNum::Int64(wrapped)))
                     }
                     BigNum::UInt64(lv) => {
-                        lv.checked_shl(shift_amount as u32)
-                            .map(|result| Value::bignum(BigNum::UInt64(result)))
-                            .ok_or_else(|| GraphoidError::runtime("Integer overflow in left shift".to_string()))
+                        let result = lv.wrapping_shl(shift_amount as u32);
+                        let wrapped = self.config_stack.current().wrap_value(result as i64) as u64;
+                        Ok(Value::bignum(BigNum::UInt64(wrapped)))
                     }
                     BigNum::Float128(_) => {
                         Err(GraphoidError::runtime("Cannot left shift floating-point bignum".to_string()))
@@ -7359,16 +7436,17 @@ impl Executor {
 
                 let l_int = l.trunc() as i64;
                 let result = l_int << r_int;
+                let wrapped = self.config_stack.current().wrap_value(result);
 
                 match self.config_stack.current().precision_mode {
                     PrecisionMode::High => {
                         if self.config_stack.current().unsigned_mode {
-                            Ok(Value::bignum(BigNum::UInt64(result as u64)))
+                            Ok(Value::bignum(BigNum::UInt64(wrapped as u64)))
                         } else {
-                            Ok(Value::bignum(BigNum::Int64(result)))
+                            Ok(Value::bignum(BigNum::Int64(wrapped)))
                         }
                     }
-                    _ => Ok(Value::number(result as f64))
+                    _ => Ok(Value::number(wrapped as f64))
                 }
             }
 
@@ -7429,11 +7507,15 @@ impl Executor {
                 match l {
                     BigNum::Int64(lv) => {
                         // Arithmetic right shift for signed
-                        Ok(Value::bignum(BigNum::Int64(lv >> (shift_amount as u32))))
+                        let result = lv >> (shift_amount as u32);
+                        let wrapped = self.config_stack.current().wrap_value(result);
+                        Ok(Value::bignum(BigNum::Int64(wrapped)))
                     }
                     BigNum::UInt64(lv) => {
                         // Logical right shift for unsigned
-                        Ok(Value::bignum(BigNum::UInt64(lv >> (shift_amount as u32))))
+                        let result = lv >> (shift_amount as u32);
+                        let wrapped = self.config_stack.current().wrap_value(result as i64) as u64;
+                        Ok(Value::bignum(BigNum::UInt64(wrapped)))
                     }
                     BigNum::Float128(_) => {
                         Err(GraphoidError::runtime("Cannot right shift floating-point bignum".to_string()))
@@ -7463,20 +7545,28 @@ impl Executor {
                     PrecisionMode::High => {
                         if self.config_stack.current().unsigned_mode {
                             let l_uint = (*l as i64) as u64;
-                            Ok(Value::bignum(BigNum::UInt64(l_uint >> r_int)))
+                            let result = l_uint >> r_int;
+                            let wrapped = self.config_stack.current().wrap_value(result as i64) as u64;
+                            Ok(Value::bignum(BigNum::UInt64(wrapped)))
                         } else {
                             let l_int = l.trunc() as i64;
-                            Ok(Value::bignum(BigNum::Int64(l_int >> r_int)))
+                            let result = l_int >> r_int;
+                            let wrapped = self.config_stack.current().wrap_value(result);
+                            Ok(Value::bignum(BigNum::Int64(wrapped)))
                         }
                     }
                     _ => {
                         let result = if self.config_stack.current().unsigned_mode {
                             let l_int = l.trunc() as i64;
                             let l_uint = l_int as u64;
-                            (l_uint >> r_int) as i64 as f64
+                            let shifted = l_uint >> r_int;
+                            let wrapped = self.config_stack.current().wrap_value(shifted as i64) as u64;
+                            wrapped as f64
                         } else {
                             let l_int = l.trunc() as i64;
-                            (l_int >> r_int) as f64
+                            let shifted = l_int >> r_int;
+                            let wrapped = self.config_stack.current().wrap_value(shifted);
+                            wrapped as f64
                         };
                         Ok(Value::number(result))
                     }

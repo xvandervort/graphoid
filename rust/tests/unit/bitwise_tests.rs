@@ -3,6 +3,7 @@
 
 use graphoid::execution::Executor;
 use graphoid::error::GraphoidError;
+use graphoid::values::ValueKind;
 
 // ============================================================================
 // Basic Bitwise Operations (10 tests)
@@ -637,4 +638,250 @@ fn test_complex_bitwise_expression() {
     // ~0xFF = -256, & 0xFFFF = 65280, 0x0F << 4 = 240, | = 65520
     let result = exec.get_variable("result").unwrap();
     assert_eq!(result.to_number().unwrap(), 65520.0);
+}
+
+// ============================================================================
+// Phase 13: :32bit Directive - Wrapping Arithmetic Tests
+// ============================================================================
+
+#[test]
+fn test_32bit_addition_wrapping() {
+    let mut exec = Executor::new();
+    let source = r#"
+        configure { :unsigned, :32bit } {
+            x = 4294967295  # 0xFFFFFFFF
+            y = 1
+            result = x + y
+        }
+    "#;
+    exec.execute_source(source).unwrap();
+
+    let result = exec.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::BigNumber(bignum) => {
+            assert_eq!(bignum.to_i64().unwrap(), 0);  // Wraps to 0
+        }
+        _ => panic!("Expected BigNumber, got {:?}", result.kind),
+    }
+}
+
+#[test]
+fn test_32bit_subtraction_wrapping() {
+    let mut exec = Executor::new();
+    let source = r#"
+        configure { :unsigned, :32bit } {
+            x = 0
+            y = 1
+            result = x - y
+        }
+    "#;
+    exec.execute_source(source).unwrap();
+
+    let result = exec.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::BigNumber(bignum) => {
+            assert_eq!(bignum.to_u64().unwrap(), 4294967295);  // Wraps to 0xFFFFFFFF
+        }
+        _ => panic!("Expected BigNumber, got {:?}", result.kind),
+    }
+}
+
+#[test]
+fn test_32bit_multiplication_wrapping() {
+    let mut exec = Executor::new();
+    let source = r#"
+        configure { :unsigned, :32bit } {
+            x = 65536  # 0x10000
+            y = 65536
+            result = x * y
+        }
+    "#;
+    exec.execute_source(source).unwrap();
+
+    let result = exec.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::BigNumber(bignum) => {
+            assert_eq!(bignum.to_i64().unwrap(), 0);  // 0x100000000 wraps to 0
+        }
+        _ => panic!("Expected BigNumber, got {:?}", result.kind),
+    }
+}
+
+#[test]
+fn test_32bit_left_shift_wrapping() {
+    let mut exec = Executor::new();
+    let source = r#"
+        configure { :unsigned, :32bit } {
+            x = 305419896  # 0x12345678
+            result = x << 8
+        }
+    "#;
+    exec.execute_source(source).unwrap();
+
+    let result = exec.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::BigNumber(bignum) => {
+            assert_eq!(bignum.to_i64().unwrap(), 0x34567800);  // High bits discarded
+        }
+        _ => panic!("Expected BigNumber, got {:?}", result.kind),
+    }
+}
+
+#[test]
+fn test_32bit_bitwise_and_wrapping() {
+    let mut exec = Executor::new();
+    let source = r#"
+        configure { :unsigned, :32bit } {
+            x = 4294967295  # 0xFFFFFFFF
+            y = 252645135   # 0x0F0F0F0F
+            result = x & y
+        }
+    "#;
+    exec.execute_source(source).unwrap();
+
+    let result = exec.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::BigNumber(bignum) => {
+            assert_eq!(bignum.to_u64().unwrap(), 252645135);  // 0x0F0F0F0F
+        }
+        _ => panic!("Expected BigNumber, got {:?}", result.kind),
+    }
+}
+
+#[test]
+fn test_32bit_bitwise_or_wrapping() {
+    let mut exec = Executor::new();
+    let source = r#"
+        configure { :unsigned, :32bit } {
+            x = 4042322160  # 0xF0F0F0F0
+            y = 252645135   # 0x0F0F0F0F
+            result = x | y
+        }
+    "#;
+    exec.execute_source(source).unwrap();
+
+    let result = exec.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::BigNumber(bignum) => {
+            assert_eq!(bignum.to_u64().unwrap(), 4294967295);  // 0xFFFFFFFF
+        }
+        _ => panic!("Expected BigNumber, got {:?}", result.kind),
+    }
+}
+
+#[test]
+fn test_32bit_bitwise_xor_wrapping() {
+    let mut exec = Executor::new();
+    let source = r#"
+        configure { :unsigned, :32bit } {
+            x = 4294967295  # 0xFFFFFFFF
+            y = 4294967295  # 0xFFFFFFFF
+            result = x ^ y
+        }
+    "#;
+    exec.execute_source(source).unwrap();
+
+    let result = exec.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::BigNumber(bignum) => {
+            assert_eq!(bignum.to_i64().unwrap(), 0);
+        }
+        _ => panic!("Expected BigNumber, got {:?}", result.kind),
+    }
+}
+
+#[test]
+fn test_64bit_no_wrapping() {
+    let mut exec = Executor::new();
+    let source = r#"
+        configure { :unsigned } {
+            x = 4294967295  # 0xFFFFFFFF
+            y = 1
+            result = x + y
+        }
+    "#;
+    exec.execute_source(source).unwrap();
+
+    // Without :high or :integer, values may be regular Numbers (f64) or BigNumbers
+    let result = exec.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::BigNumber(bignum) => {
+            assert_eq!(bignum.to_u64().unwrap(), 4294967296);  // No wrapping in 64-bit mode
+        }
+        ValueKind::Number(n) => {
+            assert_eq!(*n as u64, 4294967296);  // No wrapping in 64-bit mode
+        }
+        _ => panic!("Expected Number or BigNumber, got {:?}", result.kind),
+    }
+}
+
+#[test]
+fn test_32bit_nested_configure() {
+    let mut exec = Executor::new();
+    let source = r#"
+        configure { :unsigned } {
+            outer = 4294967295 + 1  # 64-bit: 4294967296
+
+            configure { :32bit } {
+                inner = 4294967295 + 1  # 32-bit: 0
+            }
+
+            back_to_outer = 4294967295 + 1  # 64-bit: 4294967296
+        }
+    "#;
+    exec.execute_source(source).unwrap();
+
+    // In 64-bit mode (:unsigned without :32bit), values are UInt64 BigNumbers
+    let outer = exec.get_variable("outer").unwrap();
+    match &outer.kind {
+        ValueKind::BigNumber(bignum) => {
+            assert_eq!(bignum.to_u64().unwrap(), 4294967296);
+        }
+        ValueKind::Number(n) => {
+            assert_eq!(*n as u64, 4294967296);
+        }
+        _ => panic!("Expected Number or BigNumber for outer, got {:?}", outer.kind),
+    }
+
+    // In 32-bit mode, should be Int64/UInt64 BigNumber with value 0
+    let inner = exec.get_variable("inner").unwrap();
+    match &inner.kind {
+        ValueKind::BigNumber(bignum) => {
+            assert_eq!(bignum.to_i64().unwrap(), 0);
+        }
+        _ => panic!("Expected BigNumber for inner, got {:?}", inner.kind),
+    }
+
+    // Back to 64-bit mode
+    let back = exec.get_variable("back_to_outer").unwrap();
+    match &back.kind {
+        ValueKind::BigNumber(bignum) => {
+            assert_eq!(bignum.to_u64().unwrap(), 4294967296);
+        }
+        ValueKind::Number(n) => {
+            assert_eq!(*n as u64, 4294967296);
+        }
+        _ => panic!("Expected Number or BigNumber for back, got {:?}", back.kind),
+    }
+}
+
+#[test]
+fn test_32bit_sequential_operations() {
+    let mut exec = Executor::new();
+    let source = r#"
+        configure { :unsigned, :32bit } {
+            a = 2147483648  # 0x80000000
+            b = 2147483648
+            result = a + b  # Should wrap to 0
+        }
+    "#;
+    exec.execute_source(source).unwrap();
+
+    let result = exec.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::BigNumber(bignum) => {
+            assert_eq!(bignum.to_i64().unwrap(), 0);
+        }
+        _ => panic!("Expected BigNumber, got {:?}", result.kind),
+    }
 }

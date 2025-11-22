@@ -1,5 +1,5 @@
 use graphoid::execution::config::{
-    Config, ConfigStack, ErrorMode, BoundsCheckingMode, TypeCoercionMode, NoneHandlingMode
+    Config, ConfigStack, ErrorMode, BoundsCheckingMode, TypeCoercionMode, NoneHandlingMode, BitWidth, PrecisionMode
 };
 use graphoid::values::Value;
 use std::collections::HashMap;
@@ -311,4 +311,145 @@ fn test_integer_directive_inherits_other_config() {
     stack.pop();
     assert_eq!(stack.current().skip_none, true);
     assert_eq!(stack.current().integer_mode, false);  // Back to false
+}
+
+// ===== Phase 13: :32bit Directive Tests =====
+
+#[test]
+fn test_default_config_bit_width_64() {
+    let config = Config::default();
+    assert_eq!(config.bit_width, BitWidth::Bits64);
+}
+
+#[test]
+fn test_32bit_directive_sets_bit_width() {
+    let mut stack = ConfigStack::new();
+
+    // Simulate configure { :32bit } { ... }
+    let mut changes = HashMap::new();
+    changes.insert("32bit".to_string(), Value::symbol("32bit".to_string()));
+
+    stack.push_with_changes(changes).unwrap();
+    assert_eq!(stack.current().bit_width, BitWidth::Bits32);
+    assert_eq!(stack.depth(), 2);
+}
+
+#[test]
+fn test_32bit_directive_auto_enables_integer_mode() {
+    let mut stack = ConfigStack::new();
+
+    // :32bit should automatically enable integer_mode
+    let mut changes = HashMap::new();
+    changes.insert("32bit".to_string(), Value::symbol("32bit".to_string()));
+
+    stack.push_with_changes(changes).unwrap();
+    assert_eq!(stack.current().bit_width, BitWidth::Bits32);
+    assert_eq!(stack.current().integer_mode, true);
+    assert_eq!(stack.current().precision_mode, PrecisionMode::High);
+}
+
+#[test]
+fn test_32bit_directive_scoped_correctly() {
+    let mut stack = ConfigStack::new();
+
+    // Base level - 64-bit by default
+    assert_eq!(stack.current().bit_width, BitWidth::Bits64);
+    assert_eq!(stack.current().integer_mode, false);
+
+    // Push :32bit directive
+    let mut changes = HashMap::new();
+    changes.insert("32bit".to_string(), Value::symbol("32bit".to_string()));
+    stack.push_with_changes(changes).unwrap();
+    assert_eq!(stack.current().bit_width, BitWidth::Bits32);
+    assert_eq!(stack.current().integer_mode, true);
+    assert_eq!(stack.depth(), 2);
+
+    // Pop back to base level
+    stack.pop();
+    assert_eq!(stack.current().bit_width, BitWidth::Bits64);
+    assert_eq!(stack.current().integer_mode, false);
+    assert_eq!(stack.depth(), 1);
+}
+
+#[test]
+fn test_32bit_directive_combines_with_unsigned() {
+    let mut stack = ConfigStack::new();
+
+    // Combine :32bit with :unsigned (typical crypto use case)
+    let mut changes = HashMap::new();
+    changes.insert("32bit".to_string(), Value::symbol("32bit".to_string()));
+    changes.insert("unsigned".to_string(), Value::symbol("unsigned".to_string()));
+
+    stack.push_with_changes(changes).unwrap();
+    assert_eq!(stack.current().bit_width, BitWidth::Bits32);
+    assert_eq!(stack.current().unsigned_mode, true);
+    assert_eq!(stack.current().integer_mode, true);
+    assert_eq!(stack.current().precision_mode, PrecisionMode::High);
+}
+
+#[test]
+fn test_32bit_directive_inherits_other_config() {
+    let mut stack = ConfigStack::new();
+
+    // First level: set skip_none
+    let mut changes1 = HashMap::new();
+    changes1.insert("skip_none".to_string(), Value::boolean(true));
+    stack.push_with_changes(changes1).unwrap();
+    assert_eq!(stack.current().skip_none, true);
+    assert_eq!(stack.current().bit_width, BitWidth::Bits64);
+
+    // Second level: add :32bit directive
+    let mut changes2 = HashMap::new();
+    changes2.insert("32bit".to_string(), Value::symbol("32bit".to_string()));
+    stack.push_with_changes(changes2).unwrap();
+    assert_eq!(stack.current().skip_none, true);  // Inherited
+    assert_eq!(stack.current().bit_width, BitWidth::Bits32);  // New setting
+
+    // Pop back to first level
+    stack.pop();
+    assert_eq!(stack.current().skip_none, true);
+    assert_eq!(stack.current().bit_width, BitWidth::Bits64);  // Back to 64-bit
+}
+
+#[test]
+fn test_wrap_value_32bit_mode() {
+    let mut config = Config::default();
+    config.bit_width = BitWidth::Bits32;
+
+    // Test wrapping at 32-bit boundary
+    assert_eq!(config.wrap_value(0xFFFFFFFF), 0xFFFFFFFF);  // Max 32-bit value
+    assert_eq!(config.wrap_value(0x100000000), 0);  // Wraps to 0
+    assert_eq!(config.wrap_value(0x100000001), 1);  // Wraps to 1
+    assert_eq!(config.wrap_value(0x1FFFFFFFF), 0xFFFFFFFF);  // High bits masked
+}
+
+#[test]
+fn test_wrap_value_64bit_mode() {
+    let config = Config::default();  // Default is 64-bit
+    assert_eq!(config.bit_width, BitWidth::Bits64);
+
+    // In 64-bit mode, no wrapping occurs
+    assert_eq!(config.wrap_value(0xFFFFFFFF), 0xFFFFFFFF);
+    assert_eq!(config.wrap_value(0x100000000), 0x100000000);
+    assert_eq!(config.wrap_value(0x1FFFFFFFF), 0x1FFFFFFFF);
+}
+
+#[test]
+fn test_nested_32bit_and_64bit_modes() {
+    let mut stack = ConfigStack::new();
+
+    // Base: 64-bit
+    assert_eq!(stack.current().bit_width, BitWidth::Bits64);
+
+    // Push 32-bit mode
+    let mut changes1 = HashMap::new();
+    changes1.insert("32bit".to_string(), Value::symbol("32bit".to_string()));
+    stack.push_with_changes(changes1).unwrap();
+    assert_eq!(stack.current().bit_width, BitWidth::Bits32);
+    assert_eq!(stack.depth(), 2);
+
+    // Nested 64-bit block (explicit reversion) - not directly supported, but test popping
+    stack.pop();
+    assert_eq!(stack.current().bit_width, BitWidth::Bits64);
+    assert_eq!(stack.depth(), 1);
 }

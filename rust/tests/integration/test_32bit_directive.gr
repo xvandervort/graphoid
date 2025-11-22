@@ -1,0 +1,195 @@
+# Test :32bit directive for 32-bit wrapping arithmetic
+# Phase 13 - Integer wrapping for crypto and binary protocols
+
+# No imports needed - using built-in print()
+
+# Test 1: Basic 32-bit wrapping on overflow
+print("Test 1: Basic overflow wrapping")
+configure { :unsigned, :32bit } {
+    x = 0xffffffff
+    y = 1
+    result = x + y
+    print("  0xffffffff + 1 = " + result.to_string())
+    # Expected: 0 (wraps at 32 bits)
+}
+
+# Test 2: Subtraction with wrapping
+print("Test 2: Subtraction wrapping")
+configure { :unsigned, :32bit } {
+    x = 0
+    y = 1
+    result = x - y
+    print("  0 - 1 = " + result.to_string())
+    # Expected: 0xffffffff (underflow wraps to max 32-bit)
+}
+
+# Test 3: Multiplication with wrapping
+print("Test 3: Multiplication wrapping")
+configure { :unsigned, :32bit } {
+    x = 0x10000
+    y = 0x10000
+    result = x * y
+    print("  0x10000 * 0x10000 = " + result.to_string())
+    # Expected: 0 (0x100000000 wraps to 0)
+}
+
+# Test 4: Left shift with wrapping
+print("Test 4: Left shift wrapping")
+configure { :unsigned, :32bit } {
+    x = 0x12345678
+    result = x << 8
+    print("  0x12345678 << 8 = " + result.to_string())
+    # Expected: 0x34567800 (high bits discarded)
+}
+
+# Test 5: Right shift (no wrapping needed, but test anyway)
+print("Test 5: Right shift")
+configure { :unsigned, :32bit } {
+    x = 0x12345678
+    result = x >> 8
+    print("  0x12345678 >> 8 = " + result.to_string())
+    # Expected: 0x00123456
+}
+
+# Test 6: Bitwise AND with wrapping
+print("Test 6: Bitwise AND")
+configure { :unsigned, :32bit } {
+    x = 0xffffffff
+    y = 0x0f0f0f0f
+    result = x & y
+    print("  0xffffffff & 0x0f0f0f0f = " + result.to_string())
+    # Expected: 0x0f0f0f0f
+}
+
+# Test 7: Bitwise OR with wrapping
+print("Test 7: Bitwise OR")
+configure { :unsigned, :32bit } {
+    x = 0xf0f0f0f0
+    y = 0x0f0f0f0f
+    result = x | y
+    print("  0xf0f0f0f0 | 0x0f0f0f0f = " + result.to_string())
+    # Expected: 0xffffffff
+}
+
+# Test 8: Bitwise XOR with wrapping
+print("Test 8: Bitwise XOR")
+configure { :unsigned, :32bit } {
+    x = 0xffffffff
+    y = 0xffffffff
+    result = x ^ y
+    print("  0xffffffff ^ 0xffffffff = " + result.to_string())
+    # Expected: 0
+}
+
+# Test 9: Right rotation using wrapping
+print("Test 9: Right rotation (clean syntax with :32bit)")
+configure { :unsigned, :32bit } {
+    fn rotr(x, n) {
+        return (x >> n) | (x << (32 - n))
+    }
+
+    result = rotr(0x12345678, 8)
+    print("  rotr(0x12345678, 8) = " + result.to_string())
+    # Expected: 0x78123456
+}
+
+# Test 10: Left rotation using wrapping
+print("Test 10: Left rotation (clean syntax with :32bit)")
+configure { :unsigned, :32bit } {
+    fn rotl(x, n) {
+        return (x << n) | (x >> (32 - n))
+    }
+
+    result = rotl(0x12345678, 8)
+    print("  rotl(0x12345678, 8) = " + result.to_string())
+    # Expected: 0x34567812
+}
+
+# Test 11: Multiple operations in sequence
+print("Test 11: Sequential operations")
+configure { :unsigned, :32bit } {
+    a = 0x80000000
+    b = 0x80000000
+    result = a + b  # Should wrap to 0
+    print("  0x80000000 + 0x80000000 = " + result.to_string())
+    # Expected: 0
+}
+
+# Test 12: Verify 64-bit mode still works (default)
+print("Test 12: 64-bit mode (default, no wrapping)")
+configure { :unsigned } {
+    x = 0xffffffff
+    y = 1
+    result = x + y
+    print("  0xffffffff + 1 (64-bit) = " + result.to_string())
+    # Expected: 0x100000000 (no wrapping)
+}
+
+# Test 13: Nested configure blocks
+print("Test 13: Nested configure blocks")
+configure { :unsigned } {
+    x = 0xffffffff
+    y = 1
+    outer_result = x + y
+    print("  Outer (64-bit): " + outer_result.to_string())
+
+    configure { :32bit } {
+        inner_result = x + y
+        print("  Inner (32-bit): " + inner_result.to_string())
+        # Expected: 0 (wrapped)
+    }
+
+    # Back to 64-bit
+    final_result = x + y
+    print("  Back to outer (64-bit): " + final_result.to_string())
+    # Expected: 0x100000000 (no wrapping)
+}
+
+# Test 14: Complex crypto-like operations
+print("Test 14: Crypto-style operations")
+configure { :unsigned, :32bit } {
+    # Simulate a simple hash function step
+    h = 0x6a09e667
+    k = 0x428a2f98
+    w = 0x12345678
+
+    # Ch function: (x & y) ^ (~x & z)
+    x = 0xabcdef01
+    y = 0x23456789
+    z = 0xfedcba98
+    ch = (x & y) ^ ((~x) & z)
+
+    # Maj function: (x & y) ^ (x & z) ^ (y & z)
+    maj = (x & y) ^ (x & z) ^ (y & z)
+
+    # Sum: combine with rotation
+    fn rotr(val, n) {
+        return (val >> n) | (val << (32 - n))
+    }
+
+    s0 = rotr(x, 2) ^ rotr(x, 13) ^ rotr(x, 22)
+    s1 = rotr(x, 6) ^ rotr(x, 11) ^ rotr(x, 25)
+
+    # Final step (like SHA-256)
+    temp1 = h + s1 + ch + k + w
+    temp2 = s0 + maj
+
+    print("  Ch result: " + ch.to_string())
+    print("  Maj result: " + maj.to_string())
+    print("  Temp1: " + temp1.to_string())
+    print("  Temp2: " + temp2.to_string())
+}
+
+# Test 15: Verify no manual masking needed
+print("Test 15: Clean syntax - no masking needed")
+configure { :unsigned, :32bit } {
+    # Without :32bit, this would need: result = (a + b) & 0xffffffff
+    # With :32bit, it's clean:
+    a = 0xffffffff
+    b = 0xffffffff
+    result = a + b
+    print("  0xffffffff + 0xffffffff = " + result.to_string())
+    # Expected: 0xfffffffe (wraps automatically)
+}
+
+print("\nAll :32bit directive tests completed!")
