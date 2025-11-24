@@ -16,23 +16,23 @@ print()
 # When you import a module, it creates a separate namespace.
 # You access its contents via the module name (or alias).
 
-# Example: Import the math module from stdlib
-import "math"
+# Example: Import a sample module
+import "./utils_module"
 
-# Access math functions through the module namespace
-result1 = math.abs(-15)
-result2 = math.max(10, 20)
+# Access module functions through the module namespace
+result1 = utils.add(10, 5)
+result2 = utils.multiply(3, 7)
 
 print("Using import:")
-print("  math.abs(-15) =", result1)
-print("  math.max(10, 20) =", result2)
+print("  utils.add(10, 5) =", result1)
+print("  utils.multiply(3, 7) =", result2)
 print()
 
 # The module's symbols are NOT in the current namespace:
-# This would error: abs(-15)  # Error: 'abs' not defined
-# You must use: math.abs(-15)
+# This would error: add(10, 5)  # Error: 'add' not defined
+# You must use: utils.add(10, 5)
 
-print("Key point: Symbols are accessed via 'math.symbol'")
+print("Key point: Symbols are accessed via 'utils.symbol'")
 print("They are NOT directly accessible in current namespace")
 print()
 
