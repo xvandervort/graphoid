@@ -10,6 +10,62 @@ Graphoid embraces three core principles:
 2. **No Hidden Side Effects** - Operations never mutate operands unless explicitly requested
 3. **Graph-Theoretic Foundation** - Leverage graphs, don't fight them
 
+## Configuration & Directives
+
+### Configure at Program Start
+
+Place all directives and imports at the top of your file, before any code:
+
+```graphoid
+# ✅ GOOD: Directives first, then imports, then code
+:precision 32
+:32bit
+
+import "math"
+import "statistics"
+
+# Now your code begins
+result = math.sqrt(2)
+```
+
+```graphoid
+# ❌ BAD: Directives scattered throughout
+import "math"
+
+x = math.sqrt(2)
+
+:precision 32  # Too late! Should be at top
+
+y = math.sqrt(3)
+```
+
+### Group Imports Logically
+
+Organize imports in a consistent order for readability:
+
+```graphoid
+# ✅ GOOD: Logical grouping
+# 1. Standard library modules
+import "math"
+import "io"
+import "collections"
+
+# 2. Project/local modules
+import "./utils_module"
+import "./service_module"
+
+# 3. Relative imports from subdirectories
+import "./validators/user_validator"
+```
+
+```graphoid
+# ❌ BAD: Random order
+import "./service_module"
+import "math"
+import "./utils_module"
+import "io"
+```
+
 ## Code Style
 
 ### Keep It Simple
@@ -320,13 +376,75 @@ myapp/
 ```graphoid
 # File: calculator.gr
 
-# Public
+# Public API - explicitly exported
 export fn add(a, b) { ... }
 export fn subtract(a, b) { ... }
 
-# Private (not exported)
-fn internal_helper(x) { ... }
+# Private - use priv keyword for internal helpers
+priv fn validate_input(x) {
+    if x == none { return false }
+    return true
+}
+
+priv fn internal_helper(x) { ... }
 ```
+
+**Why use `priv`?** It signals intent to other developers (and your future self) that these functions are implementation details, not part of the module's contract.
+
+### Use Meaningful Module Aliases
+
+```graphoid
+# ✅ GOOD: Short, clear alias
+module user_validation alias uv
+
+# ✅ GOOD: Descriptive for complex names
+module business_analytics_service alias analytics
+
+# ❌ BAD: Cryptic alias
+module user_validation alias x1
+```
+
+### Include Module Version
+
+Add a version at the end of your modules for tracking:
+
+```graphoid
+module my_utilities alias utils
+
+# ... all your functions ...
+
+fn helper_one() { ... }
+fn helper_two() { ... }
+
+# Version at module end
+__version = "1.2.0"
+```
+
+### Configure Module Error Handling
+
+Set error handling behavior appropriate for your module's purpose:
+
+```graphoid
+# Strict mode for critical modules (fail immediately on errors)
+module payment_processor alias pay {
+    error_mode: :strict
+}
+
+# Lenient mode for data processing (continue on non-fatal errors)
+module data_importer alias importer {
+    error_mode: :lenient
+}
+
+# Collect mode for batch operations (gather all errors, report at end)
+module bulk_validator alias validator {
+    error_mode: :collect
+}
+```
+
+**Guidelines:**
+- Use `:strict` for financial, security, or safety-critical code
+- Use `:lenient` when partial results are acceptable
+- Use `:collect` for batch validation or migration scripts
 
 ## Performance
 
@@ -538,6 +656,8 @@ if score < 0 or score > 100 {
 
 Key principles for writing great Graphoid code:
 
+- ✅ **Configure at the top** - Directives and imports before code
+- ✅ **Group imports logically** - Stdlib first, then project modules
 - ✅ **Keep it simple** - Simplicity beats cleverness
 - ✅ **Use named transformations** - Clear intent
 - ✅ **Write small functions** - Single responsibility
@@ -546,6 +666,9 @@ Key principles for writing great Graphoid code:
 - ✅ **Use graph features** - Rules, behaviors, algorithms
 - ✅ **Fail fast** - Early validation
 - ✅ **One concept per module** - Focused organization
+- ✅ **Use `priv` for internals** - Signal implementation details
+- ✅ **Version your modules** - Track with `__version`
+- ✅ **Set appropriate error modes** - Strict, lenient, or collect
 - ✅ **Don't optimize early** - Correct first, fast second
 - ✅ **Comment why, not what** - Explain reasoning
 - ✅ **Avoid anti-patterns** - No magic numbers, deep nesting, duplication
