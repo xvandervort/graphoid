@@ -388,7 +388,7 @@ cargo run -- samples/04-modules/load_vs_import.gr
 
 - `service_module.gr` - Used by `app_main.gr`
 - `utils_module.gr` - Used by `service_module.gr` and `load_vs_import.gr`
-- `modules_main.gr` - Demonstrates using a custom module
+- `modules_main.gr` - Demonstrates using stdlib math module
 
 These files show how modules work together in a multi-file project.
 

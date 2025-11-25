@@ -46,8 +46,7 @@ MANIFEST
 .dmypy.json
 dmypy.json
 
-# Rust
-rust/target/
+target/
 **/*.rs.bk
 *.pdb
 
