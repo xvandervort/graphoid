@@ -215,7 +215,7 @@ The `dev_docs/` directory contains **comprehensive development documentation** i
 
 ```bash
 # Rust implementation (ACTIVE)
-cd rust
+# From project root
 
 # Build
 ~/.cargo/bin/cargo build
@@ -555,7 +555,7 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 18-phase plan:
 - Phase 2: ✅ Parser & AST (31 tests)
 - Phase 3: 🔜 Value System & Execution (next)
 - Total tests: **85/85 passing**
-- Command: `cd rust && cargo test`
+- Command: `# From project root && cargo test`
 - Build: `cargo build` (zero warnings)
 
 ---
@@ -590,16 +590,16 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 18-phase plan:
 - New built-in functions
 
 **Where to Put Examples:**
-- `rust/samples/*.gr` - Standalone example files
+- `samples/*.gr` - Standalone example files
 - Each example should have clear comments explaining what it demonstrates
-- Update `rust/samples/README.md` with descriptions
+- Update `samples/README.md` with descriptions
 
 **Example Checklist for New Features:**
 1. ✅ Implement feature in Rust
 2. ✅ Write Rust unit tests (TDD)
 3. ✅ **Create `.gr` example file(s)** demonstrating the feature
 4. ✅ Run the example to verify it works: `cargo run --quiet samples/your_example.gr`
-5. ✅ Update `rust/samples/README.md` with description
+5. ✅ Update `samples/README.md` with description
 6. ✅ Consider updating `docs/QUICKSTART.md` if it's a major feature
 
 **Real Example:**
@@ -657,7 +657,7 @@ pub fn shortest_path(&self, from: &str, to: &str, edge_type: Option<&str>, weigh
 **Test Organization**:
 - **Unit tests (Rust)** - In `tests/unit/` for internal API verification
 - **Integration tests (.gr files)** - In `tests/integration/` for user-facing executability
-- **Example files (.gr)** - In `rust/samples/` for documentation and demonstration
+- **Example files (.gr)** - In `samples/` for documentation and demonstration
 - **Property-based tests** - For algorithmic correctness
 - **Regression tests** - For every bug fix
 
@@ -666,7 +666,7 @@ pub fn shortest_path(&self, from: &str, to: &str, edge_type: Option<&str>, weigh
 - ❌ **NEVER** use `#[cfg(test)]` modules in `src/` files
 - ✅ **ALWAYS** place Rust tests in `tests/unit/` or `tests/integration/`
 - ✅ **ALWAYS** create `.gr` integration tests in `tests/integration/`
-- ✅ **ALWAYS** create `.gr` example files in `rust/samples/` for new features
+- ✅ **ALWAYS** create `.gr` example files in `samples/` for new features
 - ✅ **ALWAYS** write tests BEFORE implementation (TDD)
 - ✅ **ALWAYS** register methods/functions in executor after implementing
 - ✅ **ALWAYS** verify examples run: `cargo run --quiet samples/your_example.gr`
