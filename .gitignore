@@ -46,7 +46,7 @@ MANIFEST
 .dmypy.json
 dmypy.json
 
-target/
+target/**/*
 **/*.rs.bk
 *.pdb
 
@@ -68,3 +68,4 @@ SESSION_*.md
 START_HERE_*.md
 *_TEMP.md
 *.backup
+experiments/
