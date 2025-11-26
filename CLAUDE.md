@@ -41,7 +41,7 @@ A comprehensive executability audit revealed that **features implemented at the 
 
 **Action Plan**: See `dev_docs/EXECUTABILITY_FIX_PLAN.md` for 3-phase fix strategy (2-3 days critical, 1-2 weeks comprehensive)
 
-**Python Implementation**: The Python implementation in `python/` serves as a **reference prototype** demonstrating language concepts. The Rust implementation in `rust/` is the **production target**.
+**Python Implementation**: The Python implementation in `python/` serves as a **reference prototype** demonstrating language concepts. The Rust implementation is the **current bootstrap target**, with the ultimate goal being a self-hosted Graphoid implementation.
 
 ---
 
@@ -80,6 +80,40 @@ Graphoid is built on three levels of graph abstraction:
 - **No Method Proliferation** - One method with parameters beats many similar methods
 - **Dogfooding** - Use Graphoid extensively to validate its expressiveness
 - **🚫 NO GENERICS - EVER** - See `dev_docs/NO_GENERICS_POLICY.md` - Non-negotiable!
+
+---
+
+## Ultimate Goal: Self-Hosting & Zero External Dependencies
+
+**The Rust implementation is a bootstrap, not a foundation.**
+
+The end goal for Graphoid is complete self-sufficiency:
+
+1. **Self-Hosting** - Graphoid compiler/interpreter written entirely in Graphoid
+2. **Zero Rust Dependencies** - No Rust code in the final product
+3. **Direct System Interface** - Graphoid runtime makes syscalls directly, not via Rust
+4. **Pure Graphoid Standard Library** - All stdlib modules (crypto, json, http, etc.) in pure Graphoid
+
+### The Bootstrap Path
+
+The current Rust implementation exists only to birth Graphoid to the point where it can implement itself:
+
+| Phase | Description |
+|-------|-------------|
+| **Current** | Rust bootstrap - getting Graphoid functional |
+| **Phase 13** | Bitwise operators - enables pure Graphoid crypto |
+| **Future** | Rewrite lexer, parser, executor in Graphoid |
+| **Future** | Graphoid runtime with direct syscalls |
+| **End State** | Delete Rust, Graphoid runs Graphoid |
+
+### What This Means for Development
+
+- **Rust code is temporary scaffolding** - Write it knowing it will be replaced
+- **Native modules are stopgaps** - Every Rust stdlib module should have a pure Graphoid replacement path
+- **No permanent Rust dependencies** - Even syscall wrappers will eventually be pure Graphoid
+- **Performance via native acceleration, not native requirement** - Rust crypto may be faster, but pure Graphoid crypto must be *possible*
+
+This is not aspirational - it is the architectural mandate. Every design decision must keep self-hosting in view.
 
 ---
 
