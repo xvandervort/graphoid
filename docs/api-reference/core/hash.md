@@ -922,7 +922,7 @@ import "json"
 
 # Hash to JSON
 user = {"name": "Alice", "age": 30}
-json_str = json.stringify(user)
+json_str = json.to_string(user)
 # '{"name":"Alice","age":30}'
 
 # JSON to hash

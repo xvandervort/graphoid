@@ -1,0 +1,570 @@
+# X.509 Certificate Parser Module
+# Pure Graphoid implementation for parsing X.509 certificates
+# Uses the asn1 module for DER/ASN.1 parsing
+
+import "asn1"
+
+__module = "x509"
+__version = "0.1.0"
+
+# Parse a DER-encoded X.509 certificate
+# Input: hex string of the DER-encoded certificate
+# Returns: hash with certificate fields
+fn parse_certificate(cert_hex) {
+    # X.509 Certificate structure:
+    # Certificate ::= SEQUENCE {
+    #     tbsCertificate       TBSCertificate,
+    #     signatureAlgorithm   AlgorithmIdentifier,
+    #     signatureValue       BIT STRING
+    # }
+
+    result = {
+        "version": none,
+        "serial_number": none,
+        "issuer": {},
+        "subject": {},
+        "not_before": none,
+        "not_after": none,
+        "public_key_algorithm": none,
+        "public_key": none,
+        "signature_algorithm": none,
+        "signature": none,
+        "tbs_certificate": none,  # For signature verification
+        "error": none
+    }
+
+    # Parse outer SEQUENCE
+    outer = asn1.parse(cert_hex, 0)
+    if outer.has_key("error") {
+        result["error"] = "Invalid certificate: " + outer["error"]
+        return result
+    }
+
+    if outer["tag"] != asn1.TAG_SEQUENCE {
+        result["error"] = "Certificate must be a SEQUENCE"
+        return result
+    }
+
+    # Parse the three components
+    cert_contents = outer["value"]
+    offset = 0
+
+    # 1. TBSCertificate
+    tbs = asn1.parse(cert_contents, offset)
+    if tbs.has_key("error") {
+        result["error"] = "Invalid TBSCertificate: " + tbs["error"]
+        return result
+    }
+
+    # Store raw TBS for signature verification
+    result["tbs_certificate"] = extract_tbs_raw(cert_hex, outer["value_start"])
+
+    # Parse TBSCertificate fields
+    parse_tbs_certificate(tbs["value"], result)
+
+    offset = tbs["next_offset"]
+
+    # 2. SignatureAlgorithm
+    sig_alg = asn1.parse(cert_contents, offset)
+    if not sig_alg.has_key("error") {
+        result["signature_algorithm"] = parse_algorithm_identifier(sig_alg["value"])
+        offset = sig_alg["next_offset"]
+    }
+
+    # 3. SignatureValue
+    sig_val = asn1.parse(cert_contents, offset)
+    if not sig_val.has_key("error") and sig_val["tag"] == asn1.TAG_BIT_STRING {
+        bs = asn1.parse_bit_string(sig_val["value"])
+        result["signature"] = bs["data"]
+    }
+
+    return result
+}
+
+# Extract raw TBS certificate bytes for signature verification
+fn extract_tbs_raw(cert_hex, value_start) {
+    # Parse the TBS to find its length, then extract raw bytes
+    tbs = asn1.parse(cert_hex, value_start)
+    if tbs.has_key("error") {
+        return ""
+    }
+
+    # Calculate total TBS length including tag and length bytes
+    tbs_start = value_start
+    tbs_end = tbs["next_offset"]
+
+    raw = ""
+    i = tbs_start
+    while i < tbs_end {
+        raw = raw + cert_hex[i]
+        i = i + 1
+    }
+    return raw
+}
+
+# Parse TBSCertificate structure
+fn parse_tbs_certificate(tbs_hex, result) {
+    # TBSCertificate ::= SEQUENCE {
+    #     version         [0]  EXPLICIT Version DEFAULT v1,
+    #     serialNumber         CertificateSerialNumber,
+    #     signature            AlgorithmIdentifier,
+    #     issuer               Name,
+    #     validity             Validity,
+    #     subject              Name,
+    #     subjectPublicKeyInfo SubjectPublicKeyInfo,
+    #     ... extensions ...
+    # }
+
+    offset = 0
+
+    # Check for version (optional, tagged [0])
+    first = asn1.parse(tbs_hex, offset)
+    if first.has_key("error") {
+        return
+    }
+
+    if first["tag"] == asn1.TAG_CONTEXT_0 {
+        # Version is present
+        ver_int = asn1.parse(first["value"], 0)
+        if not ver_int.has_key("error") {
+            result["version"] = asn1.parse_integer(ver_int["value"]) + 1  # v1=0, v2=1, v3=2
+        }
+        offset = first["next_offset"]
+    } else {
+        result["version"] = 1  # Default to v1
+    }
+
+    # Serial Number
+    serial = asn1.parse(tbs_hex, offset)
+    if not serial.has_key("error") and serial["tag"] == asn1.TAG_INTEGER {
+        result["serial_number"] = asn1.parse_integer(serial["value"])
+        offset = serial["next_offset"]
+    }
+
+    # Signature Algorithm (in TBS, should match outer)
+    sig_alg = asn1.parse(tbs_hex, offset)
+    if not sig_alg.has_key("error") and sig_alg["tag"] == asn1.TAG_SEQUENCE {
+        # Skip - we use outer signature algorithm
+        offset = sig_alg["next_offset"]
+    }
+
+    # Issuer Name
+    issuer = asn1.parse(tbs_hex, offset)
+    if not issuer.has_key("error") and issuer["tag"] == asn1.TAG_SEQUENCE {
+        result["issuer"] = parse_name(issuer["value"])
+        offset = issuer["next_offset"]
+    }
+
+    # Validity
+    validity = asn1.parse(tbs_hex, offset)
+    if not validity.has_key("error") and validity["tag"] == asn1.TAG_SEQUENCE {
+        parse_validity(validity["value"], result)
+        offset = validity["next_offset"]
+    }
+
+    # Subject Name
+    subject = asn1.parse(tbs_hex, offset)
+    if not subject.has_key("error") and subject["tag"] == asn1.TAG_SEQUENCE {
+        result["subject"] = parse_name(subject["value"])
+        offset = subject["next_offset"]
+    }
+
+    # SubjectPublicKeyInfo
+    spki = asn1.parse(tbs_hex, offset)
+    if not spki.has_key("error") and spki["tag"] == asn1.TAG_SEQUENCE {
+        parse_subject_public_key_info(spki["value"], result)
+        offset = spki["next_offset"]
+    }
+}
+
+# Parse AlgorithmIdentifier
+fn parse_algorithm_identifier(alg_hex) {
+    # AlgorithmIdentifier ::= SEQUENCE {
+    #     algorithm   OBJECT IDENTIFIER,
+    #     parameters  ANY DEFINED BY algorithm OPTIONAL
+    # }
+
+    offset = 0
+
+    oid_elem = asn1.parse(alg_hex, offset)
+    if oid_elem.has_key("error") or oid_elem["tag"] != asn1.TAG_OID {
+        return {"oid": "", "name": "unknown"}
+    }
+
+    oid = asn1.parse_oid(oid_elem["value"])
+    return {
+        "oid": oid,
+        "name": asn1.oid_name(oid)
+    }
+}
+
+# Parse X.500 Name (issuer/subject)
+fn parse_name(name_hex) {
+    # Name ::= SEQUENCE OF RelativeDistinguishedName
+    # RDN ::= SET OF AttributeTypeAndValue
+    # AttributeTypeAndValue ::= SEQUENCE { type OID, value ANY }
+
+    result = {}
+    offset = 0
+
+    while offset < name_hex.size() {
+        rdn = asn1.parse(name_hex, offset)
+        if rdn.has_key("error") {
+            break
+        }
+
+        if rdn["tag"] == asn1.TAG_SET {
+            # Parse AttributeTypeAndValue within the SET
+            atv_offset = 0
+            while atv_offset < rdn["value"].size() {
+                atv = asn1.parse(rdn["value"], atv_offset)
+                if atv.has_key("error") {
+                    break
+                }
+
+                if atv["tag"] == asn1.TAG_SEQUENCE {
+                    parse_attribute_type_value(atv["value"], result)
+                }
+                atv_offset = atv["next_offset"]
+            }
+        }
+
+        offset = rdn["next_offset"]
+    }
+
+    return result
+}
+
+# Parse a single AttributeTypeAndValue
+fn parse_attribute_type_value(atv_hex, result) {
+    offset = 0
+
+    # OID
+    oid_elem = asn1.parse(atv_hex, offset)
+    if oid_elem.has_key("error") or oid_elem["tag"] != asn1.TAG_OID {
+        return
+    }
+    oid = asn1.parse_oid(oid_elem["value"])
+    offset = oid_elem["next_offset"]
+
+    # Value (string type)
+    val_elem = asn1.parse(atv_hex, offset)
+    if val_elem.has_key("error") {
+        return
+    }
+
+    value = ""
+    if val_elem["tag"] == asn1.TAG_UTF8_STRING or val_elem["tag"] == asn1.TAG_PRINTABLE_STRING or val_elem["tag"] == asn1.TAG_IA5_STRING {
+        value = asn1.parse_string(val_elem["value"])
+    }
+
+    # Map OID to friendly name
+    if oid == asn1.OID_COMMON_NAME {
+        result["CN"] = value
+    } else if oid == asn1.OID_COUNTRY {
+        result["C"] = value
+    } else if oid == asn1.OID_ORGANIZATION {
+        result["O"] = value
+    } else if oid == asn1.OID_ORG_UNIT {
+        result["OU"] = value
+    } else {
+        result[oid] = value
+    }
+}
+
+# Parse Validity period
+fn parse_validity(validity_hex, result) {
+    # Validity ::= SEQUENCE {
+    #     notBefore   Time,
+    #     notAfter    Time
+    # }
+
+    offset = 0
+
+    # notBefore
+    nb = asn1.parse(validity_hex, offset)
+    if not nb.has_key("error") {
+        if nb["tag"] == asn1.TAG_UTC_TIME {
+            result["not_before"] = asn1.parse_utc_time(nb["value"])
+        } else if nb["tag"] == asn1.TAG_GENERALIZED_TIME {
+            result["not_before"] = asn1.parse_generalized_time(nb["value"])
+        }
+        offset = nb["next_offset"]
+    }
+
+    # notAfter
+    na = asn1.parse(validity_hex, offset)
+    if not na.has_key("error") {
+        if na["tag"] == asn1.TAG_UTC_TIME {
+            result["not_after"] = asn1.parse_utc_time(na["value"])
+        } else if na["tag"] == asn1.TAG_GENERALIZED_TIME {
+            result["not_after"] = asn1.parse_generalized_time(na["value"])
+        }
+    }
+}
+
+# Parse SubjectPublicKeyInfo
+fn parse_subject_public_key_info(spki_hex, result) {
+    # SubjectPublicKeyInfo ::= SEQUENCE {
+    #     algorithm        AlgorithmIdentifier,
+    #     subjectPublicKey BIT STRING
+    # }
+
+    offset = 0
+
+    # Algorithm
+    alg = asn1.parse(spki_hex, offset)
+    if not alg.has_key("error") and alg["tag"] == asn1.TAG_SEQUENCE {
+        result["public_key_algorithm"] = parse_public_key_algorithm(alg["value"])
+        offset = alg["next_offset"]
+    }
+
+    # Public Key
+    pk = asn1.parse(spki_hex, offset)
+    if not pk.has_key("error") and pk["tag"] == asn1.TAG_BIT_STRING {
+        bs = asn1.parse_bit_string(pk["value"])
+        result["public_key"] = bs["data"]
+    }
+}
+
+# Parse public key algorithm identifier with parameters
+fn parse_public_key_algorithm(alg_hex) {
+    result = {"oid": "", "name": "unknown", "curve": none}
+
+    offset = 0
+
+    # OID
+    oid_elem = asn1.parse(alg_hex, offset)
+    if oid_elem.has_key("error") or oid_elem["tag"] != asn1.TAG_OID {
+        return result
+    }
+
+    oid = asn1.parse_oid(oid_elem["value"])
+    result["oid"] = oid
+    result["name"] = asn1.oid_name(oid)
+    offset = oid_elem["next_offset"]
+
+    # Parameters (for EC, this is the curve OID)
+    if oid == asn1.OID_EC_PUBLIC_KEY {
+        param = asn1.parse(alg_hex, offset)
+        if not param.has_key("error") and param["tag"] == asn1.TAG_OID {
+            curve_oid = asn1.parse_oid(param["value"])
+            result["curve"] = asn1.oid_name(curve_oid)
+            result["curve_oid"] = curve_oid
+        }
+    }
+
+    return result
+}
+
+# Pretty print a certificate
+fn print_certificate(cert) {
+    print("X.509 Certificate")
+    print("-----------------")
+    print("Version:", cert["version"])
+
+    serial = cert["serial_number"]
+    if serial.is_string() {
+        print("Serial Number:", serial)
+    } else {
+        print("Serial Number:", serial.to_string())
+    }
+
+    print("")
+    print("Issuer:")
+    issuer = cert["issuer"]
+    if issuer.has_key("CN") {
+        print("  Common Name:", issuer["CN"])
+    }
+    if issuer.has_key("O") {
+        print("  Organization:", issuer["O"])
+    }
+    if issuer.has_key("C") {
+        print("  Country:", issuer["C"])
+    }
+
+    print("")
+    print("Subject:")
+    subject = cert["subject"]
+    if subject.has_key("CN") {
+        print("  Common Name:", subject["CN"])
+    }
+    if subject.has_key("O") {
+        print("  Organization:", subject["O"])
+    }
+    if subject.has_key("C") {
+        print("  Country:", subject["C"])
+    }
+
+    print("")
+    print("Validity:")
+    if cert["not_before"] != none {
+        nb = cert["not_before"]
+        print("  Not Before:", nb["year"].to_string() + "-" + nb["month"] + "-" + nb["day"])
+    }
+    if cert["not_after"] != none {
+        na = cert["not_after"]
+        print("  Not After:", na["year"].to_string() + "-" + na["month"] + "-" + na["day"])
+    }
+
+    print("")
+    print("Public Key:")
+    if cert["public_key_algorithm"] != none {
+        pka = cert["public_key_algorithm"]
+        print("  Algorithm:", pka["name"])
+        if pka["curve"] != none {
+            print("  Curve:", pka["curve"])
+        }
+    }
+    if cert["public_key"] != none {
+        pk = cert["public_key"]
+        print("  Key:", pk[0..64] + "...")  # First 32 bytes
+    }
+
+    print("")
+    print("Signature:")
+    if cert["signature_algorithm"] != none {
+        print("  Algorithm:", cert["signature_algorithm"]["name"])
+    }
+    if cert["signature"] != none {
+        sig = cert["signature"]
+        print("  Value:", sig[0..64] + "...")  # First 32 bytes
+    }
+}
+
+# Verify certificate signature using parent certificate's public key
+# Returns: {valid: bool, error: string or none}
+fn verify_signature(cert, issuer_cert) {
+    import "crypto"
+
+    if cert["tbs_certificate"] == none {
+        return {"valid": false, "error": "No TBS certificate data"}
+    }
+
+    if cert["signature"] == none {
+        return {"valid": false, "error": "No signature"}
+    }
+
+    if issuer_cert["public_key"] == none {
+        return {"valid": false, "error": "Issuer has no public key"}
+    }
+
+    sig_alg = cert["signature_algorithm"]
+    if sig_alg == none {
+        return {"valid": false, "error": "No signature algorithm"}
+    }
+
+    oid = sig_alg["oid"]
+
+    # Determine hash algorithm and signature type
+    if oid == asn1.OID_SHA256_WITH_RSA or oid == asn1.OID_SHA384_WITH_RSA or oid == asn1.OID_SHA512_WITH_RSA {
+        # RSA signature
+        hash_alg = "sha256"
+        if oid == asn1.OID_SHA384_WITH_RSA {
+            hash_alg = "sha384"
+        } else if oid == asn1.OID_SHA512_WITH_RSA {
+            hash_alg = "sha512"
+        }
+
+        valid = crypto.rsa_verify(
+            issuer_cert["public_key"],
+            cert["tbs_certificate"],
+            cert["signature"],
+            hash_alg
+        )
+        return {"valid": valid, "error": none}
+
+    } else if oid == asn1.OID_ECDSA_WITH_SHA256 or oid == asn1.OID_ECDSA_WITH_SHA384 {
+        # ECDSA signature
+        curve = "P-256"
+        if oid == asn1.OID_ECDSA_WITH_SHA384 {
+            curve = "P-384"
+        }
+
+        valid = crypto.ecdsa_verify(
+            issuer_cert["public_key"],
+            cert["tbs_certificate"],
+            cert["signature"],
+            curve
+        )
+        return {"valid": valid, "error": none}
+    }
+
+    return {"valid": false, "error": "Unsupported signature algorithm: " + oid}
+}
+
+# Check if certificate is currently valid (by date)
+fn is_valid_now(cert) {
+    import "time"
+
+    now = time.now()
+    year = now["year"]
+    month = now["month"]
+    day = now["day"]
+
+    # Check not_before
+    if cert["not_before"] != none {
+        nb = cert["not_before"]
+        if year < nb["year"] {
+            return false
+        }
+        if year == nb["year"] {
+            nb_month_str = nb["month"]
+            nb_month = 0
+            i = 0
+            while i < 2 {
+                nb_month = nb_month * 10 + (nb_month_str.char_code(i) - 48)
+                i = i + 1
+            }
+            if month < nb_month {
+                return false
+            }
+            if month == nb_month {
+                nb_day_str = nb["day"]
+                nb_day = 0
+                i = 0
+                while i < 2 {
+                    nb_day = nb_day * 10 + (nb_day_str.char_code(i) - 48)
+                    i = i + 1
+                }
+                if day < nb_day {
+                    return false
+                }
+            }
+        }
+    }
+
+    # Check not_after
+    if cert["not_after"] != none {
+        na = cert["not_after"]
+        if year > na["year"] {
+            return false
+        }
+        if year == na["year"] {
+            na_month_str = na["month"]
+            na_month = 0
+            i = 0
+            while i < 2 {
+                na_month = na_month * 10 + (na_month_str.char_code(i) - 48)
+                i = i + 1
+            }
+            if month > na_month {
+                return false
+            }
+            if month == na_month {
+                na_day_str = na["day"]
+                na_day = 0
+                i = 0
+                while i < 2 {
+                    na_day = na_day * 10 + (na_day_str.char_code(i) - 48)
+                    i = i + 1
+                }
+                if day > na_day {
+                    return false
+                }
+            }
+        }
+    }
+
+    return true
+}

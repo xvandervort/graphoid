@@ -7,7 +7,7 @@ fn test_import_json_module() {
 
     let source = r#"
         import "json"
-        result = json.stringify({})
+        result = json.to_string({})
     "#;
     executor.execute_source(source).unwrap();
 
@@ -105,7 +105,7 @@ fn test_multiple_stdlib_imports() {
         import "json"
 
         pi_value = math.pi
-        json_result = json.stringify({})
+        json_result = json.to_string({})
     "#;
     executor.execute_source(source).unwrap();
 

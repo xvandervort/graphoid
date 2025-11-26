@@ -1,0 +1,431 @@
+# ASN.1/DER Parser Module
+# Pure Graphoid implementation for parsing DER-encoded data
+# Used for X.509 certificate parsing and other cryptographic structures
+
+__module = "asn1"
+__version = "0.1.0"
+
+# ASN.1 Tag constants (Universal class)
+TAG_BOOLEAN = 0x01
+TAG_INTEGER = 0x02
+TAG_BIT_STRING = 0x03
+TAG_OCTET_STRING = 0x04
+TAG_NULL = 0x05
+TAG_OID = 0x06
+TAG_UTF8_STRING = 0x0C
+TAG_SEQUENCE = 0x30
+TAG_SET = 0x31
+TAG_PRINTABLE_STRING = 0x13
+TAG_IA5_STRING = 0x16
+TAG_UTC_TIME = 0x17
+TAG_GENERALIZED_TIME = 0x18
+
+# Context-specific tags (used in X.509)
+TAG_CONTEXT_0 = 0xA0
+TAG_CONTEXT_1 = 0xA1
+TAG_CONTEXT_2 = 0xA2
+TAG_CONTEXT_3 = 0xA3
+
+# Parse a DER-encoded structure
+# Returns a hash with: tag, length, value, raw, next_offset
+# data: hex string of DER data
+# offset: starting position (in hex characters, so byte offset * 2)
+fn parse(data, offset) {
+    if offset >= data.size() {
+        return {"error": "End of data"}
+    }
+
+    # Read tag byte (2 hex chars = 1 byte)
+    tag_hex = data[offset] + data[offset + 1]
+    tag = hex_to_int(tag_hex)
+    offset = offset + 2
+
+    # Read length
+    len_result = parse_length(data, offset)
+    if len_result.has_key("error") {
+        return len_result
+    }
+    length = len_result["length"]
+    offset = len_result["next_offset"]
+
+    # Extract value (length bytes = length * 2 hex chars)
+    value_start = offset
+    value_end = offset + (length * 2)
+
+    if value_end > data.size() {
+        return {"error": "Value extends beyond data"}
+    }
+
+    value_hex = ""
+    i = value_start
+    while i < value_end {
+        value_hex = value_hex + data[i]
+        i = i + 1
+    }
+
+    return {
+        "tag": tag,
+        "length": length,
+        "value": value_hex,
+        "value_start": value_start,
+        "next_offset": value_end
+    }
+}
+
+# Parse DER length field
+# Returns: {length, next_offset} or {error}
+fn parse_length(data, offset) {
+    if offset >= data.size() {
+        return {"error": "No length byte"}
+    }
+
+    first_byte_hex = data[offset] + data[offset + 1]
+    first_byte = hex_to_int(first_byte_hex)
+    offset = offset + 2
+
+    # Short form: length < 128
+    if first_byte < 128 {
+        return {"length": first_byte, "next_offset": offset}
+    }
+
+    # Long form: first byte indicates number of length bytes
+    num_length_bytes = first_byte - 128
+
+    if num_length_bytes == 0 {
+        return {"error": "Indefinite length not supported in DER"}
+    }
+
+    if num_length_bytes > 4 {
+        return {"error": "Length too large"}
+    }
+
+    length = 0
+    i = 0
+    while i < num_length_bytes {
+        if offset >= data.size() {
+            return {"error": "Length bytes extend beyond data"}
+        }
+        byte_hex = data[offset] + data[offset + 1]
+        byte_val = hex_to_int(byte_hex)
+        length = (length * 256) + byte_val
+        offset = offset + 2
+        i = i + 1
+    }
+
+    return {"length": length, "next_offset": offset}
+}
+
+# Convert integer to string without decimal places
+fn int_to_string(n) {
+    s = n.to_string()
+    # Remove trailing .0 if present
+    if s.size() >= 2 {
+        last_two = s[s.size() - 2] + s[s.size() - 1]
+        if last_two == ".0" {
+            result = ""
+            i = 0
+            while i < s.size() - 2 {
+                result = result + s[i]
+                i = i + 1
+            }
+            return result
+        }
+    }
+    return s
+}
+
+# Convert hex string to integer
+fn hex_to_int(hex_str) {
+    result = 0
+    i = 0
+    while i < hex_str.size() {
+        c = hex_str[i]
+        code = hex_str.char_code(i)
+        result = result * 16
+        if c >= "0" and c <= "9" {
+            result = result + (code - 48)  # '0' = 48
+        } else if c >= "a" and c <= "f" {
+            result = result + (code - 87)  # 'a' = 97, 97-10 = 87
+        } else if c >= "A" and c <= "F" {
+            result = result + (code - 55)  # 'A' = 65, 65-10 = 55
+        }
+        i = i + 1
+    }
+    return result
+}
+
+# Parse an INTEGER value from DER
+# Returns the integer value (supports arbitrary size via hex string for large values)
+fn parse_integer(value_hex) {
+    if value_hex.size() == 0 {
+        return 0
+    }
+
+    # Check for negative (high bit set)
+    first_byte = hex_to_int(value_hex[0] + value_hex[1])
+    is_negative = first_byte >= 128
+
+    # For small positive integers (up to 8 bytes), compute directly
+    if value_hex.size() <= 16 and not is_negative {
+        return hex_to_int(value_hex)
+    }
+
+    # For large integers, return as hex string with "0x" prefix
+    return "0x" + value_hex
+}
+
+# Parse a BIT STRING value
+# Returns: {unused_bits, data}
+fn parse_bit_string(value_hex) {
+    if value_hex.size() < 2 {
+        return {"error": "BIT STRING too short"}
+    }
+
+    unused_bits = hex_to_int(value_hex[0] + value_hex[1])
+
+    # Extract the actual bit string data (skip first byte)
+    data = ""
+    i = 2
+    while i < value_hex.size() {
+        data = data + value_hex[i]
+        i = i + 1
+    }
+
+    return {"unused_bits": unused_bits, "data": data}
+}
+
+# Parse an OID (Object Identifier)
+# Returns the OID as a dotted string (e.g., "1.2.840.113549.1.1.1")
+fn parse_oid(value_hex) {
+    if value_hex.size() < 2 {
+        return ""
+    }
+
+    # First byte encodes first two components: first = byte / 40, second = byte % 40
+    first_byte = hex_to_int(value_hex[0] + value_hex[1])
+    first_component = (first_byte / 40).down()  # Integer division
+    second_component = first_byte % 40
+
+    # Handle edge case for large second component
+    if first_component > 2 {
+        first_component = 2
+        second_component = first_byte - 80
+    }
+
+    # Format integers without decimal places
+    fc = first_component.down()
+    sc = second_component.down()
+    oid = int_to_string(fc) + "." + int_to_string(sc)
+
+    # Parse remaining components (variable-length encoding)
+    i = 2
+    current_value = 0
+    while i < value_hex.size() {
+        byte_val = hex_to_int(value_hex[i] + value_hex[i + 1])
+        i = i + 2
+
+        # High bit indicates continuation
+        if byte_val >= 128 {
+            current_value = (current_value * 128) + (byte_val - 128)
+        } else {
+            current_value = (current_value * 128) + byte_val
+            oid = oid + "." + int_to_string(current_value)
+            current_value = 0
+        }
+    }
+
+    return oid
+}
+
+# Parse a UTF8String, PrintableString, or IA5String
+fn parse_string(value_hex) {
+    result = ""
+    i = 0
+    while i < value_hex.size() {
+        byte_val = hex_to_int(value_hex[i] + value_hex[i + 1])
+        result = result + byte_val.to_char()
+        i = i + 2
+    }
+    return result
+}
+
+# Parse UTCTime (YYMMDDHHMMSSZ)
+fn parse_utc_time(value_hex) {
+    time_str = parse_string(value_hex)
+
+    # UTCTime: YYMMDDHHMMSSZ
+    if time_str.size() < 13 {
+        return {"error": "Invalid UTCTime"}
+    }
+
+    year = time_str[0] + time_str[1]
+    year_int = 0
+    i = 0
+    while i < 2 {
+        year_int = year_int * 10 + (time_str.char_code(i) - 48)
+        i = i + 1
+    }
+
+    # Y2K handling: 00-49 = 2000-2049, 50-99 = 1950-1999
+    if year_int < 50 {
+        full_year = 2000 + year_int
+    } else {
+        full_year = 1900 + year_int
+    }
+
+    return {
+        "year": full_year,
+        "month": time_str[2] + time_str[3],
+        "day": time_str[4] + time_str[5],
+        "hour": time_str[6] + time_str[7],
+        "minute": time_str[8] + time_str[9],
+        "second": time_str[10] + time_str[11],
+        "raw": time_str
+    }
+}
+
+# Parse GeneralizedTime (YYYYMMDDHHMMSSZ)
+fn parse_generalized_time(value_hex) {
+    time_str = parse_string(value_hex)
+
+    if time_str.size() < 15 {
+        return {"error": "Invalid GeneralizedTime"}
+    }
+
+    return {
+        "year": time_str[0] + time_str[1] + time_str[2] + time_str[3],
+        "month": time_str[4] + time_str[5],
+        "day": time_str[6] + time_str[7],
+        "hour": time_str[8] + time_str[9],
+        "minute": time_str[10] + time_str[11],
+        "second": time_str[12] + time_str[13],
+        "raw": time_str
+    }
+}
+
+# Parse a SEQUENCE, returning all contained elements
+fn parse_sequence(value_hex) {
+    elements = []
+    offset = 0
+
+    while offset < value_hex.size() {
+        elem = parse(value_hex, offset)
+        if elem.has_key("error") {
+            break
+        }
+        elements = elements.append(elem)
+        offset = elem["next_offset"]
+    }
+
+    return elements
+}
+
+# Get tag name for debugging
+fn tag_name(tag) {
+    if tag == TAG_BOOLEAN { return "BOOLEAN" }
+    if tag == TAG_INTEGER { return "INTEGER" }
+    if tag == TAG_BIT_STRING { return "BIT STRING" }
+    if tag == TAG_OCTET_STRING { return "OCTET STRING" }
+    if tag == TAG_NULL { return "NULL" }
+    if tag == TAG_OID { return "OID" }
+    if tag == TAG_UTF8_STRING { return "UTF8String" }
+    if tag == TAG_SEQUENCE { return "SEQUENCE" }
+    if tag == TAG_SET { return "SET" }
+    if tag == TAG_PRINTABLE_STRING { return "PrintableString" }
+    if tag == TAG_IA5_STRING { return "IA5String" }
+    if tag == TAG_UTC_TIME { return "UTCTime" }
+    if tag == TAG_GENERALIZED_TIME { return "GeneralizedTime" }
+    if tag == TAG_CONTEXT_0 { return "[0]" }
+    if tag == TAG_CONTEXT_1 { return "[1]" }
+    if tag == TAG_CONTEXT_2 { return "[2]" }
+    if tag == TAG_CONTEXT_3 { return "[3]" }
+    return "UNKNOWN(" + tag.to_string() + ")"
+}
+
+# Recursively dump ASN.1 structure (for debugging)
+fn dump(data, offset, indent) {
+    if offset >= data.size() {
+        return
+    }
+
+    elem = parse(data, offset)
+    if elem.has_key("error") {
+        print(indent + "ERROR: " + elem["error"])
+        return
+    }
+
+    tag = elem["tag"]
+    prefix = indent + tag_name(tag) + " [" + elem["length"].to_string() + "]"
+
+    # Handle constructed types recursively
+    if tag == TAG_SEQUENCE or tag == TAG_SET or tag >= 0xA0 {
+        print(prefix)
+        dump(elem["value"], 0, indent + "  ")
+    } else if tag == TAG_OID {
+        print(prefix + ": " + parse_oid(elem["value"]))
+    } else if tag == TAG_INTEGER {
+        int_val = parse_integer(elem["value"])
+        if int_val.is_string() {
+            print(prefix + ": " + int_val)  # Large integer as hex
+        } else {
+            print(prefix + ": " + int_val.to_string())
+        }
+    } else if tag == TAG_UTF8_STRING or tag == TAG_PRINTABLE_STRING or tag == TAG_IA5_STRING {
+        print(prefix + ": \"" + parse_string(elem["value"]) + "\"")
+    } else if tag == TAG_UTC_TIME {
+        time = parse_utc_time(elem["value"])
+        print(prefix + ": " + time["raw"])
+    } else if tag == TAG_BIT_STRING {
+        bs = parse_bit_string(elem["value"])
+        print(prefix + ": " + bs["data"].size().to_string() + " hex chars, " + bs["unused_bits"].to_string() + " unused bits")
+    } else {
+        print(prefix + ": " + elem["value"])
+    }
+
+    # Continue with next element at same level
+    if elem["next_offset"] < data.size() {
+        dump(data, elem["next_offset"], indent)
+    }
+}
+
+# Known OID mappings for X.509
+OID_RSA_ENCRYPTION = "1.2.840.113549.1.1.1"
+OID_SHA256_WITH_RSA = "1.2.840.113549.1.1.11"
+OID_SHA384_WITH_RSA = "1.2.840.113549.1.1.12"
+OID_SHA512_WITH_RSA = "1.2.840.113549.1.1.13"
+OID_ECDSA_WITH_SHA256 = "1.2.840.10045.4.3.2"
+OID_ECDSA_WITH_SHA384 = "1.2.840.10045.4.3.3"
+OID_EC_PUBLIC_KEY = "1.2.840.10045.2.1"
+OID_PRIME256V1 = "1.2.840.10045.3.1.7"
+OID_SECP384R1 = "1.3.132.0.34"
+
+# Attribute OIDs
+OID_COMMON_NAME = "2.5.4.3"
+OID_COUNTRY = "2.5.4.6"
+OID_ORGANIZATION = "2.5.4.10"
+OID_ORG_UNIT = "2.5.4.11"
+
+# Extension OIDs
+OID_SUBJECT_ALT_NAME = "2.5.29.17"
+OID_BASIC_CONSTRAINTS = "2.5.29.19"
+OID_KEY_USAGE = "2.5.29.15"
+
+fn oid_name(oid) {
+    if oid == OID_RSA_ENCRYPTION { return "rsaEncryption" }
+    if oid == OID_SHA256_WITH_RSA { return "sha256WithRSAEncryption" }
+    if oid == OID_SHA384_WITH_RSA { return "sha384WithRSAEncryption" }
+    if oid == OID_SHA512_WITH_RSA { return "sha512WithRSAEncryption" }
+    if oid == OID_ECDSA_WITH_SHA256 { return "ecdsa-with-SHA256" }
+    if oid == OID_ECDSA_WITH_SHA384 { return "ecdsa-with-SHA384" }
+    if oid == OID_EC_PUBLIC_KEY { return "ecPublicKey" }
+    if oid == OID_PRIME256V1 { return "prime256v1 (P-256)" }
+    if oid == OID_SECP384R1 { return "secp384r1 (P-384)" }
+    if oid == OID_COMMON_NAME { return "commonName" }
+    if oid == OID_COUNTRY { return "countryName" }
+    if oid == OID_ORGANIZATION { return "organizationName" }
+    if oid == OID_ORG_UNIT { return "organizationalUnitName" }
+    if oid == OID_SUBJECT_ALT_NAME { return "subjectAltName" }
+    if oid == OID_BASIC_CONSTRAINTS { return "basicConstraints" }
+    if oid == OID_KEY_USAGE { return "keyUsage" }
+    return oid
+}

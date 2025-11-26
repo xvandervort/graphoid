@@ -1,0 +1,35 @@
+# TLS Module - TLS 1.3 implementation in pure Graphoid
+#
+# STATUS: Not yet implemented - requires Phase 13 (bitwise operators)
+#
+# This module will implement TLS 1.3 using only:
+# - net.connect() for TCP sockets
+# - crypto.* for cryptographic primitives
+#
+# TLS 1.3 requires bitwise operators for:
+# - Record layer framing (content type, version, length fields)
+# - Handshake message construction
+# - Key schedule computations
+#
+# Once Phase 13 is complete, this module will implement:
+# 1. ClientHello construction
+# 2. ServerHello parsing
+# 3. Key exchange via crypto.x25519_*
+# 4. Key derivation via crypto.hkdf_*
+# 5. Certificate validation via crypto.ecdsa_verify / crypto.rsa_verify
+# 6. Record encryption via crypto.aes_gcm_* or crypto.chacha20_*
+#
+# Functions (planned):
+# - tls_connect(host, port) -> tls_socket
+# - tls_send(tls_socket, data) -> bytes_sent
+# - tls_recv(tls_socket, max_bytes) -> data
+# - tls_close(tls_socket) -> bool
+
+__module = "tls"
+__version = "0.1.0"
+
+# Placeholder - TLS not yet implemented
+fn tls_connect(host, port) {
+    print("ERROR: TLS not yet implemented. Requires Phase 13 (bitwise operators).")
+    return none
+}

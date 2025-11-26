@@ -340,11 +340,8 @@ import "json"
 data = json.parse('{"name": "Alice", "age": 30}')
 name = data["name"]
 
-# Stringify to JSON
-json_str = json.stringify(data)
-
-# Pretty-print
-pretty = json.stringify(data, indent: 2)
+# Convert to JSON string
+json_str = json.to_string(data)
 
 # Parse with error handling
 try {

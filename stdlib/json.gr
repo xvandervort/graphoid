@@ -3,7 +3,7 @@
 #
 # Functions:
 # - parse(text) -> value - Parse JSON string to Graphoid value
-# - stringify(value) -> string - Convert Graphoid value to JSON string
+# - to_string(value) -> string - Convert Graphoid value to JSON string
 # - read_json(path) -> value - Read and parse JSON file
 # - write_json(path, value) -> bool - Write value to JSON file
 
@@ -252,8 +252,6 @@ fn parse_value(text, pos) {
                 return [none, 0 - 1]
             }
 
-            # Add to object (simplified - treat as string key)
-            # TODO: Need proper map/hash implementation
             obj[key] = value
 
             pos = skip_whitespace(text, pos)
@@ -331,11 +329,85 @@ fn parse(text) {
     return result[0]
 }
 
-# Stringify value to JSON
-fn stringify(value) {
-    # TODO: Implement JSON serialization
-    # For now, return simple string representation
-    return value + ""
+# Helper: Escape string for JSON
+fn escape_string(s) {
+    result = ""
+    i = 0
+    size = s.size()
+
+    while i < size {
+        char = s[i]
+
+        if char == "\\" {
+            result = result + "\\\\"
+        } else if char == "\"" {
+            result = result + "\\\""
+        } else if char == "\n" {
+            result = result + "\\n"
+        } else if char == "\r" {
+            result = result + "\\r"
+        } else if char == "\t" {
+            result = result + "\\t"
+        } else {
+            result = result + char
+        }
+
+        i = i + 1
+    }
+
+    return result
+}
+
+# Convert Graphoid value to JSON string
+fn to_string(value) {
+    t = value.type()
+
+    # Handle none/null
+    if t == "none" {
+        return "null"
+    }
+
+    # Handle booleans
+    if t == "bool" {
+        if value {
+            return "true"
+        } else {
+            return "false"
+        }
+    }
+
+    # Handle numbers
+    if t == "num" {
+        return value + ""
+    }
+
+    # Handle strings - escape and quote
+    if t == "string" {
+        return "\"" + escape_string(value) + "\""
+    }
+
+    # Handle lists/arrays
+    if t == "list" {
+        parts = []
+        for item in value {
+            parts = parts.append(to_string(item))
+        }
+        return "[" + parts.join(", ") + "]"
+    }
+
+    # Handle maps/objects
+    if t == "map" {
+        parts = []
+        for key in value.keys() {
+            key_str = to_string(key)
+            val_str = to_string(value[key])
+            parts = parts.append(key_str + ": " + val_str)
+        }
+        return "{" + parts.join(", ") + "}"
+    }
+
+    # Fallback for other types
+    return "\"" + escape_string(value + "") + "\""
 }
 
 # Read JSON file
@@ -346,6 +418,6 @@ fn read_json(path) {
 
 # Write JSON file
 fn write_json(path, value) {
-    text = stringify(value)
+    text = to_string(value)
     return io.write_file(path, text)
 }

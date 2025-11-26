@@ -1,46 +1,26 @@
-# HTTP Module - HTTP client implementation
-# Built on net module for TCP socket operations
+# HTTP Module - HTTP/HTTPS client implementation
+# Built on net module for TCP sockets and tls module for HTTPS
 #
 # Functions:
-# - get(url) -> response - Perform HTTP GET request
-# - post(url, body, content_type) -> response - Perform HTTP POST request
-# - parse_url(url) -> {host, port, path} - Parse URL into components
+# - get(url) -> response - Perform HTTP/HTTPS GET request
+# - post(url, body, content_type) -> response - Perform HTTP/HTTPS POST request
+# - parse_url(url) -> {host, port, path, is_https} - Parse URL into components
 # - parse_response(response_text) -> {status, headers, body} - Parse HTTP response
+#
+# NOTE: HTTPS requires the tls module (Phase 13 - bitwise operators)
+#       HTTP works now, HTTPS is pending TLS implementation
 
 import "net"
+import "tls"
 
 # Parse URL into components
+# Returns: {host, port, path, is_https}
 fn parse_url(url) {
-    # Simple URL parsing for http://host:port/path
-    # Remove http:// or https:// prefix
     cleaned = url
+    is_https = false
+    default_port = 80
 
-    # Check for http://
-    if url.size() > 7 {
-        if url[0] == "h" {
-            if url[1] == "t" {
-                if url[2] == "t" {
-                    if url[3] == "p" {
-                        if url[4] == ":" {
-                            if url[5] == "/" {
-                                if url[6] == "/" {
-                                    # Found http://
-                                    cleaned = ""
-                                    i = 7
-                                    while i < url.size() {
-                                        cleaned = cleaned + url[i]
-                                        i = i + 1
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    # Check for https://
+    # Check for https:// first (must check before http://)
     if url.size() > 8 {
         if url[0] == "h" {
             if url[1] == "t" {
@@ -51,8 +31,37 @@ fn parse_url(url) {
                                 if url[6] == "/" {
                                     if url[7] == "/" {
                                         # Found https://
+                                        is_https = true
+                                        default_port = 443
                                         cleaned = ""
                                         i = 8
+                                        while i < url.size() {
+                                            cleaned = cleaned + url[i]
+                                            i = i + 1
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    # Check for http:// (only if not already https)
+    if is_https == false {
+        if url.size() > 7 {
+            if url[0] == "h" {
+                if url[1] == "t" {
+                    if url[2] == "t" {
+                        if url[3] == "p" {
+                            if url[4] == ":" {
+                                if url[5] == "/" {
+                                    if url[6] == "/" {
+                                        # Found http://
+                                        cleaned = ""
+                                        i = 7
                                         while i < url.size() {
                                             cleaned = cleaned + url[i]
                                             i = i + 1
@@ -79,7 +88,7 @@ fn parse_url(url) {
     }
 
     host = ""
-    port = 80
+    port = default_port
     path = "/"
 
     if path_start < 0 {
@@ -114,7 +123,7 @@ fn parse_url(url) {
     }
 
     if port_start >= 0 {
-        # Extract port
+        # Extract port number
         host_only = ""
         i = 0
         while i < port_start {
@@ -122,9 +131,19 @@ fn parse_url(url) {
             i = i + 1
         }
 
-        # Port string (simplified - just use default 80 for now)
-        # TODO: Need string-to-number conversion
-        port = 80
+        # Extract port string and convert to number
+        port_str = ""
+        i = port_start + 1
+        while i < host.size() {
+            port_str = port_str + host[i]
+            i = i + 1
+        }
+
+        # Convert port string to number
+        port_num = port_str.to_num()
+        if port_num != none {
+            port = port_num
+        }
 
         host = host_only
     }
@@ -132,7 +151,8 @@ fn parse_url(url) {
     return {
         "host": host,
         "port": port,
-        "path": path
+        "path": path,
+        "is_https": is_https
     }
 }
 
@@ -167,8 +187,28 @@ fn parse_response(response_text) {
     status = 0
     if lines.size() > 0 {
         status_line = lines[0]
-        # Extract status code (simplified)
-        status = 200  # Default
+        # Extract status code - look for first space, then parse 3-digit code
+        space_count = 0
+        status_str = ""
+        j = 0
+        while j < status_line.size() {
+            char = status_line[j]
+            if char == " " {
+                space_count = space_count + 1
+            } else {
+                if space_count == 1 {
+                    # We're in the status code section
+                    if status_str.size() < 3 {
+                        status_str = status_str + char
+                    }
+                }
+            }
+            j = j + 1
+        }
+        status_num = status_str.to_num()
+        if status_num != none {
+            status = status_num
+        }
     }
 
     # Find empty line separating headers and body
@@ -202,19 +242,33 @@ fn parse_response(response_text) {
     }
 }
 
-# Perform HTTP GET request
+# Perform HTTP/HTTPS GET request
 fn get(url) {
     parsed = parse_url(url)
     host = parsed["host"]
     port = parsed["port"]
     path = parsed["path"]
+    is_https = parsed["is_https"]
 
-    # Connect to server
-    socket = net.connect(host, port)
+    # Connect to server (TLS for HTTPS, plain TCP for HTTP)
+    if is_https {
+        socket = tls.tls_connect(host, port)
+        if socket == none {
+            return {
+                "status": 0,
+                "headers": {},
+                "body": "ERROR: HTTPS not yet supported. TLS module requires Phase 13 (bitwise operators)."
+            }
+        }
+    } else {
+        socket = net.connect(host, port)
+    }
 
     # Build HTTP request
     request = "GET " + path + " HTTP/1.1\r\n"
     request = request + "Host: " + host + "\r\n"
+    request = request + "User-Agent: Graphoid/1.0\r\n"
+    request = request + "Accept: */*\r\n"
     request = request + "Connection: close\r\n"
     request = request + "\r\n"
 
@@ -238,21 +292,34 @@ fn get(url) {
     return parse_response(response)
 }
 
-# Perform HTTP POST request
+# Perform HTTP/HTTPS POST request
 fn post(url, body, content_type) {
     parsed = parse_url(url)
     host = parsed["host"]
     port = parsed["port"]
     path = parsed["path"]
+    is_https = parsed["is_https"]
 
-    # Connect to server
-    socket = net.connect(host, port)
+    # Connect to server (TLS for HTTPS, plain TCP for HTTP)
+    if is_https {
+        socket = tls.tls_connect(host, port)
+        if socket == none {
+            return {
+                "status": 0,
+                "headers": {},
+                "body": "ERROR: HTTPS not yet supported. TLS module requires Phase 13 (bitwise operators)."
+            }
+        }
+    } else {
+        socket = net.connect(host, port)
+    }
 
     # Build HTTP request
     request = "POST " + path + " HTTP/1.1\r\n"
     request = request + "Host: " + host + "\r\n"
+    request = request + "User-Agent: Graphoid/1.0\r\n"
     request = request + "Content-Type: " + content_type + "\r\n"
-    request = request + "Content-Length: " + body.size() + "\r\n"
+    request = request + "Content-Length: " + body.size().to_string() + "\r\n"
     request = request + "Connection: close\r\n"
     request = request + "\r\n"
     request = request + body

@@ -2487,6 +2487,27 @@ impl Executor {
                 reversed.reverse();
                 Ok(Value::list(List::from_vec(reversed)))
             }
+            "join" => {
+                // join(separator) - join list elements into a string
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'join' expects 1 argument (separator), but got {}",
+                        args.len()
+                    )));
+                }
+
+                let separator = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+
+                let string_elements: Vec<String> = elements
+                    .iter()
+                    .map(|e| e.to_string_value())
+                    .collect();
+
+                Ok(Value::string(string_elements.join(&separator)))
+            }
             "uniq" => {
                 if !args.is_empty() {
                     return Err(GraphoidError::runtime(format!(

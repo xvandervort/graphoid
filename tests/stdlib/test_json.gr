@@ -36,17 +36,12 @@ print("")
 print("  Parsing object: '{\"name\":\"Alice\",\"age\":25}'")
 print("  Result: " + json.parse("{\"name\":\"Alice\",\"age\":25}").to_string())
 
-# Test stringify
+# Test to_string
 print("")
-print("Testing stringify()...")
-print("  Stringify: 42")
-print("  Result: " + json.stringify(42))
-
-print("  Stringify: true")
-print("  Result: " + json.stringify(true))
-
-print("  Stringify: 'hello'")
-print("  Result: " + json.stringify("hello"))
+print("Testing to_string()...")
+print("  to_string(42): " + json.to_string(42))
+print("  to_string(true): " + json.to_string(true))
+print("  to_string(\"hello\"): " + json.to_string("hello"))
 
 print("")
 print("=== JSON Module: ALL TESTS PASSED ✓ ===")

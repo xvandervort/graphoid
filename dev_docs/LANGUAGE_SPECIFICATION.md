@@ -2358,8 +2358,8 @@ import "json"
 data = json.parse('{"name": "Alice", "age": 30}')
 name = data["name"]
 
-# Stringify to JSON
-json_str = json.stringify(data)
+# Convert to JSON string
+json_str = json.to_string(data)
 ```
 
 #### CSV Module
@@ -2422,7 +2422,7 @@ if response["status"] == 200 {
 # HTTP POST
 response = http.post("https://api.example.com/submit", {
     "Content-Type": "application/json"
-}, json.stringify({"key": "value"}))
+}, json.to_string({"key": "value"}))
 ```
 
 #### HTML Module

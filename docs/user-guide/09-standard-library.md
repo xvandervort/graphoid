@@ -123,11 +123,8 @@ print(data["name"])  # "Alice"
 
 # Convert to JSON
 obj = {"name": "Bob", "scores": [95, 87, 92]}
-json_str = json.stringify(obj)
+json_str = json.to_string(obj)
 # '{"name":"Bob","scores":[95,87,92]}'
-
-# Pretty print
-pretty = json.stringify(obj, indent: 2)
 ```
 
 ### csv - CSV Handling

@@ -236,7 +236,7 @@ if response["status"] == 200 {
 # HTTP POST
 response = http.post("https://api.example.com/submit", {
     "Content-Type": "application/json"
-}, json.stringify({"key": "value"}))
+}, json.to_string({"key": "value"}))
 
 # With options
 response = http.get("https://example.com", {
