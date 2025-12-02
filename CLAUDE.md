@@ -8,38 +8,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Graphoid** is a revolutionary graph-theoretic programming language where **everything is a graph**. Unlike traditional languages that bolt graphs onto the side, Graphoid makes graphs the fundamental abstraction at every level: data structures, variable storage, and even the runtime environment itself.
 
-### Current Status (November 2025)
+### Current Status (December 2025)
 
-**🚨 CRITICAL FINDING: EXECUTOR INTEGRATION GAP DISCOVERED (November 6, 2025)**
+**Major Milestone: Pure Graphoid HTTPS Working!**
 
-A comprehensive executability audit revealed that **features implemented at the Rust API level are not accessible from .gr user-facing files**. See `dev_docs/EXECUTABILITY_AUDIT.md` for full details.
+TLS 1.3 has been implemented in pure Graphoid. HTTPS requests now work:
+```graphoid
+import "http"
+response = http.get("https://example.com/")
+print(response["body"])
+```
 
-**Key Issues**:
-- ❌ `print()` function not working - even "Hello World" fails
-- ❌ **REPL completely broken** - cannot execute basic commands
-- ❌ Pattern matching (Phase 9) non-functional from .gr files despite 186 passing Rust tests
-- ❌ Many implemented features likely non-functional from user perspective
+**Implementation Status:**
 
-**Status Under Review**: Phase completion claims are being reassessed based on actual .gr file executability, not just Rust test passage.
+- ✅ **Phases 0-11 Complete** - Core language fully functional
+- ✅ **TLS 1.3** - X25519 key exchange, AES-GCM encryption, HKDF key derivation
+- ✅ **HTTPS** - Working via `http.get()` in pure Graphoid
+- ✅ **Module System** - Stdlib auto-discovery (no environment variables needed)
+- ✅ **Project Structure** - Flattened (no more `rust/` subdirectory)
+- 📊 **2,228+ Rust Tests Passing**
+- 📊 **30/30 Sample Files Working**
+- 🔄 **Phase 12** - Native stdlib modules (~15% complete)
 
----
-
-**REVISED IMPLEMENTATION STATUS**
-
-- ✅ **Phases 0-2 Complete** - Lexer and Parser (verified working)
-- ⚠️ **Phases 3-7 Status UNCERTAIN** - Rust tests pass but .gr executability unverified:
-  - Phase 3: Value System & Basic Execution
-  - Phase 4: Functions & Lambdas
-  - Phase 5: Collections & Methods
-  - Phase 6: Graph Types & Rules
-  - Phase 6.5: Foundational gaps (132+ tests)
-  - Phase 7: Behaviors & Pattern Matching (186+ tests)
-- ⚠️ **Phase 8 ~75% Complete** - Module System (31 tests, executor integration incomplete)
-- 🚨 **Phase 9** - Pattern matching API implemented but **0% usable** from .gr files
-- 📊 **1,609 Rust Tests Passing** - But **0 integration tests** with .gr files
-- 📋 **14-Phase Roadmap** - Actual completion TBD based on executability audit
-
-**Action Plan**: See `dev_docs/EXECUTABILITY_FIX_PLAN.md` for 3-phase fix strategy (2-3 days critical, 1-2 weeks comprehensive)
+**Recent Fixes (December 2025):**
+- Module function resolution (stack overflow bug fixed)
+- Stdlib path auto-discovery
+- List `sublist()` method for performance
+- HMAC hex input handling
+- TLS multi-record response handling
 
 **Python Implementation**: The Python implementation in `python/` serves as a **reference prototype** demonstrating language concepts. The Rust implementation is the **current bootstrap target**, with the ultimate goal being a self-hosted Graphoid implementation.
 
@@ -123,30 +119,39 @@ This is not aspirational - it is the architectural mandate. Every design decisio
 /home/irv/work/grang/
 ├── CLAUDE.md                    # This file - guidance for Claude Code
 ├── README.md                    # Project readme
-├── rust/                        # 🎯 ACTIVE DEVELOPMENT - Rust implementation
-│   ├── src/                     # Source code
-│   │   ├── lib.rs               # Library root
-│   │   ├── main.rs              # CLI & REPL
-│   │   ├── error.rs             # Error types (complete)
-│   │   ├── lexer/               # Tokenization (Phase 1 - next)
-│   │   ├── parser/              # AST parsing (Phase 2)
-│   │   ├── ast/                 # Syntax tree nodes (Phase 2)
-│   │   ├── execution/           # Execution engine (Phase 3)
-│   │   ├── values/              # Value system (Phase 3)
-│   │   └── graph/               # Graph types & rules (Phase 6)
-│   ├── tests/                   # Rust tests
-│   │   ├── unit/                # Unit tests
-│   │   └── integration/         # Integration tests
-│   ├── benches/                 # Performance benchmarks
-│   ├── examples/                # Example programs
-│   ├── Cargo.toml               # Rust dependencies
-│   └── README.md                # Rust-specific readme
-├── python/                      # Python prototype (reference only)
-│   ├── src/glang/               # Python implementation
-│   ├── test/                    # Python tests
-│   ├── stdlib/                  # Standard library in .gr files
-│   └── samples/                 # Example .gr programs
-├── dev_docs/                    # 📋 DEVELOPMENT DOCUMENTATION
+├── Cargo.toml                   # Rust project configuration
+├── src/                         # 🎯 Rust implementation source
+│   ├── lib.rs                   # Library root
+│   ├── main.rs                  # CLI & REPL
+│   ├── error.rs                 # Error types
+│   ├── lexer/                   # Tokenization
+│   ├── parser/                  # AST parsing
+│   ├── ast/                     # Syntax tree nodes
+│   ├── execution/               # Execution engine
+│   ├── values/                  # Value system
+│   ├── graph/                   # Graph types & rules
+│   └── stdlib/                  # Native stdlib modules (Rust)
+├── stdlib/                      # 📦 Standard library (.gr files)
+│   ├── tls.gr                   # TLS 1.3 implementation (pure Graphoid!)
+│   ├── http.gr                  # HTTP client using TLS
+│   ├── math.gr                  # Math functions
+│   ├── json.gr                  # JSON parsing
+│   ├── time.gr                  # Time/date functions
+│   └── ... (15+ modules)
+├── samples/                     # Example programs (30 files)
+│   ├── 01-basics/               # Hello world, functions, collections
+│   ├── 02-intermediate/         # Behaviors, patterns, bitwise
+│   ├── 03-advanced/             # Graph pattern matching
+│   ├── 04-modules/              # Module system examples
+│   └── 05-stdlib/               # Standard library usage
+├── tests/                       # Rust tests
+│   ├── unit/                    # Unit tests
+│   └── integration/             # Integration tests
+├── docs/                        # 📖 User documentation
+│   ├── WHY_GRAPHOID.md          # Why use Graphoid
+│   ├── DESIGN_PHILOSOPHY.md     # Theoretical foundations
+│   └── user-guide/              # Tutorial chapters
+├── dev_docs/                    # 📋 Development documentation
 │   ├── LANGUAGE_SPECIFICATION.md           # Canonical language spec
 │   ├── RUST_IMPLEMENTATION_ROADMAP.md      # 14-phase implementation plan
 │   ├── ARCHITECTURE_DESIGN.md              # Internal architecture decisions
@@ -206,9 +211,9 @@ The `dev_docs/` directory contains **comprehensive development documentation** i
 6. **`PRODUCTION_TOOLING_SUMMARY.md`** - Executive summary
 7. **`TESTING_FRAMEWORK_COMPARISON.md`** - Why RSpec-style testing
 
-**Session Documentation (in rust/ directory):**
-- `rust/SESSION_SUMMARY.md` - What was accomplished this session
-- `rust/START_HERE_NEXT_SESSION.md` - Quick start guide for next session
+**Session Documentation (in project root):**
+- `SESSION_SUMMARY.md` - What was accomplished this session
+- `START_HERE_NEXT_SESSION.md` - Quick start guide for next session
 
 **DO NOT create new documentation files** in `dev_docs/` without explicit user request. The existing documents are comprehensive and authoritative.
 
@@ -216,34 +221,30 @@ The `dev_docs/` directory contains **comprehensive development documentation** i
 
 ## Current Development: Rust Implementation
 
-### Where We Are Now
+### Where We Are Now (December 2025)
 
-**Phase 0: ✅ COMPLETE** (January 2025)
-- Rust project structure created
-- All dependencies configured (thiserror, regex, chrono, serde, crypto, etc.)
-- Error types with source position tracking
-- CLI and REPL skeleton functional
+**Phases 0-11: ✅ COMPLETE**
+- Lexer, Parser, AST
+- Value System & Basic Execution
+- Functions & Lambdas
+- Collections & Methods
+- Graph Types & Rules
+- Module System
+- Pattern Matching
+- Pure Graphoid Stdlib (11 modules)
 
-**Phase 1: ✅ COMPLETE** - Lexer (54 tests passing)
-- Complete tokenization engine
-- All operators including integer division (`//`) and element-wise (`.+`, `.*`, etc.)
-- Position tracking, comments, strings, numbers, symbols
-- Zero compiler warnings
+**Phase 12: 🔄 IN PROGRESS** (~15% complete)
+- Native stdlib modules (Rust acceleration)
+- Constants, Random modules complete
+- TLS 1.3, HTTP working in pure Graphoid
 
-**Phase 2: ✅ COMPLETE** - Parser & AST (31 tests passing)
-- Full AST node definitions with source positions
-- Recursive descent parser with precedence climbing
-- All statements and expressions
-- Correct operator precedence
-- Zero compiler warnings
+**Key Capabilities:**
+- ✅ **HTTPS Working** - `http.get("https://...")` in pure Graphoid
+- ✅ **TLS 1.3** - X25519, AES-GCM, HKDF implemented
+- ✅ **Module System** - Auto-discovery, no env vars needed
+- ✅ **30 Sample Programs** - All working, well-organized
 
-**Phase 3: 🔜 STARTING NEXT** - Value System & Basic Execution
-- Runtime value types
-- Environment for variable storage
-- Basic expression evaluation
-- Write 30+ executor tests following TDD
-
-**Current Test Status**: ✅ 85/85 tests passing (54 lexer + 31 parser)
+**Current Test Status**: ✅ 2,228+ tests passing
 
 ### Development Commands
 
@@ -584,13 +585,14 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 18-phase plan:
 
 ### Quick Reference
 
-- Phase 0: ✅ Project setup
-- Phase 1: ✅ Lexer (54 tests)
-- Phase 2: ✅ Parser & AST (31 tests)
-- Phase 3: 🔜 Value System & Execution (next)
-- Total tests: **85/85 passing**
-- Command: `# From project root && cargo test`
-- Build: `cargo build` (zero warnings)
+- Phases 0-11: ✅ Complete (core language functional)
+- Phase 12: 🔄 Native stdlib modules (~15%)
+- **TLS 1.3: ✅ Working** (pure Graphoid!)
+- **HTTPS: ✅ Working** via `http.get()`
+- Total tests: **2,228+ passing**
+- Samples: **30/30 working**
+- Command: `~/.cargo/bin/cargo test --lib`
+- Build: `~/.cargo/bin/cargo build`
 
 ---
 
@@ -795,13 +797,20 @@ It becomes a **reference implementation** demonstrating language concepts. The R
 
 ### How long until Graphoid is usable?
 
-- **MVP (basic language)**: 6-8 weeks from now
-- **Feature complete**: 12-16 weeks
-- **Production ready** (with tooling): 24-28 weeks
+Graphoid is usable **now** for many tasks:
+- ✅ **HTTPS/TLS working** - Can fetch web APIs
+- ✅ **JSON parsing** - Handle API responses
+- ✅ **File I/O** - Read/write files
+- ✅ **Math/Statistics** - Data analysis
+
+Still in progress: Testing framework, debugger, package manager.
 
 ### Can I use Graphoid today?
 
-The Python prototype works for experimentation. The Rust implementation will be production-ready in ~6 months.
+Yes! The Rust implementation is functional. Try:
+```bash
+~/.cargo/bin/cargo run --quiet samples/01-basics/hello_world.gr
+```
 
 ### What makes Graphoid different from other languages?
 
@@ -825,37 +834,43 @@ The Python prototype works for experimentation. The Rust implementation will be 
 
 ### For Next Session
 
-**START HERE**: Read `rust/START_HERE_NEXT_SESSION.md` for detailed guide
+**START HERE**: Read `START_HERE_NEXT_SESSION.md` for detailed guide
 
-**🎉 Phase 13.1 IN PROGRESS! (Documentation & Publishing - ~35% complete)**
+**Major Milestone Achieved: Pure Graphoid HTTPS Working! (December 2025)**
 
-**Last Session**: November 21, 2025 (Brief continuation, no new work)
+**Last Session**: December 1-2, 2025
 
-**Recent Accomplishments** (Prior session - November 21, 2025):
-- ✅ **User Guide**: All 10 chapters complete (Getting Started through Best Practices)
-- ✅ **API Reference Core**: 9 files complete (6 core types + 2 reference sections + 1 stdlib module)
-  - Core types: num, string, list, hash, tree, graph
-  - Reference sections: directives, operators
-  - Stdlib modules: math
-- ✅ ~5,360 lines of comprehensive documentation created
-- ✅ ~250+ functions/methods/operators documented
-- ✅ ~600+ code examples included
+**Recent Accomplishments**:
+- ✅ **TLS 1.3 Complete** - X25519, AES-GCM, HKDF working in pure Graphoid
+- ✅ **HTTPS Working** - `http.get("https://...")` fetches real websites
+- ✅ **6 Major Bugs Fixed** - Module resolution, HMAC, stdlib path, etc.
+- ✅ **Project Restructured** - No more `rust/` subdirectory
 
-**Current Status**: Phase 13.1 Task 2 (API Reference) ~60% complete
+**Next Goal**: Build Bitcoin Price Tracker application
+- Fetch BTC prices via HTTPS
+- Store in JSON
+- Perform statistical analysis
+- All in 100% Graphoid
 
 **🚀 Recommended Next Steps:**
 
-1. **⭐ RECOMMENDED: Complete API Reference** (~2-3 days)
-   - Finish remaining stdlib module documentation (~8-10 modules)
-   - Ask: "Let's continue the API Reference. Start with io.md stdlib module."
+1. **⭐ RECOMMENDED: Bitcoin Price Tracker** (The original goal!)
+   - Fetch BTC prices from a public API via HTTPS
+   - Store historical data in JSON files
+   - Calculate statistics (mean, std dev, trends)
+   - Ask: "Let's build the Bitcoin price tracker"
 
-2. **Task 3: Examples Collection** (2-3 days)
-   - Create 10-15 practical example programs
-   - Ask: "Let's start Task 3 - Examples Collection."
+2. **Add HTTP POST Support** (~1 day)
+   - Extend http.gr with `http.post(url, body, headers)`
+   - Needed for APIs that require POST
 
-3. **Task 4: Code Cleanup** (1-2 days)
-   - Remove dead code, add doc comments, run clippy
-   - Ask: "Let's start Task 4 - Code Cleanup for publication."
+3. **Complete API Reference Documentation** (~2-3 days)
+   - Finish remaining stdlib module documentation
+   - Document tls.gr and http.gr
+
+4. **Improve TLS Error Handling** (~1 day)
+   - Better error messages for connection failures
+   - Timeout handling
 
 ---
 

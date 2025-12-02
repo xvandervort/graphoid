@@ -123,13 +123,26 @@ impl ModuleManager {
     }
 
     fn get_stdlib_path() -> PathBuf {
-        // Check GRAPHOID_STDLIB_PATH environment variable
-        if let Ok(path) = std::env::var("GRAPHOID_STDLIB_PATH") {
-            PathBuf::from(path)
-        } else {
-            // Default to "stdlib" directory
-            PathBuf::from("stdlib")
+        // Try relative to executable location
+        if let Ok(exe_path) = std::env::current_exe() {
+            // Executable is in target/debug or target/release
+            // Go up to find project root, then look for stdlib
+            let mut path = exe_path.clone();
+
+            // Try various relative paths from executable
+            // target/debug/graphoid -> ../../stdlib
+            // target/release/graphoid -> ../../stdlib
+            for _ in 0..3 {
+                path.pop();
+                let stdlib = path.join("stdlib");
+                if stdlib.exists() && stdlib.is_dir() {
+                    return stdlib;
+                }
+            }
         }
+
+        // Fallback to "stdlib" in current directory
+        PathBuf::from("stdlib")
     }
 
     /// Resolve module name to file path

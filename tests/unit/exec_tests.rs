@@ -157,9 +157,6 @@ import "io"
 print("Imported io module successfully")
     "#).unwrap();
 
-    // Set stdlib path for imports to work
-    std::env::set_var("GRAPHOID_STDLIB_PATH", "/home/irv/work/grang/stdlib");
-
     let code = r#"
         output = exec("/tmp/graphoid_exec_imports.gr")
     "#;

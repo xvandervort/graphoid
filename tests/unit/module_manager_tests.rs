@@ -3,6 +3,26 @@ use graphoid::execution::environment::Environment;
 use std::path::PathBuf;
 
 #[test]
+fn test_stdlib_auto_discovery() {
+    // Stdlib must be found automatically without any environment variables
+    let manager = ModuleManager::new();
+
+    // The search paths should include a stdlib directory
+    let has_stdlib = manager.search_paths().iter().any(|p| {
+        p.to_string_lossy().contains("stdlib")
+    });
+    assert!(has_stdlib, "Search paths must include stdlib directory");
+
+    // Should be able to resolve a standard library module (math.gr exists in stdlib)
+    let result = manager.resolve_module_path("math", None);
+    assert!(result.is_ok(), "Should auto-discover stdlib module 'math': {:?}", result.err());
+
+    let path = result.unwrap();
+    assert!(path.exists(), "Resolved stdlib path must exist: {:?}", path);
+    assert!(path.to_string_lossy().contains("stdlib"), "Path should be in stdlib: {:?}", path);
+}
+
+#[test]
 fn test_module_manager_creation() {
     let manager = ModuleManager::new();
     assert_eq!(manager.search_paths().len(), 3); // src/, lib/, stdlib/

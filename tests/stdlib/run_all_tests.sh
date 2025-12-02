@@ -9,7 +9,6 @@ if [ ! -f "Cargo.toml" ]; then
     exit 1
 fi
 
-STDLIB_PATH="/home/irv/work/grang/stdlib"
 CARGO="$HOME/.cargo/bin/cargo"
 TESTS_DIR="/home/irv/work/grang/tests/stdlib"
 
@@ -17,8 +16,6 @@ echo "=========================================="
 echo "Running All Stdlib Module Tests"
 echo "=========================================="
 echo ""
-
-export GRAPHOID_STDLIB_PATH="$STDLIB_PATH"
 
 TESTS=(
     "test_statistics"

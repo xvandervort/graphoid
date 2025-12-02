@@ -1350,21 +1350,8 @@ impl Executor {
                 )));
             }
 
-            // If there are arguments, evaluate them first to know the arity
-            if !args.is_empty() {
-                let arg_values = self.eval_arguments(args)?;
-                let arity = arg_values.len();
-
-                // Check global_functions for overloaded functions with matching arity
-                if let Some(overloads) = self.global_functions.get(method) {
-                    // Find function with matching arity and clone it to avoid borrow issues
-                    if let Some(func) = overloads.iter().find(|f| f.parameters.len() == arity).cloned() {
-                        return self.call_function(&func, &arg_values);
-                    }
-                }
-            }
-
-            // Look up the member in the module's namespace
+            // Look up the member in the module's namespace FIRST (module-qualified calls
+            // should always resolve to the module's definition, not global_functions)
             let member = module.namespace.get(method)?;
 
             // If it's a function, call it with args

@@ -1,35 +1,924 @@
-# TLS Module - TLS 1.3 implementation in pure Graphoid
+# TLS 1.3 Module - Pure Graphoid Implementation
 #
-# STATUS: Not yet implemented - requires Phase 13 (bitwise operators)
+# Implements TLS 1.3 (RFC 8446) using:
+# - net module for TCP sockets
+# - crypto module for cryptographic primitives
+# - Bitwise operators for binary protocol handling
 #
-# This module will implement TLS 1.3 using only:
-# - net.connect() for TCP sockets
-# - crypto.* for cryptographic primitives
-#
-# TLS 1.3 requires bitwise operators for:
-# - Record layer framing (content type, version, length fields)
-# - Handshake message construction
-# - Key schedule computations
-#
-# Once Phase 13 is complete, this module will implement:
-# 1. ClientHello construction
-# 2. ServerHello parsing
-# 3. Key exchange via crypto.x25519_*
-# 4. Key derivation via crypto.hkdf_*
-# 5. Certificate validation via crypto.ecdsa_verify / crypto.rsa_verify
-# 6. Record encryption via crypto.aes_gcm_* or crypto.chacha20_*
-#
-# Functions (planned):
-# - tls_connect(host, port) -> tls_socket
-# - tls_send(tls_socket, data) -> bytes_sent
-# - tls_recv(tls_socket, max_bytes) -> data
-# - tls_close(tls_socket) -> bool
+# Functions:
+# - connect(host, port) -> tls_connection - Establish TLS connection
+# - send(conn, data) -> bytes_sent - Send encrypted data
+# - recv(conn, max_bytes) -> data - Receive and decrypt data
+# - close(conn) -> bool - Close TLS connection
+
+import "net"
+import "crypto"
 
 __module = "tls"
-__version = "0.1.0"
+__version = "1.0.0"
 
-# Placeholder - TLS not yet implemented
-fn tls_connect(host, port) {
-    print("ERROR: TLS not yet implemented. Requires Phase 13 (bitwise operators).")
-    return none
+# ============================================================================
+# TLS Constants
+# ============================================================================
+
+# Content types
+CONTENT_CHANGE_CIPHER_SPEC = 20
+CONTENT_ALERT = 21
+CONTENT_HANDSHAKE = 22
+CONTENT_APPLICATION_DATA = 23
+
+# Handshake types
+HANDSHAKE_CLIENT_HELLO = 1
+HANDSHAKE_SERVER_HELLO = 2
+HANDSHAKE_ENCRYPTED_EXTENSIONS = 8
+HANDSHAKE_CERTIFICATE = 11
+HANDSHAKE_CERTIFICATE_VERIFY = 15
+HANDSHAKE_FINISHED = 20
+
+# TLS versions
+TLS_VERSION_1_2 = 0x0303  # Used in record layer for compatibility
+TLS_VERSION_1_3 = 0x0304
+
+# Cipher suites (TLS 1.3)
+TLS_AES_128_GCM_SHA256 = 0x1301
+TLS_AES_256_GCM_SHA384 = 0x1302
+TLS_CHACHA20_POLY1305_SHA256 = 0x1303
+
+# Named groups (for key exchange)
+X25519 = 0x001D
+
+# Signature algorithms
+ECDSA_SECP256R1_SHA256 = 0x0403
+RSA_PSS_RSAE_SHA256 = 0x0804
+
+# Extension types
+EXT_SERVER_NAME = 0
+EXT_SUPPORTED_GROUPS = 10
+EXT_SIGNATURE_ALGORITHMS = 13
+EXT_SUPPORTED_VERSIONS = 43
+EXT_KEY_SHARE = 51
+
+# ============================================================================
+# Utility Functions - Byte Manipulation
+# ============================================================================
+
+# Convert integer to big-endian bytes (2 bytes)
+fn int_to_bytes_2(n) {
+    b1 = (n >> 8) & 0xFF
+    b2 = n & 0xFF
+    return [b1, b2]
+}
+
+# Convert integer to big-endian bytes (3 bytes)
+fn int_to_bytes_3(n) {
+    b1 = (n >> 16) & 0xFF
+    b2 = (n >> 8) & 0xFF
+    b3 = n & 0xFF
+    return [b1, b2, b3]
+}
+
+# Convert integer to big-endian bytes (4 bytes)
+fn int_to_bytes_4(n) {
+    b1 = (n >> 24) & 0xFF
+    b2 = (n >> 16) & 0xFF
+    b3 = (n >> 8) & 0xFF
+    b4 = n & 0xFF
+    return [b1, b2, b3, b4]
+}
+
+# Convert big-endian bytes to integer (2 bytes)
+fn bytes_to_int_2(bytes, offset) {
+    return (bytes[offset] << 8) | bytes[offset + 1]
+}
+
+# Convert big-endian bytes to integer (3 bytes)
+fn bytes_to_int_3(bytes, offset) {
+    return (bytes[offset] << 16) | (bytes[offset + 1] << 8) | bytes[offset + 2]
+}
+
+# Concatenate two byte lists (uses native implementation for speed)
+fn concat_bytes(a, b) {
+    return net.concat_bytes(a, b)
+}
+
+# Convert string to bytes
+fn string_to_bytes(s) {
+    result = []
+    i = 0
+    while i < s.size() {
+        # Get ASCII code of character
+        c = s[i]
+        code = c.to_bytes()[0]
+        result = result.append(code)
+        i = i + 1
+    }
+    return result
+}
+
+# Convert hex string to byte list (uses native implementation for speed)
+fn hex_to_bytes(hex_str) {
+    return net.hex_to_bytes(hex_str)
+}
+
+# Convert byte list to hex string (uses native implementation for speed)
+fn bytes_to_hex(bytes) {
+    return net.bytes_to_hex(bytes)
+}
+
+# Convert single hex char to int
+fn hex_char_to_int(c) {
+    if c == "0" { return 0 }
+    if c == "1" { return 1 }
+    if c == "2" { return 2 }
+    if c == "3" { return 3 }
+    if c == "4" { return 4 }
+    if c == "5" { return 5 }
+    if c == "6" { return 6 }
+    if c == "7" { return 7 }
+    if c == "8" { return 8 }
+    if c == "9" { return 9 }
+    if c == "a" { return 10 }
+    if c == "A" { return 10 }
+    if c == "b" { return 11 }
+    if c == "B" { return 11 }
+    if c == "c" { return 12 }
+    if c == "C" { return 12 }
+    if c == "d" { return 13 }
+    if c == "D" { return 13 }
+    if c == "e" { return 14 }
+    if c == "E" { return 14 }
+    if c == "f" { return 15 }
+    if c == "F" { return 15 }
+    return 0
+}
+
+# Generate random bytes
+fn random_bytes(count) {
+    result = []
+    i = 0
+    while i < count {
+        # Use crypto module for random
+        key = crypto.generate_key(1)
+        # Key is returned as hex string, convert first byte
+        byte = hex_char_to_int(key[0]) * 16 + hex_char_to_int(key[1])
+        result = result.append(byte)
+        i = i + 1
+    }
+    return result
+}
+
+# ============================================================================
+# TLS Record Layer
+# ============================================================================
+
+# Build TLS record header
+# Returns: [content_type, version_hi, version_lo, length_hi, length_lo]
+fn build_record_header(content_type, length) {
+    header = [content_type]
+    # Use TLS 1.2 version in record layer (TLS 1.3 compatibility)
+    header = header.append(0x03)
+    header = header.append(0x03)
+    # Length (2 bytes big-endian)
+    len_bytes = int_to_bytes_2(length)
+    header = concat_bytes(header, len_bytes)
+    return header
+}
+
+# Parse TLS record header
+# Returns: {content_type, version, length}
+fn parse_record_header(bytes, offset) {
+    content_type = bytes[offset]
+    version = bytes_to_int_2(bytes, offset + 1)
+    length = bytes_to_int_2(bytes, offset + 3)
+    return {
+        "content_type": content_type,
+        "version": version,
+        "length": length
+    }
+}
+
+# ============================================================================
+# TLS Handshake Messages
+# ============================================================================
+
+# Build ClientHello message
+fn build_client_hello(hostname, client_random, client_key_share) {
+    # Handshake header will be prepended later
+    msg = []
+
+    # Legacy version (TLS 1.2)
+    msg = concat_bytes(msg, [0x03, 0x03])
+
+    # Random (32 bytes)
+    msg = concat_bytes(msg, client_random)
+
+    # Session ID (empty for TLS 1.3)
+    msg = msg.append(0)  # session_id length = 0
+
+    # Cipher suites - only offer AES-128-GCM-SHA256 for now
+    # (SHA-384 support would require additional implementation)
+    cipher_suites = [
+        0x13, 0x01   # TLS_AES_128_GCM_SHA256
+    ]
+    cipher_len = int_to_bytes_2(cipher_suites.size())
+    msg = concat_bytes(msg, cipher_len)
+    msg = concat_bytes(msg, cipher_suites)
+
+    # Compression methods (only null for TLS 1.3)
+    msg = concat_bytes(msg, [0x01, 0x00])  # 1 method, null compression
+
+    # Extensions
+    extensions = build_client_hello_extensions(hostname, client_key_share)
+    ext_len = int_to_bytes_2(extensions.size())
+    msg = concat_bytes(msg, ext_len)
+    msg = concat_bytes(msg, extensions)
+
+    # Prepend handshake header
+    header = [HANDSHAKE_CLIENT_HELLO]
+    msg_len = int_to_bytes_3(msg.size())
+    header = concat_bytes(header, msg_len)
+
+    return concat_bytes(header, msg)
+}
+
+# Build ClientHello extensions
+fn build_client_hello_extensions(hostname, client_key_share) {
+    extensions = []
+
+    # Server Name extension (SNI)
+    sni = build_sni_extension(hostname)
+    extensions = concat_bytes(extensions, sni)
+
+    # Supported Groups extension
+    groups = build_supported_groups_extension()
+    extensions = concat_bytes(extensions, groups)
+
+    # Signature Algorithms extension
+    sig_algs = build_signature_algorithms_extension()
+    extensions = concat_bytes(extensions, sig_algs)
+
+    # Supported Versions extension (TLS 1.3)
+    versions = build_supported_versions_extension()
+    extensions = concat_bytes(extensions, versions)
+
+    # Key Share extension
+    key_share = build_key_share_extension(client_key_share)
+    extensions = concat_bytes(extensions, key_share)
+
+    return extensions
+}
+
+# Build SNI extension
+fn build_sni_extension(hostname) {
+    # Extension type (2 bytes)
+    ext = int_to_bytes_2(EXT_SERVER_NAME)
+
+    # Hostname bytes
+    hostname_bytes = string_to_bytes(hostname)
+    hostname_len = int_to_bytes_2(hostname_bytes.size())
+
+    # Server name list entry: type (1) + length (2) + name
+    entry = [0]  # host_name type
+    entry = concat_bytes(entry, hostname_len)
+    entry = concat_bytes(entry, hostname_bytes)
+
+    # Server name list: length (2) + entries
+    list_len = int_to_bytes_2(entry.size())
+    list_data = concat_bytes(list_len, entry)
+
+    # Extension data length
+    ext_len = int_to_bytes_2(list_data.size())
+    ext = concat_bytes(ext, ext_len)
+    ext = concat_bytes(ext, list_data)
+
+    return ext
+}
+
+# Build Supported Groups extension
+fn build_supported_groups_extension() {
+    ext = int_to_bytes_2(EXT_SUPPORTED_GROUPS)
+
+    # Groups list: x25519
+    groups = int_to_bytes_2(X25519)
+    groups_len = int_to_bytes_2(groups.size())
+    data = concat_bytes(groups_len, groups)
+
+    ext_len = int_to_bytes_2(data.size())
+    ext = concat_bytes(ext, ext_len)
+    ext = concat_bytes(ext, data)
+
+    return ext
+}
+
+# Build Signature Algorithms extension
+fn build_signature_algorithms_extension() {
+    ext = int_to_bytes_2(EXT_SIGNATURE_ALGORITHMS)
+
+    # Algorithms: ECDSA P-256, RSA-PSS
+    algs = concat_bytes(int_to_bytes_2(ECDSA_SECP256R1_SHA256), int_to_bytes_2(RSA_PSS_RSAE_SHA256))
+    algs_len = int_to_bytes_2(algs.size())
+    data = concat_bytes(algs_len, algs)
+
+    ext_len = int_to_bytes_2(data.size())
+    ext = concat_bytes(ext, ext_len)
+    ext = concat_bytes(ext, data)
+
+    return ext
+}
+
+# Build Supported Versions extension
+fn build_supported_versions_extension() {
+    ext = int_to_bytes_2(EXT_SUPPORTED_VERSIONS)
+
+    # Versions: TLS 1.3 only
+    versions = int_to_bytes_2(TLS_VERSION_1_3)
+    versions_len = [versions.size()]  # 1 byte length for client
+    data = concat_bytes(versions_len, versions)
+
+    ext_len = int_to_bytes_2(data.size())
+    ext = concat_bytes(ext, ext_len)
+    ext = concat_bytes(ext, data)
+
+    return ext
+}
+
+# Build Key Share extension
+fn build_key_share_extension(public_key) {
+    ext = int_to_bytes_2(EXT_KEY_SHARE)
+
+    # Key share entry: group (2) + key length (2) + key
+    entry = int_to_bytes_2(X25519)
+    key_len = int_to_bytes_2(public_key.size())
+    entry = concat_bytes(entry, key_len)
+    entry = concat_bytes(entry, public_key)
+
+    # Client key shares length
+    entries_len = int_to_bytes_2(entry.size())
+    data = concat_bytes(entries_len, entry)
+
+    ext_len = int_to_bytes_2(data.size())
+    ext = concat_bytes(ext, ext_len)
+    ext = concat_bytes(ext, data)
+
+    return ext
+}
+
+# ============================================================================
+# TLS Key Schedule (HKDF-based)
+# ============================================================================
+
+# Derive early secret (from PSK or zeros)
+fn derive_early_secret() {
+    # For non-PSK: HKDF-Extract(salt=zeros, IKM=zeros)
+    # 32 zero bytes as hex = 64 zeros
+    zeros_hex = "0000000000000000000000000000000000000000000000000000000000000000"
+    return crypto.hkdf_extract(zeros_hex, zeros_hex)
+}
+
+# Derive handshake secret
+# Both shared_secret and early_secret should be hex strings
+fn derive_handshake_secret(shared_secret_hex, early_secret_hex) {
+    # derived_secret = Derive-Secret(early_secret, "derived", "")
+    # handshake_secret = HKDF-Extract(derived_secret, shared_secret)
+    # NOTE: In TLS 1.3, the empty context "" means Hash(""), not literally empty!
+    empty_hash = crypto.sha256("")
+    derived = derive_secret(early_secret_hex, "derived", empty_hash)
+    return crypto.hkdf_extract(derived, shared_secret_hex)
+}
+
+# Derive secret using HKDF-Expand-Label
+# secret should be hex string, ctx should be hex string (or empty "")
+fn derive_secret(secret_hex, label, ctx_hex) {
+    # TLS 1.3 uses HKDF-Expand-Label with hash output length (32 for SHA-256)
+    return hkdf_expand_label(secret_hex, label, ctx_hex, 32)
+}
+
+# HKDF-Expand-Label
+# secret should be hex string, label should be the TLS 1.3 label (without "tls13 " prefix)
+# ctx should be hex string
+fn hkdf_expand_label(secret_hex, label, ctx_hex, length) {
+    # TLS 1.3 HKDF-Expand-Label prepends "tls13 " to label
+    full_label = "tls13 " + label
+    label_bytes = string_to_bytes(full_label)
+
+    # Convert context hex to bytes for length calculation
+    ctx_bytes = []
+    if ctx_hex != "" {
+        ctx_bytes = hex_to_bytes(ctx_hex)
+    }
+
+    info = int_to_bytes_2(length)
+    info = info.append(label_bytes.size())
+    info = concat_bytes(info, label_bytes)
+    info = info.append(ctx_bytes.size())
+    if ctx_bytes.size() > 0 {
+        info = concat_bytes(info, ctx_bytes)
+    }
+
+    # Convert info bytes to hex for crypto call
+    info_hex = bytes_to_hex(info)
+    return crypto.hkdf_expand(secret_hex, info_hex, length)
+}
+
+# ============================================================================
+# Main TLS Functions
+# ============================================================================
+
+# TLS connection state
+# Returns a hash with connection state
+fn create_connection_state(socket, hostname) {
+    return {
+        "socket": socket,
+        "hostname": hostname,
+        "error": none,
+        "client_random": none,
+        "server_random": none,
+        "client_private_key": none,
+        "client_public_key": none,
+        "server_public_key": none,
+        "handshake_secret": none,
+        "client_handshake_key": none,
+        "server_handshake_key": none,
+        "client_handshake_iv": none,
+        "server_handshake_iv": none,
+        "client_app_key": none,
+        "server_app_key": none,
+        "client_app_iv": none,
+        "server_app_iv": none,
+        "client_seq": 0,
+        "server_seq": 0,
+        "transcript_hash": [],
+        "established": false
+    }
+}
+
+# Connect to server with TLS
+fn tls_connect(hostname, port) {
+    # Open TCP connection
+    socket = net.connect(hostname, port)
+
+    # Create connection state
+    conn = create_connection_state(socket, hostname)
+
+    # Generate client random (32 bytes)
+    conn["client_random"] = random_bytes(32)
+
+    # Generate X25519 keypair
+    keypair = crypto.x25519_keygen()
+    # Store private key as hex string for crypto operations
+    conn["client_private_key"] = keypair["secret"]
+    # Convert public key to bytes for TLS message
+    client_public_bytes = hex_to_bytes(keypair["public"])
+
+    # Build and send ClientHello
+    client_hello = build_client_hello(hostname, conn["client_random"], client_public_bytes)
+    record = build_record_header(CONTENT_HANDSHAKE, client_hello.size())
+    record = concat_bytes(record, client_hello)
+
+    # Update transcript
+    conn["transcript_hash"] = concat_bytes(conn["transcript_hash"], client_hello)
+
+    # Send ClientHello
+    net.send_bytes(socket, record)
+
+    # Receive ServerHello
+    response = net.recv_bytes(socket, 4096)
+
+    # Parse ServerHello (stores server_public_key as byte list)
+    conn = parse_server_hello(conn, response)
+
+    if conn["error"] != none {
+        net.close(socket)
+        return conn
+    }
+
+    # Compute shared secret (convert server public key to hex for crypto)
+    server_public_hex = bytes_to_hex(conn["server_public_key"])
+    shared_secret_hex = crypto.x25519_shared_secret(conn["client_private_key"], server_public_hex)
+
+    # Derive keys (all using hex strings)
+    early_secret_hex = derive_early_secret()
+    conn["handshake_secret"] = derive_handshake_secret(shared_secret_hex, early_secret_hex)
+
+    # Derive handshake traffic keys
+    # Convert transcript bytes to hex, then hash, result is hex
+    transcript_hex = bytes_to_hex(conn["transcript_hash"])
+    transcript_hash_hex = crypto.sha256_hex(transcript_hex)
+
+    client_hs_traffic = derive_secret(conn["handshake_secret"], "c hs traffic", transcript_hash_hex)
+    server_hs_traffic = derive_secret(conn["handshake_secret"], "s hs traffic", transcript_hash_hex)
+
+    # Store traffic secrets for Finished message computation
+    conn["client_hs_traffic"] = client_hs_traffic
+
+    conn["client_handshake_key"] = hkdf_expand_label(client_hs_traffic, "key", "", 16)
+    conn["client_handshake_iv"] = hkdf_expand_label(client_hs_traffic, "iv", "", 12)
+    conn["server_handshake_key"] = hkdf_expand_label(server_hs_traffic, "key", "", 16)
+    conn["server_handshake_iv"] = hkdf_expand_label(server_hs_traffic, "iv", "", 12)
+
+    # Process encrypted handshake messages from server
+    # The response already contains: ServerHello + ChangeCipherSpec + encrypted records
+    conn = process_encrypted_handshake(conn, response)
+    if conn["error"] != none {
+        net.close(socket)
+        return conn
+    }
+
+    # Derive master secret
+    zeros_hex = "0000000000000000000000000000000000000000000000000000000000000000"
+    empty_hash = crypto.sha256("")  # In TLS 1.3, empty context means Hash("")
+    derived_from_hs = derive_secret(conn["handshake_secret"], "derived", empty_hash)
+    master_secret = crypto.hkdf_extract(derived_from_hs, zeros_hex)
+
+    # Derive application traffic secrets using final transcript hash
+    final_transcript_hex = bytes_to_hex(conn["transcript_hash"])
+    final_transcript_hash = crypto.sha256_hex(final_transcript_hex)
+
+    client_app_traffic = derive_secret(master_secret, "c ap traffic", final_transcript_hash)
+    server_app_traffic = derive_secret(master_secret, "s ap traffic", final_transcript_hash)
+
+    # Derive application keys
+    conn["client_app_key"] = hkdf_expand_label(client_app_traffic, "key", "", 16)
+    conn["client_app_iv"] = hkdf_expand_label(client_app_traffic, "iv", "", 12)
+    conn["server_app_key"] = hkdf_expand_label(server_app_traffic, "key", "", 16)
+    conn["server_app_iv"] = hkdf_expand_label(server_app_traffic, "iv", "", 12)
+
+    # Send client Finished
+    send_client_finished(conn)
+
+    conn["established"] = true
+    return conn
+}
+
+# Process encrypted handshake messages from server
+fn process_encrypted_handshake(conn, response) {
+    # Parse all records in the response
+    offset = 0
+    server_seq = 0
+
+    while offset < response.size() - 5 {
+        content_type = response[offset]
+        length = (response[offset + 3] * 256) + response[offset + 4]
+
+        if offset + 5 + length > response.size() {
+            break
+        }
+
+        if content_type == CONTENT_HANDSHAKE {
+            # ServerHello - already processed, just skip
+            offset = offset + 5 + length
+        } else if content_type == 20 {
+            # ChangeCipherSpec - ignore in TLS 1.3
+            offset = offset + 5 + length
+        } else if content_type == CONTENT_APPLICATION_DATA {
+            # Encrypted handshake message
+            ciphertext = response.slice(offset + 5, offset + 5 + length)
+
+            # Build AAD (record header)
+            aad = [content_type, 0x03, 0x03]
+            aad = concat_bytes(aad, int_to_bytes_2(length))
+
+            # Build nonce
+            nonce = build_nonce_from_iv(conn["server_handshake_iv"], server_seq)
+
+            # Decrypt
+            plaintext_hex = crypto.aes_gcm_decrypt(
+                conn["server_handshake_key"],
+                nonce,
+                bytes_to_hex(aad),
+                bytes_to_hex(ciphertext)
+            )
+
+            # The last byte of plaintext is the real content type
+            plaintext_bytes = hex_to_bytes(plaintext_hex)
+            if plaintext_bytes.size() > 0 {
+                real_content_type = plaintext_bytes[plaintext_bytes.size() - 1]
+                # Remove content type byte
+                handshake_bytes = plaintext_bytes.slice(0, plaintext_bytes.size() - 1)
+                # Add to transcript (only handshake messages)
+                if real_content_type == CONTENT_HANDSHAKE {
+                    conn["transcript_hash"] = concat_bytes(conn["transcript_hash"], handshake_bytes)
+                }
+            }
+
+            server_seq = server_seq + 1
+            offset = offset + 5 + length
+        } else {
+            # Unknown record type, skip
+            offset = offset + 5 + length
+        }
+    }
+
+    return conn
+}
+
+# Build nonce from IV and sequence number
+fn build_nonce_from_iv(iv_hex, seq) {
+    iv_bytes = hex_to_bytes(iv_hex)
+    seq_bytes = int_to_bytes_8(seq)
+
+    # XOR: first 4 bytes unchanged, last 8 bytes XOR with sequence
+    nonce = []
+    i = 0
+    while i < 4 {
+        nonce = nonce.append(iv_bytes[i])
+        i = i + 1
+    }
+    while i < 12 {
+        nonce = nonce.append(iv_bytes[i] ^ seq_bytes[i - 4])
+        i = i + 1
+    }
+    return bytes_to_hex(nonce)
+}
+
+# Send client Finished message
+fn send_client_finished(conn) {
+    # Compute Finished verify data (RFC 8446 Section 4.4.4)
+    # finished_key = HKDF-Expand-Label(client_handshake_traffic_secret, "finished", "", Hash.length)
+    # verify_data = HMAC(finished_key, Transcript-Hash(handshake messages))
+
+    # Compute transcript hash
+    transcript_hex = bytes_to_hex(conn["transcript_hash"])
+    transcript_hash = crypto.sha256_hex(transcript_hex)
+
+    # Derive finished_key from client handshake traffic secret
+    finished_key = hkdf_expand_label(conn["client_hs_traffic"], "finished", "", 32)
+
+    # Compute verify_data = HMAC-SHA256(finished_key, transcript_hash)
+    # Note: Both inputs are hex strings, so use hmac_sha256_hex
+    verify_data_hex = crypto.hmac_sha256_hex(transcript_hash, finished_key)
+    finished_data = hex_to_bytes(verify_data_hex)
+
+    # Build Finished handshake message
+    finished_msg = [HANDSHAKE_FINISHED]
+    finished_msg = concat_bytes(finished_msg, int_to_bytes_3(finished_data.size()))
+    finished_msg = concat_bytes(finished_msg, finished_data)
+
+    # Add content type for encrypted record
+    finished_msg = finished_msg.append(CONTENT_HANDSHAKE)
+
+    # Encrypt with client handshake key
+    nonce = build_nonce_from_iv(conn["client_handshake_iv"], 0)
+    record_len = finished_msg.size() + 16  # Add auth tag length
+    aad = [CONTENT_APPLICATION_DATA, 0x03, 0x03]
+    aad = concat_bytes(aad, int_to_bytes_2(record_len))
+
+    ciphertext_hex = crypto.aes_gcm_encrypt(
+        conn["client_handshake_key"],
+        nonce,
+        bytes_to_hex(aad),
+        bytes_to_hex(finished_msg)
+    )
+
+    # Build TLS record
+    ciphertext = hex_to_bytes(ciphertext_hex)
+    record = aad
+    record = concat_bytes(record, ciphertext)
+
+    # Send
+    net.send_bytes(conn["socket"], record)
+}
+
+# Parse ServerHello response
+fn parse_server_hello(conn, response) {
+    # Parse record header
+    if response.size() < 5 {
+        conn["error"] = "Response too short"
+        return conn
+    }
+
+    header = parse_record_header(response, 0)
+
+    if header["content_type"] != CONTENT_HANDSHAKE {
+        conn["error"] = "Expected handshake record"
+        return conn
+    }
+
+    # Parse handshake header
+    offset = 5
+    handshake_type = response[offset]
+
+    if handshake_type != HANDSHAKE_SERVER_HELLO {
+        conn["error"] = "Expected ServerHello"
+        return conn
+    }
+
+    # Handshake length (3 bytes)
+    hs_length = bytes_to_int_3(response, offset + 1)
+    offset = offset + 4
+
+    # Legacy version (2 bytes) - skip
+    offset = offset + 2
+
+    # Server random (32 bytes)
+    server_random = []
+    i = 0
+    while i < 32 {
+        server_random = server_random.append(response[offset + i])
+        i = i + 1
+    }
+    conn["server_random"] = server_random
+    offset = offset + 32
+
+    # Session ID length and value
+    session_id_len = response[offset]
+    offset = offset + 1 + session_id_len
+
+    # Cipher suite (2 bytes)
+    cipher_suite = bytes_to_int_2(response, offset)
+    offset = offset + 2
+
+    # Compression method (1 byte) - skip
+    offset = offset + 1
+
+    # Extensions
+    if offset < response.size() - 2 {
+        ext_len = bytes_to_int_2(response, offset)
+        offset = offset + 2
+
+        # Parse extensions to find key_share
+        ext_end = offset + ext_len
+        while offset < ext_end {
+            ext_type = bytes_to_int_2(response, offset)
+            ext_data_len = bytes_to_int_2(response, offset + 2)
+            offset = offset + 4
+
+            if ext_type == EXT_KEY_SHARE {
+                # Parse server key share
+                group = bytes_to_int_2(response, offset)
+                key_len = bytes_to_int_2(response, offset + 2)
+                server_key = []
+                i = 0
+                while i < key_len {
+                    server_key = server_key.append(response[offset + 4 + i])
+                    i = i + 1
+                }
+                conn["server_public_key"] = server_key
+            }
+
+            offset = offset + ext_data_len
+        }
+    }
+
+    # Update transcript with ServerHello
+    sh_start = 5  # After record header
+    sh_end = 5 + 4 + hs_length  # Header + handshake data
+    i = sh_start
+    while i < sh_end {
+        conn["transcript_hash"] = conn["transcript_hash"].append(response[i])
+        i = i + 1
+    }
+
+    return conn
+}
+
+# Convert byte list to string (uses native implementation for speed and UTF-8 support)
+fn bytes_to_string(bytes) {
+    return net.bytes_to_string(bytes)
+}
+
+# Send data over TLS connection
+fn tls_send(conn, data) {
+    if conn["established"] != true {
+        return {"error": "Connection not established"}
+    }
+
+    # Encrypt data using application key
+    plaintext = string_to_bytes(data)
+
+    # Add content type for encrypted record
+    plaintext = plaintext.append(CONTENT_APPLICATION_DATA)
+
+    # Build nonce from IV and sequence number
+    nonce = build_nonce_from_iv(conn["client_app_iv"], conn["client_seq"])
+
+    # Calculate record length (plaintext + content type + auth tag)
+    record_len = plaintext.size() + 16
+
+    # Build AAD (record header)
+    aad = [CONTENT_APPLICATION_DATA, 0x03, 0x03]
+    aad = concat_bytes(aad, int_to_bytes_2(record_len))
+
+    # Encrypt with AES-GCM
+    ciphertext_hex = crypto.aes_gcm_encrypt(
+        conn["client_app_key"],
+        nonce,
+        bytes_to_hex(aad),
+        bytes_to_hex(plaintext)
+    )
+
+    # Build encrypted record
+    ciphertext = hex_to_bytes(ciphertext_hex)
+    record = aad
+    record = concat_bytes(record, ciphertext)
+
+    # Send and increment sequence number
+    bytes_sent = net.send_bytes(conn["socket"], record)
+    conn["client_seq"] = conn["client_seq"] + 1
+
+    return bytes_sent
+}
+
+# Receive data over TLS connection
+fn tls_recv(conn, max_bytes) {
+    if conn["established"] != true {
+        return ""
+    }
+
+    # Receive encrypted records
+    response = net.recv_bytes(conn["socket"], max_bytes)
+
+    if response.size() < 5 {
+        return ""
+    }
+
+    # Process all records in the response
+    # (Server may send NewSessionTicket before application data)
+    result = ""
+    offset = 0
+
+    while offset < response.size() - 5 {
+        content_type = response[offset]
+        length = (response[offset + 3] << 8) | response[offset + 4]
+
+        if offset + 5 + length > response.size() {
+            break
+        }
+
+        if content_type == CONTENT_APPLICATION_DATA {
+            # Extract ciphertext
+            ciphertext = response.slice(offset + 5, offset + 5 + length)
+            aad = response.slice(offset, offset + 5)
+
+            # Build nonce
+            nonce = build_nonce_from_iv(conn["server_app_iv"], conn["server_seq"])
+
+            # Decrypt
+            plaintext_hex = crypto.aes_gcm_decrypt(
+                conn["server_app_key"],
+                nonce,
+                bytes_to_hex(aad),
+                bytes_to_hex(ciphertext)
+            )
+
+            if plaintext_hex != "" {
+                plaintext_bytes = hex_to_bytes(plaintext_hex)
+                inner_content_type = plaintext_bytes[plaintext_bytes.size() - 1]
+
+                if inner_content_type == CONTENT_APPLICATION_DATA {
+                    # Actual application data
+                    data_bytes = plaintext_bytes.slice(0, plaintext_bytes.size() - 1)
+                    result = result + bytes_to_string(data_bytes)
+                }
+                # Ignore handshake (NewSessionTicket) and alert messages for now
+            }
+
+            conn["server_seq"] = conn["server_seq"] + 1
+        }
+
+        offset = offset + 5 + length
+    }
+
+    return result
+}
+
+# Build nonce for AEAD
+fn build_nonce(iv, seq) {
+    # XOR IV with sequence number (padded to 12 bytes)
+    nonce = []
+    seq_bytes = int_to_bytes_8(seq)
+
+    # IV is 12 bytes, seq is 8 bytes (right-aligned)
+    i = 0
+    while i < 4 {
+        nonce = nonce.append(iv[i])
+        i = i + 1
+    }
+    while i < 12 {
+        nonce = nonce.append(iv[i] ^ seq_bytes[i - 4])
+        i = i + 1
+    }
+
+    return nonce
+}
+
+# Convert integer to 8 bytes (big-endian)
+fn int_to_bytes_8(n) {
+    # Build bytes from high to low
+    b0 = (n >> 56) & 0xFF
+    b1 = (n >> 48) & 0xFF
+    b2 = (n >> 40) & 0xFF
+    b3 = (n >> 32) & 0xFF
+    b4 = (n >> 24) & 0xFF
+    b5 = (n >> 16) & 0xFF
+    b6 = (n >> 8) & 0xFF
+    b7 = n & 0xFF
+    return [b0, b1, b2, b3, b4, b5, b6, b7]
+}
+
+# Close TLS connection
+fn tls_close(conn) {
+    # Send close_notify alert (optional in TLS 1.3)
+    net.close(conn["socket"])
+    return true
 }

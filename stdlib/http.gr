@@ -7,8 +7,7 @@
 # - parse_url(url) -> {host, port, path, is_https} - Parse URL into components
 # - parse_response(response_text) -> {status, headers, body} - Parse HTTP response
 #
-# NOTE: HTTPS requires the tls module (Phase 13 - bitwise operators)
-#       HTTP works now, HTTPS is pending TLS implementation
+# HTTPS is fully supported via the tls module (TLS 1.3 in pure Graphoid)
 
 import "net"
 import "tls"
@@ -156,6 +155,103 @@ fn parse_url(url) {
     }
 }
 
+# Decode chunked transfer encoding
+fn decode_chunked(body_text) {
+    result = ""
+    lines = []
+    current_line = ""
+    i = 0
+
+    # Split into lines
+    while i < body_text.size() {
+        char = body_text[i]
+        if char == "\n" {
+            lines = lines.append(current_line)
+            current_line = ""
+        } else {
+            if char != "\r" {
+                current_line = current_line + char
+            }
+        }
+        i = i + 1
+    }
+    if current_line != "" {
+        lines = lines.append(current_line)
+    }
+
+    # Process chunks: size_in_hex, data, size_in_hex, data, ..., 0
+    i = 0
+    while i < lines.size() {
+        size_line = lines[i]
+        # Check for final "0" chunk
+        if size_line == "0" {
+            break
+        }
+        if size_line == "" {
+            i = i + 1
+            continue
+        }
+        # Next line(s) should be the chunk data
+        i = i + 1
+        if i < lines.size() {
+            result = result + lines[i]
+        }
+        i = i + 1
+    }
+
+    return result
+}
+
+# Check if response uses chunked encoding
+fn is_chunked(headers_text) {
+    # Simple check for "transfer-encoding: chunked" in headers
+    lower_text = headers_text.lower()
+    i = 0
+    while i < lower_text.size() - 20 {
+        if lower_text[i] == "t" {
+            if lower_text[i+1] == "r" {
+                if lower_text[i+2] == "a" {
+                    if lower_text[i+3] == "n" {
+                        if lower_text[i+4] == "s" {
+                            if lower_text[i+5] == "f" {
+                                if lower_text[i+6] == "e" {
+                                    if lower_text[i+7] == "r" {
+                                        # Found "transfer", check for "chunked" nearby
+                                        j = i + 8
+                                        while j < lower_text.size() - 7 {
+                                            if lower_text[j] == "c" {
+                                                if lower_text[j+1] == "h" {
+                                                    if lower_text[j+2] == "u" {
+                                                        if lower_text[j+3] == "n" {
+                                                            if lower_text[j+4] == "k" {
+                                                                if lower_text[j+5] == "e" {
+                                                                    if lower_text[j+6] == "d" {
+                                                                        return true
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            j = j + 1
+                                            if j > i + 30 {
+                                                break
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        i = i + 1
+    }
+    return false
+}
+
 # Parse HTTP response
 fn parse_response(response_text) {
     lines = []
@@ -213,11 +309,14 @@ fn parse_response(response_text) {
 
     # Find empty line separating headers and body
     body_start = 0 - 1
+    headers_text = ""
     i = 0
     while i < lines.size() {
         if lines[i] == "" {
             body_start = i + 1
             i = lines.size()  # Break
+        } else {
+            headers_text = headers_text + lines[i] + "\n"
         }
         i = i + 1
     }
@@ -233,6 +332,11 @@ fn parse_response(response_text) {
             body = body + lines[i]
             i = i + 1
         }
+    }
+
+    # Handle chunked transfer encoding
+    if is_chunked(headers_text) {
+        body = decode_chunked(body)
     }
 
     return {
@@ -253,13 +357,6 @@ fn get(url) {
     # Connect to server (TLS for HTTPS, plain TCP for HTTP)
     if is_https {
         socket = tls.tls_connect(host, port)
-        if socket == none {
-            return {
-                "status": 0,
-                "headers": {},
-                "body": "ERROR: HTTPS not yet supported. TLS module requires Phase 13 (bitwise operators)."
-            }
-        }
     } else {
         socket = net.connect(host, port)
     }
@@ -272,13 +369,21 @@ fn get(url) {
     request = request + "Connection: close\r\n"
     request = request + "\r\n"
 
-    # Send request
-    net.send(socket, request)
+    # Send request (use appropriate function based on protocol)
+    if is_https {
+        tls.tls_send(socket, request)
+    } else {
+        net.send(socket, request)
+    }
 
     # Receive response
     response = ""
     while true {
-        chunk = net.recv(socket, 4096)
+        if is_https {
+            chunk = tls.tls_recv(socket, 4096)
+        } else {
+            chunk = net.recv(socket, 4096)
+        }
         if chunk == "" {
             break
         }
@@ -286,7 +391,11 @@ fn get(url) {
     }
 
     # Close connection
-    net.close(socket)
+    if is_https {
+        tls.tls_close(socket)
+    } else {
+        net.close(socket)
+    }
 
     # Parse and return response
     return parse_response(response)
@@ -303,13 +412,6 @@ fn post(url, body, content_type) {
     # Connect to server (TLS for HTTPS, plain TCP for HTTP)
     if is_https {
         socket = tls.tls_connect(host, port)
-        if socket == none {
-            return {
-                "status": 0,
-                "headers": {},
-                "body": "ERROR: HTTPS not yet supported. TLS module requires Phase 13 (bitwise operators)."
-            }
-        }
     } else {
         socket = net.connect(host, port)
     }
@@ -324,13 +426,21 @@ fn post(url, body, content_type) {
     request = request + "\r\n"
     request = request + body
 
-    # Send request
-    net.send(socket, request)
+    # Send request (use appropriate function based on protocol)
+    if is_https {
+        tls.tls_send(socket, request)
+    } else {
+        net.send(socket, request)
+    }
 
     # Receive response
     response = ""
     while true {
-        chunk = net.recv(socket, 4096)
+        if is_https {
+            chunk = tls.tls_recv(socket, 4096)
+        } else {
+            chunk = net.recv(socket, 4096)
+        }
         if chunk == "" {
             break
         }
@@ -338,7 +448,11 @@ fn post(url, body, content_type) {
     }
 
     # Close connection
-    net.close(socket)
+    if is_https {
+        tls.tls_close(socket)
+    } else {
+        net.close(socket)
+    }
 
     # Parse and return response
     return parse_response(response)

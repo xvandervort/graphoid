@@ -15,15 +15,11 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TEST_DIR="$SCRIPT_DIR/integration"
 GRAPHOID="$HOME/.cargo/bin/cargo"
 
-# Set stdlib path
-export GRAPHOID_STDLIB_PATH="$SCRIPT_DIR/../../stdlib"
-
 echo "================================================"
 echo "  Graphoid Integration Test Runner"
 echo "================================================"
 echo ""
 echo "Test directory: $TEST_DIR"
-echo "Stdlib path: $GRAPHOID_STDLIB_PATH"
 echo ""
 
 # Counters

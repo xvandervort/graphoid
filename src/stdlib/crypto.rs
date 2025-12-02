@@ -77,6 +77,7 @@ impl NativeModule for CryptoModule {
 
         // Hashing functions
         functions.insert("sha256".to_string(), sha256 as NativeFunction);
+        functions.insert("sha256_hex".to_string(), sha256_hex as NativeFunction);
         functions.insert("sha512".to_string(), sha512 as NativeFunction);
         functions.insert("sha1".to_string(), sha1 as NativeFunction);  // deprecated
         functions.insert("md5".to_string(), md5 as NativeFunction);    // deprecated
@@ -95,6 +96,9 @@ impl NativeModule for CryptoModule {
         // Symmetric encryption (AES-256-GCM)
         functions.insert("aes_encrypt".to_string(), aes_encrypt as NativeFunction);
         functions.insert("aes_decrypt".to_string(), aes_decrypt as NativeFunction);
+        // TLS-specific AEAD (supports separate nonce and AAD)
+        functions.insert("aes_gcm_encrypt".to_string(), aes_gcm_encrypt as NativeFunction);
+        functions.insert("aes_gcm_decrypt".to_string(), aes_gcm_decrypt as NativeFunction);
 
         // Symmetric encryption (ChaCha20-Poly1305)
         functions.insert("chacha20_encrypt".to_string(), chacha20_encrypt as NativeFunction);
@@ -102,6 +106,7 @@ impl NativeModule for CryptoModule {
 
         // HMAC
         functions.insert("hmac_sha256".to_string(), hmac_sha256 as NativeFunction);
+        functions.insert("hmac_sha256_hex".to_string(), hmac_sha256_hex as NativeFunction);
         functions.insert("hmac_verify".to_string(), hmac_verify as NativeFunction);
 
         // Key derivation
@@ -147,6 +152,28 @@ fn sha256(args: &[Value]) -> Result<Value> {
 
     let mut hasher = Sha256::new();
     hasher.update(data);
+    let result = hasher.finalize();
+
+    // Return as hex string
+    Ok(Value::string(hex::encode(result)))
+}
+
+/// SHA-256 hash with hex input (for binary data)
+fn sha256_hex(args: &[Value]) -> Result<Value> {
+    if args.len() != 1 {
+        return Err(GraphoidError::runtime("sha256_hex() requires 1 argument: hex_data".to_string()));
+    }
+
+    let hex_data = match &args[0].kind {
+        ValueKind::String(s) => s,
+        _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+    };
+
+    let data = hex::decode(hex_data)
+        .map_err(|e| GraphoidError::runtime(format!("Invalid hex data: {}", e)))?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(&data);
     let result = hasher.finalize();
 
     // Return as hex string
@@ -428,6 +455,138 @@ fn aes_decrypt(args: &[Value]) -> Result<Value> {
     Ok(Value::string(result))
 }
 
+/// TLS-style AES-GCM encrypt with separate nonce and AAD
+/// Args: key (hex), nonce (hex), aad (hex), plaintext (hex)
+/// Returns: ciphertext + auth tag as hex
+fn aes_gcm_encrypt(args: &[Value]) -> Result<Value> {
+    if args.len() != 4 {
+        return Err(GraphoidError::runtime(
+            "aes_gcm_encrypt() requires 4 arguments: key, nonce, aad, plaintext".to_string()
+        ));
+    }
+
+    let key_hex = match &args[0].kind {
+        ValueKind::String(s) => s,
+        _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+    };
+    let nonce_hex = match &args[1].kind {
+        ValueKind::String(s) => s,
+        _ => return Err(GraphoidError::type_error("string", args[1].type_name())),
+    };
+    let aad_hex = match &args[2].kind {
+        ValueKind::String(s) => s,
+        _ => return Err(GraphoidError::type_error("string", args[2].type_name())),
+    };
+    let plaintext_hex = match &args[3].kind {
+        ValueKind::String(s) => s,
+        _ => return Err(GraphoidError::type_error("string", args[3].type_name())),
+    };
+
+    let key_bytes = hex::decode(key_hex)
+        .map_err(|e| GraphoidError::runtime(format!("Invalid key: {}", e)))?;
+    let nonce_bytes = hex::decode(nonce_hex)
+        .map_err(|e| GraphoidError::runtime(format!("Invalid nonce: {}", e)))?;
+    let aad_bytes = hex::decode(aad_hex)
+        .map_err(|e| GraphoidError::runtime(format!("Invalid aad: {}", e)))?;
+    let plaintext_bytes = hex::decode(plaintext_hex)
+        .map_err(|e| GraphoidError::runtime(format!("Invalid plaintext: {}", e)))?;
+
+    if key_bytes.len() != 16 && key_bytes.len() != 32 {
+        return Err(GraphoidError::runtime("Key must be 16 or 32 bytes".to_string()));
+    }
+    if nonce_bytes.len() != 12 {
+        return Err(GraphoidError::runtime("Nonce must be 12 bytes".to_string()));
+    }
+
+    use aes_gcm::aead::{Aead, KeyInit, Payload};
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let payload = Payload {
+        msg: &plaintext_bytes,
+        aad: &aad_bytes,
+    };
+
+    let ciphertext = if key_bytes.len() == 16 {
+        use aes_gcm::Aes128Gcm;
+        let key = aes_gcm::Key::<Aes128Gcm>::from_slice(&key_bytes);
+        let cipher = Aes128Gcm::new(key);
+        cipher.encrypt(nonce, payload)
+            .map_err(|e| GraphoidError::runtime(format!("Encryption failed: {}", e)))?
+    } else {
+        let key = aes_gcm::Key::<Aes256Gcm>::from_slice(&key_bytes);
+        let cipher = Aes256Gcm::new(key);
+        cipher.encrypt(nonce, payload)
+            .map_err(|e| GraphoidError::runtime(format!("Encryption failed: {}", e)))?
+    };
+
+    Ok(Value::string(hex::encode(ciphertext)))
+}
+
+/// TLS-style AES-GCM decrypt with separate nonce and AAD
+/// Args: key (hex), nonce (hex), aad (hex), ciphertext (hex, includes auth tag)
+/// Returns: plaintext as hex
+fn aes_gcm_decrypt(args: &[Value]) -> Result<Value> {
+    if args.len() != 4 {
+        return Err(GraphoidError::runtime(
+            "aes_gcm_decrypt() requires 4 arguments: key, nonce, aad, ciphertext".to_string()
+        ));
+    }
+
+    let key_hex = match &args[0].kind {
+        ValueKind::String(s) => s,
+        _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+    };
+    let nonce_hex = match &args[1].kind {
+        ValueKind::String(s) => s,
+        _ => return Err(GraphoidError::type_error("string", args[1].type_name())),
+    };
+    let aad_hex = match &args[2].kind {
+        ValueKind::String(s) => s,
+        _ => return Err(GraphoidError::type_error("string", args[2].type_name())),
+    };
+    let ciphertext_hex = match &args[3].kind {
+        ValueKind::String(s) => s,
+        _ => return Err(GraphoidError::type_error("string", args[3].type_name())),
+    };
+
+    let key_bytes = hex::decode(key_hex)
+        .map_err(|e| GraphoidError::runtime(format!("Invalid key: {}", e)))?;
+    let nonce_bytes = hex::decode(nonce_hex)
+        .map_err(|e| GraphoidError::runtime(format!("Invalid nonce: {}", e)))?;
+    let aad_bytes = hex::decode(aad_hex)
+        .map_err(|e| GraphoidError::runtime(format!("Invalid aad: {}", e)))?;
+    let ciphertext_bytes = hex::decode(ciphertext_hex)
+        .map_err(|e| GraphoidError::runtime(format!("Invalid ciphertext: {}", e)))?;
+
+    if key_bytes.len() != 16 && key_bytes.len() != 32 {
+        return Err(GraphoidError::runtime("Key must be 16 or 32 bytes".to_string()));
+    }
+    if nonce_bytes.len() != 12 {
+        return Err(GraphoidError::runtime("Nonce must be 12 bytes".to_string()));
+    }
+
+    use aes_gcm::aead::{Aead, KeyInit, Payload};
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let payload = Payload {
+        msg: &ciphertext_bytes,
+        aad: &aad_bytes,
+    };
+
+    let plaintext = if key_bytes.len() == 16 {
+        use aes_gcm::Aes128Gcm;
+        let key = aes_gcm::Key::<Aes128Gcm>::from_slice(&key_bytes);
+        let cipher = Aes128Gcm::new(key);
+        cipher.decrypt(nonce, payload)
+            .map_err(|e| GraphoidError::runtime(format!("Decryption failed: {}", e)))?
+    } else {
+        let key = aes_gcm::Key::<Aes256Gcm>::from_slice(&key_bytes);
+        let cipher = Aes256Gcm::new(key);
+        cipher.decrypt(nonce, payload)
+            .map_err(|e| GraphoidError::runtime(format!("Decryption failed: {}", e)))?
+    };
+
+    Ok(Value::string(hex::encode(plaintext)))
+}
+
 // =============================================================================
 // SYMMETRIC ENCRYPTION - ChaCha20-Poly1305
 // =============================================================================
@@ -543,6 +702,41 @@ fn hmac_sha256(args: &[Value]) -> Result<Value> {
         .map_err(|e| GraphoidError::runtime(format!("Invalid key: {}", e)))?;
 
     <HmacSha256 as HmacMac>::update(&mut mac, message);
+    let result = <HmacSha256 as HmacMac>::finalize(mac);
+    let code_bytes = result.into_bytes();
+
+    Ok(Value::string(hex::encode(code_bytes)))
+}
+
+/// Compute HMAC-SHA256 with hex inputs (for TLS)
+fn hmac_sha256_hex(args: &[Value]) -> Result<Value> {
+    if args.len() != 2 {
+        return Err(GraphoidError::runtime(
+            "hmac_sha256_hex() requires 2 arguments: message_hex, key_hex".to_string(),
+        ));
+    }
+
+    let message_hex = match &args[0].kind {
+        ValueKind::String(s) => s,
+        _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+    };
+
+    let key_hex = match &args[1].kind {
+        ValueKind::String(s) => s,
+        _ => return Err(GraphoidError::type_error("string", args[1].type_name())),
+    };
+
+    let message = hex::decode(message_hex)
+        .map_err(|e| GraphoidError::runtime(format!("Invalid message hex: {}", e)))?;
+
+    let key = hex::decode(key_hex)
+        .map_err(|e| GraphoidError::runtime(format!("Invalid key hex: {}", e)))?;
+
+    type HmacSha256 = Hmac<Sha256>;
+    let mut mac = <HmacSha256 as HmacMac>::new_from_slice(&key)
+        .map_err(|e| GraphoidError::runtime(format!("Invalid key: {}", e)))?;
+
+    <HmacSha256 as HmacMac>::update(&mut mac, &message);
     let result = <HmacSha256 as HmacMac>::finalize(mac);
     let code_bytes = result.into_bytes();
 
@@ -824,14 +1018,10 @@ fn hkdf_extract(args: &[Value]) -> Result<Value> {
     let ikm = hex::decode(ikm_hex)
         .map_err(|e| GraphoidError::runtime(format!("Invalid ikm (must be hex): {}", e)))?;
 
-    let hk = Hkdf::<Sha256>::new(Some(&salt), &ikm);
-
-    // Extract PRK (pseudo-random key) - for SHA-256 this is 32 bytes
-    // We need to get the PRK directly, but hkdf crate doesn't expose it directly
-    // So we use expand with empty info to get 32 bytes
-    let mut prk = [0u8; 32];
-    hk.expand(&[], &mut prk)
-        .map_err(|e| GraphoidError::runtime(format!("HKDF extract failed: {}", e)))?;
+    // HKDF-Extract returns the PRK (pseudo-random key)
+    // Use the extract method which returns (prk, hkdf) tuple
+    let (prk, _hkdf) = Hkdf::<Sha256>::extract(Some(&salt), &ikm);
+    let prk: [u8; 32] = prk.into();
 
     Ok(Value::string(hex::encode(prk)))
 }
@@ -873,8 +1063,9 @@ fn hkdf_expand(args: &[Value]) -> Result<Value> {
     let info = hex::decode(info_hex)
         .map_err(|e| GraphoidError::runtime(format!("Invalid info (must be hex): {}", e)))?;
 
-    // Create HKDF with the PRK as IKM (salt doesn't matter for expand-only)
-    let hk = Hkdf::<Sha256>::new(None, &prk);
+    // Create HKDF from the PRK directly (not as IKM)
+    let hk = Hkdf::<Sha256>::from_prk(&prk)
+        .map_err(|_| GraphoidError::runtime("Invalid PRK length".to_string()))?;
 
     let mut okm = vec![0u8; length];
     hk.expand(&info, &mut okm)
