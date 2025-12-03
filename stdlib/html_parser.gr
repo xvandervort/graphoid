@@ -1,0 +1,168 @@
+# html_parser.gr - HTML Parsing Module
+# Minimal set of composable functions for extracting data from HTML
+
+__module = "html_parser"
+__version = "1.0.0"
+
+# =============================================================================
+# CORE FUNCTIONS
+# =============================================================================
+
+# Find all text occurring between start_pattern and end_pattern
+# Returns: list of matches (use [0] for first match)
+fn find_between(html, start_pattern, end_pattern) {
+    results = []
+    pos = 0
+
+    while pos < html.size() {
+        start_idx = _index_of(html, start_pattern, pos)
+        if start_idx == -1 { break }
+
+        content_start = start_idx + start_pattern.size()
+        end_idx = _index_of(html, end_pattern, content_start)
+        if end_idx == -1 { break }
+
+        results = results.append(html.substring(content_start, end_idx))
+        pos = end_idx + end_pattern.size()
+    }
+
+    return results
+}
+
+# Strip all HTML tags, returning plain text
+fn strip_tags(html) {
+    result = ""
+    in_tag = false
+    i = 0
+
+    while i < html.size() {
+        char = html[i]
+        if char == "<" {
+            in_tag = true
+        } else if char == ">" {
+            in_tag = false
+        } else if in_tag == false {
+            result = result + char
+        }
+        i = i + 1
+    }
+
+    return result
+}
+
+# Get attribute value from an HTML tag string
+# Example: get_attr('<div class="price">', "class") -> "price"
+fn get_attr(tag, attr_name) {
+    # Try double quotes: attr="value"
+    pattern = attr_name + "=\""
+    idx = _index_of(tag, pattern, 0)
+    if idx != -1 {
+        start = idx + pattern.size()
+        end = _index_of(tag, "\"", start)
+        if end != -1 {
+            return tag.substring(start, end)
+        }
+    }
+
+    # Try single quotes: attr='value'
+    pattern = attr_name + "='"
+    idx = _index_of(tag, pattern, 0)
+    if idx != -1 {
+        start = idx + pattern.size()
+        end = _index_of(tag, "'", start)
+        if end != -1 {
+            return tag.substring(start, end)
+        }
+    }
+
+    return none
+}
+
+# Unescape common HTML entities
+fn unescape(text) {
+    result = text
+    result = _replace(result, "&lt;", "<")
+    result = _replace(result, "&gt;", ">")
+    result = _replace(result, "&amp;", "&")
+    result = _replace(result, "&quot;", "\"")
+    result = _replace(result, "&#39;", "'")
+    result = _replace(result, "&nbsp;", " ")
+    result = _replace(result, "&#x27;", "'")
+    result = _replace(result, "&#x2F;", "/")
+    return result
+}
+
+# Trim leading/trailing whitespace
+fn trim(text) {
+    start = 0
+    end = text.size()
+
+    while start < end {
+        c = text[start]
+        if c != " " { if c != "\t" { if c != "\n" { if c != "\r" { break } } } }
+        start = start + 1
+    }
+
+    while end > start {
+        c = text[end - 1]
+        if c != " " { if c != "\t" { if c != "\n" { if c != "\r" { break } } } }
+        end = end - 1
+    }
+
+    if start >= end { return "" }
+    return text.substring(start, end)
+}
+
+# =============================================================================
+# PRIVATE HELPERS
+# =============================================================================
+
+fn _index_of(text, pattern, start_pos) {
+    i = start_pos
+    plen = pattern.size()
+    tlen = text.size()
+
+    while i <= tlen - plen {
+        found = true
+        j = 0
+        while j < plen {
+            if text[i + j] != pattern[j] {
+                found = false
+                break
+            }
+            j = j + 1
+        }
+        if found { return i }
+        i = i + 1
+    }
+    return -1
+}
+
+fn _replace(text, old, new) {
+    result = ""
+    i = 0
+    olen = old.size()
+
+    while i < text.size() {
+        if i <= text.size() - olen {
+            found = true
+            j = 0
+            while j < olen {
+                if text[i + j] != old[j] {
+                    found = false
+                    break
+                }
+                j = j + 1
+            }
+            if found {
+                result = result + new
+                i = i + olen
+                continue
+            }
+        }
+        result = result + text[i]
+        i = i + 1
+    }
+
+    return result
+}

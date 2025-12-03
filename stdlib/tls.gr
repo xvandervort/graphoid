@@ -55,6 +55,7 @@ RSA_PSS_RSAE_SHA256 = 0x0804
 EXT_SERVER_NAME = 0
 EXT_SUPPORTED_GROUPS = 10
 EXT_SIGNATURE_ALGORITHMS = 13
+EXT_ALPN = 16
 EXT_SUPPORTED_VERSIONS = 43
 EXT_KEY_SHARE = 51
 
@@ -265,6 +266,10 @@ fn build_client_hello_extensions(hostname, client_key_share) {
     key_share = build_key_share_extension(client_key_share)
     extensions = concat_bytes(extensions, key_share)
 
+    # ALPN extension (request HTTP/1.1)
+    alpn = build_alpn_extension()
+    extensions = concat_bytes(extensions, alpn)
+
     return extensions
 }
 
@@ -355,6 +360,29 @@ fn build_key_share_extension(public_key) {
     # Client key shares length
     entries_len = int_to_bytes_2(entry.size())
     data = concat_bytes(entries_len, entry)
+
+    ext_len = int_to_bytes_2(data.size())
+    ext = concat_bytes(ext, ext_len)
+    ext = concat_bytes(ext, data)
+
+    return ext
+}
+
+# Build ALPN extension (Application-Layer Protocol Negotiation)
+# We advertise http/1.1 only to avoid HTTP/2 negotiation
+fn build_alpn_extension() {
+    ext = int_to_bytes_2(EXT_ALPN)
+
+    # Protocol: "http/1.1" = [104, 116, 116, 112, 47, 49, 46, 49]
+    protocol = [104, 116, 116, 112, 47, 49, 46, 49]  # "http/1.1"
+    protocol_len = [protocol.size()]  # 1 byte length prefix
+
+    # Protocol list
+    proto_entry = concat_bytes(protocol_len, protocol)
+
+    # ALPN extension data: length (2 bytes) + protocol list
+    list_len = int_to_bytes_2(proto_entry.size())
+    data = concat_bytes(list_len, proto_entry)
 
     ext_len = int_to_bytes_2(data.size())
     ext = concat_bytes(ext, ext_len)

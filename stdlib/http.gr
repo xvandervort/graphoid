@@ -355,8 +355,16 @@ fn get(url) {
     is_https = parsed["is_https"]
 
     # Connect to server (TLS for HTTPS, plain TCP for HTTP)
+    socket = none
     if is_https {
         socket = tls.tls_connect(host, port)
+        # Check for TLS connection errors
+        if socket["error"] != none {
+            return {"status": 0, "headers": "", "body": "", "error": socket["error"]}
+        }
+        if socket["established"] != true {
+            return {"status": 0, "headers": "", "body": "", "error": "TLS handshake failed"}
+        }
     } else {
         socket = net.connect(host, port)
     }
@@ -379,6 +387,7 @@ fn get(url) {
     # Receive response
     response = ""
     while true {
+        chunk = ""
         if is_https {
             chunk = tls.tls_recv(socket, 4096)
         } else {

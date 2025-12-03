@@ -3797,6 +3797,43 @@ Graph-based dependency management:
 
 ---
 
+## Future Phases (Post-1.0)
+
+These phases are planned for after the initial production release:
+
+### Phase 18: JavaScript Execution (TBD)
+
+Enable execution of JavaScript within Graphoid for web scraping and browser automation:
+
+- **Headless browser integration** - Execute JavaScript-rendered pages
+- **DOM manipulation** - Access dynamically loaded content
+- **Web scraping** - Extract data from JavaScript-heavy sites
+- **Options**:
+  - Embed lightweight JS engine (QuickJS)
+  - Interface with headless Chrome/Firefox via CDP
+  - WebDriver protocol support
+- **Use cases**: Web scraping, browser testing, SPA interaction
+
+### Phase 19: GUI Toolkit (TBD)
+
+Native GUI application development:
+
+- Cross-platform windowing
+- Widget library
+- Event handling
+- Graphics/canvas support
+
+### Phase 20: Concurrency & Async (TBD)
+
+Advanced concurrency primitives:
+
+- Async/await syntax
+- Channels and message passing
+- Actor model support
+- Parallel graph operations
+
+---
+
 ## Development Best Practices
 
 ### Code Organization
