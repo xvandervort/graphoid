@@ -276,8 +276,8 @@ impl Parser {
     fn function_declaration(&mut self, is_private: bool) -> Result<Stmt> {
         let position = self.previous_position();
 
-        // Expect identifier
-        let name = if let TokenType::Identifier(id) = &self.peek().token_type {
+        // Expect identifier (could be function name or receiver for method syntax)
+        let first_ident = if let TokenType::Identifier(id) = &self.peek().token_type {
             let n = id.clone();
             self.advance();
             n
@@ -286,6 +286,25 @@ impl Parser {
                 message: "Expected function name".to_string(),
                 position: self.peek().position(),
             });
+        };
+
+        // Check for method syntax: fn Receiver.method_name(...)
+        let (receiver, name) = if self.match_token(&TokenType::Dot) {
+            // This is method syntax - first_ident is the receiver
+            let method_name = if let TokenType::Identifier(id) = &self.peek().token_type {
+                let n = id.clone();
+                self.advance();
+                n
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected method name after '.'".to_string(),
+                    position: self.peek().position(),
+                });
+            };
+            (Some(first_ident), method_name)
+        } else {
+            // Regular function syntax
+            (None, first_ident)
         };
 
         // ⚠️  NO GENERICS POLICY ENFORCEMENT
@@ -415,6 +434,7 @@ impl Parser {
 
         Ok(Stmt::FunctionDecl {
             name,
+            receiver,  // For method syntax: fn Graph.method()
             params,
             body,
             pattern_clauses,

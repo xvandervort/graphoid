@@ -366,6 +366,7 @@ impl Executor {
             }
             Stmt::FunctionDecl {
                 name,
+                receiver,
                 params,
                 body,
                 pattern_clauses,
@@ -392,23 +393,48 @@ impl Executor {
                 let node_id = self.function_graph.borrow_mut().register_function(func.clone());
                 func.node_id = Some(node_id);
 
-                // Store in global functions table (for recursion support and overloading)
-                // Multiple functions with same name but different arities are supported
-                self.global_functions
-                    .entry(name.clone())
-                    .or_insert_with(Vec::new)
-                    .push(func.clone());
+                // Check if this is a method (has receiver) or regular function
+                if let Some(receiver_name) = receiver {
+                    // Method syntax: fn Receiver.method_name()
+                    // Look up the receiver graph in the environment and attach the method
+                    let receiver_value = self.env.get(receiver_name)?;
 
-                // Store function in environment (last definition wins for direct calls)
-                self.env.define(name.clone(), Value::function(func.clone()));
+                    // Receiver must be a graph
+                    match &receiver_value.kind {
+                        ValueKind::Graph(graph) => {
+                            // Clone the graph, attach the method, and update the binding
+                            let mut graph_clone = graph.clone();
+                            graph_clone.attach_method(name.clone(), func.clone());
+                            self.env.define(receiver_name.clone(), Value::graph(graph_clone));
+                        }
+                        _ => {
+                            return Err(GraphoidError::runtime(format!(
+                                "Cannot attach method '{}' to '{}': expected graph, got {}",
+                                name, receiver_name, receiver_value.type_name()
+                            )));
+                        }
+                    }
+                } else {
+                    // Regular function - store in environment and global functions table
 
-                // NOW update the function's captured environment to include itself for recursion
-                // Since we use Rc<RefCell>, this updates all copies of the function
-                *placeholder_env.borrow_mut() = self.env.clone();
+                    // Store in global functions table (for recursion support and overloading)
+                    // Multiple functions with same name but different arities are supported
+                    self.global_functions
+                        .entry(name.clone())
+                        .or_insert_with(Vec::new)
+                        .push(func.clone());
 
-                // Phase 10: Track private symbols
-                if *is_private {
-                    self.private_symbols.insert(name.clone());
+                    // Store function in environment (last definition wins for direct calls)
+                    self.env.define(name.clone(), Value::function(func.clone()));
+
+                    // NOW update the function's captured environment to include itself for recursion
+                    // Since we use Rc<RefCell>, this updates all copies of the function
+                    *placeholder_env.borrow_mut() = self.env.clone();
+
+                    // Phase 10: Track private symbols
+                    if *is_private {
+                        self.private_symbols.insert(name.clone());
+                    }
                 }
 
                 Ok(None)
@@ -4542,6 +4568,13 @@ impl Executor {
 
     /// Evaluates a method call on a graph.
     fn eval_graph_method(&mut self, mut graph: crate::values::Graph, method: &str, args: &[Value], object_expr: &Expr) -> Result<Value> {
+        // Check for user-defined methods first (class-like graphs)
+        if let Some(func) = graph.get_method(method) {
+            // User-defined method found - call it with `self` bound to the graph
+            let func_clone = func.clone();
+            return self.call_graph_method(&graph, &func_clone, args, object_expr);
+        }
+
         match method {
             "add_node" => {
                 // Add a node to the graph
@@ -5020,6 +5053,19 @@ impl Executor {
                 let node_ids = graph.node_ids();
                 let node_id_values: Vec<Value> = node_ids.iter().map(|id| Value::string(id.clone())).collect();
                 Ok(Value::list(crate::values::List::from_vec(node_id_values)))
+            }
+            "clone" => {
+                // Create a deep copy of the graph, including all nodes, edges, and methods
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "clone() expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Rust's Clone trait already does a deep copy of all fields
+                // including nodes, edges, rules, and methods
+                Ok(Value::graph(graph.clone()))
             }
             "edges" => {
                 // Get all edges as a list of lists [from, to, edge_type]
@@ -5895,6 +5941,86 @@ impl Executor {
 
         // Pop function from graph with return value
         self.function_graph.borrow_mut().pop_call(return_value.clone());
+
+        // Propagate errors
+        execution_result?;
+
+        Ok(return_value)
+    }
+
+    /// Helper method to call a user-defined method on a graph with `self` binding.
+    /// Used for class-like graph methods defined with `fn Graph.method() { }` syntax.
+    ///
+    /// The `object_expr` parameter is used to persist mutations to `self` back to the
+    /// original graph variable after method execution.
+    fn call_graph_method(&mut self, graph: &crate::values::Graph, func: &Function, arg_values: &[Value], object_expr: &Expr) -> Result<Value> {
+        // Validate argument count
+        if arg_values.len() != func.parameters.len() {
+            return Err(GraphoidError::runtime(format!(
+                "Method '{}' expects {} arguments, but got {}",
+                func.name.as_ref().unwrap_or(&"<anonymous>".to_string()),
+                func.parameters.len(),
+                arg_values.len()
+            )));
+        }
+
+        // Push method onto call stack
+        let method_name = func.name.as_ref().unwrap_or(&"<anonymous>".to_string()).clone();
+        self.call_stack.push(method_name.clone());
+
+        // Push function call onto the graph
+        if let Some(ref func_id) = func.node_id {
+            self.function_graph.borrow_mut().push_call(func_id.clone(), arg_values.to_vec());
+        }
+
+        // Use the captured environment (from method definition)
+        let parent_env = func.env.borrow().clone();
+        let call_env = Environment::with_parent(parent_env);
+
+        // Save current environment and switch to call environment
+        let saved_env = std::mem::replace(&mut self.env, call_env);
+
+        // Bind `self` to the graph
+        self.env.define("self".to_string(), Value::graph(graph.clone()));
+
+        // Bind parameters to argument values
+        for (param, arg) in func.parameters.iter().zip(arg_values.iter()) {
+            self.env.define(param.name.clone(), arg.clone());
+        }
+
+        // Execute function body
+        let mut return_value = Value::none();
+        let execution_result: Result<()> = (|| {
+            for stmt in &func.body {
+                if let Some(ret_val) = self.eval_stmt(stmt)? {
+                    return_value = ret_val;
+                    return Ok(());
+                }
+            }
+            Ok(())
+        })();
+
+        // Get the (possibly modified) `self` before restoring environment
+        let modified_self = self.env.get("self").ok();
+
+        // Restore original environment
+        self.env = saved_env;
+
+        // Persist mutations to `self` back to the original graph variable
+        if let Some(modified_graph) = modified_self {
+            // Only update if object_expr is a simple variable reference
+            if let Expr::Variable { name, .. } = object_expr {
+                self.env.set(name, modified_graph)?;
+            }
+        }
+
+        // Pop method from call stack
+        self.call_stack.pop();
+
+        // Pop function from graph with return value
+        if func.node_id.is_some() {
+            self.function_graph.borrow_mut().pop_call(return_value.clone());
+        }
 
         // Propagate errors
         execution_result?;

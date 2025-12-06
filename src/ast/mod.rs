@@ -23,6 +23,7 @@ pub enum Stmt {
     },
     FunctionDecl {
         name: String,
+        receiver: Option<String>,  // For method syntax: fn Graph.method() - receiver is "Graph"
         params: Vec<Parameter>,
         body: Vec<Stmt>,
         pattern_clauses: Option<Vec<PatternClause>>,  // Phase 7: Pattern matching

@@ -1111,6 +1111,7 @@ fn test_function_declaration() {
     // Define function: func add(a, b) { return a + b }
     let func_decl = Stmt::FunctionDecl {
         name: "add".to_string(),
+        receiver: None,
         params: vec![
             graphoid::ast::Parameter {
                 name: "a".to_string(),
@@ -1157,6 +1158,7 @@ fn test_function_call_simple() {
     // Define function: func add(a, b) { return a + b }
     let func_decl = Stmt::FunctionDecl {
         name: "add".to_string(),
+        receiver: None,
         params: vec![
             graphoid::ast::Parameter {
                 name: "a".to_string(),
@@ -1221,6 +1223,7 @@ fn test_function_no_params() {
     // Define function: func greet() { return "Hello" }
     let func_decl = Stmt::FunctionDecl {
         name: "greet".to_string(),
+        receiver: None,
         params: vec![],
         body: vec![Stmt::Return {
             value: Some(Expr::Literal {
@@ -1257,6 +1260,7 @@ fn test_function_with_expression_body() {
     // Define function: func double(x) { return x * 2 }
     let func_decl = Stmt::FunctionDecl {
         name: "double".to_string(),
+        receiver: None,
         params: vec![graphoid::ast::Parameter {
             name: "x".to_string(),
             default_value: None,
@@ -1308,6 +1312,7 @@ fn test_function_nested_calls() {
     // Define: func add(a, b) { return a + b }
     let add_decl = Stmt::FunctionDecl {
         name: "add".to_string(),
+        receiver: None,
         params: vec![
             graphoid::ast::Parameter {
                 name: "a".to_string(),
@@ -1343,6 +1348,7 @@ fn test_function_nested_calls() {
     // Define: func mul(a, b) { return a * b }
     let mul_decl = Stmt::FunctionDecl {
         name: "mul".to_string(),
+        receiver: None,
         params: vec![
             graphoid::ast::Parameter {
                 name: "a".to_string(),
@@ -1424,6 +1430,7 @@ fn test_function_closure() {
     // Define: func add_x(y) { return x + y }  (captures x)
     let func_decl = Stmt::FunctionDecl {
         name: "add_x".to_string(),
+        receiver: None,
         params: vec![graphoid::ast::Parameter {
             name: "y".to_string(),
             default_value: None,
@@ -1475,6 +1482,7 @@ fn test_function_return_none() {
     // Define: func do_nothing() { return }
     let func_decl = Stmt::FunctionDecl {
         name: "do_nothing".to_string(),
+        receiver: None,
         params: vec![],
         body: vec![Stmt::Return {
             value: None,
@@ -1508,6 +1516,7 @@ fn test_function_wrong_arg_count() {
     // Define: func add(a, b) { return a + b }
     let func_decl = Stmt::FunctionDecl {
         name: "add".to_string(),
+        receiver: None,
         params: vec![
             graphoid::ast::Parameter {
                 name: "a".to_string(),
@@ -1740,6 +1749,7 @@ fn test_function_as_value() {
     // func double(n) { return n * 2 }
     let func_decl = Stmt::FunctionDecl {
         name: "double".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
@@ -1779,6 +1789,7 @@ fn test_function_multiple_params() {
     // func calculate(a, b, c) { return a + b * c }
     let func_decl = Stmt::FunctionDecl {
         name: "calculate".to_string(),
+        receiver: None,
         params: vec![
             Parameter {
                 name: "a".to_string(),
@@ -1870,6 +1881,7 @@ fn test_recursive_function() {
     // For now, test that function can call itself (will hit max depth eventually)
     let func_decl = Stmt::FunctionDecl {
         name: "identity".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
@@ -1912,6 +1924,7 @@ fn test_function_with_string_return() {
     // func greet(name) { return "Hello, " + name }
     let func_decl = Stmt::FunctionDecl {
         name: "greet".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "name".to_string(),
             default_value: None,
@@ -1965,6 +1978,7 @@ fn test_function_modifying_closure_var() {
     // func get_x() { return x }
     let func_decl = Stmt::FunctionDecl {
         name: "get_x".to_string(),
+        receiver: None,
         params: vec![],
         body: vec![Stmt::Return {
             value: Some(Expr::Variable {
@@ -2114,6 +2128,7 @@ fn test_function_returning_boolean() {
     // func is_positive(n) { return n > 0 }
     let func_decl = Stmt::FunctionDecl {
         name: "is_positive".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
@@ -2179,6 +2194,7 @@ fn test_function_returning_list() {
     // func make_list(a, b) { return [a, b] }
     let func_decl = Stmt::FunctionDecl {
         name: "make_list".to_string(),
+        receiver: None,
         params: vec![
             Parameter {
                 name: "a".to_string(),
@@ -2246,6 +2262,7 @@ fn test_deeply_nested_calls() {
     // func add1(n) { return n + 1 }
     let func_decl = Stmt::FunctionDecl {
         name: "add1".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
@@ -2311,6 +2328,7 @@ fn test_function_with_no_return_statement() {
     // func do_nothing() { }
     let func_decl = Stmt::FunctionDecl {
         name: "do_nothing".to_string(),
+        receiver: None,
         params: vec![],
         body: vec![], // No statements
         pattern_clauses: None,
@@ -2340,6 +2358,7 @@ fn test_function_early_return() {
     // func early() { return 1; return 2; }
     let func_decl = Stmt::FunctionDecl {
         name: "early".to_string(),
+        receiver: None,
         params: vec![],
         body: vec![
             Stmt::Return {
@@ -2420,6 +2439,7 @@ fn test_function_with_side_effects() {
     // func set_x(val) { x = val; return x }
     let func_decl = Stmt::FunctionDecl {
         name: "set_x".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "val".to_string(),
             default_value: None,
@@ -2481,6 +2501,7 @@ fn test_nested_closures() {
     // func outer() { return x }
     let outer_decl = Stmt::FunctionDecl {
         name: "outer".to_string(),
+        receiver: None,
         params: vec![],
         body: vec![Stmt::Return {
             value: Some(Expr::Variable {
@@ -2519,6 +2540,7 @@ fn test_function_parameter_shadowing() {
     // func use_param(x) { return x * 2 }
     let func_decl = Stmt::FunctionDecl {
         name: "use_param".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "x".to_string(), // Shadows outer x
             default_value: None,
@@ -2570,6 +2592,7 @@ fn test_function_returning_function_value() {
     // func make_adder(n) { return n + 1 }
     let func_decl = Stmt::FunctionDecl {
         name: "make_adder".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
@@ -2674,6 +2697,7 @@ fn test_function_with_comparison() {
     // func compare(a, b) { return a > b }
     let func_decl = Stmt::FunctionDecl {
         name: "compare".to_string(),
+        receiver: None,
         params: vec![
             Parameter {
                 name: "a".to_string(),
@@ -2798,6 +2822,7 @@ fn test_function_with_unary_ops() {
     // func negate(x) { return -x }
     let func_decl = Stmt::FunctionDecl {
         name: "negate".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "x".to_string(),
             default_value: None,
@@ -2844,6 +2869,7 @@ fn test_function_with_not_op() {
     // func invert(b) { return not b }
     let func_decl = Stmt::FunctionDecl {
         name: "invert".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "b".to_string(),
             default_value: None,
@@ -2890,6 +2916,7 @@ fn test_function_four_params() {
     // func avg(a, b, c, d) { return (a + b + c + d) / 4 }
     let func_decl = Stmt::FunctionDecl {
         name: "avg".to_string(),
+        receiver: None,
         params: vec![
             Parameter {
                 name: "a".to_string(),
@@ -3019,6 +3046,7 @@ fn test_function_call_with_expression_args() {
     // func add(a, b) { return a + b }
     let func_decl = Stmt::FunctionDecl {
         name: "add".to_string(),
+        receiver: None,
         params: vec![
             Parameter {
                 name: "a".to_string(),
@@ -3282,6 +3310,7 @@ fn test_if_return_in_function() {
     // func check(n) { if n > 0 { return 1 } return 0 }
     let func_decl = Stmt::FunctionDecl {
         name: "check".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
@@ -3372,6 +3401,7 @@ fn test_call_stack_cleared_after_return() {
     // func add(a, b) { return a + b }
     let func_decl = Stmt::FunctionDecl {
         name: "add".to_string(),
+        receiver: None,
         params: vec![
             Parameter {
                 name: "a".to_string(),
@@ -3662,6 +3692,7 @@ fn test_while_loop_in_function() {
     // }
     let func_decl = Stmt::FunctionDecl {
         name: "factorial".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "n".to_string(),
             default_value: None,
@@ -4106,6 +4137,7 @@ fn test_for_loop_in_function() {
     // }
     let func_decl = Stmt::FunctionDecl {
         name: "sum_list".to_string(),
+        receiver: None,
         params: vec![Parameter {
             name: "numbers".to_string(),
             default_value: None,

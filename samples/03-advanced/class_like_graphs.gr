@@ -1,0 +1,72 @@
+# Class-Like Graphs in Graphoid
+#
+# Graphoid is not an object-oriented language, but graphs can have attached
+# methods, simulating class-like behavior. This pattern enables:
+# - Encapsulation of state (data as graph nodes)
+# - Methods that operate on that state
+# - Instance creation via cloning
+# - Method chaining
+
+# Define a Counter "class" - a prototype graph with methods
+Counter = graph {}
+Counter.add_node("count", 0)
+
+# The .new() method is a convention for creating instances
+fn Counter.new(initial) {
+    instance = self.clone()  # Clone the prototype
+    instance.remove_node("count")
+    instance.add_node("count", initial)
+    return instance
+}
+
+fn Counter.increment() {
+    current = self.get_node("count")
+    self.remove_node("count")
+    self.add_node("count", current + 1)
+    return self
+}
+
+fn Counter.decrement() {
+    current = self.get_node("count")
+    self.remove_node("count")
+    self.add_node("count", current - 1)
+    return self
+}
+
+fn Counter.value() {
+    return self.get_node("count")
+}
+
+fn Counter.reset() {
+    self.remove_node("count")
+    self.add_node("count", 0)
+    return self
+}
+
+# Create instances using .new()
+c1 = Counter.new(0)
+c2 = Counter.new(100)
+
+# Individual operations (mutations persist to the variable)
+c1.increment()
+c1.increment()
+c1.increment()
+
+c2.decrement()
+c2.decrement()
+
+print("c1 after 3 increments: " + c1.value().to_string())
+print("c2 after 2 decrements: " + c2.value().to_string())
+
+# Method chaining (requires explicit assignment for full persistence)
+c3 = Counter.new(10)
+c3 = c3.increment().increment().decrement()
+print("c3 after +1, +1, -1: " + c3.value().to_string())
+
+# The prototype is unchanged
+print("Counter prototype: " + Counter.value().to_string())
+
+# Note: For simple operations, no assignment needed:
+c4 = Counter.new(5)
+c4.increment()  # This persists directly to c4
+print("c4 after single increment: " + c4.value().to_string())

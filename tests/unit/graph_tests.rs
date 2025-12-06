@@ -494,3 +494,162 @@ fn test_empty_tree_graph_is_falsy() {
     let val = Value::graph(t);
     assert!(!val.is_truthy());  // Empty graph is falsy
 }
+
+// ============================================================================
+// METHOD STORAGE TESTS (Class-like Graphs)
+// ============================================================================
+
+use graphoid::values::Function;
+use graphoid::execution::Environment;
+use std::rc::Rc;
+use std::cell::RefCell;
+
+/// Helper to create a simple test function
+fn make_test_function(name: &str) -> Function {
+    Function {
+        name: Some(name.to_string()),
+        params: vec![],
+        parameters: vec![],
+        body: vec![],
+        pattern_clauses: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
+    }
+}
+
+#[test]
+fn test_attach_method_creates_methods_branch() {
+    let mut g = Graph::new(GraphType::Directed);
+
+    // Initially no __methods__ branch
+    assert!(!g.has_node("__methods__"));
+
+    // Attach a method
+    let func = make_test_function("add");
+    g.attach_method("add".to_string(), func);
+
+    // Now __methods__ branch should exist
+    assert!(g.has_node("__methods__"));
+    // And the method node
+    assert!(g.has_node("__methods__/add"));
+}
+
+#[test]
+fn test_attach_method_creates_edge_to_method() {
+    let mut g = Graph::new(GraphType::Directed);
+
+    let func = make_test_function("increment");
+    g.attach_method("increment".to_string(), func);
+
+    // Should have edge from __methods__ to __methods__/increment
+    assert!(g.has_edge("__methods__", "__methods__/increment"));
+}
+
+#[test]
+fn test_get_method_returns_function() {
+    let mut g = Graph::new(GraphType::Directed);
+
+    let func = make_test_function("calculate");
+    g.attach_method("calculate".to_string(), func);
+
+    // Should retrieve the method
+    let retrieved = g.get_method("calculate");
+    assert!(retrieved.is_some());
+    assert_eq!(retrieved.unwrap().name, Some("calculate".to_string()));
+}
+
+#[test]
+fn test_get_method_returns_none_for_nonexistent() {
+    let g = Graph::new(GraphType::Directed);
+    assert!(g.get_method("nonexistent").is_none());
+}
+
+#[test]
+fn test_has_method() {
+    let mut g = Graph::new(GraphType::Directed);
+
+    assert!(!g.has_method("foo"));
+
+    let func = make_test_function("foo");
+    g.attach_method("foo".to_string(), func);
+
+    assert!(g.has_method("foo"));
+    assert!(!g.has_method("bar"));
+}
+
+#[test]
+fn test_method_names() {
+    let mut g = Graph::new(GraphType::Directed);
+
+    g.attach_method("add".to_string(), make_test_function("add"));
+    g.attach_method("subtract".to_string(), make_test_function("subtract"));
+    g.attach_method("multiply".to_string(), make_test_function("multiply"));
+
+    let mut names = g.method_names();
+    names.sort();
+
+    assert_eq!(names, vec!["add", "multiply", "subtract"]);
+}
+
+#[test]
+fn test_data_node_ids_excludes_methods() {
+    let mut g = Graph::new(GraphType::Directed);
+
+    // Add data nodes
+    g.add_node("count".to_string(), Value::number(0.0)).unwrap();
+    g.add_node("name".to_string(), Value::string("test".to_string())).unwrap();
+
+    // Add methods
+    g.attach_method("increment".to_string(), make_test_function("increment"));
+    g.attach_method("get_name".to_string(), make_test_function("get_name"));
+
+    // data_node_ids should only return data nodes
+    let mut data_ids = g.data_node_ids();
+    data_ids.sort();
+
+    assert_eq!(data_ids, vec!["count", "name"]);
+
+    // Total node count includes method nodes
+    // 2 data + 1 __methods__ branch + 2 method nodes = 5
+    assert_eq!(g.node_count(), 5);
+}
+
+#[test]
+fn test_clone_preserves_methods() {
+    let mut g = Graph::new(GraphType::Directed);
+
+    g.add_node("value".to_string(), Value::number(42.0)).unwrap();
+    g.attach_method("get_value".to_string(), make_test_function("get_value"));
+
+    // Clone the graph
+    let g2 = g.clone();
+
+    // Clone should have the method
+    assert!(g2.has_method("get_value"));
+    assert!(g2.get_method("get_value").is_some());
+
+    // And the data
+    assert!(g2.has_node("value"));
+}
+
+#[test]
+fn test_method_node_has_correct_type() {
+    let mut g = Graph::new(GraphType::Directed);
+
+    g.attach_method("test".to_string(), make_test_function("test"));
+
+    // The method node should have node_type "__method__"
+    // Access through public nodes field to check GraphNode properties
+    if let Some(node) = g.nodes.get("__methods__/test") {
+        assert_eq!(node.node_type, Some("__method__".to_string()));
+    } else {
+        panic!("Method node not found");
+    }
+
+    // The branch node should have node_type "__branch__"
+    if let Some(node) = g.nodes.get("__methods__") {
+        assert_eq!(node.node_type, Some("__branch__".to_string()));
+    } else {
+        panic!("Branch node not found");
+    }
+}

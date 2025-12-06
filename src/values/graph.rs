@@ -4,7 +4,7 @@
 //! Each node stores direct pointers to its neighbors, avoiding index scans.
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use super::{Value, ValueKind, PatternNode, PatternEdge, PatternPath};
+use super::{Value, ValueKind, PatternNode, PatternEdge, PatternPath, Function};
 use crate::graph::rules::{Rule, RuleContext, GraphOperation, RuleSpec, RuleInstance, RuleSeverity};
 use crate::graph::rulesets::get_ruleset_rules;
 use crate::error::GraphoidError;
@@ -236,6 +236,8 @@ pub struct Graph {
     property_indices: HashMap<String, HashMap<String, Vec<String>>>,
     /// Threshold for auto-index creation (default: 10 accesses)
     auto_index_threshold: usize,
+    // Note: Methods are stored as nodes with node_type "__method__"
+    // This follows Graphoid's "everything is a graph" principle
 }
 
 // Manual PartialEq implementation that ignores optimization state
@@ -264,6 +266,7 @@ impl Graph {
             property_access_counts: HashMap::new(),
             property_indices: HashMap::new(),
             auto_index_threshold: 10, // Create index after 10 lookups
+            // Methods are stored as nodes with node_type "__method__"
         }
     }
 
@@ -2425,6 +2428,144 @@ impl Graph {
         let mut copy = self.clone();
         copy.frozen = false;
         copy
+    }
+
+    // =========================================================================
+    // Method Storage (Class-like Graphs)
+    // =========================================================================
+    //
+    // Methods are stored in a dedicated `__methods__` branch of the graph.
+    // Structure:
+    //   __methods__              (container node)
+    //   __methods__/add          (method node with Function value)
+    //   __methods__/increment    (method node with Function value)
+    //
+    //   Edges: __methods__ --has_method--> __methods__/add
+    //
+    // This follows Graphoid's "everything is a graph" principle with a clean
+    // separation between data nodes and method nodes.
+
+    /// The prefix used for method node IDs
+    const METHOD_BRANCH: &'static str = "__methods__";
+
+    /// Get the full node ID for a method
+    fn method_node_id(name: &str) -> String {
+        format!("__methods__/{}", name)
+    }
+
+    /// Ensure the __methods__ branch node exists
+    fn ensure_methods_branch(&mut self) {
+        if !self.nodes.contains_key(Self::METHOD_BRANCH) {
+            let branch_node = GraphNode {
+                id: Self::METHOD_BRANCH.to_string(),
+                value: Value::none(),
+                node_type: Some("__branch__".to_string()),
+                properties: HashMap::new(),
+                neighbors: HashMap::new(),
+                predecessors: HashMap::new(),
+            };
+            self.nodes.insert(Self::METHOD_BRANCH.to_string(), branch_node);
+        }
+    }
+
+    /// Attach a method (function) to this graph
+    ///
+    /// Methods attached to a graph can be called with the graph as `self`.
+    /// This enables class-like behavior where graphs act as objects.
+    /// Methods are stored under the `__methods__` branch, keeping them
+    /// cleanly separated from data nodes.
+    ///
+    /// # Example
+    /// ```
+    /// use graphoid::values::{Graph, GraphType, Function};
+    /// use graphoid::execution::Environment;
+    /// use std::rc::Rc;
+    /// use std::cell::RefCell;
+    ///
+    /// let mut g = Graph::new(GraphType::Directed);
+    /// let func = Function {
+    ///     name: Some("add".to_string()),
+    ///     params: vec![],
+    ///     parameters: vec![],
+    ///     body: vec![],
+    ///     pattern_clauses: None,
+    ///     env: Rc::new(RefCell::new(Environment::new())),
+    ///     node_id: None,
+    /// };
+    /// g.attach_method("add".to_string(), func);
+    ///
+    /// assert!(g.has_method("add"));
+    /// assert!(g.has_node("__methods__"));
+    /// assert!(g.has_node("__methods__/add"));
+    /// ```
+    pub fn attach_method(&mut self, name: String, func: Function) {
+        // Ensure __methods__ branch exists
+        self.ensure_methods_branch();
+
+        // Create method node with namespaced ID
+        let method_id = Self::method_node_id(&name);
+        let method_node = GraphNode {
+            id: method_id.clone(),
+            value: Value::function(func),
+            node_type: Some("__method__".to_string()),
+            properties: HashMap::new(),
+            neighbors: HashMap::new(),
+            predecessors: HashMap::new(),
+        };
+        self.nodes.insert(method_id.clone(), method_node);
+
+        // Add edge from __methods__ branch to this method node
+        if let Some(branch) = self.nodes.get_mut(Self::METHOD_BRANCH) {
+            branch.neighbors.insert(method_id.clone(), EdgeInfo {
+                edge_type: "has_method".to_string(),
+                weight: None,
+                properties: HashMap::new(),
+            });
+        }
+        // Add predecessor edge back to branch
+        if let Some(method) = self.nodes.get_mut(&method_id) {
+            method.predecessors.insert(Self::METHOD_BRANCH.to_string(), EdgeInfo {
+                edge_type: "has_method".to_string(),
+                weight: None,
+                properties: HashMap::new(),
+            });
+        }
+    }
+
+    /// Get a method attached to this graph by name
+    /// Returns the Function if the method exists
+    pub fn get_method(&self, name: &str) -> Option<&Function> {
+        let method_id = Self::method_node_id(name);
+        if let Some(node) = self.nodes.get(&method_id) {
+            if let ValueKind::Function(func) = &node.value.kind {
+                return Some(func);
+            }
+        }
+        None
+    }
+
+    /// Check if this graph has a method with the given name
+    pub fn has_method(&self, name: &str) -> bool {
+        let method_id = Self::method_node_id(name);
+        self.nodes.contains_key(&method_id)
+    }
+
+    /// Get all method names attached to this graph
+    pub fn method_names(&self) -> Vec<String> {
+        const PREFIX: &str = "__methods__/";
+        self.nodes.keys()
+            .filter(|id| id.starts_with(PREFIX))
+            .map(|id| id[PREFIX.len()..].to_string())
+            .collect()
+    }
+
+    /// Get all data node IDs (excluding method branch and method nodes)
+    /// Use this when you want to iterate over "real" data nodes only
+    pub fn data_node_ids(&self) -> Vec<String> {
+        self.nodes.keys()
+            .filter(|id| !id.starts_with("__methods__"))
+            .cloned()
+            .collect()
     }
 
     // =========================================================================
