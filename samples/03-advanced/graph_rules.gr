@@ -1,0 +1,176 @@
+# Graph Rules Example
+# Demonstrates graph.add_rule() for data integrity constraints
+#
+# Phase 7 of CLASS_LIKE_GRAPHS implementation
+
+# =============================================================================
+# Basic Rule Usage
+# =============================================================================
+
+print("=== Graph Rules Demo ===")
+print("")
+
+# Create a graph and add the no_cycles rule
+dag = graph{}
+dag.add_node("A", 1)
+dag.add_node("B", 2)
+dag.add_node("C", 3)
+dag.add_edge("A", "B")
+dag.add_edge("B", "C")
+
+# Add the DAG constraint
+dag.add_rule(:no_cycles)
+print("Created DAG with no_cycles rule")
+print("Nodes:", dag.nodes())
+
+# Check if rule is active
+print("Has no_cycles rule:", dag.has_rule(:no_cycles))
+print("Has connected rule:", dag.has_rule(:connected))
+
+# =============================================================================
+# Rule Enforcement
+# =============================================================================
+
+print("")
+print("=== Rule Enforcement ===")
+
+# Try to create a cycle (this will fail)
+print("Attempting to add edge C->A (would create cycle)...")
+# Uncomment to see the error:
+# dag.add_edge("C", "A")  # Error: Would create a cycle
+print("(Edge rejected - cycle prevented)")
+
+# =============================================================================
+# Binary Tree Rule
+# =============================================================================
+
+print("")
+print("=== Binary Tree Rule ===")
+
+btree = graph{}
+btree.add_node("root", 100)
+btree.add_node("left", 50)
+btree.add_node("right", 150)
+
+btree.add_rule(:binary_tree)
+print("Created graph with binary_tree rule")
+
+# Binary tree allows max 2 children
+btree.add_edge("root", "left")
+btree.add_edge("root", "right")
+print("Added 2 children to root (allowed)")
+
+# Adding a third child would fail:
+# btree.add_node("extra", 200)
+# btree.add_edge("root", "extra")  # Error: Exceeds max children
+
+# =============================================================================
+# Max Degree Rule with Parameter
+# =============================================================================
+
+print("")
+print("=== Max Degree Rule ===")
+
+limited = graph{}
+limited.add_node("hub", 0)
+limited.add_node("spoke1", 1)
+limited.add_node("spoke2", 2)
+limited.add_node("spoke3", 3)
+
+# Limit each node to max 2 outgoing edges
+limited.add_rule(:max_degree, 2)
+print("Created graph with max_degree(2) rule")
+
+limited.add_edge("hub", "spoke1")
+limited.add_edge("hub", "spoke2")
+print("Hub has 2 outgoing edges (at limit)")
+
+# Third edge would fail:
+# limited.add_edge("hub", "spoke3")  # Error: Exceeds max degree
+
+# =============================================================================
+# Removing Rules
+# =============================================================================
+
+print("")
+print("=== Rule Removal ===")
+
+flexible = graph{}
+flexible.add_node("X", 1)
+flexible.add_node("Y", 2)
+flexible.add_node("Z", 3)
+flexible.add_edge("X", "Y")
+flexible.add_edge("Y", "Z")
+
+flexible.add_rule(:no_cycles)
+print("Added no_cycles rule")
+print("Has no_cycles:", flexible.has_rule(:no_cycles))
+
+flexible.remove_rule(:no_cycles)
+print("Removed no_cycles rule")
+print("Has no_cycles:", flexible.has_rule(:no_cycles))
+
+# Now we can add a cycle
+flexible.add_edge("Z", "X")
+print("Created cycle Z->X (now allowed)")
+
+# =============================================================================
+# Combining Rules with Methods
+# =============================================================================
+
+print("")
+print("=== Rules with Class-Like Graphs ===")
+
+# Create a counter with validation
+counter = graph{}
+counter.add_node("value", 0)
+counter.add_node("max_value", 100)
+counter.add_edge("value", "max_value", "bounded_by")  # Connect nodes for connected rule
+
+# Define methods
+fn counter.get() {
+    return self.get_node("value")
+}
+
+fn counter.increment() {
+    current = self.get_node("value")
+    max_val = self.get_node("max_value")
+    if current < max_val {
+        self.add_node("value", current + 1)
+    }
+}
+
+# Add rules (they apply to data only, not __methods__ branch)
+counter.add_rule(:no_cycles)
+
+print("Counter with methods and rules:")
+print("  Value:", counter.get())
+counter.increment()
+print("  After increment:", counter.get())
+
+# The rules do not interfere with method storage
+print("  Has no_cycles:", counter.has_rule(:no_cycles))
+print("  Node count (data only):", counter.node_count())
+
+# =============================================================================
+# Using with Rulesets
+# =============================================================================
+
+print("")
+print("=== Combining with Rulesets ===")
+
+# Start with DAG ruleset, add additional constraint
+hybrid = graph{}.with_ruleset(:dag)
+hybrid.add_node("start", 1)
+hybrid.add_node("middle", 2)
+hybrid.add_node("end", 3)
+
+# DAG gives us no_cycles, add max_degree too
+hybrid.add_rule(:max_degree, 3)
+
+print("Has DAG ruleset:", hybrid.has_ruleset(:dag))
+print("Has no_cycles (from DAG):", hybrid.has_rule(:no_cycles))
+print("Has max_degree (ad hoc):", hybrid.has_rule(:max_degree))
+
+print("")
+print("=== Demo Complete ===")

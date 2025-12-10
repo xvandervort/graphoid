@@ -609,9 +609,12 @@ fn test_data_node_ids_excludes_methods() {
 
     assert_eq!(data_ids, vec!["count", "name"]);
 
-    // Total node count includes method nodes
+    // node_count() returns data nodes only
+    assert_eq!(g.node_count(), 2);
+
+    // total_node_count() includes method nodes
     // 2 data + 1 __methods__ branch + 2 method nodes = 5
-    assert_eq!(g.node_count(), 5);
+    assert_eq!(g.total_node_count(), 5);
 }
 
 #[test]

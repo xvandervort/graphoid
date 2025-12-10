@@ -1,0 +1,205 @@
+# Graph Method Constraints (Phase 11)
+#
+# This example demonstrates method constraint rules that control what
+# operations methods can perform on a graph. These constraints provide
+# encapsulation and safety guarantees for class-like graph patterns.
+#
+# Built-in constraints:
+#   :no_node_removals   - Methods cannot remove nodes (append-only)
+#   :no_edge_removals   - Methods cannot remove edges (permanent connections)
+#   :read_only          - Methods cannot modify the graph at all (immutable)
+#
+# Custom constraints:
+#   add_method_constraint(fn, "name") - User-defined constraint function
+
+print("=== Graph Method Constraints Demo ===")
+print("")
+
+# -----------------------------------------------------------------------------
+# Example 1: Immutable Counter (read_only)
+# -----------------------------------------------------------------------------
+print("--- Example 1: Immutable Counter with :read_only ---")
+
+ImmutableCounter = graph{}
+ImmutableCounter.add_node("count", 42)
+ImmutableCounter.add_rule(:read_only)
+
+fn ImmutableCounter.get_count() {
+    return self.get_node("count")
+}
+
+print("Count: " + ImmutableCounter.get_count().to_string())
+print("")
+
+# -----------------------------------------------------------------------------
+# Example 2: Append-Only Log (no_node_removals)
+# -----------------------------------------------------------------------------
+print("--- Example 2: Append-Only Log with :no_node_removals ---")
+
+AppendOnlyLog = graph{}
+AppendOnlyLog.add_rule(:no_node_removals)
+
+fn AppendOnlyLog.add_entry(id, message) {
+    self.add_node(id, message)
+}
+
+fn AppendOnlyLog.get_entry(id) {
+    return self.get_node(id)
+}
+
+AppendOnlyLog.add_entry("log_1", "System started")
+AppendOnlyLog.add_entry("log_2", "User logged in")
+AppendOnlyLog.add_entry("log_3", "Request processed")
+
+print("Log entry 2: " + AppendOnlyLog.get_entry("log_2"))
+print("Total nodes: " + AppendOnlyLog.node_count().to_string())
+print("")
+
+# -----------------------------------------------------------------------------
+# Example 3: Permanent Connections (no_edge_removals)
+# -----------------------------------------------------------------------------
+print("--- Example 3: Permanent Connections with :no_edge_removals ---")
+
+ConnectionGraph = graph{}
+ConnectionGraph.add_node("server1", "active")
+ConnectionGraph.add_node("server2", "active")
+ConnectionGraph.add_node("server3", "standby")
+ConnectionGraph.add_rule(:no_edge_removals)
+
+fn ConnectionGraph.establish_link(from, to) {
+    self.add_edge(from, to, "connected")
+}
+
+ConnectionGraph.establish_link("server1", "server2")
+ConnectionGraph.establish_link("server2", "server3")
+
+print("Server connections: " + ConnectionGraph.edge_count().to_string())
+print("")
+
+# -----------------------------------------------------------------------------
+# Example 4: Custom Constraint - No Node Additions
+# -----------------------------------------------------------------------------
+print("--- Example 4: Custom Constraint (no node additions) ---")
+
+# Define a custom constraint function
+# Receives (old_graph, new_graph), returns true if operation is allowed
+fn no_node_additions(old_graph, new_graph) {
+    return old_graph.node_count() >= new_graph.node_count()
+}
+
+FixedNodes = graph{}
+FixedNodes.add_node("a", 1)
+FixedNodes.add_node("b", 2)
+FixedNodes.add_method_constraint(no_node_additions, "no_node_additions")
+
+fn FixedNodes.link(from, to) {
+    self.add_edge(from, to, "link")
+}
+
+fn FixedNodes.get_count() {
+    return self.node_count()
+}
+
+# Can read and add edges - constraint only blocks node additions
+FixedNodes.link("a", "b")
+print("Node count: " + FixedNodes.get_count().to_string())
+print("Edge count: " + FixedNodes.edge_count().to_string())
+print("")
+
+# -----------------------------------------------------------------------------
+# Example 5: Custom Constraint with Lambda
+# -----------------------------------------------------------------------------
+print("--- Example 5: Custom Constraint with Lambda ---")
+
+MaxNodes = graph{}
+MaxNodes.add_node("a", 1)
+
+# Constraint: graph can have at most 3 nodes
+MaxNodes.add_method_constraint(
+    (old_g, new_g) => new_g.node_count() <= 3,
+    "max_3_nodes"
+)
+
+fn MaxNodes.add_item(id, val) {
+    self.add_node(id, val)
+}
+
+MaxNodes.add_item("b", 2)
+MaxNodes.add_item("c", 3)
+print("Nodes after adding 2 more: " + MaxNodes.node_count().to_string())
+
+# Trying to add a 4th node would fail:
+# MaxNodes.add_item("d", 4)  # Would raise: violates max_3_nodes constraint
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Example 6: Combining Built-in and Custom Constraints
+# -----------------------------------------------------------------------------
+print("--- Example 6: Combining Built-in and Custom Constraints ---")
+
+SecureGraph = graph{}
+SecureGraph.add_node("data", 100)
+SecureGraph.add_rule(:no_node_removals)  # Built-in
+SecureGraph.add_method_constraint(
+    (old_g, new_g) => new_g.edge_count() <= 10,
+    "max_10_edges"
+)
+
+fn SecureGraph.update(key, value) {
+    self.add_node(key, value)
+}
+
+fn SecureGraph.connect(from, to) {
+    self.add_edge(from, to, "link")
+}
+
+SecureGraph.update("key1", 200)
+SecureGraph.update("key2", 300)
+SecureGraph.connect("data", "key1")
+
+print("Nodes: " + SecureGraph.node_count().to_string())
+print("Edges: " + SecureGraph.edge_count().to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Example 7: Remove Method (Phase 12)
+# -----------------------------------------------------------------------------
+print("--- Example 7: Remove Method ---")
+
+DynamicGraph = graph{}
+DynamicGraph.add_node("value", 100)
+
+fn DynamicGraph.get_value() {
+    return self.get_node("value")
+}
+
+fn DynamicGraph.double_value() {
+    current = self.get_node("value")
+    self.add_node("value", current * 2)
+}
+
+# Call the methods
+print("Initial value: " + DynamicGraph.get_value().to_string())
+DynamicGraph.double_value()
+print("After double: " + DynamicGraph.get_value().to_string())
+
+# Remove the double_value method (no longer needed)
+removed = DynamicGraph.remove_method("double_value")
+print("Method removed: " + removed.to_string())
+
+# get_value still works
+print("Value via remaining method: " + DynamicGraph.get_value().to_string())
+
+# Re-add a different implementation
+fn DynamicGraph.double_value() {
+    current = self.get_node("value")
+    self.add_node("value", current * 3)  # Actually triples now!
+}
+
+DynamicGraph.double_value()
+print("After new 'double' (triples): " + DynamicGraph.get_value().to_string())
+
+print("")
+print("=== Demo Complete ===")

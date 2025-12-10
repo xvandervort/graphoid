@@ -1,0 +1,85 @@
+# Graph Layer Visibility Example
+# Demonstrates how nodes() and edges() hide internal layers by default
+#
+# Phase 8 of CLASS_LIKE_GRAPHS implementation
+
+print("=== Graph Layer Visibility Demo ===")
+print("")
+
+# =============================================================================
+# Create a graph with methods
+# =============================================================================
+
+counter = graph{}
+counter.add_node("value", 0)
+counter.add_node("max", 100)
+counter.add_edge("value", "max", "bounded_by")
+
+fn counter.get() {
+    return self.get_node("value")
+}
+
+fn counter.increment() {
+    v = self.get_node("value")
+    self.add_node("value", v + 1)
+}
+
+print("Created counter graph with 2 data nodes, 1 edge, and 2 methods")
+print("")
+
+# =============================================================================
+# Default behavior: Data layer only
+# =============================================================================
+
+print("=== Default (Data Layer Only) ===")
+
+print("nodes():", counter.nodes())
+print("node_count():", counter.node_count())
+print("")
+print("edges():", counter.edges())
+print("edge_count():", counter.edge_count())
+print("")
+
+# Verify these are just data nodes
+print("Node list has", counter.nodes().len(), "items (data nodes only)")
+
+# =============================================================================
+# Show all layers with :all
+# =============================================================================
+
+print("")
+print("=== With :all (Including Internal) ===")
+
+print("nodes(:all):", counter.nodes(:all))
+print("Total nodes:", counter.nodes(:all).len())
+print("")
+print("edges(:all):", counter.edges(:all))
+print("Total edges:", counter.edges(:all).len())
+print("")
+
+# =============================================================================
+# Compare counts
+# =============================================================================
+
+print("")
+print("=== Comparison ===")
+print("Data nodes:", counter.node_count())
+print("All nodes:", counter.nodes(:all).len())
+print("")
+print("Data edges:", counter.edge_count())
+print("All edges:", counter.edges(:all).len())
+print("")
+
+# =============================================================================
+# Methods still work as expected
+# =============================================================================
+
+print("=== Methods Work Normally ===")
+print("Initial value:", counter.get())
+counter.increment()
+counter.increment()
+counter.increment()
+print("After 3 increments:", counter.get())
+
+print("")
+print("=== Demo Complete ===")

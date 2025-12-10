@@ -156,6 +156,23 @@ pub enum RuleSpec {
     CopyElements,
     /// Freeze the collection itself, but not its elements
     ShallowFreezeOnly,
+
+    // ========================================================================
+    // Method Constraint Rules (Phase 11 - Class-like graphs)
+    // ========================================================================
+
+    /// Methods cannot remove nodes from the graph (append-only data)
+    NoNodeRemovals,
+    /// Methods cannot remove edges from the graph (permanent connections)
+    NoEdgeRemovals,
+    /// Methods cannot modify the graph at all (read-only/immutable)
+    ReadOnly,
+    /// User-defined method constraint function
+    /// The function receives (before_graph, after_graph) and returns true if allowed
+    CustomMethodConstraint {
+        function: Value,
+        name: String,
+    },
 }
 
 impl RuleSpec {
@@ -196,6 +213,13 @@ impl RuleSpec {
             RuleSpec::NoFrozen => Box::new(NoFrozenBehavior),
             RuleSpec::CopyElements => Box::new(CopyElementsBehavior),
             RuleSpec::ShallowFreezeOnly => Box::new(ShallowFreezeOnlyBehavior),
+
+            // Method constraint rules - these are checked at method call time, not graph operation time
+            // They use a no-op rule implementation since enforcement happens in call_graph_method()
+            RuleSpec::NoNodeRemovals => Box::new(MethodConstraintRule::new("no_node_removals")),
+            RuleSpec::NoEdgeRemovals => Box::new(MethodConstraintRule::new("no_edge_removals")),
+            RuleSpec::ReadOnly => Box::new(MethodConstraintRule::new("read_only")),
+            RuleSpec::CustomMethodConstraint { name, .. } => Box::new(MethodConstraintRule::new(name)),
         }
     }
 
@@ -230,6 +254,12 @@ impl RuleSpec {
             RuleSpec::NoFrozen => "no_frozen",
             RuleSpec::CopyElements => "copy_elements",
             RuleSpec::ShallowFreezeOnly => "shallow_freeze_only",
+
+            // Method constraint rules
+            RuleSpec::NoNodeRemovals => "no_node_removals",
+            RuleSpec::NoEdgeRemovals => "no_edge_removals",
+            RuleSpec::ReadOnly => "read_only",
+            RuleSpec::CustomMethodConstraint { ref name, .. } => name,
         }
     }
 
@@ -259,6 +289,11 @@ impl RuleSpec {
             "copy_elements" => Some(RuleSpec::CopyElements),
             "shallow_freeze_only" => Some(RuleSpec::ShallowFreezeOnly),
 
+            // Method constraint rules
+            "no_node_removals" => Some(RuleSpec::NoNodeRemovals),
+            "no_edge_removals" => Some(RuleSpec::NoEdgeRemovals),
+            "read_only" => Some(RuleSpec::ReadOnly),
+
             _ => None,
         }
     }
@@ -280,6 +315,20 @@ impl RuleSpec {
             RuleSpec::NoFrozen |
             RuleSpec::CopyElements |
             RuleSpec::ShallowFreezeOnly
+        )
+    }
+
+    /// Check if this is a method constraint rule
+    ///
+    /// Method constraint rules control what operations methods can perform
+    /// on the graph. They're enforced at method call time, not at graph
+    /// operation time.
+    pub fn is_method_constraint(&self) -> bool {
+        matches!(self,
+            RuleSpec::NoNodeRemovals |
+            RuleSpec::NoEdgeRemovals |
+            RuleSpec::ReadOnly |
+            RuleSpec::CustomMethodConstraint { .. }
         )
     }
 }
@@ -1090,6 +1139,44 @@ impl Rule for BSTOrderingRule {
         // BST ordering should run on both node additions (to check numeric values)
         // and edge additions (to check ordering)
         matches!(operation, GraphOperation::AddNode { .. } | GraphOperation::AddEdge { .. })
+    }
+}
+
+/// A no-op rule for method constraints
+///
+/// Method constraints are NOT enforced at graph operation time - they're
+/// enforced at method call time in `call_graph_method()`. This struct
+/// is just a placeholder to allow method constraint rules to exist in
+/// the rules system.
+pub struct MethodConstraintRule {
+    name: String,
+}
+
+impl MethodConstraintRule {
+    /// Create a new method constraint rule
+    pub fn new(name: &str) -> Self {
+        MethodConstraintRule { name: name.to_string() }
+    }
+}
+
+impl Rule for MethodConstraintRule {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn default_severity(&self) -> RuleSeverity {
+        RuleSeverity::Error // Method constraint violations are errors
+    }
+
+    fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
+        // Method constraints are not validated at graph operation time
+        // They're checked in call_graph_method() in executor.rs
+        Ok(())
+    }
+
+    fn should_run_on(&self, _operation: &GraphOperation) -> bool {
+        // Method constraints never run on graph operations
+        false
     }
 }
 

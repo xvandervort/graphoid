@@ -617,26 +617,68 @@ impl Graph {
         }
     }
 
-    /// Get node count
+    /// Get data node count (excludes internal nodes like __methods__ branch)
     pub fn node_count(&self) -> usize {
+        self.data_node_ids().len()
+    }
+
+    /// Get total node count including internal nodes
+    pub fn total_node_count(&self) -> usize {
         self.nodes.len()
     }
 
-    /// Get edge count
+    /// Get edge count (data edges only)
     pub fn edge_count(&self) -> usize {
-        self.nodes.values().map(|n| n.neighbors.len()).sum()
+        // Count only edges where both endpoints are data nodes
+        let data_nodes: std::collections::HashSet<&String> =
+            self.nodes.keys()
+                .filter(|id| !id.starts_with("__methods__"))
+                .collect();
+
+        self.nodes.iter()
+            .filter(|(id, _)| !id.starts_with("__methods__"))
+            .map(|(_, node)| {
+                node.neighbors.iter()
+                    .filter(|(to_id, _)| data_nodes.contains(to_id))
+                    .count()
+            })
+            .sum()
     }
 
-    /// Get all node IDs as a list
+    /// Get all node IDs as a list (data nodes only by default)
     pub fn node_ids(&self) -> Vec<String> {
+        self.data_node_ids()
+    }
+
+    /// Get all node IDs including internal nodes
+    pub fn all_node_ids(&self) -> Vec<String> {
         self.nodes.keys().cloned().collect()
     }
 
-    /// Get all edges as a list of tuples (from, to, edge_type)
+    /// Get all edges as a list of tuples (from, to, edge_type) - includes internal edges
     pub fn edge_list(&self) -> Vec<(String, String, String)> {
         let mut edges = Vec::new();
         for (from_id, node) in &self.nodes {
             for (to_id, edge_info) in &node.neighbors {
+                edges.push((from_id.clone(), to_id.clone(), edge_info.edge_type.clone()));
+            }
+        }
+        edges
+    }
+
+    /// Get data edges only (excludes edges involving __methods__ branch)
+    pub fn data_edge_list(&self) -> Vec<(String, String, String)> {
+        let mut edges = Vec::new();
+        for (from_id, node) in &self.nodes {
+            // Skip edges from method branch nodes
+            if from_id.starts_with("__methods__") {
+                continue;
+            }
+            for (to_id, edge_info) in &node.neighbors {
+                // Skip edges to method branch nodes
+                if to_id.starts_with("__methods__") {
+                    continue;
+                }
                 edges.push((from_id.clone(), to_id.clone(), edge_info.edge_type.clone()));
             }
         }
@@ -2196,6 +2238,48 @@ impl Graph {
         false
     }
 
+    /// Get a specific rule if active (from either rulesets or ad hoc)
+    /// Returns the RuleSpec which contains any parameters
+    pub fn get_rule(&self, rule_name: &str) -> Option<RuleSpec> {
+        // Check ad hoc rules first (they may have specific parameters)
+        for rule in &self.rules {
+            if rule.spec.name() == rule_name {
+                return Some(rule.spec.clone());
+            }
+        }
+
+        // Check ruleset rules (return default spec for ruleset rules)
+        for ruleset in &self.rulesets {
+            match ruleset.as_str() {
+                "tree" => {
+                    match rule_name {
+                        "no_cycles" => return Some(RuleSpec::NoCycles),
+                        "single_root" => return Some(RuleSpec::SingleRoot),
+                        "connected" => return Some(RuleSpec::Connected),
+                        _ => {}
+                    }
+                }
+                "binary_tree" => {
+                    match rule_name {
+                        "no_cycles" => return Some(RuleSpec::NoCycles),
+                        "single_root" => return Some(RuleSpec::SingleRoot),
+                        "connected" => return Some(RuleSpec::Connected),
+                        "binary_tree" => return Some(RuleSpec::BinaryTree),
+                        _ => {}
+                    }
+                }
+                "dag" => {
+                    if rule_name == "no_cycles" {
+                        return Some(RuleSpec::NoCycles);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        None
+    }
+
     // ========================================================================
     // Auto-Optimization: Property-based Indexing
     // ========================================================================
@@ -2557,6 +2641,27 @@ impl Graph {
             .filter(|id| id.starts_with(PREFIX))
             .map(|id| id[PREFIX.len()..].to_string())
             .collect()
+    }
+
+    /// Remove a method from this graph by name
+    /// Returns true if the method was found and removed, false if it didn't exist
+    pub fn remove_method(&mut self, name: &str) -> bool {
+        let method_id = Self::method_node_id(name);
+
+        // Check if method exists
+        if !self.nodes.contains_key(&method_id) {
+            return false;
+        }
+
+        // Remove edge from __methods__ branch to this method
+        if let Some(branch) = self.nodes.get_mut(Self::METHOD_BRANCH) {
+            branch.neighbors.remove(&method_id);
+        }
+
+        // Remove the method node itself
+        self.nodes.remove(&method_id);
+
+        true
     }
 
     /// Get all data node IDs (excluding method branch and method nodes)

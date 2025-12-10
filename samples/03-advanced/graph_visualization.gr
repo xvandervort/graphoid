@@ -1,0 +1,103 @@
+# Graph Visualization Example
+# Demonstrates visualize(), to_dot(), and to_ascii() methods
+#
+# Phase 9 of CLASS_LIKE_GRAPHS implementation
+
+print("=== Graph Visualization Demo ===")
+print("")
+
+# =============================================================================
+# Create a sample graph
+# =============================================================================
+
+g = graph{}
+g.add_node("Alice", 25)
+g.add_node("Bob", 30)
+g.add_node("Carol", 28)
+g.add_node("Dave", 35)
+
+g.add_edge("Alice", "Bob", "friend")
+g.add_edge("Alice", "Carol", "friend")
+g.add_edge("Bob", "Dave", "colleague")
+g.add_edge("Carol", "Dave", "colleague")
+
+print("Created graph with 4 people and 4 relationships")
+print("")
+
+# =============================================================================
+# visualize() - Text representation
+# =============================================================================
+
+print("=== visualize() ===")
+print(g.visualize())
+
+# =============================================================================
+# to_dot() - Graphviz format
+# =============================================================================
+
+print("=== to_dot() ===")
+print(g.to_dot())
+
+# =============================================================================
+# to_ascii() - ASCII tree (works best for trees)
+# =============================================================================
+
+print("=== to_ascii() ===")
+print(g.to_ascii())
+
+# =============================================================================
+# Tree structure works better for to_ascii()
+# =============================================================================
+
+print("")
+print("=== Tree Structure for to_ascii() ===")
+
+org = graph{}
+org.add_node("CEO", "Chief Executive")
+org.add_node("CTO", "Chief Tech")
+org.add_node("CFO", "Chief Finance")
+org.add_node("Dev1", "Developer")
+org.add_node("Dev2", "Developer")
+org.add_node("Acc1", "Accountant")
+
+org.add_edge("CEO", "CTO", "manages")
+org.add_edge("CEO", "CFO", "manages")
+org.add_edge("CTO", "Dev1", "manages")
+org.add_edge("CTO", "Dev2", "manages")
+org.add_edge("CFO", "Acc1", "manages")
+
+print("Organization chart:")
+print(org.to_ascii())
+
+# =============================================================================
+# Graph with methods - showing data layer only
+# =============================================================================
+
+print("")
+print("=== Graph with Methods ===")
+
+counter = graph{}
+counter.add_node("value", 0)
+
+fn counter.increment() {
+    v = self.get_node("value")
+    self.add_node("value", v + 1)
+}
+
+print("Data layer only (default):")
+print(counter.visualize())
+
+print("All layers (:all):")
+print(counter.visualize(:all))
+
+# =============================================================================
+# DOT format can be used with Graphviz
+# =============================================================================
+
+print("")
+print("=== DOT Format for Graphviz ===")
+print("Copy this to a .dot file and use: dot -Tpng file.dot -o output.png")
+print("")
+print(org.to_dot())
+
+print("=== Demo Complete ===")

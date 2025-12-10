@@ -152,6 +152,13 @@ impl Executor {
             ("shallow_freeze_only", None) => Ok(RuleSpec::ShallowFreezeOnly),
 
             // ================================================================
+            // Method Constraint Rules (Phase 11)
+            // ================================================================
+            ("no_node_removals", None) => Ok(RuleSpec::NoNodeRemovals),
+            ("no_edge_removals", None) => Ok(RuleSpec::NoEdgeRemovals),
+            ("read_only", None) => Ok(RuleSpec::ReadOnly),
+
+            // ================================================================
             // Error handling
             // ================================================================
             (name, None) => Err(GraphoidError::runtime(format!(
@@ -5042,15 +5049,34 @@ impl Executor {
                 }
             }
             "nodes" => {
-                // Get all node IDs as a list
-                if !args.is_empty() {
+                // Get node IDs as a list
+                // nodes()      - Data nodes only (default)
+                // nodes(:all)  - All nodes including __methods__ branch
+                if args.len() > 1 {
                     return Err(GraphoidError::runtime(format!(
-                        "nodes() expects 0 arguments, but got {}",
+                        "nodes() expects 0-1 arguments, but got {}",
                         args.len()
                     )));
                 }
 
-                let node_ids = graph.node_ids();
+                let include_all = if args.len() == 1 {
+                    match &args[0].kind {
+                        ValueKind::Symbol(s) if s == "all" => true,
+                        _ => {
+                            return Err(GraphoidError::runtime(
+                                "nodes() optional argument must be :all".to_string()
+                            ));
+                        }
+                    }
+                } else {
+                    false
+                };
+
+                let node_ids = if include_all {
+                    graph.all_node_ids()
+                } else {
+                    graph.node_ids()  // Already returns data nodes only
+                };
                 let node_id_values: Vec<Value> = node_ids.iter().map(|id| Value::string(id.clone())).collect();
                 Ok(Value::list(crate::values::List::from_vec(node_id_values)))
             }
@@ -5067,16 +5093,64 @@ impl Executor {
                 // including nodes, edges, rules, and methods
                 Ok(Value::graph(graph.clone()))
             }
-            "edges" => {
-                // Get all edges as a list of lists [from, to, edge_type]
-                if !args.is_empty() {
+            "remove_method" => {
+                // Remove a method from the graph by name
+                // remove_method("method_name")
+                // Returns true if method was removed, false if it didn't exist
+                if args.len() != 1 {
                     return Err(GraphoidError::runtime(format!(
-                        "edges() expects 0 arguments, but got {}",
+                        "remove_method() expects 1 argument, but got {}",
                         args.len()
                     )));
                 }
 
-                let edge_list = graph.edge_list();
+                let method_name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => {
+                        return Err(GraphoidError::runtime(
+                            "remove_method() argument must be a string (method name)".to_string()
+                        ));
+                    }
+                };
+
+                let removed = graph.remove_method(&method_name);
+
+                // Update graph in environment (mutation)
+                if let Expr::Variable { name, .. } = object_expr {
+                    self.env.set(name, Value::graph(graph))?;
+                }
+
+                Ok(Value::boolean(removed))
+            }
+            "edges" => {
+                // Get edges as a list of lists [from, to, edge_type]
+                // edges()      - Data edges only (default)
+                // edges(:all)  - All edges including __methods__ branch
+                if args.len() > 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "edges() expects 0-1 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let include_all = if args.len() == 1 {
+                    match &args[0].kind {
+                        ValueKind::Symbol(s) if s == "all" => true,
+                        _ => {
+                            return Err(GraphoidError::runtime(
+                                "edges() optional argument must be :all".to_string()
+                            ));
+                        }
+                    }
+                } else {
+                    false
+                };
+
+                let edge_list = if include_all {
+                    graph.edge_list()  // All edges
+                } else {
+                    graph.data_edge_list()  // Data edges only
+                };
                 let edge_values: Vec<Value> = edge_list.iter().map(|(from, to, edge_type)| {
                     let edge_vec = vec![
                         Value::string(from.clone()),
@@ -5304,6 +5378,460 @@ impl Executor {
                     )));
                 }
                 Ok(Value::number(graph.edge_count() as f64))
+            }
+            "add_rule" => {
+                // Add a rule to the graph (scoped to data layer only)
+                // add_rule(:rule_name) or add_rule(:rule_name, param)
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "add_rule() expects 1-2 arguments (rule_symbol, [param]), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get rule symbol
+                let rule_symbol = match &args[0].kind {
+                    ValueKind::Symbol(name) => name.as_str(),
+                    _ => {
+                        return Err(GraphoidError::runtime(format!(
+                            "add_rule() expects a symbol, got {}",
+                            args[0].type_name()
+                        )));
+                    }
+                };
+
+                // Get optional parameter
+                let param = if args.len() == 2 {
+                    match &args[1].kind {
+                        ValueKind::Number(n) => Some(*n),
+                        _ => {
+                            return Err(GraphoidError::runtime(format!(
+                                "add_rule() parameter must be a number, got {}",
+                                args[1].type_name()
+                            )));
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                // Convert symbol to RuleSpec
+                let rule_spec = Self::symbol_to_rule_spec(rule_symbol, param)?;
+
+                // Add rule to graph
+                use crate::graph::RuleInstance;
+                graph.add_rule(RuleInstance::new(rule_spec))?;
+
+                // Update graph in environment (mutation)
+                if let Expr::Variable { name, .. } = object_expr {
+                    self.env.set(name, Value::graph(graph))?;
+                }
+
+                Ok(Value::none())
+            }
+            "remove_rule" => {
+                // Remove a rule from the graph
+                // remove_rule(:rule_name) or remove_rule(:rule_name, param)
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "remove_rule() expects 1-2 arguments (rule_symbol, [param]), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get rule symbol
+                let rule_symbol = match &args[0].kind {
+                    ValueKind::Symbol(name) => name.as_str(),
+                    _ => {
+                        return Err(GraphoidError::runtime(format!(
+                            "remove_rule() expects a symbol, got {}",
+                            args[0].type_name()
+                        )));
+                    }
+                };
+
+                // Get optional parameter
+                let param = if args.len() == 2 {
+                    match &args[1].kind {
+                        ValueKind::Number(n) => Some(*n),
+                        _ => {
+                            return Err(GraphoidError::runtime(format!(
+                                "remove_rule() parameter must be a number, got {}",
+                                args[1].type_name()
+                            )));
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                // Convert symbol to RuleSpec
+                let rule_spec = Self::symbol_to_rule_spec(rule_symbol, param)?;
+
+                // Remove rule from graph
+                graph.remove_rule(&rule_spec);
+
+                // Update graph in environment (mutation)
+                if let Expr::Variable { name, .. } = object_expr {
+                    self.env.set(name, Value::graph(graph))?;
+                }
+
+                Ok(Value::none())
+            }
+            "add_method_constraint" => {
+                // Add a custom method constraint function
+                // add_method_constraint(constraint_fn) or add_method_constraint(constraint_fn, "name")
+                // The constraint function receives (before_graph, after_graph) and returns true if allowed
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "add_method_constraint() expects 1-2 arguments (function, [name]), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get the constraint function
+                let constraint_fn = match &args[0].kind {
+                    ValueKind::Function(_) => args[0].clone(),
+                    _ => {
+                        return Err(GraphoidError::runtime(format!(
+                            "add_method_constraint() expects a function, got {}",
+                            args[0].type_name()
+                        )));
+                    }
+                };
+
+                // Get optional name (defaults to "custom_constraint")
+                let name = if args.len() == 2 {
+                    match &args[1].kind {
+                        ValueKind::String(s) => s.clone(),
+                        _ => {
+                            return Err(GraphoidError::runtime(format!(
+                                "add_method_constraint() name must be a string, got {}",
+                                args[1].type_name()
+                            )));
+                        }
+                    }
+                } else {
+                    "custom_constraint".to_string()
+                };
+
+                // Create the custom method constraint rule
+                let rule_spec = RuleSpec::CustomMethodConstraint {
+                    function: constraint_fn,
+                    name,
+                };
+
+                // Add rule to graph
+                use crate::graph::RuleInstance;
+                graph.add_rule(RuleInstance::new(rule_spec))?;
+
+                // Update graph in environment (mutation)
+                if let Expr::Variable { name, .. } = object_expr {
+                    self.env.set(name, Value::graph(graph))?;
+                }
+
+                Ok(Value::none())
+            }
+            "has_rule" => {
+                // Check if graph has a specific rule (from either rulesets or ad hoc)
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "has_rule() expects 1 argument (rule_symbol), but got {}",
+                        args.len()
+                    )));
+                }
+
+                let rule_name = match &args[0].kind {
+                    ValueKind::Symbol(name) => name.as_str(),
+                    _ => {
+                        return Err(GraphoidError::runtime(format!(
+                            "has_rule() expects a symbol argument, got {}",
+                            args[0].type_name()
+                        )));
+                    }
+                };
+
+                Ok(Value::boolean(graph.has_rule(rule_name)))
+            }
+            "rule" => {
+                // Get a rule's parameter value
+                // g.rule(:max_degree) -> returns the max degree value (e.g., 2)
+                // g.rule(:no_cycles) -> returns true if the rule exists
+                // g.rule(:nonexistent) -> returns none
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "rule() expects 1 argument (rule_symbol), but got {}",
+                        args.len()
+                    )));
+                }
+
+                let rule_name = match &args[0].kind {
+                    ValueKind::Symbol(name) => name.as_str(),
+                    _ => {
+                        return Err(GraphoidError::runtime(format!(
+                            "rule() expects a symbol argument, got {}",
+                            args[0].type_name()
+                        )));
+                    }
+                };
+
+                use crate::graph::RuleSpec;
+                use crate::values::List;
+                match graph.get_rule(rule_name) {
+                    Some(spec) => {
+                        // Return the parameter value for parameterized rules
+                        match spec {
+                            RuleSpec::MaxDegree(n) => Ok(Value::number(n as f64)),
+                            RuleSpec::ValidateRange { min, max } => {
+                                // Return as a list [min, max]
+                                Ok(Value::list(List::from_vec(vec![Value::number(min), Value::number(max)])))
+                            }
+                            // For non-parameterized rules, return true
+                            _ => Ok(Value::boolean(true)),
+                        }
+                    }
+                    None => Ok(Value::none()),
+                }
+            }
+            "visualize" => {
+                // Text visualization of the graph
+                // visualize()       - Data layer only (default)
+                // visualize(:all)   - All layers including __methods__
+                if args.len() > 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "visualize() expects 0-1 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let include_all = if args.len() == 1 {
+                    match &args[0].kind {
+                        ValueKind::Symbol(s) if s == "all" => true,
+                        _ => {
+                            return Err(GraphoidError::runtime(
+                                "visualize() optional argument must be :all".to_string()
+                            ));
+                        }
+                    }
+                } else {
+                    false
+                };
+
+                let mut output = String::new();
+                output.push_str("Graph:\n");
+
+                // Get nodes based on visibility
+                let node_ids = if include_all {
+                    graph.all_node_ids()
+                } else {
+                    graph.node_ids()
+                };
+
+                // Show nodes
+                output.push_str("  Nodes:\n");
+                if node_ids.is_empty() {
+                    output.push_str("    (none)\n");
+                } else {
+                    for node_id in &node_ids {
+                        if let Some(value) = graph.get_node(node_id) {
+                            output.push_str(&format!("    {} = {}\n", node_id, value.to_string_value()));
+                        } else {
+                            output.push_str(&format!("    {}\n", node_id));
+                        }
+                    }
+                }
+
+                // Get edges based on visibility
+                let edges = if include_all {
+                    graph.edge_list()
+                } else {
+                    graph.data_edge_list()
+                };
+
+                // Show edges
+                output.push_str("  Edges:\n");
+                if edges.is_empty() {
+                    output.push_str("    (none)\n");
+                } else {
+                    for (from, to, edge_type) in &edges {
+                        output.push_str(&format!("    {} -> {} [{}]\n", from, to, edge_type));
+                    }
+                }
+
+                Ok(Value::string(output))
+            }
+            "to_dot" => {
+                // Export to Graphviz DOT format
+                // to_dot()       - Data layer only (default)
+                // to_dot(:all)   - All layers including __methods__
+                if args.len() > 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "to_dot() expects 0-1 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let include_all = if args.len() == 1 {
+                    match &args[0].kind {
+                        ValueKind::Symbol(s) if s == "all" => true,
+                        _ => {
+                            return Err(GraphoidError::runtime(
+                                "to_dot() optional argument must be :all".to_string()
+                            ));
+                        }
+                    }
+                } else {
+                    false
+                };
+
+                let mut output = String::new();
+                output.push_str("digraph G {\n");
+
+                // Get nodes and edges based on visibility
+                let node_ids = if include_all {
+                    graph.all_node_ids()
+                } else {
+                    graph.node_ids()
+                };
+
+                let edges = if include_all {
+                    graph.edge_list()
+                } else {
+                    graph.data_edge_list()
+                };
+
+                // Add node declarations
+                for node_id in &node_ids {
+                    // Escape quotes in node ID
+                    let escaped_id = node_id.replace("\"", "\\\"");
+                    output.push_str(&format!("  \"{}\";\n", escaped_id));
+                }
+
+                // Add edge declarations
+                for (from, to, edge_type) in &edges {
+                    let escaped_from = from.replace("\"", "\\\"");
+                    let escaped_to = to.replace("\"", "\\\"");
+                    let escaped_type = edge_type.replace("\"", "\\\"");
+                    output.push_str(&format!(
+                        "  \"{}\" -> \"{}\" [label=\"{}\"];\n",
+                        escaped_from, escaped_to, escaped_type
+                    ));
+                }
+
+                output.push_str("}\n");
+
+                Ok(Value::string(output))
+            }
+            "to_ascii" => {
+                // ASCII tree visualization
+                // Works best for tree-like structures
+                // to_ascii()       - Data layer only (default)
+                // to_ascii(:all)   - All layers
+                if args.len() > 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "to_ascii() expects 0-1 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let include_all = if args.len() == 1 {
+                    match &args[0].kind {
+                        ValueKind::Symbol(s) if s == "all" => true,
+                        _ => {
+                            return Err(GraphoidError::runtime(
+                                "to_ascii() optional argument must be :all".to_string()
+                            ));
+                        }
+                    }
+                } else {
+                    false
+                };
+
+                // Get nodes and edges based on visibility
+                let node_ids = if include_all {
+                    graph.all_node_ids()
+                } else {
+                    graph.node_ids()
+                };
+
+                let edges = if include_all {
+                    graph.edge_list()
+                } else {
+                    graph.data_edge_list()
+                };
+
+                // Build adjacency list for children
+                let mut children: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+                let mut has_parent: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+                for (from, to, _) in &edges {
+                    children.entry(from.clone()).or_default().push(to.clone());
+                    has_parent.insert(to.clone());
+                }
+
+                // Find root nodes (nodes with no incoming edges)
+                let roots: Vec<String> = node_ids
+                    .iter()
+                    .filter(|id| !has_parent.contains(*id))
+                    .cloned()
+                    .collect();
+
+                // Helper function to build ASCII tree
+                fn build_tree(
+                    node: &str,
+                    children: &std::collections::HashMap<String, Vec<String>>,
+                    prefix: &str,
+                    is_last: bool,
+                    output: &mut String,
+                ) {
+                    // Add current node
+                    let connector = if prefix.is_empty() {
+                        ""
+                    } else if is_last {
+                        "└── "
+                    } else {
+                        "├── "
+                    };
+                    output.push_str(&format!("{}{}{}\n", prefix, connector, node));
+
+                    // Get children of this node
+                    if let Some(child_list) = children.get(node) {
+                        let new_prefix = if prefix.is_empty() {
+                            "".to_string()
+                        } else if is_last {
+                            format!("{}    ", prefix)
+                        } else {
+                            format!("{}│   ", prefix)
+                        };
+
+                        for (i, child) in child_list.iter().enumerate() {
+                            let child_is_last = i == child_list.len() - 1;
+                            build_tree(child, children, &new_prefix, child_is_last, output);
+                        }
+                    }
+                }
+
+                let mut output = String::new();
+
+                if roots.is_empty() && !node_ids.is_empty() {
+                    // No clear root - just list nodes
+                    output.push_str("(no clear root - listing nodes)\n");
+                    for node_id in &node_ids {
+                        output.push_str(&format!("  {}\n", node_id));
+                    }
+                } else if roots.is_empty() {
+                    output.push_str("(empty graph)\n");
+                } else {
+                    // Build tree from each root
+                    for (i, root) in roots.iter().enumerate() {
+                        if i > 0 {
+                            output.push('\n');
+                        }
+                        build_tree(root, &children, "", true, &mut output);
+                    }
+                }
+
+                Ok(Value::string(output))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Graph does not have method '{}'",
@@ -5953,6 +6481,13 @@ impl Executor {
     ///
     /// The `object_expr` parameter is used to persist mutations to `self` back to the
     /// original graph variable after method execution.
+    ///
+    /// This method enforces method constraint rules (Phase 11):
+    /// - `:no_node_additions` - Methods cannot add nodes
+    /// - `:no_node_removals` - Methods cannot remove nodes
+    /// - `:no_edge_additions` - Methods cannot add edges
+    /// - `:no_edge_removals` - Methods cannot remove edges
+    /// - `:read_only` - Methods cannot modify the graph at all
     fn call_graph_method(&mut self, graph: &crate::values::Graph, func: &Function, arg_values: &[Value], object_expr: &Expr) -> Result<Value> {
         // Validate argument count
         if arg_values.len() != func.parameters.len() {
@@ -5963,6 +6498,10 @@ impl Executor {
                 arg_values.len()
             )));
         }
+
+        // Capture graph state before method execution for constraint checking
+        let before_node_ids: std::collections::HashSet<String> = graph.data_node_ids().into_iter().collect();
+        let before_edge_count = graph.data_edge_list().len();
 
         // Push method onto call stack
         let method_name = func.name.as_ref().unwrap_or(&"<anonymous>".to_string()).clone();
@@ -6005,6 +6544,113 @@ impl Executor {
 
         // Restore original environment
         self.env = saved_env;
+
+        // Check method constraints before persisting changes
+        if let Some(Value { kind: ValueKind::Graph(ref modified_graph), .. }) = modified_self {
+            // Get the after state
+            let after_node_ids: std::collections::HashSet<String> = modified_graph.data_node_ids().into_iter().collect();
+            let after_edge_count = modified_graph.data_edge_list().len();
+
+            // Check for constraint violations
+            for rule_instance in &graph.rules {
+                if rule_instance.spec.is_method_constraint() {
+                    match &rule_instance.spec {
+                        RuleSpec::ReadOnly => {
+                            // Any change violates read_only
+                            if before_node_ids != after_node_ids || before_edge_count != after_edge_count {
+                                // Pop call stack before returning error
+                                self.call_stack.pop();
+                                if func.node_id.is_some() {
+                                    self.function_graph.borrow_mut().pop_call(Value::none());
+                                }
+                                return Err(GraphoidError::runtime(format!(
+                                    "Method '{}' violates :read_only constraint: graph was modified",
+                                    method_name
+                                )));
+                            }
+                        }
+                        RuleSpec::NoNodeRemovals => {
+                            // Check if any nodes were removed
+                            let removed: Vec<_> = before_node_ids.difference(&after_node_ids).collect();
+                            if !removed.is_empty() {
+                                self.call_stack.pop();
+                                if func.node_id.is_some() {
+                                    self.function_graph.borrow_mut().pop_call(Value::none());
+                                }
+                                return Err(GraphoidError::runtime(format!(
+                                    "Method '{}' violates :no_node_removals constraint: removed node(s) {:?}",
+                                    method_name, removed
+                                )));
+                            }
+                        }
+                        RuleSpec::NoEdgeRemovals => {
+                            // Check if edges were removed
+                            if after_edge_count < before_edge_count {
+                                self.call_stack.pop();
+                                if func.node_id.is_some() {
+                                    self.function_graph.borrow_mut().pop_call(Value::none());
+                                }
+                                return Err(GraphoidError::runtime(format!(
+                                    "Method '{}' violates :no_edge_removals constraint: edges removed",
+                                    method_name
+                                )));
+                            }
+                        }
+                        RuleSpec::CustomMethodConstraint { function, name } => {
+                            // Call user-defined constraint function with (before_graph, after_graph)
+                            // The function returns true if the operation is allowed
+                            let before_graph_value = Value::graph(graph.clone());
+                            let after_graph_value = Value::graph(modified_graph.clone());
+
+                            let result = match &function.kind {
+                                ValueKind::Function(constraint_func) => {
+                                    self.call_function(constraint_func, &[before_graph_value, after_graph_value])
+                                }
+                                _ => {
+                                    Err(GraphoidError::runtime(
+                                        "Custom method constraint must be a function".to_string()
+                                    ))
+                                }
+                            };
+
+                            match result {
+                                Ok(val) => {
+                                    // Check if result is truthy (constraint passed)
+                                    let is_allowed = match &val.kind {
+                                        ValueKind::Boolean(b) => *b,
+                                        ValueKind::None => false,
+                                        ValueKind::Number(n) => *n != 0.0,
+                                        _ => true,
+                                    };
+
+                                    if !is_allowed {
+                                        self.call_stack.pop();
+                                        if func.node_id.is_some() {
+                                            self.function_graph.borrow_mut().pop_call(Value::none());
+                                        }
+                                        return Err(GraphoidError::runtime(format!(
+                                            "Method '{}' violates custom constraint '{}': constraint returned false",
+                                            method_name, name
+                                        )));
+                                    }
+                                }
+                                Err(e) => {
+                                    self.call_stack.pop();
+                                    if func.node_id.is_some() {
+                                        self.function_graph.borrow_mut().pop_call(Value::none());
+                                    }
+                                    return Err(GraphoidError::runtime(format!(
+                                        "Method '{}': custom constraint '{}' failed: {}",
+                                        method_name, name, e
+                                    )));
+                                }
+                            }
+                        }
+                        _ => {} // Other rules are not method constraints
+                    }
+                }
+            }
+        }
 
         // Persist mutations to `self` back to the original graph variable
         if let Some(modified_graph) = modified_self {
