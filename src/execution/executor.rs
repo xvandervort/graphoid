@@ -33,6 +33,14 @@ pub struct Executor {
     /// Output capture support for exec()
     output_capture_enabled: bool,
     output_buffer: String,
+    /// Stack of graph variable names we're currently inside a method of (Phase 15: private methods)
+    /// When we're executing a method on a graph stored in variable "MyGraph",
+    /// this stack contains "MyGraph" so we can allow private method calls on self.
+    method_context_stack: Vec<String>,
+    /// Stack of graphs for super call resolution (Phase 16: super calls)
+    /// When executing a method, this tracks which graph's method we're in,
+    /// so super.method() can find the correct parent.
+    super_context_stack: Vec<crate::values::Graph>,
 }
 
 impl Executor {
@@ -51,6 +59,8 @@ impl Executor {
             private_symbols: std::collections::HashSet::new(),
             output_capture_enabled: false,
             output_buffer: String::new(),
+            method_context_stack: Vec::new(),
+            super_context_stack: Vec::new(),
         }
     }
 
@@ -69,6 +79,8 @@ impl Executor {
             private_symbols: std::collections::HashSet::new(),
             output_capture_enabled: false,
             output_buffer: String::new(),
+            method_context_stack: Vec::new(),
+            super_context_stack: Vec::new(),
         }
     }
 
@@ -98,6 +110,10 @@ impl Executor {
             pattern_clauses: None,
             env: Rc::new(RefCell::new(self.env.clone())),
             node_id: None,
+            is_getter: false,
+            is_setter: false,
+            is_static: false,
+            guard: None,
         };
 
         let toplevel_id = self.function_graph.borrow_mut().register_function(toplevel_func);
@@ -209,7 +225,9 @@ impl Executor {
             Expr::Map { entries, .. } => self.eval_map(entries),
             Expr::Index { object, index, .. } => self.eval_index(object, index),
             Expr::MethodCall { object, method, args, .. } => self.eval_method_call(object, method, args),
-            Expr::Graph { config, .. } => self.eval_graph(config),
+            Expr::PropertyAccess { object, property, .. } => self.eval_property_access(object, property),
+            Expr::SuperMethodCall { method, args, position } => self.eval_super_method_call(method, args, position),
+            Expr::Graph { config, parent, .. } => self.eval_graph(config, parent),
             // Expr::Tree removed in Step 7 - tree{} now desugars to graph{}.with_ruleset(:tree) in parser
             Expr::Conditional {
                 condition,
@@ -278,6 +296,18 @@ impl Executor {
 
                 // Phase 1A: Truncate if integer mode is active
                 let val = self.truncate_if_integer_mode(val);
+
+                // Phase 18: Set type_name on graphs when assigned to a variable
+                let val = if let ValueKind::Graph(mut graph) = val.kind {
+                    // Only set type_name if it's not already set (e.g., for clones that keep their type)
+                    if graph.type_name.is_none() {
+                        graph.type_name = Some(name.clone());
+                    }
+                    Value::graph(graph)
+                } else {
+                    val
+                };
+
                 self.env.define(name.clone(), val);
 
                 // Phase 10: Track private symbols
@@ -293,6 +323,17 @@ impl Executor {
                 let val = self.truncate_if_integer_mode(val);
                 match target {
                     AssignmentTarget::Variable(name) => {
+                        // Phase 18: Set type_name on graphs when assigned to a variable
+                        let val = if let ValueKind::Graph(mut graph) = val.kind {
+                            // Only set type_name if it's not already set (e.g., for clones that keep their type)
+                            if graph.type_name.is_none() {
+                                graph.type_name = Some(name.clone());
+                            }
+                            Value::graph(graph)
+                        } else {
+                            val
+                        };
+
                         // Try to update existing variable, or create new one if it doesn't exist
                         if self.env.exists(name) {
                             self.env.set(name, val)?;
@@ -369,6 +410,58 @@ impl Executor {
                             ))),
                         }
                     }
+                    AssignmentTarget::Property { object, property } => {
+                        // Property assignment: object.property = value
+                        // Don't allow assignment to internal properties
+                        if property.starts_with("__") {
+                            return Err(GraphoidError::runtime(format!(
+                                "Cannot assign to internal property '{}'",
+                                property
+                            )));
+                        }
+
+                        let obj = self.eval_expr(object)?;
+
+                        match obj.kind {
+                            ValueKind::Graph(mut graph) => {
+                                // Phase 19: Check if there's a setter for this property
+                                if let Some(setter_func) = graph.get_setter(property).cloned() {
+                                    // Call the setter with the value being assigned
+                                    // The setter receives `self` (the graph) and the value as an argument
+                                    self.call_graph_method(&graph, &setter_func, &[val], object)?;
+
+                                    // The graph is already updated in the environment by call_graph_method
+                                    Ok(None)
+                                } else {
+                                    // No setter - add or update the data node directly
+                                    graph.add_node(property.clone(), val)?;
+
+                                    // Update the graph in the environment
+                                    if let Expr::Variable { name, .. } = object.as_ref() {
+                                        self.env.set(name, Value::graph(graph))?;
+                                    }
+                                    Ok(None)
+                                }
+                            }
+                            ValueKind::Map(mut hash) => {
+                                // Apply transformation rules if hash has them
+                                let transformed_val = self.apply_transformation_rules_with_context(val, &hash.graph.rules)?;
+
+                                // Insert key-value pair
+                                hash.insert_raw(property.clone(), transformed_val)?;
+
+                                // Update the map in the environment
+                                if let Expr::Variable { name, .. } = object.as_ref() {
+                                    self.env.set(name, Value::map(hash))?;
+                                }
+                                Ok(None)
+                            }
+                            _ => Err(GraphoidError::runtime(format!(
+                                "Cannot use property assignment on type {}",
+                                obj.type_name()
+                            ))),
+                        }
+                    }
                 }
             }
             Stmt::FunctionDecl {
@@ -378,6 +471,10 @@ impl Executor {
                 body,
                 pattern_clauses,
                 is_private,
+                is_getter,
+                is_setter,
+                is_static,
+                guard,
                 ..
             } => {
                 // Extract parameter names
@@ -394,6 +491,10 @@ impl Executor {
                     pattern_clauses: pattern_clauses.clone(),
                     env: placeholder_env.clone(),
                     node_id: None,
+                    is_getter: *is_getter,  // Phase 17: computed properties (getters)
+                    is_setter: *is_setter,  // Phase 19: computed property assignment (setters)
+                    is_static: *is_static,  // Phase 20: class methods
+                    guard: guard.clone(),   // Phase 21: structure-based dispatch
                 };
 
                 // Register function in the function graph and store its node_id
@@ -409,9 +510,18 @@ impl Executor {
                     // Receiver must be a graph
                     match &receiver_value.kind {
                         ValueKind::Graph(graph) => {
-                            // Clone the graph, attach the method, and update the binding
+                            // Clone the graph, attach the method/setter/static, and update the binding
                             let mut graph_clone = graph.clone();
-                            graph_clone.attach_method(name.clone(), func.clone());
+                            if *is_static {
+                                // Phase 20: Attach as a static method
+                                graph_clone.attach_static_method(name.clone(), func.clone());
+                            } else if *is_setter {
+                                // Phase 19: Attach as a setter
+                                graph_clone.attach_setter(name.clone(), func.clone());
+                            } else {
+                                // Regular method or getter
+                                graph_clone.attach_method(name.clone(), func.clone());
+                            }
                             self.env.define(receiver_name.clone(), Value::graph(graph_clone));
                         }
                         _ => {
@@ -1010,9 +1120,25 @@ impl Executor {
     }
 
     /// Evaluates a graph expression.
-    fn eval_graph(&mut self, config: &[(String, Expr)]) -> Result<Value> {
+    fn eval_graph(&mut self, config: &[(String, Expr)], parent_expr: &Option<Box<Expr>>) -> Result<Value> {
         use crate::values::{Graph, GraphType};
 
+        // If there's a parent, evaluate it and create child graph via inheritance
+        if let Some(parent_box) = parent_expr {
+            let parent_value = self.eval_expr(parent_box)?;
+            if let ValueKind::Graph(parent_graph) = parent_value.kind {
+                // Create child that inherits from parent
+                let child = Graph::from_parent(parent_graph);
+                return Ok(Value::graph(child));
+            } else {
+                return Err(GraphoidError::runtime(format!(
+                    "Cannot inherit from non-graph type '{}'. Expected graph.",
+                    parent_value.type_name()
+                )));
+            }
+        }
+
+        // No parent - create a new empty graph
         // Parse configuration to determine graph type
         let mut graph_type = GraphType::Directed; // Default
 
@@ -1105,6 +1231,10 @@ impl Executor {
             pattern_clauses: None,
             env: Rc::new(RefCell::new(self.env.clone())),
             node_id: None,
+            is_getter: false,  // Lambdas are never getters
+            is_setter: false,  // Lambdas are never setters
+            is_static: false,  // Lambdas are never static
+            guard: None,       // Lambdas don't have guards
         };
 
         // Register lambda in the function graph and store its node_id
@@ -1305,6 +1435,11 @@ impl Executor {
                     }
                 };
 
+                // Don't allow access to internal nodes via index syntax
+                if node_id.starts_with("__") {
+                    return Ok(Value::none());
+                }
+
                 // Look up the node
                 match graph.get_node(&node_id) {
                     Some(value) => Ok(value.clone()),
@@ -1321,6 +1456,127 @@ impl Executor {
                 )))
             }
         }
+    }
+
+    /// Evaluates a property access expression (object.property without parentheses).
+    /// For graphs: Returns data node value, or calls a getter method if one exists.
+    /// For hashes: Returns the value for the key.
+    /// Returns none if property doesn't exist.
+    fn eval_property_access(&mut self, object: &Expr, property: &str) -> Result<Value> {
+        let object_value = self.eval_expr(object)?;
+
+        match &object_value.kind {
+            ValueKind::Graph(ref graph) => {
+                // Don't allow access to internal nodes via property syntax
+                if property.starts_with("__") {
+                    return Ok(Value::none());
+                }
+
+                // First try to get a data node with this name (data takes priority)
+                if let Some(value) = graph.get_node(property) {
+                    return Ok(value.clone());
+                }
+
+                // Phase 17: Check for getter method
+                // If there's a method with this name that's a getter, call it
+                if let Some(func) = graph.get_method(property) {
+                    if func.is_getter {
+                        // Call the getter method with no arguments
+                        // Pass the original object expression for proper self binding and mutation persistence
+                        return self.call_graph_method(graph, &func, &[], object);
+                    }
+                }
+
+                // Nothing found, return none
+                Ok(Value::none())
+            }
+            ValueKind::Map(ref hash) => {
+                // For hashes, property access is equivalent to index access
+                match hash.get(&property.to_string()) {
+                    Some(value) => Ok(value.clone()),
+                    None => Ok(Value::none()),
+                }
+            }
+            _other => {
+                // For other types, try calling a method with this name (no args)
+                // This maintains backward compatibility with code like `list.length`
+                self.eval_method_call(object, property, &[])
+            }
+        }
+    }
+
+    /// Evaluates a super method call (super.method(args)).
+    /// This calls the parent graph's implementation of the method.
+    fn eval_super_method_call(
+        &mut self,
+        method: &str,
+        args: &[crate::ast::Argument],
+        _position: &crate::error::SourcePosition,
+    ) -> Result<Value> {
+        // Get `self` from the current environment
+        let self_value = self.env.get("self").map_err(|_| {
+            GraphoidError::runtime("'super' can only be used within a method".to_string())
+        })?;
+
+        // Extract the graph from self
+        let self_graph = match &self_value.kind {
+            ValueKind::Graph(g) => g.clone(),
+            _ => {
+                return Err(GraphoidError::runtime(
+                    "'super' can only be used within a graph method".to_string(),
+                ));
+            }
+        };
+
+        // Get the context graph from super_context_stack (which graph's parent we should use)
+        // This enables multi-level super calls: if we're in a super method, use that method's
+        // defining graph's parent, not self's parent.
+        let context_graph = self.super_context_stack.last().cloned().ok_or_else(|| {
+            GraphoidError::runtime("'super' can only be used within a method".to_string())
+        })?;
+
+        // Get the parent graph from the context graph
+        let parent_graph = match &context_graph.parent {
+            Some(parent) => (**parent).clone(),
+            None => {
+                return Err(GraphoidError::runtime(format!(
+                    "Cannot call super.{}(): graph has no parent",
+                    method
+                )));
+            }
+        };
+
+        // Find the method on the parent
+        let parent_method = parent_graph.get_method(method).ok_or_else(|| {
+            GraphoidError::runtime(format!(
+                "Method '{}' not found on parent graph",
+                method
+            ))
+        })?;
+
+        // Evaluate argument expressions
+        let arg_values = self.eval_arguments(args)?;
+
+        // Push the parent graph onto super_context_stack before calling
+        // This ensures that if the parent method also calls super, it will
+        // use the parent's parent, not loop back to itself
+        self.super_context_stack.push(parent_graph.clone());
+
+        // Call the parent's method implementation with `self` as the receiver
+        // This is important: we use `self_graph` (the child), not `parent_graph`
+        // The method runs on the child but uses the parent's implementation
+        // We need a dummy expression for the object_expr parameter
+        let dummy_expr = Expr::Variable {
+            name: "self".to_string(),
+            position: crate::error::SourcePosition { line: 0, column: 0, file: None },
+        };
+        // Use call_graph_method_impl with manage_super_context=false since we manage the stack ourselves
+        let result = self.call_graph_method_impl(&self_graph, &parent_method, &arg_values, &dummy_expr, false);
+
+        // Pop the parent from super_context_stack
+        self.super_context_stack.pop();
+
+        result
     }
 
     /// Helper to evaluate arguments (positional only for now).
@@ -4575,11 +4831,89 @@ impl Executor {
 
     /// Evaluates a method call on a graph.
     fn eval_graph_method(&mut self, mut graph: crate::values::Graph, method: &str, args: &[Value], object_expr: &Expr) -> Result<Value> {
-        // Check for user-defined methods first (class-like graphs)
-        if let Some(func) = graph.get_method(method) {
-            // User-defined method found - call it with `self` bound to the graph
-            let func_clone = func.clone();
-            return self.call_graph_method(&graph, &func_clone, args, object_expr);
+        // Phase 20: Check for static methods first (called on class, not instances)
+        if let Some(static_func) = graph.get_static_method(method) {
+            // Static method found - call it WITHOUT binding `self`
+            let static_func_clone = static_func.clone();
+            return self.call_static_method(&static_func_clone, args);
+        }
+
+        // Check for user-defined instance methods (class-like graphs)
+        // Phase 21: Get all method variants and evaluate guards to find the matching one
+        let method_variants = graph.get_method_variants(method);
+        if !method_variants.is_empty() {
+            // Phase 15: Private method check
+            // Methods starting with _ are private and can only be called from within the same graph's methods
+            if method.starts_with('_') {
+                // Check if we're inside a method of this graph
+                let graph_var_name = if let Expr::Variable { name, .. } = object_expr {
+                    Some(name.clone())
+                } else {
+                    None
+                };
+
+                let is_self_call = if let Expr::Variable { name, .. } = object_expr {
+                    name == "self"
+                } else {
+                    false
+                };
+
+                // Allow if:
+                // 1. We're calling on `self` (always allowed inside a method)
+                // 2. We're in a method context for this specific graph variable
+                let is_allowed = is_self_call ||
+                    graph_var_name.as_ref().map_or(false, |name| {
+                        self.method_context_stack.contains(name)
+                    });
+
+                if !is_allowed {
+                    return Err(GraphoidError::runtime(format!(
+                        "Cannot call private method '{}' from outside the graph's methods",
+                        method
+                    )));
+                }
+            }
+
+            // Phase 21: Find matching method variant by evaluating guards
+            // Guards are evaluated with `self` bound to the graph
+            let mut matching_func: Option<Function> = None;
+            let mut fallback_func: Option<Function> = None;
+
+            for func in method_variants {
+                if let Some(guard_expr) = &func.guard {
+                    // Evaluate guard with `self` bound to graph
+                    // Create temporary environment for guard evaluation
+                    let saved_env = self.env.clone();
+                    self.env.define("self".to_string(), Value::graph(graph.clone()));
+
+                    let guard_result = self.eval_expr(guard_expr);
+                    self.env = saved_env;
+
+                    match guard_result {
+                        Ok(guard_val) => {
+                            if guard_val.is_truthy() {
+                                matching_func = Some(func.clone());
+                                break;
+                            }
+                        }
+                        Err(_) => {
+                            // Guard evaluation failed, skip this variant
+                            continue;
+                        }
+                    }
+                } else {
+                    // No guard - this is the fallback
+                    fallback_func = Some(func.clone());
+                }
+            }
+
+            // Use matching func or fallback
+            let func_to_call = matching_func.or(fallback_func);
+
+            if let Some(func) = func_to_call {
+                return self.call_graph_method(&graph, &func, args, object_expr);
+            }
+            // If no matching variant found, fall through to built-in methods
         }
 
         match method {
@@ -5093,6 +5427,56 @@ impl Executor {
                 // including nodes, edges, rules, and methods
                 Ok(Value::graph(graph.clone()))
             }
+            // Phase 18: Type checking methods
+            "type_of" => {
+                // Returns the type name of the graph (the variable name it was assigned to)
+                // e.g., Dog = graph{} -> Dog.type_of() returns "Dog"
+                // Anonymous graphs return "graph"
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "type_of() expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let type_name = graph.type_name.clone().unwrap_or_else(|| "graph".to_string());
+                Ok(Value::string(type_name))
+            }
+            "is_a" => {
+                // Checks if the graph is an instance of a type, walking the inheritance chain
+                // e.g., puppy.is_a(Dog) returns true if Puppy = graph from Dog {}
+                // Works with both type names (strings) and graph values
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "is_a() expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get the type name to check against
+                let check_type = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    ValueKind::Graph(g) => g.type_name.clone().unwrap_or_else(|| "graph".to_string()),
+                    _ => return Err(GraphoidError::runtime(format!(
+                        "is_a() expects a type name (string) or graph, but got {}",
+                        args[0].type_name()
+                    ))),
+                };
+
+                // Walk the inheritance chain to check if this graph is of the given type
+                let mut current = Some(&graph);
+                while let Some(g) = current {
+                    if let Some(ref name) = g.type_name {
+                        if name == &check_type {
+                            return Ok(Value::boolean(true));
+                        }
+                    }
+                    // Move to parent
+                    current = g.parent.as_ref().map(|p| p.as_ref());
+                }
+
+                Ok(Value::boolean(false))
+            }
             "remove_method" => {
                 // Remove a method from the graph by name
                 // remove_method("method_name")
@@ -5121,6 +5505,76 @@ impl Executor {
                 }
 
                 Ok(Value::boolean(removed))
+            }
+            "include" => {
+                // Phase 22: Mixin pattern - copy all methods from another graph
+                // include(other_graph)
+                // Returns a list of method names that were copied
+                // Skips private methods (starting with underscore)
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "include() expects 1 argument (graph to include methods from), but got {}",
+                        args.len()
+                    )));
+                }
+
+                let other_graph = match &args[0].kind {
+                    ValueKind::Graph(g) => g.clone(),
+                    _ => {
+                        return Err(GraphoidError::runtime(
+                            "include() argument must be a graph".to_string()
+                        ));
+                    }
+                };
+
+                let included_names = graph.include_methods_from(&other_graph);
+
+                // Update graph in environment (mutation)
+                if let Expr::Variable { name, .. } = object_expr {
+                    self.env.set(name, Value::graph(graph))?;
+                }
+
+                // Return list of included method names
+                let name_values: Vec<Value> = included_names.iter()
+                    .map(|n| Value::string(n.clone()))
+                    .collect();
+                Ok(Value::list(crate::values::List::from_vec(name_values)))
+            }
+            "responds_to" => {
+                // Phase 23: Check if the graph has a method with the given name
+                // responds_to("method_name") -> bool
+                // Also checks parent graph if using inheritance
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "responds_to() expects 1 argument (method name), but got {}",
+                        args.len()
+                    )));
+                }
+
+                let method_name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => {
+                        return Err(GraphoidError::runtime(
+                            "responds_to() argument must be a string (method name)".to_string()
+                        ));
+                    }
+                };
+
+                // Check if this graph or any parent has the method
+                // Walk up the inheritance chain
+                fn check_method_in_chain(g: &crate::values::Graph, method_name: &str) -> bool {
+                    if g.has_method(method_name) {
+                        return true;
+                    }
+                    // Check parent if exists
+                    if let Some(parent) = &g.parent {
+                        return check_method_in_chain(parent, method_name);
+                    }
+                    false
+                }
+
+                let has_method = check_method_in_chain(&graph, &method_name);
+                Ok(Value::boolean(has_method))
             }
             "edges" => {
                 // Get edges as a list of lists [from, to, edge_type]
@@ -6489,6 +6943,77 @@ impl Executor {
     /// - `:no_edge_removals` - Methods cannot remove edges
     /// - `:read_only` - Methods cannot modify the graph at all
     fn call_graph_method(&mut self, graph: &crate::values::Graph, func: &Function, arg_values: &[Value], object_expr: &Expr) -> Result<Value> {
+        self.call_graph_method_impl(graph, func, arg_values, object_expr, true)
+    }
+
+    /// Phase 20: Call a static method (class method) without binding `self`.
+    /// Static methods are called on the class (graph) itself, not on instances.
+    fn call_static_method(&mut self, func: &Function, arg_values: &[Value]) -> Result<Value> {
+        // Validate argument count
+        if arg_values.len() != func.parameters.len() {
+            return Err(GraphoidError::runtime(format!(
+                "Static method '{}' expects {} arguments, but got {}",
+                func.name.as_ref().unwrap_or(&"<anonymous>".to_string()),
+                func.parameters.len(),
+                arg_values.len()
+            )));
+        }
+
+        // Push method onto call stack
+        let method_name = func.name.as_ref().unwrap_or(&"<anonymous>".to_string()).clone();
+        self.call_stack.push(method_name.clone());
+
+        // Push function call onto the graph
+        if let Some(ref func_id) = func.node_id {
+            self.function_graph.borrow_mut().push_call(func_id.clone(), arg_values.to_vec());
+        }
+
+        // Static methods execute in the current environment directly.
+        // This allows them to modify class-level state (e.g., Counter._count).
+        // We only need to temporarily bind the parameters, then clean them up.
+
+        // Save any existing bindings for parameter names (to restore after)
+        let mut saved_params: Vec<(String, Option<Value>)> = Vec::new();
+        for param in &func.parameters {
+            let existing = self.env.get(&param.name).ok();
+            saved_params.push((param.name.clone(), existing));
+        }
+
+        // Bind arguments - NO `self` binding for static methods
+        for (param, value) in func.parameters.iter().zip(arg_values.iter()) {
+            self.env.define(param.name.clone(), value.clone());
+        }
+
+        // Execute method body
+        let mut return_value = Value::none();
+        for stmt in &func.body {
+            if let Some(ret_val) = self.eval_stmt(stmt)? {
+                return_value = ret_val;
+                break;
+            }
+        }
+
+        // Restore original parameter bindings (or remove if they didn't exist)
+        for (name, original) in saved_params {
+            if let Some(val) = original {
+                self.env.define(name, val);
+            } else {
+                self.env.remove_variable(&name);
+            }
+        }
+
+        // Pop from call stack
+        self.call_stack.pop();
+
+        // Pop function call from graph
+        self.function_graph.borrow_mut().pop_call(return_value.clone());
+
+        Ok(return_value)
+    }
+
+    /// Internal implementation of call_graph_method with control over super context management.
+    /// When `manage_super_context` is false, the caller is responsible for managing super_context_stack.
+    fn call_graph_method_impl(&mut self, graph: &crate::values::Graph, func: &Function, arg_values: &[Value], object_expr: &Expr, manage_super_context: bool) -> Result<Value> {
         // Validate argument count
         if arg_values.len() != func.parameters.len() {
             return Err(GraphoidError::runtime(format!(
@@ -6506,6 +7031,23 @@ impl Executor {
         // Push method onto call stack
         let method_name = func.name.as_ref().unwrap_or(&"<anonymous>".to_string()).clone();
         self.call_stack.push(method_name.clone());
+
+        // Phase 15: Push graph variable name to method context stack for private method access
+        let graph_var_name = if let Expr::Variable { name, .. } = object_expr {
+            Some(name.clone())
+        } else {
+            None
+        };
+        if let Some(ref var_name) = graph_var_name {
+            self.method_context_stack.push(var_name.clone());
+        }
+
+        // Phase 16: Push the graph onto super_context_stack for super call resolution
+        // This tells super.method() which graph's parent to look at
+        // Only do this if manage_super_context is true; super calls manage their own stack
+        if manage_super_context {
+            self.super_context_stack.push(graph.clone());
+        }
 
         // Push function call onto the graph
         if let Some(ref func_id) = func.node_id {
@@ -6662,6 +7204,16 @@ impl Executor {
 
         // Pop method from call stack
         self.call_stack.pop();
+
+        // Phase 15: Pop method context stack
+        if graph_var_name.is_some() {
+            self.method_context_stack.pop();
+        }
+
+        // Phase 16: Pop super context stack (only if we pushed)
+        if manage_super_context {
+            self.super_context_stack.pop();
+        }
 
         // Pop function from graph with return value
         if func.node_id.is_some() {

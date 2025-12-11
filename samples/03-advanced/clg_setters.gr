@@ -1,0 +1,160 @@
+# Class-Like Graphs: Setters Demo (Phase 19)
+#
+# Demonstrates computed property assignment using the explicit `set` keyword.
+# Setters allow custom logic to run when a property is assigned.
+
+print("=== Setters Demo ===")
+print("")
+
+# -----------------------------------------------------------------------------
+# Basic Setter with Validation
+# -----------------------------------------------------------------------------
+print("--- Setter with Validation ---")
+
+Person = graph{}
+Person._age = 0  # Private backing field
+
+# Getter for age
+get Person.age() {
+    return self._age
+}
+
+# Setter for age with validation
+set Person.age(value) {
+    if value < 0 {
+        self._age = 0
+    } else if value > 150 {
+        self._age = 150
+    } else {
+        self._age = value
+    }
+}
+
+p = Person.clone()
+p.age = 25
+print("Set age to 25: " + p.age.to_string())
+
+p.age = -5
+print("Set age to -5 (clamped to 0): " + p.age.to_string())
+
+p.age = 200
+print("Set age to 200 (clamped to 150): " + p.age.to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Computed Property with Getter and Setter
+# -----------------------------------------------------------------------------
+print("--- Computed Property (getter + setter) ---")
+
+Circle = graph{}
+Circle._radius = 0
+
+# Getter for radius
+get Circle.radius() {
+    return self._radius
+}
+
+# Setter for radius
+set Circle.radius(value) {
+    if value < 0 {
+        self._radius = 0
+    } else {
+        self._radius = value
+    }
+}
+
+# Getter for area (read-only computed property)
+get Circle.area() {
+    return 3.14159 * self._radius * self._radius
+}
+
+# Setter for area - computes radius from area
+set Circle.area(value) {
+    # area = pi * r^2, so r = sqrt(area / pi)
+    if value < 0 {
+        self._radius = 0
+    } else {
+        # Simple approximation of sqrt for positive numbers
+        r = value / 3.14159
+        # Newton's method for sqrt (10 iterations)
+        guess = r / 2
+        i = 0
+        while i < 10 {
+            guess = (guess + r / guess) / 2
+            i = i + 1
+        }
+        self._radius = guess
+    }
+}
+
+c = Circle.clone()
+c.radius = 5
+print("Set radius to 5:")
+print("  radius = " + c.radius.to_string())
+print("  area = " + c.area.to_string())
+
+c.area = 50
+print("Set area to 50:")
+print("  radius = " + c.radius.to_string())
+print("  area = " + c.area.to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Setter with Inheritance
+# -----------------------------------------------------------------------------
+print("--- Setter with Inheritance ---")
+
+Temperature = graph{}
+Temperature._celsius = 0
+
+get Temperature.celsius() {
+    return self._celsius
+}
+
+set Temperature.celsius(value) {
+    self._celsius = value
+}
+
+get Temperature.fahrenheit() {
+    return self._celsius * 9 / 5 + 32
+}
+
+set Temperature.fahrenheit(value) {
+    self._celsius = (value - 32) * 5 / 9
+}
+
+# Child class adds kelvin
+ScientificTemp = graph from Temperature {}
+
+get ScientificTemp.kelvin() {
+    return self._celsius + 273.15
+}
+
+set ScientificTemp.kelvin(value) {
+    self._celsius = value - 273.15
+}
+
+temp = ScientificTemp.clone()
+
+temp.celsius = 100
+print("Set celsius to 100:")
+print("  celsius = " + temp.celsius.to_string())
+print("  fahrenheit = " + temp.fahrenheit.to_string())
+print("  kelvin = " + temp.kelvin.to_string())
+
+temp.fahrenheit = 32
+print("Set fahrenheit to 32:")
+print("  celsius = " + temp.celsius.to_string())
+print("  fahrenheit = " + temp.fahrenheit.to_string())
+print("  kelvin = " + temp.kelvin.to_string())
+
+temp.kelvin = 0
+print("Set kelvin to 0 (absolute zero):")
+print("  celsius = " + temp.celsius.to_string())
+print("  fahrenheit = " + temp.fahrenheit.to_string())
+print("  kelvin = " + temp.kelvin.to_string())
+
+print("")
+print("=== Demo Complete ===")

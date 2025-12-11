@@ -1,0 +1,184 @@
+# Property Access Syntax Demo (Phase 13)
+#
+# This example demonstrates the new property access syntax for graphs:
+#   self.property      - Get data node value
+#   self.property = x  - Set data node value
+#   self["key"]        - Dynamic access (also works)
+#
+# Key features:
+#   - Only accesses data layer (not __methods__ or other internal nodes)
+#   - Returns none if property doesn't exist (no error)
+#   - Works on both graphs and hashes
+
+print("=== Property Access Syntax Demo ===")
+print("")
+
+# -----------------------------------------------------------------------------
+# Basic Property Access on Graphs
+# -----------------------------------------------------------------------------
+print("--- Basic Property Access ---")
+
+person = graph{}
+person.add_node("name", "Alice")
+person.add_node("age", 30)
+
+# Dot notation read - NEW SYNTAX!
+print("Name: " + person.name)
+print("Age: " + person.age.to_string())
+
+# Dot notation write - NEW SYNTAX!
+person.age = 31
+print("After birthday: " + person.age.to_string())
+
+# New property creation via assignment
+person.city = "New York"
+print("City: " + person.city)
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Dynamic Access with Index Notation
+# -----------------------------------------------------------------------------
+print("--- Dynamic Access ---")
+
+field = "name"
+print("Dynamic access [" + field + "]: " + person[field])
+
+# Dynamic assignment
+person["country"] = "USA"
+print("Country: " + person.country)
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Property Access in Methods
+# -----------------------------------------------------------------------------
+print("--- Property Access in Methods ---")
+
+Counter = graph{}
+Counter.add_node("count", 0)
+Counter.add_node("step", 1)
+
+fn Counter.increment() {
+    # Using property syntax instead of get_node/add_node
+    self.count = self.count + self.step
+}
+
+fn Counter.set_step(n) {
+    self.step = n
+}
+
+fn Counter.value() {
+    return self.count
+}
+
+fn Counter.new(initial) {
+    c = self.clone()
+    c.count = initial
+    return c
+}
+
+c = Counter.new(0)
+print("Initial: " + c.value().to_string())
+c.increment()
+c.increment()
+print("After 2 increments: " + c.value().to_string())
+c.set_step(5)
+c.increment()
+print("After step=5 increment: " + c.value().to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Property Access on Hashes
+# -----------------------------------------------------------------------------
+print("--- Property Access on Hashes ---")
+
+config = {"host": "localhost", "port": 8080}
+print("Host: " + config.host)
+print("Port: " + config.port.to_string())
+
+# Update via property syntax
+config.port = 9000
+print("New port: " + config.port.to_string())
+
+# Add new key
+config.debug = true
+print("Debug: " + config.debug.to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Missing Properties Return None
+# -----------------------------------------------------------------------------
+print("--- Missing Properties ---")
+
+g = graph{}
+result = g.nonexistent
+if result == none {
+    print("Missing property returns none (as expected)")
+}
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Internal Nodes Not Accessible
+# -----------------------------------------------------------------------------
+print("--- Internal Node Protection ---")
+
+TestGraph = graph{}
+fn TestGraph.method() {
+    return "hello"
+}
+
+# Internal nodes cannot be accessed via property/index syntax
+# Using index notation to test (since __methods__ has special characters)
+internal = TestGraph["__methods__"]
+if internal == none {
+    print("Internal nodes (__methods__) not accessible via index syntax (correct!)")
+}
+
+# But the method itself still works
+print("Method still works: " + TestGraph.method())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Complete Example: Point Class
+# -----------------------------------------------------------------------------
+print("--- Complete Example: Point ---")
+
+Point = graph{}
+Point.add_node("x", 0)
+Point.add_node("y", 0)
+
+fn Point.new(x, y) {
+    p = self.clone()
+    p.x = x
+    p.y = y
+    return p
+}
+
+fn Point.distance_from_origin() {
+    return (self.x * self.x + self.y * self.y) ** 0.5
+}
+
+fn Point.translate(dx, dy) {
+    self.x = self.x + dx
+    self.y = self.y + dy
+}
+
+fn Point.describe() {
+    return "(" + self.x.to_string() + ", " + self.y.to_string() + ")"
+}
+
+p1 = Point.new(3, 4)
+print("Point: " + p1.describe())
+print("Distance from origin: " + p1.distance_from_origin().to_string())
+
+p1.translate(1, 1)
+print("After translate(1,1): " + p1.describe())
+print("New distance: " + p1.distance_from_origin().to_string())
+
+print("")
+print("=== Demo Complete ===")

@@ -41,6 +41,10 @@ fn create_double_fn() -> Function {
 
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     }
 }
 
@@ -64,6 +68,10 @@ fn create_negate_fn() -> Function {
 
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     }
 }
 
@@ -88,6 +96,10 @@ fn create_is_negative_fn() -> Function {
 
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     }
 }
 
@@ -133,6 +145,10 @@ fn test_custom_function_with_closure() {
         pattern_clauses: None,
         env: Rc::new(RefCell::new(env)),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     };
 
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
@@ -166,6 +182,10 @@ fn test_custom_function_type_specific() {
 
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     };
 
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
@@ -205,6 +225,10 @@ fn test_custom_function_error_handling() {
 
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     };
 
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
@@ -332,6 +356,10 @@ fn test_conditional_without_fallback() {
 
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     };
 
     // func(x) { return x * x }
@@ -354,6 +382,10 @@ fn test_conditional_without_fallback() {
 
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     };
 
     let rule = RuleInstance::new(RuleSpec::Conditional {
@@ -448,6 +480,10 @@ fn test_conditional_chain() {
 
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     };
 
     // func(x) { return 10 }
@@ -465,6 +501,10 @@ fn test_conditional_chain() {
 
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     };
 
     let behavior1 = RuleInstance::new(RuleSpec::Conditional {

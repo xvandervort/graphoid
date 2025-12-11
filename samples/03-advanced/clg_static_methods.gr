@@ -1,0 +1,168 @@
+# Class-Like Graphs: Static Methods Demo (Phase 20)
+#
+# Demonstrates static methods using the `static fn` keyword.
+# Static methods are called on the class (graph) itself, not on instances.
+# They do NOT have access to `self`.
+
+print("=== Static Methods Demo ===")
+print("")
+
+# -----------------------------------------------------------------------------
+# Basic Static Method (Factory Pattern)
+# -----------------------------------------------------------------------------
+print("--- Factory Pattern ---")
+
+Circle = graph{}
+Circle.radius = 0
+
+# Instance method - requires `self`
+get Circle.area() {
+    return 3.14159 * self.radius * self.radius
+}
+
+# Static method - called on Circle, creates instances
+static fn Circle.create_unit_circle() {
+    c = Circle.clone()
+    c.radius = 1
+    return c
+}
+
+static fn Circle.create_with_radius(r) {
+    c = Circle.clone()
+    c.radius = r
+    return c
+}
+
+# Use factory methods
+unit = Circle.create_unit_circle()
+print("Unit circle radius: " + unit.radius.to_string())
+print("Unit circle area: " + unit.area.to_string())
+
+big = Circle.create_with_radius(10)
+print("Big circle radius: " + big.radius.to_string())
+print("Big circle area: " + big.area.to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Static Method vs Instance Method
+# -----------------------------------------------------------------------------
+print("--- Static vs Instance Methods ---")
+
+Counter = graph{}
+Counter._value = 0
+Counter._count = 0  # Tracks number of counters
+
+# Instance method - works on a specific counter
+fn Counter.increment() {
+    self._value = self._value + 1
+}
+
+get Counter.value() {
+    return self._value
+}
+
+# Static method - factory that tracks count
+static fn Counter.create(initial) {
+    c = Counter.clone()
+    c._value = initial
+    Counter._count = Counter._count + 1
+    return c
+}
+
+# Static method - gets the count (no self needed)
+static fn Counter.get_count() {
+    return Counter._count
+}
+
+c1 = Counter.create(0)
+c2 = Counter.create(10)
+c3 = Counter.create(100)
+
+c1.increment()
+c1.increment()
+c2.increment()
+
+print("Counter 1 value: " + c1.value.to_string())
+print("Counter 2 value: " + c2.value.to_string())
+print("Counter 3 value: " + c3.value.to_string())
+print("Total counters created: " + Counter.get_count().to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Static Methods with Inheritance
+# -----------------------------------------------------------------------------
+print("--- Static Methods with Inheritance ---")
+
+Shape = graph{}
+Shape.name = "shape"
+
+static fn Shape.describe() {
+    return "I am a Shape class"
+}
+
+Rectangle = graph from Shape {}
+Rectangle.name = "rectangle"
+Rectangle.width = 0
+Rectangle.height = 0
+
+static fn Rectangle.describe() {
+    return "I am a Rectangle class"
+}
+
+static fn Rectangle.create(w, h) {
+    r = Rectangle.clone()
+    r.width = w
+    r.height = h
+    return r
+}
+
+get Rectangle.area() {
+    return self.width * self.height
+}
+
+# Call static methods on classes
+print("Shape.describe(): " + Shape.describe())
+print("Rectangle.describe(): " + Rectangle.describe())
+
+# Create instances with static factory
+rect = Rectangle.create(10, 5)
+print("Rectangle area: " + rect.area.to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Static Method for Utility Functions
+# -----------------------------------------------------------------------------
+print("--- Utility Functions ---")
+
+Math = graph{}
+
+static fn Math.max(a, b) {
+    if a > b {
+        return a
+    }
+    return b
+}
+
+static fn Math.min(a, b) {
+    if a < b {
+        return a
+    }
+    return b
+}
+
+static fn Math.abs(n) {
+    if n < 0 {
+        return 0 - n
+    }
+    return n
+}
+
+print("Math.max(5, 10) = " + Math.max(5, 10).to_string())
+print("Math.min(5, 10) = " + Math.min(5, 10).to_string())
+print("Math.abs(-42) = " + Math.abs(-42).to_string())
+
+print("")
+print("=== Demo Complete ===")

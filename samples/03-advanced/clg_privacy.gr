@@ -1,0 +1,123 @@
+# Class-Like Graphs: Private Methods Demo (Phase 15)
+#
+# Demonstrates private methods using the _ prefix convention.
+# Private methods can only be called from within the same graph's methods.
+
+print("=== Private Methods Demo ===")
+print("")
+
+# -----------------------------------------------------------------------------
+# Basic Private Method
+# -----------------------------------------------------------------------------
+print("--- Basic Private Method ---")
+
+Calculator = graph{}
+Calculator.value = 0
+
+# Private helper method - starts with _
+fn Calculator._validate(n) {
+    if n < 0 {
+        return 0  # Clamp negative to 0
+    }
+    return n
+}
+
+# Public method that uses private helper
+fn Calculator.set(n) {
+    self.value = self._validate(n)  # OK - internal call
+}
+
+fn Calculator.get() {
+    return self.value
+}
+
+calc = Calculator.clone()
+calc.set(10)
+print("Set to 10: " + calc.get().to_string())
+
+calc.set(-5)
+print("Set to -5 (clamped): " + calc.get().to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Nested Private Calls
+# -----------------------------------------------------------------------------
+print("--- Nested Private Calls ---")
+
+DataProcessor = graph{}
+DataProcessor.data = []
+
+fn DataProcessor._clean(x) {
+    # Remove whitespace equivalent - just return the value for now
+    return x
+}
+
+fn DataProcessor._transform(x) {
+    # Call another private method
+    return self._clean(x) * 2
+}
+
+fn DataProcessor.process(x) {
+    # Public method calls private methods
+    return self._transform(x)
+}
+
+dp = DataProcessor.clone()
+result = dp.process(5)
+print("Process 5: " + result.to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Private Methods in Inherited Graphs
+# -----------------------------------------------------------------------------
+print("--- Private Methods with Inheritance ---")
+
+Base = graph{}
+Base.factor = 1
+
+fn Base._secret() {
+    return self.factor * 100
+}
+
+fn Base.reveal() {
+    return self._secret()  # Public method exposes private
+}
+
+# Child inherits the private method
+Child = graph from Base {}
+Child.factor = 2
+
+# Child can also call inherited private through public
+print("Base reveal: " + Base.reveal().to_string())
+print("Child reveal: " + Child.reveal().to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Private Method External Call (Should Fail)
+# -----------------------------------------------------------------------------
+print("--- External Private Call Prevention ---")
+
+Secret = graph{}
+Secret.code = 42
+
+fn Secret._hidden() {
+    return self.code
+}
+
+fn Secret.public() {
+    return self._hidden()
+}
+
+# This works - going through public method
+print("Via public: " + Secret.public().to_string())
+
+# Uncomment to see error:
+# Secret._hidden()  # ERROR: Cannot call private method
+
+print("(Commented out direct private call - would error)")
+
+print("")
+print("=== Demo Complete ===")

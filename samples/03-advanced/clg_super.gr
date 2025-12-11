@@ -1,0 +1,173 @@
+# Class-Like Graphs: Super Calls Demo (Phase 16)
+#
+# Demonstrates super method calls using the `super.method()` syntax.
+# Super calls invoke the parent graph's implementation of a method.
+
+print("=== Super Calls Demo ===")
+print("")
+
+# -----------------------------------------------------------------------------
+# Basic Super Call
+# -----------------------------------------------------------------------------
+print("--- Basic Super Call ---")
+
+Animal = graph{}
+Animal.name = "Unknown"
+Animal.sound = "..."
+
+fn Animal.speak() {
+    return self.name + " says: " + self.sound
+}
+
+# Dog overrides speak and calls parent's implementation
+Dog = graph from Animal {}
+Dog.sound = "Woof"
+
+fn Dog.speak() {
+    # Call parent's speak method
+    base = super.speak()
+    return base + "!"
+}
+
+dog = Dog.clone()
+dog.name = "Buddy"
+print("Dog speaks: " + dog.speak())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Multi-Level Super Calls
+# -----------------------------------------------------------------------------
+print("--- Multi-Level Super Calls ---")
+
+# Build a 3-level hierarchy
+Shape = graph{}
+Shape.type = "shape"
+
+fn Shape.describe() {
+    return "I am a " + self.type
+}
+
+Rectangle = graph from Shape {}
+Rectangle.type = "rectangle"
+Rectangle.width = 0
+Rectangle.height = 0
+
+fn Rectangle.describe() {
+    base = super.describe()
+    return base + " with dimensions " + self.width.to_string() + "x" + self.height.to_string()
+}
+
+fn Rectangle.area() {
+    return self.width * self.height
+}
+
+Square = graph from Rectangle {}
+Square.type = "square"
+
+fn Square.describe() {
+    # This calls Rectangle.describe() which calls Shape.describe()
+    base = super.describe()
+    return base + " (all sides equal)"
+}
+
+# Override area for efficiency (but we'll call super anyway for demo)
+fn Square.area() {
+    return super.area()  # Works the same for squares
+}
+
+square = Square.clone()
+square.width = 5
+square.height = 5
+print("Square describes: " + square.describe())
+print("Square area: " + square.area().to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Super with Arguments
+# -----------------------------------------------------------------------------
+print("--- Super with Arguments ---")
+
+Calculator = graph{}
+
+fn Calculator.compute(x, y) {
+    return x + y
+}
+
+AdvancedCalculator = graph from Calculator {}
+
+fn AdvancedCalculator.compute(x, y) {
+    # Call parent with arguments, then add our own processing
+    base_result = super.compute(x, y)
+    return base_result * 2  # Double the result
+}
+
+calc = AdvancedCalculator.clone()
+print("Compute(3, 4): " + calc.compute(3, 4).to_string())  # (3+4)*2 = 14
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Super Accessing Child's Data
+# -----------------------------------------------------------------------------
+print("--- Super Accessing Child's Data ---")
+
+# When super.method() runs, `self` still refers to the child graph
+# This allows polymorphic behavior where parent methods can access
+# child's overridden data
+
+Vehicle = graph{}
+Vehicle.speed = 0
+
+fn Vehicle.describe() {
+    return "Vehicle traveling at " + self.speed.to_string() + " mph"
+}
+
+Car = graph from Vehicle {}
+Car.speed = 60
+
+fn Car.describe() {
+    return "Car: " + super.describe()  # Uses Car's speed value
+}
+
+Racecar = graph from Car {}
+Racecar.speed = 200
+
+fn Racecar.describe() {
+    return "Racecar: " + super.describe()  # Uses Racecar's speed value
+}
+
+racecar = Racecar.clone()
+print(racecar.describe())  # Shows "200 mph" from Racecar.speed
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Combined with Private Methods
+# -----------------------------------------------------------------------------
+print("--- Super with Private Methods ---")
+
+BaseFormatter = graph{}
+
+fn BaseFormatter._format(text) {
+    return "[" + text + "]"
+}
+
+fn BaseFormatter.format(text) {
+    return self._format(text)
+}
+
+FancyFormatter = graph from BaseFormatter {}
+
+fn FancyFormatter._format(text) {
+    # Call parent's private method through super
+    base = super._format(text)
+    return "*** " + base + " ***"
+}
+
+formatter = FancyFormatter.clone()
+print("Formatted: " + formatter.format("Hello"))
+
+print("")
+print("=== Demo Complete ===")

@@ -15,6 +15,10 @@ fn make_test_function(name: &str) -> Function {
 
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     }
 }
 

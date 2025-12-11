@@ -1,0 +1,127 @@
+# Class-Like Graphs: Computed Properties (Getters) Demo (Phase 17)
+#
+# Demonstrates computed properties using the explicit `get` keyword.
+# Getters are methods that can be accessed like properties (without parentheses).
+
+print("=== Computed Properties (Getters) Demo ===")
+print("")
+
+# -----------------------------------------------------------------------------
+# Basic Getter
+# -----------------------------------------------------------------------------
+print("--- Basic Getter ---")
+
+Circle = graph{}
+Circle.radius = 0
+
+# Define area as a getter using `get` keyword
+get Circle.area() {
+    return 3.14159 * self.radius * self.radius
+}
+
+# Define circumference as another getter
+get Circle.circumference() {
+    return 2 * 3.14159 * self.radius
+}
+
+# Create instance
+c = Circle.clone()
+c.radius = 5
+
+# Access getters like properties (no parens needed)
+print("Radius: " + c.radius.to_string())
+print("Area: " + c.area.to_string())
+print("Circumference: " + c.circumference.to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Getter vs Data Node Priority
+# -----------------------------------------------------------------------------
+print("--- Data Node Takes Priority ---")
+
+Point = graph{}
+Point.x = 0
+Point.y = 0
+
+# This getter would be shadowed if we set a data node with the same name
+get Point.description() {
+    return "(" + self.x.to_string() + ", " + self.y.to_string() + ")"
+}
+
+p = Point.clone()
+p.x = 3
+p.y = 4
+print("Point: " + p.description)
+
+# If we set a data node with the same name, it shadows the getter
+# p.description = "custom"  # This would shadow the getter
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Getters with Inheritance
+# -----------------------------------------------------------------------------
+print("--- Getters with Inheritance ---")
+
+Shape = graph{}
+Shape.name = "shape"
+
+get Shape.info() {
+    return "Shape: " + self.name
+}
+
+Rectangle = graph from Shape {}
+Rectangle.name = "rectangle"
+Rectangle.width = 0
+Rectangle.height = 0
+
+# Override the getter in child
+get Rectangle.info() {
+    return "Rectangle " + self.width.to_string() + "x" + self.height.to_string()
+}
+
+# Add new getter in child
+get Rectangle.area() {
+    return self.width * self.height
+}
+
+rect = Rectangle.clone()
+rect.width = 10
+rect.height = 5
+print("Info: " + rect.info)
+print("Area: " + rect.area.to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Regular Methods vs Getters
+# -----------------------------------------------------------------------------
+print("--- Methods vs Getters ---")
+
+# Regular methods use `fn` and require parens
+# Getters use `get` and can be accessed without parens
+
+Counter = graph{}
+Counter.value = 0
+
+# Getter - access without parens
+get Counter.doubled() {
+    return self.value * 2
+}
+
+# Regular method - requires parens for parameters
+fn Counter.add(n) {
+    self.value = self.value + n
+}
+
+counter = Counter.clone()
+counter.value = 5
+print("Value: " + counter.value.to_string())
+print("Doubled: " + counter.doubled.to_string())  # Getter - no parens
+counter.add(3)                                     # Method - requires parens
+print("After add(3): " + counter.value.to_string())
+print("Doubled: " + counter.doubled.to_string())
+
+print("")
+print("=== Demo Complete ===")

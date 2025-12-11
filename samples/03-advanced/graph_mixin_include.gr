@@ -1,0 +1,59 @@
+# Phase 22: Mixin pattern with include()
+# Allows copying methods from one graph to another without inheritance
+
+# Define a mixin with common functionality
+Comparable = graph {}
+
+fn Comparable.equals(other) {
+    return self.value == other.value
+}
+
+fn Comparable.not_equals(other) {
+    return self.value != other.value
+}
+
+fn Comparable.greater_than(other) {
+    return self.value > other.value
+}
+
+# Private method - should NOT be included
+fn Comparable._internal_compare(other) {
+    return self.value - other.value
+}
+
+# Define a class that uses the mixin
+Point = graph {}
+Point.value = 0
+Point.x = 0
+Point.y = 0
+
+fn Point.new(x, y) {
+    p = self.clone()
+    p.x = x
+    p.y = y
+    p.value = x + y
+    return p
+}
+
+fn Point.to_string() {
+    return "Point(" + self.x.to_string() + ", " + self.y.to_string() + ")"
+}
+
+# Include the Comparable mixin
+included = Point.include(Comparable)
+print("Included methods: " + included.to_string())
+
+# Create instances
+p1 = Point.new(1, 2)
+p2 = Point.new(3, 4)
+p3 = Point.new(1, 2)
+
+# Test the mixed-in methods
+print("p1: " + p1.to_string() + " (value=" + p1.value.to_string() + ")")
+print("p2: " + p2.to_string() + " (value=" + p2.value.to_string() + ")")
+print("p3: " + p3.to_string() + " (value=" + p3.value.to_string() + ")")
+
+print("p1.equals(p3): " + p1.equals(p3).to_string())
+print("p1.equals(p2): " + p1.equals(p2).to_string())
+print("p1.not_equals(p2): " + p1.not_equals(p2).to_string())
+print("p2.greater_than(p1): " + p2.greater_than(p1).to_string())

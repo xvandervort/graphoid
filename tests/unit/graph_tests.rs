@@ -514,6 +514,10 @@ fn make_test_function(name: &str) -> Function {
         pattern_clauses: None,
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     }
 }
 

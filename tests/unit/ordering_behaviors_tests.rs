@@ -209,6 +209,10 @@ fn test_ordering_custom_function() {
 
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     };
 
     let mut list = List::new();
@@ -269,6 +273,10 @@ fn test_ordering_reverse() {
 
         env: Rc::new(RefCell::new(Environment::new())),
         node_id: None,
+        is_getter: false,
+        is_setter: false,
+        is_static: false,
+        guard: None,
     };
 
     let mut list = List::new();

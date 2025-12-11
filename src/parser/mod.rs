@@ -83,7 +83,20 @@ impl Parser {
         ) {
             self.variable_declaration(is_private)
         } else if self.match_token(&TokenType::Func) {
-            self.function_declaration(is_private)
+            self.function_declaration(is_private, false, false, false)  // fn = not a getter, not a setter, not static
+        } else if self.match_token(&TokenType::Get) {
+            self.function_declaration(is_private, true, false, false)   // get = getter
+        } else if self.match_token(&TokenType::Set) {
+            self.function_declaration(is_private, false, true, false)   // set = setter
+        } else if self.match_token(&TokenType::Static) {
+            // static fn ... - expect fn keyword next
+            if !self.match_token(&TokenType::Func) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected 'fn' after 'static'".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+            self.function_declaration(is_private, false, false, true)   // static fn = static method
         } else if self.match_token(&TokenType::If) {
             self.if_statement()
         } else if self.match_token(&TokenType::While) {
@@ -273,7 +286,7 @@ impl Parser {
         })
     }
 
-    fn function_declaration(&mut self, is_private: bool) -> Result<Stmt> {
+    fn function_declaration(&mut self, is_private: bool, is_getter: bool, is_setter: bool, is_static: bool) -> Result<Stmt> {
         let position = self.previous_position();
 
         // Expect identifier (could be function name or receiver for method syntax)
@@ -291,15 +304,27 @@ impl Parser {
         // Check for method syntax: fn Receiver.method_name(...)
         let (receiver, name) = if self.match_token(&TokenType::Dot) {
             // This is method syntax - first_ident is the receiver
-            let method_name = if let TokenType::Identifier(id) = &self.peek().token_type {
-                let n = id.clone();
-                self.advance();
-                n
-            } else {
-                return Err(GraphoidError::SyntaxError {
-                    message: "Expected method name after '.'".to_string(),
-                    position: self.peek().position(),
-                });
+            // Method name can be an identifier OR a keyword (like "describe", "map", etc.)
+            let method_name = match &self.peek().token_type {
+                TokenType::Identifier(id) => {
+                    let n = id.clone();
+                    self.advance();
+                    n
+                }
+                // Allow keywords as method names by using their lexeme
+                _ => {
+                    let lexeme = self.peek().lexeme.clone();
+                    // Check if it's a valid method name (alphabetic + underscore)
+                    if lexeme.chars().all(|c| c.is_alphabetic() || c == '_') && !lexeme.is_empty() {
+                        self.advance();
+                        lexeme
+                    } else {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected method name after '.'".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+                }
             };
             (Some(first_ident), method_name)
         } else {
@@ -384,6 +409,40 @@ impl Parser {
             });
         }
 
+        // Phase 17: Getters cannot have parameters
+        if is_getter && !params.is_empty() {
+            return Err(GraphoidError::SyntaxError {
+                message: "Getters cannot have parameters. Use `fn` instead of `get` for methods with parameters.".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Phase 19: Setters must have exactly one parameter (the value being assigned)
+        if is_setter && params.len() != 1 {
+            return Err(GraphoidError::SyntaxError {
+                message: "Setters must have exactly one parameter (the value being assigned).".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Phase 20: Static methods require a receiver (must be attached to a graph)
+        if is_static && receiver.is_none() {
+            return Err(GraphoidError::SyntaxError {
+                message: "Static methods must be attached to a graph. Use `static fn GraphName.method_name()`.".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Phase 21: Parse optional `when` guard clause
+        // Syntax: fn Graph.method() when condition { ... }
+        let guard = if self.match_token(&TokenType::When) {
+            // Parse the guard expression
+            let guard_expr = self.expression()?;
+            Some(Box::new(guard_expr))
+        } else {
+            None
+        };
+
         // Expect '{'
         if !self.match_token(&TokenType::LeftBrace) {
             return Err(GraphoidError::SyntaxError {
@@ -439,6 +498,10 @@ impl Parser {
             body,
             pattern_clauses,
             is_private,  // Phase 10: priv keyword support
+            is_getter,   // Phase 17: computed properties
+            is_setter,   // Phase 19: computed property assignment
+            is_static,   // Phase 20: class methods
+            guard,       // Phase 21: structure-based dispatch
             position,
         })
     }
@@ -1013,6 +1076,9 @@ impl Parser {
                     Expr::Variable { name, .. } => AssignmentTarget::Variable(name),
                     Expr::Index { object, index, .. } => {
                         AssignmentTarget::Index { object, index }
+                    }
+                    Expr::PropertyAccess { object, property, .. } => {
+                        AssignmentTarget::Property { object, property }
                     }
                     _ => {
                         return Err(GraphoidError::SyntaxError {
@@ -1703,21 +1769,26 @@ impl Parser {
                         position,
                     };
                 } else {
-                    // Property access or method call without parens - treat as method call with no args for now
-                    let mut args = vec![];
-
-                    // Check for trailing block even without parens: method { |params| body }
+                    // No parentheses - check for trailing block first
+                    // If there's a trailing block, treat as method call: list.map { |x| x * 2 }
+                    // Otherwise, treat as property access: self.name
                     if self.is_trailing_block() {
                         let block_lambda = self.parse_trailing_block()?;
-                        args.push(Argument::Positional(block_lambda));
+                        let args = vec![Argument::Positional(block_lambda)];
+                        expr = Expr::MethodCall {
+                            object: Box::new(expr),
+                            method,
+                            args,
+                            position,
+                        };
+                    } else {
+                        // Property access: object.property
+                        expr = Expr::PropertyAccess {
+                            object: Box::new(expr),
+                            property: method,
+                            position,
+                        };
                     }
-
-                    expr = Expr::MethodCall {
-                        object: Box::new(expr),
-                        method,
-                        args,
-                        position,
-                    };
                 }
             } else {
                 break;
@@ -1885,6 +1956,51 @@ impl Parser {
         // Match expressions
         if self.match_token(&TokenType::Match) {
             return self.match_expression(position);
+        }
+
+        // Super method calls: super.method(args)
+        if self.match_token(&TokenType::Super) {
+            if !self.match_token(&TokenType::Dot) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '.' after 'super'".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            // Get method name
+            let method = if let TokenType::Identifier(id) = &self.peek().token_type {
+                let name = id.clone();
+                self.advance();
+                name
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected method name after 'super.'".to_string(),
+                    position: self.peek().position(),
+                });
+            };
+
+            // Parse arguments (required for super calls)
+            if !self.match_token(&TokenType::LeftParen) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '(' after super method name".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            let args = self.arguments()?;
+
+            if !self.match_token(&TokenType::RightParen) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected ')' after super method arguments".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            return Ok(Expr::SuperMethodCall {
+                method,
+                args,
+                position,
+            });
         }
 
         // Numbers
@@ -2080,11 +2196,20 @@ impl Parser {
             });
         }
 
-        // Graphs: graph { type: :directed }
+        // Graphs: graph { type: :directed } or graph from Parent {}
         if self.match_token(&TokenType::GraphType) {
+            // Check for inheritance: graph from Parent {}
+            let parent = if self.match_token(&TokenType::From) {
+                // Parse the parent expression (e.g., ParentGraph, module.Graph)
+                let parent_expr = self.expression()?;
+                Some(Box::new(parent_expr))
+            } else {
+                None
+            };
+
             if !self.match_token(&TokenType::LeftBrace) {
                 return Err(GraphoidError::SyntaxError {
-                    message: "Expected '{' after 'graph'".to_string(),
+                    message: "Expected '{' after 'graph' or parent expression".to_string(),
                     position: self.peek().position(),
                 });
             }
@@ -2098,7 +2223,7 @@ impl Parser {
                 });
             }
 
-            return Ok(Expr::Graph { config, position });
+            return Ok(Expr::Graph { config, parent, position });
         }
 
         // Trees: tree {} desugars to graph{}.with_ruleset(:tree)
@@ -2123,6 +2248,7 @@ impl Parser {
             // Desugar: tree{} → graph{}.with_ruleset(:tree)
             let graph_expr = Expr::Graph {
                 config,
+                parent: None,
                 position: position.clone()
             };
 

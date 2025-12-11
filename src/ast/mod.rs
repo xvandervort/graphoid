@@ -28,6 +28,10 @@ pub enum Stmt {
         body: Vec<Stmt>,
         pattern_clauses: Option<Vec<PatternClause>>,  // Phase 7: Pattern matching
         is_private: bool,  // Phase 10: priv keyword support
+        is_getter: bool,  // Phase 17: True if defined with `get` keyword (computed property)
+        is_setter: bool,  // Phase 19: True if defined with `set` keyword (computed property assignment)
+        is_static: bool,  // Phase 20: True if defined with `static` keyword (class method)
+        guard: Option<Box<Expr>>,  // Phase 21: Guard clause for structure-based dispatch (`when` clause)
         position: SourcePosition,
     },
     If {
@@ -146,6 +150,20 @@ pub enum Expr {
         args: Vec<Argument>,
         position: SourcePosition,
     },
+    /// Super method call: super.method(args)
+    /// Calls parent graph's implementation of a method
+    SuperMethodCall {
+        method: String,
+        args: Vec<Argument>,
+        position: SourcePosition,
+    },
+    /// Property access: object.property (no parentheses)
+    /// Used for data node access on graphs and key access on hashes
+    PropertyAccess {
+        object: Box<Expr>,
+        property: String,
+        position: SourcePosition,
+    },
     Index {
         object: Box<Expr>,
         index: Box<Expr>,
@@ -170,6 +188,7 @@ pub enum Expr {
     },
     Graph {
         config: Vec<(String, Expr)>,
+        parent: Option<Box<Expr>>,  // For inheritance: graph from Parent {}
         position: SourcePosition,
     },
     // Tree variant removed in Step 7 - tree{} now desugars to graph{}.with_ruleset(:tree)
@@ -224,6 +243,7 @@ impl Expr {
             Expr::Unary { position, .. } => position,
             Expr::Call { position, .. } => position,
             Expr::MethodCall { position, .. } => position,
+            Expr::PropertyAccess { position, .. } => position,
             Expr::Index { position, .. } => position,
             Expr::Lambda { position, .. } => position,
             Expr::Block { position, .. } => position,
@@ -233,6 +253,7 @@ impl Expr {
             Expr::Conditional { position, .. } => position,
             Expr::Raise { position, .. } => position,
             Expr::Match { position, .. } => position,
+            Expr::SuperMethodCall { position, .. } => position,
         }
     }
 }
@@ -323,6 +344,11 @@ pub enum AssignmentTarget {
     Index {
         object: Box<Expr>,
         index: Box<Expr>,
+    },
+    /// Property access assignment: object.property = value
+    Property {
+        object: Box<Expr>,
+        property: String,
     },
 }
 

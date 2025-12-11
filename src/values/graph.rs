@@ -4,7 +4,7 @@
 //! Each node stores direct pointers to its neighbors, avoiding index scans.
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use super::{Value, ValueKind, PatternNode, PatternEdge, PatternPath, Function};
+use super::{Value, ValueKind, PatternNode, PatternEdge, PatternPath, Function, List};
 use crate::graph::rules::{Rule, RuleContext, GraphOperation, RuleSpec, RuleInstance, RuleSeverity};
 use crate::graph::rulesets::get_ruleset_rules;
 use crate::error::GraphoidError;
@@ -221,6 +221,14 @@ pub struct Graph {
     /// Each rule includes its configured severity
     pub rules: Vec<RuleInstance>,
 
+    /// Parent graph reference for inheritance (Phase 14)
+    /// Used for super calls and is_a() checks
+    pub parent: Option<Box<Graph>>,
+
+    /// Type name for is_a() and type_of() checks (Phase 18)
+    /// Set when graph is assigned to a variable: `Dog = graph{}`
+    pub type_name: Option<String>,
+
     // Freeze state (not included in PartialEq)
     /// Whether this graph (and by extension, List/Hash backed by it) is frozen
     /// Frozen graphs cannot be modified
@@ -260,6 +268,8 @@ impl Graph {
             nodes: HashMap::new(),
             rulesets: Vec::new(),
             rules: Vec::new(),
+            parent: None,
+            type_name: None,  // Phase 18: set on assignment
             // Freeze state
             frozen: false,
             // Auto-optimization state
@@ -268,6 +278,16 @@ impl Graph {
             auto_index_threshold: 10, // Create index after 10 lookups
             // Methods are stored as nodes with node_type "__method__"
         }
+    }
+
+    /// Create a new graph that inherits from a parent
+    pub fn from_parent(parent: Graph) -> Self {
+        let mut child = parent.clone();
+        child.parent = Some(Box::new(parent));
+        // Phase 18: Reset type_name so the child gets its own type when assigned
+        // The parent's type_name is preserved in the parent field for is_a() checks
+        child.type_name = None;
+        child
     }
 
     /// Get all active rules for this graph from both rulesets AND ad hoc rules
@@ -2575,6 +2595,10 @@ impl Graph {
     ///     pattern_clauses: None,
     ///     env: Rc::new(RefCell::new(Environment::new())),
     ///     node_id: None,
+    ///     is_getter: false,
+    ///     is_setter: false,
+    ///     is_static: false,
+    ///     guard: None,
     /// };
     /// g.attach_method("add".to_string(), func);
     ///
@@ -2586,46 +2610,151 @@ impl Graph {
         // Ensure __methods__ branch exists
         self.ensure_methods_branch();
 
-        // Create method node with namespaced ID
         let method_id = Self::method_node_id(&name);
-        let method_node = GraphNode {
-            id: method_id.clone(),
-            value: Value::function(func),
-            node_type: Some("__method__".to_string()),
-            properties: HashMap::new(),
-            neighbors: HashMap::new(),
-            predecessors: HashMap::new(),
-        };
-        self.nodes.insert(method_id.clone(), method_node);
 
-        // Add edge from __methods__ branch to this method node
-        if let Some(branch) = self.nodes.get_mut(Self::METHOD_BRANCH) {
-            branch.neighbors.insert(method_id.clone(), EdgeInfo {
-                edge_type: "has_method".to_string(),
-                weight: None,
+        // Phase 21: If the function has a guard or if a method with this name already exists,
+        // we need to store multiple variants as a list.
+        if func.guard.is_some() || self.nodes.contains_key(&method_id) {
+            // Check if method already exists
+            if let Some(existing_node) = self.nodes.get_mut(&method_id) {
+                // Method exists - convert to list if needed and append
+                match &mut existing_node.value.kind {
+                    ValueKind::List(list) => {
+                        // Already a list, just append
+                        let _ = list.append_raw(Value::function(func));
+                    }
+                    ValueKind::Function(_) => {
+                        // Convert single function to list and append new one
+                        let old_value = std::mem::replace(&mut existing_node.value, Value::none());
+                        let new_list = List::from_vec(vec![old_value, Value::function(func)]);
+                        existing_node.value = Value::list(new_list);
+                    }
+                    _ => {
+                        // Unexpected type - replace with new function
+                        existing_node.value = Value::function(func);
+                    }
+                }
+            } else {
+                // New guarded method - store as single function (will become list if more added)
+                let method_node = GraphNode {
+                    id: method_id.clone(),
+                    value: Value::function(func),
+                    node_type: Some("__method__".to_string()),
+                    properties: HashMap::new(),
+                    neighbors: HashMap::new(),
+                    predecessors: HashMap::new(),
+                };
+                self.nodes.insert(method_id.clone(), method_node);
+
+                // Add edge from __methods__ branch to this method node
+                if let Some(branch) = self.nodes.get_mut(Self::METHOD_BRANCH) {
+                    branch.neighbors.insert(method_id.clone(), EdgeInfo {
+                        edge_type: "has_method".to_string(),
+                        weight: None,
+                        properties: HashMap::new(),
+                    });
+                }
+                // Add predecessor edge back to branch
+                if let Some(method) = self.nodes.get_mut(&method_id) {
+                    method.predecessors.insert(Self::METHOD_BRANCH.to_string(), EdgeInfo {
+                        edge_type: "has_method".to_string(),
+                        weight: None,
+                        properties: HashMap::new(),
+                    });
+                }
+            }
+        } else {
+            // Simple case: no guard and no existing method - just store the function
+            let method_node = GraphNode {
+                id: method_id.clone(),
+                value: Value::function(func),
+                node_type: Some("__method__".to_string()),
                 properties: HashMap::new(),
-            });
-        }
-        // Add predecessor edge back to branch
-        if let Some(method) = self.nodes.get_mut(&method_id) {
-            method.predecessors.insert(Self::METHOD_BRANCH.to_string(), EdgeInfo {
-                edge_type: "has_method".to_string(),
-                weight: None,
-                properties: HashMap::new(),
-            });
+                neighbors: HashMap::new(),
+                predecessors: HashMap::new(),
+            };
+            self.nodes.insert(method_id.clone(), method_node);
+
+            // Add edge from __methods__ branch to this method node
+            if let Some(branch) = self.nodes.get_mut(Self::METHOD_BRANCH) {
+                branch.neighbors.insert(method_id.clone(), EdgeInfo {
+                    edge_type: "has_method".to_string(),
+                    weight: None,
+                    properties: HashMap::new(),
+                });
+            }
+            // Add predecessor edge back to branch
+            if let Some(method) = self.nodes.get_mut(&method_id) {
+                method.predecessors.insert(Self::METHOD_BRANCH.to_string(), EdgeInfo {
+                    edge_type: "has_method".to_string(),
+                    weight: None,
+                    properties: HashMap::new(),
+                });
+            }
         }
     }
 
     /// Get a method attached to this graph by name
-    /// Returns the Function if the method exists
+    /// Returns the first Function if the method exists (for backward compatibility)
+    /// For structure-based dispatch with guards, use get_method_variants instead.
     pub fn get_method(&self, name: &str) -> Option<&Function> {
         let method_id = Self::method_node_id(name);
         if let Some(node) = self.nodes.get(&method_id) {
+            // Check if it's a single function - for lists we need to use get_method_variants
             if let ValueKind::Function(func) = &node.value.kind {
                 return Some(func);
             }
+            // Note: For lists, we fall through. Caller should use get_method_variants
+            // for structure-based dispatch. This preserves backward compatibility
+            // for methods defined without guards.
         }
         None
+    }
+
+    /// Get the first method variant (owned) - for when we need to iterate methods with guards
+    pub fn get_first_method(&self, name: &str) -> Option<Function> {
+        let method_id = Self::method_node_id(name);
+        if let Some(node) = self.nodes.get(&method_id) {
+            match &node.value.kind {
+                ValueKind::Function(func) => return Some(func.clone()),
+                ValueKind::List(list) => {
+                    // Return the first variant from the list
+                    if let Some(first) = list.get(0) {
+                        if let ValueKind::Function(func) = &first.kind {
+                            return Some(func.clone());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    /// Get all method variants for a method name (for structure-based dispatch)
+    /// Returns all Function implementations with their guards.
+    /// If the method has no variants (was defined without `when`), returns a single-element vector.
+    pub fn get_method_variants(&self, name: &str) -> Vec<Function> {
+        let method_id = Self::method_node_id(name);
+        if let Some(node) = self.nodes.get(&method_id) {
+            match &node.value.kind {
+                ValueKind::Function(func) => return vec![func.clone()],
+                ValueKind::List(list) => {
+                    // List is graph-backed, use to_vec() to get elements
+                    return list.to_vec().into_iter()
+                        .filter_map(|v| {
+                            if let ValueKind::Function(func) = v.kind {
+                                Some(func)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                }
+                _ => {}
+            }
+        }
+        Vec::new()
     }
 
     /// Check if this graph has a method with the given name
@@ -2662,6 +2791,146 @@ impl Graph {
         self.nodes.remove(&method_id);
 
         true
+    }
+
+    /// Include all methods from another graph (mixin pattern)
+    /// Returns a list of method names that were copied
+    pub fn include_methods_from(&mut self, other: &Graph) -> Vec<String> {
+        let mut included = Vec::new();
+
+        for method_name in other.method_names() {
+            // Skip private methods (starting with underscore)
+            if method_name.starts_with('_') {
+                continue;
+            }
+
+            // Get all variants of this method (for structure-based dispatch)
+            let variants = other.get_method_variants(&method_name);
+            for func in variants {
+                self.attach_method(method_name.clone(), func);
+            }
+            included.push(method_name);
+        }
+
+        included
+    }
+
+    // =========================================================================
+    // Phase 19: Setters (Computed Property Assignment)
+    // =========================================================================
+
+    /// Get the setter method node ID for a property name
+    /// Setters are stored as __methods__/__set__<name>
+    fn setter_node_id(name: &str) -> String {
+        format!("__methods__/__set__{}", name)
+    }
+
+    /// Attach a setter to this graph for a property
+    /// Setters are stored with the naming convention __set__<property_name>
+    pub fn attach_setter(&mut self, property_name: String, func: Function) {
+        // Ensure __methods__ branch exists
+        self.ensure_methods_branch();
+
+        // Create setter node with namespaced ID
+        let setter_id = Self::setter_node_id(&property_name);
+
+        // Create the method node with node_type "__setter__"
+        let setter_node = GraphNode {
+            id: setter_id.clone(),
+            value: Value::function(func),
+            node_type: Some("__setter__".to_string()),
+            properties: HashMap::new(),
+            neighbors: HashMap::new(),
+            predecessors: HashMap::new(),
+        };
+
+        // Add the setter node to the graph
+        self.nodes.insert(setter_id.clone(), setter_node);
+
+        // Add edge from __methods__ branch to this setter
+        if let Some(branch) = self.nodes.get_mut(Self::METHOD_BRANCH) {
+            branch.neighbors.insert(
+                setter_id,
+                EdgeInfo::new("setter".to_string(), HashMap::new())
+            );
+        }
+    }
+
+    /// Get a setter attached to this graph by property name
+    /// Returns the Function if the setter exists
+    pub fn get_setter(&self, property_name: &str) -> Option<&Function> {
+        let setter_id = Self::setter_node_id(property_name);
+        if let Some(node) = self.nodes.get(&setter_id) {
+            if let ValueKind::Function(func) = &node.value.kind {
+                return Some(func);
+            }
+        }
+        None
+    }
+
+    /// Check if this graph has a setter for the given property
+    pub fn has_setter(&self, property_name: &str) -> bool {
+        let setter_id = Self::setter_node_id(property_name);
+        self.nodes.contains_key(&setter_id)
+    }
+
+    // =========================================================================
+    // Phase 20: Static Methods (Class Methods)
+    // =========================================================================
+
+    /// Get the static method node ID for a method name
+    /// Static methods are stored as __methods__/__static__<name>
+    fn static_method_node_id(name: &str) -> String {
+        format!("__methods__/__static__{}", name)
+    }
+
+    /// Attach a static method to this graph
+    /// Static methods can be called on the class without creating an instance
+    pub fn attach_static_method(&mut self, name: String, func: Function) {
+        // Ensure __methods__ branch exists
+        self.ensure_methods_branch();
+
+        // Create static method node with namespaced ID
+        let static_id = Self::static_method_node_id(&name);
+
+        // Create the method node with node_type "__static__"
+        let static_node = GraphNode {
+            id: static_id.clone(),
+            value: Value::function(func),
+            node_type: Some("__static__".to_string()),
+            properties: HashMap::new(),
+            neighbors: HashMap::new(),
+            predecessors: HashMap::new(),
+        };
+
+        // Add the static method node to the graph
+        self.nodes.insert(static_id.clone(), static_node);
+
+        // Add edge from __methods__ branch to this static method
+        if let Some(branch) = self.nodes.get_mut(Self::METHOD_BRANCH) {
+            branch.neighbors.insert(
+                static_id,
+                EdgeInfo::new("static".to_string(), HashMap::new())
+            );
+        }
+    }
+
+    /// Get a static method attached to this graph by name
+    /// Returns the Function if the static method exists
+    pub fn get_static_method(&self, name: &str) -> Option<&Function> {
+        let static_id = Self::static_method_node_id(name);
+        if let Some(node) = self.nodes.get(&static_id) {
+            if let ValueKind::Function(func) = &node.value.kind {
+                return Some(func);
+            }
+        }
+        None
+    }
+
+    /// Check if this graph has a static method with the given name
+    pub fn has_static_method(&self, name: &str) -> bool {
+        let static_id = Self::static_method_node_id(name);
+        self.nodes.contains_key(&static_id)
     }
 
     /// Get all data node IDs (excluding method branch and method nodes)

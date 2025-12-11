@@ -805,21 +805,17 @@ impl Lexer {
             "alias" => TokenType::Alias,
             "priv" => TokenType::Priv,
             "match" => TokenType::Match,
+            "from" => TokenType::From,
+            "super" => TokenType::Super,
+            "get" => TokenType::Get,
+            "set" => TokenType::Set,
+            "static" => TokenType::Static,
+            "when" => TokenType::When,
             "configure" => TokenType::Configure,
             "precision" => TokenType::Precision,
             "and" => TokenType::And,
             "or" => TokenType::Or,
             "not" => TokenType::Not,
-
-            // Testing keywords
-            "describe" => TokenType::Describe,
-            "context" => TokenType::Context,
-            "it" => TokenType::It,
-            "before" => TokenType::Before,
-            "after" => TokenType::After,
-            "expect" => TokenType::Expect,
-            "where" => TokenType::Where,
-            "shared" => TokenType::Shared,
 
             // Boolean literals
             "true" => TokenType::True,

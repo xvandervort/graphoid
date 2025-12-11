@@ -2,7 +2,7 @@ use std::fmt;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use crate::ast::{Stmt, Parameter, PatternClause};
+use crate::ast::{Stmt, Parameter, PatternClause, Expr};
 use crate::execution::Environment;
 use crate::execution::module_manager::Module;
 
@@ -198,6 +198,15 @@ pub struct Function {
     pub env: Rc<RefCell<Environment>>,
     /// Node ID in the function graph (set when registered, prevents duplicate registration)
     pub node_id: Option<String>,
+    /// Phase 17: Is this a getter (computed property)? Getters are called on property access.
+    pub is_getter: bool,
+    /// Phase 19: Is this a setter (computed property assignment)? Setters are called on property assignment.
+    pub is_setter: bool,
+    /// Phase 20: Is this a static method (class method)? Called on the class, not instances.
+    pub is_static: bool,
+    /// Phase 21: Optional guard expression for structure-based dispatch.
+    /// When present, this function only matches if the guard evaluates to true.
+    pub guard: Option<Box<Expr>>,
 }
 
 impl PartialEq for Function {

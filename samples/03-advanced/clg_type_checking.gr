@@ -1,0 +1,114 @@
+# Class-Like Graphs: Type Checking Demo (Phase 18)
+#
+# Demonstrates type_of() and is_a() methods for runtime type checking.
+
+print("=== Type Checking Demo ===")
+print("")
+
+# -----------------------------------------------------------------------------
+# Basic type_of()
+# -----------------------------------------------------------------------------
+print("--- Basic type_of() ---")
+
+Animal = graph{}
+Animal.species = "unknown"
+
+Dog = graph from Animal {}
+Dog.species = "canine"
+
+Cat = graph from Animal {}
+Cat.species = "feline"
+
+print("Animal.type_of() = " + Animal.type_of())
+print("Dog.type_of() = " + Dog.type_of())
+print("Cat.type_of() = " + Cat.type_of())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Instances preserve their type
+# -----------------------------------------------------------------------------
+print("--- Clone type preservation ---")
+
+fido = Dog.clone()
+fido.name = "Fido"
+
+whiskers = Cat.clone()
+whiskers.name = "Whiskers"
+
+print("fido.type_of() = " + fido.type_of())
+print("whiskers.type_of() = " + whiskers.type_of())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# is_a() with direct type
+# -----------------------------------------------------------------------------
+print("--- is_a() with direct type ---")
+
+print("fido.is_a(\"Dog\") = " + fido.is_a("Dog").to_string())
+print("fido.is_a(\"Cat\") = " + fido.is_a("Cat").to_string())
+print("whiskers.is_a(\"Cat\") = " + whiskers.is_a("Cat").to_string())
+print("whiskers.is_a(\"Dog\") = " + whiskers.is_a("Dog").to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# is_a() with inheritance chain
+# -----------------------------------------------------------------------------
+print("--- is_a() with inheritance chain ---")
+
+# Both Dog and Cat inherit from Animal
+print("fido.is_a(\"Animal\") = " + fido.is_a("Animal").to_string())
+print("whiskers.is_a(\"Animal\") = " + whiskers.is_a("Animal").to_string())
+
+# Multi-level inheritance
+Puppy = graph from Dog {}
+Puppy.age_group = "young"
+
+spot = Puppy.clone()
+spot.name = "Spot"
+
+print("")
+print("spot.type_of() = " + spot.type_of())
+print("spot.is_a(\"Puppy\") = " + spot.is_a("Puppy").to_string())
+print("spot.is_a(\"Dog\") = " + spot.is_a("Dog").to_string())
+print("spot.is_a(\"Animal\") = " + spot.is_a("Animal").to_string())
+print("spot.is_a(\"Cat\") = " + spot.is_a("Cat").to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# is_a() with graph reference (not just string)
+# -----------------------------------------------------------------------------
+print("--- is_a() with graph reference ---")
+
+# You can also pass a graph directly to is_a()
+print("fido.is_a(Dog) = " + fido.is_a(Dog).to_string())
+print("fido.is_a(Animal) = " + fido.is_a(Animal).to_string())
+print("fido.is_a(Cat) = " + fido.is_a(Cat).to_string())
+print("spot.is_a(Puppy) = " + spot.is_a(Puppy).to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Type-based dispatch example
+# -----------------------------------------------------------------------------
+print("--- Type-based dispatch example ---")
+
+fn describe(animal) {
+    if animal.is_a("Cat") {
+        return animal.name + " is a feline friend"
+    }
+    if animal.is_a("Dog") {
+        return animal.name + " is a canine companion"
+    }
+    return "Unknown animal"
+}
+
+print(describe(fido))
+print(describe(whiskers))
+print(describe(spot))
+
+print("")
+print("=== Demo Complete ===")

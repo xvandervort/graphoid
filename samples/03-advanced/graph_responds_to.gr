@@ -1,0 +1,44 @@
+# Phase 23: responds_to() method
+# Check if a graph has a method with the given name
+
+# Define a base graph with methods
+Animal = graph {}
+
+fn Animal.speak() {
+    return "..."
+}
+
+fn Animal.breathe() {
+    return "breathing"
+}
+
+# Define a child graph with inheritance
+Dog = graph from Animal {}
+
+fn Dog.speak() {
+    return "woof!"
+}
+
+fn Dog.fetch() {
+    return "fetching ball"
+}
+
+# Test responds_to on the base type
+print("Animal.responds_to('speak'): " + Animal.responds_to("speak").to_string())
+print("Animal.responds_to('breathe'): " + Animal.responds_to("breathe").to_string())
+print("Animal.responds_to('fetch'): " + Animal.responds_to("fetch").to_string())
+print("Animal.responds_to('nonexistent'): " + Animal.responds_to("nonexistent").to_string())
+
+# Test responds_to on the child type
+print("")
+print("Dog.responds_to('speak'): " + Dog.responds_to("speak").to_string())
+print("Dog.responds_to('breathe'): " + Dog.responds_to("breathe").to_string())
+print("Dog.responds_to('fetch'): " + Dog.responds_to("fetch").to_string())
+print("Dog.responds_to('nonexistent'): " + Dog.responds_to("nonexistent").to_string())
+
+# Test on instances
+buddy = Dog.clone()
+print("")
+print("buddy.responds_to('speak'): " + buddy.responds_to("speak").to_string())
+print("buddy.responds_to('breathe'): " + buddy.responds_to("breathe").to_string())
+print("buddy.responds_to('fetch'): " + buddy.responds_to("fetch").to_string())

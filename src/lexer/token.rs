@@ -37,19 +37,17 @@ pub enum TokenType {
     Alias,
     Priv,        // priv keyword for private symbols
     Match,       // match keyword for pattern matching
+    From,        // from keyword for inheritance (graph from Parent {})
+    Super,       // super keyword for calling parent method
+    Get,         // get keyword for computed properties (getters)
+    Set,         // set keyword for setters (Phase 19)
+    Static,      // static keyword for class methods (Phase 20)
+    When,        // when keyword for guard clauses (Phase 21)
     Configure,
     Precision,
     And,
     Or,
     Not,
-    Describe,
-    Context,
-    It,
-    Before,
-    After,
-    Expect,
-    Where,
-    Shared,
 
     // Types
     NumType,

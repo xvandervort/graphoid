@@ -1,0 +1,168 @@
+# Class-Like Graphs: Inheritance Demo (Phase 14)
+#
+# Demonstrates the `graph from Parent {}` syntax for inheritance.
+# Child graphs inherit all data nodes, methods, and rules from their parent.
+
+print("=== Inheritance Demo ===")
+print("")
+
+# -----------------------------------------------------------------------------
+# Basic Inheritance
+# -----------------------------------------------------------------------------
+print("--- Basic Inheritance ---")
+
+Animal = graph{}
+Animal.name = "unknown"
+Animal.sound = "..."
+
+fn Animal.speak() {
+    return self.name + " says: " + self.sound
+}
+
+fn Animal.describe() {
+    return "I am a " + self.name
+}
+
+# Dog inherits from Animal
+Dog = graph from Animal {}
+Dog.name = "dog"
+Dog.sound = "Woof!"
+
+print("Animal: " + Animal.speak())
+print("Dog: " + Dog.speak())
+print("Dog describe: " + Dog.describe())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Method Override
+# -----------------------------------------------------------------------------
+print("--- Method Override ---")
+
+Cat = graph from Animal {}
+Cat.name = "cat"
+Cat.sound = "Meow!"
+
+# Override the describe method
+fn Cat.describe() {
+    return "I am a fancy " + self.name + " who says " + self.sound
+}
+
+print("Cat speak (inherited): " + Cat.speak())
+print("Cat describe (overridden): " + Cat.describe())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Chained Inheritance
+# -----------------------------------------------------------------------------
+print("--- Chained Inheritance ---")
+
+Vehicle = graph{}
+Vehicle.wheels = 0
+
+fn Vehicle.describe() {
+    return "Vehicle with " + self.wheels.to_string() + " wheels"
+}
+
+Car = graph from Vehicle {}
+Car.wheels = 4
+Car.doors = 4
+
+fn Car.describe() {
+    return "Car with " + self.wheels.to_string() + " wheels and " + self.doors.to_string() + " doors"
+}
+
+SportsCar = graph from Car {}
+SportsCar.doors = 2
+SportsCar.top_speed = 200
+
+fn SportsCar.describe() {
+    return "SportsCar with " + self.doors.to_string() + " doors, top speed " + self.top_speed.to_string() + " mph"
+}
+
+print("Vehicle: " + Vehicle.describe())
+print("Car: " + Car.describe())
+print("SportsCar: " + SportsCar.describe())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Constructor Pattern with Inheritance
+# -----------------------------------------------------------------------------
+print("--- Constructor Pattern ---")
+
+Shape = graph{}
+Shape.x = 0
+Shape.y = 0
+
+fn Shape.new(x, y) {
+    s = self.clone()
+    s.x = x
+    s.y = y
+    return s
+}
+
+fn Shape.move(dx, dy) {
+    self.x = self.x + dx
+    self.y = self.y + dy
+}
+
+fn Shape.position() {
+    return "(" + self.x.to_string() + ", " + self.y.to_string() + ")"
+}
+
+# Circle inherits from Shape
+Circle = graph from Shape {}
+Circle.radius = 1
+
+fn Circle.new(x, y, r) {
+    c = self.clone()
+    c.x = x
+    c.y = y
+    c.radius = r
+    return c
+}
+
+fn Circle.area() {
+    return 3.14159 * self.radius * self.radius
+}
+
+fn Circle.describe() {
+    return "Circle at " + self.position() + " with radius " + self.radius.to_string()
+}
+
+c1 = Circle.new(10, 20, 5)
+print("Circle: " + c1.describe())
+print("Circle area: " + c1.area().to_string())
+
+c1.move(5, 5)
+print("After move: " + c1.describe())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Inheritance Doesn't Affect Parent
+# -----------------------------------------------------------------------------
+print("--- Parent Unchanged ---")
+
+Base = graph{}
+Base.value = 100
+
+fn Base.get() {
+    return self.value
+}
+
+Child = graph from Base {}
+Child.value = 200
+
+fn Child.get() {
+    return self.value * 2
+}
+
+print("Base value: " + Base.get().to_string())
+print("Child value: " + Child.get().to_string())
+print("Base still: " + Base.get().to_string())
+
+print("")
+print("=== Demo Complete ===")
