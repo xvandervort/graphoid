@@ -45,4 +45,5 @@ mod unit {
     pub mod time_tests;
     pub mod fs_list_dir_tests;
     pub mod exec_tests;
+    pub mod graph_decl_syntax_tests;
 }

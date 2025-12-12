@@ -234,6 +234,10 @@ pub struct Graph {
     /// Frozen graphs cannot be modified
     frozen: bool,
 
+    // Phase 4: Directive metadata
+    /// Private symbols (methods/properties only accessible from within)
+    pub private_symbols: HashSet<String>,
+
     // Auto-optimization state (not included in PartialEq)
     /// Track property lookup frequencies for auto-indexing
     /// Maps property name -> access count
@@ -272,6 +276,8 @@ impl Graph {
             type_name: None,  // Phase 18: set on assignment
             // Freeze state
             frozen: false,
+            // Phase 4: Directive metadata
+            private_symbols: HashSet::new(),
             // Auto-optimization state
             property_access_counts: HashMap::new(),
             property_indices: HashMap::new(),
@@ -288,6 +294,16 @@ impl Graph {
         // The parent's type_name is preserved in the parent field for is_a() checks
         child.type_name = None;
         child
+    }
+
+    /// Phase 4: Mark a symbol (property or method) as private (internal only)
+    pub fn mark_private(&mut self, symbol_name: String) {
+        self.private_symbols.insert(symbol_name);
+    }
+
+    /// Phase 4: Check if a symbol is private
+    pub fn is_private(&self, symbol_name: &str) -> bool {
+        self.private_symbols.contains(symbol_name)
     }
 
     /// Get all active rules for this graph from both rulesets AND ad hoc rules

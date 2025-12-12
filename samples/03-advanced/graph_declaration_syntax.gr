@@ -15,24 +15,25 @@ print("Point created with x=10, y=20")
 print(p.x)
 print(p.y)
 
-# Graph with properties and methods
+# Graph with properties and methods - using IMPLICIT SELF (Phase 2)
+# No need to write self. everywhere!
 graph Counter {
     count: 0
 
     fn increment() {
-        self.count = self.count + 1
+        count = count + 1  # Implicit self - same as: self.count = self.count + 1
     }
 
     fn decrement() {
-        self.count = self.count - 1
+        count = count - 1
     }
 
     fn reset() {
-        self.count = 0
+        count = 0
     }
 
     fn value() {
-        return self.count
+        return count  # Implicit read - same as: return self.count
     }
 }
 
@@ -47,17 +48,17 @@ c.decrement()
 print("Counter after decrement:")
 print(c.value())
 
-# Inheritance example
+# Inheritance example - with implicit self throughout
 graph Animal {
     name: "unnamed"
     sound: "..."
 
     fn speak() {
-        print(self.name + " says: " + self.sound)
+        print(name + " says: " + sound)  # Implicit self for properties
     }
 
     fn greet() {
-        print("Hello, I'm " + self.name)
+        print("Hello, I'm " + name)
     }
 }
 
@@ -66,7 +67,13 @@ graph Dog from Animal {
     breed: "unknown"
 
     fn fetch() {
-        print(self.name + " fetches the ball!")
+        print(name + " fetches the ball!")
+    }
+
+    # Implicit method call - call another method without self.
+    fn play() {
+        fetch()  # Same as: self.fetch()
+        speak()  # Inherited method, also works!
     }
 }
 
@@ -75,7 +82,7 @@ graph Cat from Animal {
     indoor: true
 
     fn purr() {
-        print(self.name + " purrs contentedly")
+        print(name + " purrs contentedly")
     }
 }
 
@@ -86,6 +93,10 @@ fido.breed = "Labrador"
 fido.greet()
 fido.speak()
 fido.fetch()
+
+# Test implicit method call
+print("Testing implicit method call (play calls fetch and speak):")
+fido.play()
 
 whiskers = Cat.clone()
 whiskers.name = "Whiskers"

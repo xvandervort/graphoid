@@ -580,3 +580,616 @@ fn test_parse_error_missing_colon_in_property() {
     let result = parser.parse();
     assert!(result.is_err());
 }
+
+// ============================================================================
+// PHASE 2: IMPLICIT SELF RESOLUTION TESTS
+// ============================================================================
+
+#[test]
+fn test_implicit_self_read_property() {
+    // Reading a property without explicit self.
+    let source = r#"
+graph Counter {
+    count: 0
+
+    fn value() {
+        return count  # Should resolve to self.count
+    }
+}
+
+c = Counter.clone()
+c.count = 42
+result = c.value()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 42.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_implicit_self_write_property() {
+    // Writing a property without explicit self.
+    let source = r#"
+graph Counter {
+    count: 0
+
+    fn set_count(n) {
+        count = n  # Should assign to self.count
+    }
+
+    fn value() {
+        return self.count
+    }
+}
+
+c = Counter.clone()
+c.set_count(99)
+result = c.value()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 99.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_implicit_self_read_and_write() {
+    // Both reading and writing without explicit self.
+    let source = r#"
+graph Counter {
+    count: 0
+
+    fn increment() {
+        count = count + 1  # Should work without self.
+    }
+
+    fn value() {
+        return count
+    }
+}
+
+c = Counter.clone()
+c.increment()
+c.increment()
+c.increment()
+result = c.value()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 3.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_implicit_self_parameters_override() {
+    // Parameters should take precedence over graph properties
+    let source = r#"
+graph Calculator {
+    value: 100
+
+    fn set_value(value) {
+        # 'value' here refers to the parameter, not self.value
+        self.value = value
+    }
+
+    fn get_value() {
+        return self.value
+    }
+}
+
+calc = Calculator.clone()
+calc.set_value(50)
+result = calc.get_value()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 50.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_implicit_self_local_vars_for_new_names() {
+    // With implicit self, assignment to a property name updates the property.
+    // True local variables are created only for names that DON'T exist on self.
+    let source = r#"
+graph Example {
+    x: 100
+
+    fn test_with_local() {
+        # 'y' is not a property, so this creates a local variable
+        y = 5
+        # 'x' IS a property, so this updates self.x
+        x = x + y
+        return y  # Returns local variable
+    }
+
+    fn get_x() {
+        return x  # implicit self.x
+    }
+}
+
+ex = Example.clone()
+local_result = ex.test_with_local()
+prop_result = ex.get_x()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // local_result should be 5 (the local 'y' variable)
+    let local_result = executor.get_variable("local_result").unwrap();
+    match &local_result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 5.0),
+        other => panic!("Expected number for local, got {:?}", other),
+    }
+
+    // prop_result should be 105 (x was updated to x + y = 100 + 5)
+    let prop_result = executor.get_variable("prop_result").unwrap();
+    match &prop_result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 105.0),
+        other => panic!("Expected number for property, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_implicit_self_method_call() {
+    // Calling another method without explicit self.
+    let source = r#"
+graph Calculator {
+    value: 0
+
+    fn add(n) {
+        value = value + n
+    }
+
+    fn double() {
+        add(value)  # Should call self.add(self.value)
+    }
+
+    fn result() {
+        return value
+    }
+}
+
+calc = Calculator.clone()
+calc.value = 5
+calc.double()
+result = calc.result()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 10.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_implicit_self_explicit_still_works() {
+    // Explicit self. should still work
+    let source = r#"
+graph Counter {
+    count: 0
+
+    fn mixed() {
+        count = count + 1        # implicit
+        self.count = self.count + 1  # explicit
+        return count  # implicit read
+    }
+}
+
+c = Counter.clone()
+result = c.mixed()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 2.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_implicit_self_multiple_properties() {
+    // Multiple properties accessed implicitly
+    let source = r#"
+graph Point {
+    x: 0
+    y: 0
+
+    fn move_by(dx, dy) {
+        x = x + dx
+        y = y + dy
+    }
+
+    fn distance_from_origin() {
+        return (x * x + y * y)
+    }
+}
+
+p = Point.clone()
+p.move_by(3, 4)
+result = p.distance_from_origin()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 25.0),  // 3*3 + 4*4 = 25
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_implicit_self_in_getter() {
+    // Implicit self should work in getters too
+    let source = r#"
+graph Rectangle {
+    width: 0
+    height: 0
+
+    get area() {
+        return width * height  # implicit self
+    }
+}
+
+r = Rectangle.clone()
+r.width = 5
+r.height = 3
+result = r.area
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 15.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_implicit_self_with_inheritance() {
+    // Implicit self should work with inherited properties
+    let source = r#"
+graph Animal {
+    name: "unknown"
+    sound: "..."
+
+    fn speak() {
+        return name + " says " + sound  # implicit self
+    }
+}
+
+graph Dog from Animal {
+    sound: "woof!"
+}
+
+fido = Dog.clone()
+fido.name = "Fido"
+result = fido.speak()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::String(s) => assert_eq!(s, "Fido says woof!"),
+        other => panic!("Expected string, got {:?}", other),
+    }
+}
+
+// ============================================================================
+// PHASE 4: DIRECTIVE TESTS
+// ============================================================================
+
+#[test]
+fn test_directive_readable_generates_getter() {
+    // readable :x generates a getter method that returns x
+    let source = r#"
+graph Point {
+    readable :x, :y
+
+    x: 10
+    y: 20
+}
+
+p = Point.clone()
+result_x = p.x()
+result_y = p.y()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result_x = executor.get_variable("result_x").unwrap();
+    match &result_x.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 10.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+
+    let result_y = executor.get_variable("result_y").unwrap();
+    match &result_y.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 20.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_directive_writable_generates_setter() {
+    // writable :x generates a set_x(value) method
+    let source = r#"
+graph Point {
+    writable :x
+
+    x: 0
+}
+
+p = Point.clone()
+p.set_x(42)
+result = p.x
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 42.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_directive_accessible_generates_both() {
+    // accessible :x generates both getter and setter
+    let source = r#"
+graph Counter {
+    accessible :count
+
+    count: 0
+}
+
+c = Counter.clone()
+c.set_count(10)
+result = c.count()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 10.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_directive_multiple_symbols() {
+    // Directive with multiple symbols
+    let source = r#"
+graph Rectangle {
+    readable :width, :height
+
+    width: 5
+    height: 3
+}
+
+r = Rectangle.clone()
+w = r.width()
+h = r.height()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let w = executor.get_variable("w").unwrap();
+    match &w.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 5.0),
+        other => panic!("Expected number for width, got {:?}", other),
+    }
+
+    let h = executor.get_variable("h").unwrap();
+    match &h.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 3.0),
+        other => panic!("Expected number for height, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_directive_explicit_method_not_overwritten() {
+    // If user defines a method, directive should not overwrite it
+    let source = r#"
+graph Custom {
+    readable :x
+
+    x: 10
+
+    fn x() {
+        return x * 2  # Custom getter that doubles
+    }
+}
+
+c = Custom.clone()
+result = c.x()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 20.0),  // Custom method returns 10 * 2 = 20
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_parse_directive_syntax() {
+    // Just verify parsing works with different directive types
+    let source = r#"
+graph Example {
+    readable :a
+    writable :b
+    accessible :c
+    private :_internal
+
+    a: 1
+    b: 2
+    c: 3
+    _internal: 5
+}
+
+e = Example.clone()
+"#;
+    let mut executor = Executor::new();
+    // Should parse and execute without error
+    executor.execute_source(source).unwrap();
+}
+
+// ============================================================================
+// PRIVATE ENFORCEMENT TESTS
+// ============================================================================
+
+#[test]
+fn test_private_property_external_access_blocked() {
+    // External access to private property should fail
+    let source = r#"
+graph Secret {
+    private :secret
+
+    secret: 42
+}
+
+s = Secret.clone()
+# This should fail - accessing private property externally
+result = s.secret
+"#;
+    let mut executor = Executor::new();
+    let result = executor.execute_source(source);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("private"));
+}
+
+#[test]
+fn test_private_property_internal_access_allowed() {
+    // Internal access to private property should work
+    let source = r#"
+graph Secret {
+    private :secret
+
+    secret: 42
+
+    fn get_secret() {
+        return self.secret
+    }
+}
+
+s = Secret.clone()
+result = s.get_secret()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 42.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_private_method_external_call_blocked() {
+    // External call to private method should fail
+    let source = r#"
+graph Secret {
+    private :internal_helper
+
+    fn internal_helper() {
+        return 42
+    }
+}
+
+s = Secret.clone()
+result = s.internal_helper()
+"#;
+    let mut executor = Executor::new();
+    let result = executor.execute_source(source);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("private"));
+}
+
+#[test]
+fn test_private_method_internal_call_allowed() {
+    // Internal call to private method should work
+    let source = r#"
+graph Secret {
+    private :internal_helper
+
+    fn internal_helper() {
+        return 42
+    }
+
+    fn public_method() {
+        return self.internal_helper()
+    }
+}
+
+s = Secret.clone()
+result = s.public_method()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 42.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_private_implicit_self_internal_allowed() {
+    // Implicit self access to private property should work
+    let source = r#"
+graph Secret {
+    private :secret
+
+    secret: 100
+
+    fn double_secret() {
+        return secret * 2  # implicit self.secret
+    }
+}
+
+s = Secret.clone()
+result = s.double_secret()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 200.0),
+        other => panic!("Expected number, got {:?}", other),
+    }
+}

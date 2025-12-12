@@ -4,8 +4,9 @@
 //! for expression parsing.
 
 use crate::ast::{
-    Argument, AssignmentTarget, BinaryOp, Expr, GraphMethod, GraphProperty, LiteralValue,
-    Parameter, Pattern, PatternClause, Program, Stmt, TypeAnnotation, UnaryOp,
+    Argument, AssignmentTarget, BinaryOp, DirectiveKind, Expr, GraphDirective, GraphMethod,
+    GraphProperty, LiteralValue, Parameter, Pattern, PatternClause, Program, Stmt, TypeAnnotation,
+    UnaryOp,
 };
 use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::lexer::token::{Token, TokenType};
@@ -824,8 +825,8 @@ impl Parser {
             });
         }
 
-        // Parse graph body: properties and methods
-        let (properties, methods) = self.parse_graph_body()?;
+        // Parse graph body: properties, methods, and directives
+        let (properties, methods, directives) = self.parse_graph_body()?;
 
         // Expect closing brace
         if !self.match_token(&TokenType::RightBrace) {
@@ -841,14 +842,16 @@ impl Parser {
             parent,
             properties,
             methods,
+            directives,
             position,
         })
     }
 
-    /// Parse the body of a graph declaration: properties and methods
-    fn parse_graph_body(&mut self) -> Result<(Vec<GraphProperty>, Vec<GraphMethod>)> {
+    /// Parse the body of a graph declaration: properties, methods, and directives
+    fn parse_graph_body(&mut self) -> Result<(Vec<GraphProperty>, Vec<GraphMethod>, Vec<GraphDirective>)> {
         let mut properties = Vec::new();
         let mut methods = Vec::new();
+        let mut directives = Vec::new();
 
         loop {
             // Skip newlines and semicolons (flexible separators)
@@ -864,9 +867,48 @@ impl Parser {
                 continue;
             }
 
-            // Determine what we're parsing: method or property
+            // Determine what we're parsing: directive, method, or property
+            // Directives: readable, writable, accessible, readonly, private (followed by symbols)
             // Method starts with: fn, get, set, static, priv fn, priv get, priv set
             // Property is: identifier: value
+
+            // Check for directives first (these are identifiers that start directive lists)
+            if let TokenType::Identifier(id) = &self.peek().token_type {
+                let directive_kind = match id.as_str() {
+                    "readable" => Some(DirectiveKind::Readable),
+                    "writable" => Some(DirectiveKind::Writable),
+                    "accessible" => Some(DirectiveKind::Accessible),
+                    "private" => Some(DirectiveKind::Private),
+                    _ => None,
+                };
+
+                if let Some(kind) = directive_kind {
+                    let position = self.peek().position();
+                    self.advance(); // consume the directive keyword
+
+                    // Parse symbol list: :sym1, :sym2, ...
+                    let symbols = self.parse_directive_symbols()?;
+                    if symbols.is_empty() {
+                        return Err(GraphoidError::SyntaxError {
+                            message: format!("Directive '{}' requires at least one symbol",
+                                match kind {
+                                    DirectiveKind::Readable => "readable",
+                                    DirectiveKind::Writable => "writable",
+                                    DirectiveKind::Accessible => "accessible",
+                                    DirectiveKind::Private => "private",
+                                }),
+                            position,
+                        });
+                    }
+
+                    directives.push(GraphDirective {
+                        kind,
+                        symbols,
+                        position,
+                    });
+                    continue;
+                }
+            }
 
             let is_private = self.match_token(&TokenType::Priv);
             let is_static = if !is_private { self.match_token(&TokenType::Static) } else { false };
@@ -920,7 +962,29 @@ impl Parser {
             }
         }
 
-        Ok((properties, methods))
+        Ok((properties, methods, directives))
+    }
+
+    /// Parse a list of symbols for a directive: :sym1, :sym2, ...
+    fn parse_directive_symbols(&mut self) -> Result<Vec<String>> {
+        let mut symbols = Vec::new();
+
+        loop {
+            // Expect a symbol token
+            if let TokenType::Symbol(sym) = &self.peek().token_type {
+                symbols.push(sym.clone());
+                self.advance();
+
+                // Check for comma to continue
+                if self.match_token(&TokenType::Comma) {
+                    // Continue parsing more symbols
+                    continue;
+                }
+            }
+            break;
+        }
+
+        Ok(symbols)
     }
 
     /// Parse a method definition inside a graph body

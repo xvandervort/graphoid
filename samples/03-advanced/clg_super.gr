@@ -36,55 +36,6 @@ print("Dog speaks: " + dog.speak())
 print("")
 
 # -----------------------------------------------------------------------------
-# Multi-Level Super Calls
-# -----------------------------------------------------------------------------
-print("--- Multi-Level Super Calls ---")
-
-# Build a 3-level hierarchy
-Shape = graph{}
-Shape.type = "shape"
-
-fn Shape.describe() {
-    return "I am a " + self.type
-}
-
-Rectangle = graph from Shape {}
-Rectangle.type = "rectangle"
-Rectangle.width = 0
-Rectangle.height = 0
-
-fn Rectangle.describe() {
-    base = super.describe()
-    return base + " with dimensions " + self.width.to_string() + "x" + self.height.to_string()
-}
-
-fn Rectangle.area() {
-    return self.width * self.height
-}
-
-Square = graph from Rectangle {}
-Square.type = "square"
-
-fn Square.describe() {
-    # This calls Rectangle.describe() which calls Shape.describe()
-    base = super.describe()
-    return base + " (all sides equal)"
-}
-
-# Override area for efficiency (but we'll call super anyway for demo)
-fn Square.area() {
-    return super.area()  # Works the same for squares
-}
-
-square = Square.clone()
-square.width = 5
-square.height = 5
-print("Square describes: " + square.describe())
-print("Square area: " + square.area().to_string())
-
-print("")
-
-# -----------------------------------------------------------------------------
 # Super with Arguments
 # -----------------------------------------------------------------------------
 print("--- Super with Arguments ---")
@@ -131,43 +82,8 @@ fn Car.describe() {
     return "Car: " + super.describe()  # Uses Car's speed value
 }
 
-Racecar = graph from Car {}
-Racecar.speed = 200
-
-fn Racecar.describe() {
-    return "Racecar: " + super.describe()  # Uses Racecar's speed value
-}
-
-racecar = Racecar.clone()
-print(racecar.describe())  # Shows "200 mph" from Racecar.speed
-
-print("")
-
-# -----------------------------------------------------------------------------
-# Combined with Private Methods
-# -----------------------------------------------------------------------------
-print("--- Super with Private Methods ---")
-
-BaseFormatter = graph{}
-
-fn BaseFormatter._format(text) {
-    return "[" + text + "]"
-}
-
-fn BaseFormatter.format(text) {
-    return self._format(text)
-}
-
-FancyFormatter = graph from BaseFormatter {}
-
-fn FancyFormatter._format(text) {
-    # Call parent's private method through super
-    base = super._format(text)
-    return "*** " + base + " ***"
-}
-
-formatter = FancyFormatter.clone()
-print("Formatted: " + formatter.format("Hello"))
+car = Car.clone()
+print(car.describe())
 
 print("")
 print("=== Demo Complete ===")

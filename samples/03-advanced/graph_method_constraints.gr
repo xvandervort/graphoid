@@ -66,8 +66,8 @@ ConnectionGraph.add_node("server2", "active")
 ConnectionGraph.add_node("server3", "standby")
 ConnectionGraph.add_rule(:no_edge_removals)
 
-fn ConnectionGraph.establish_link(from, to) {
-    self.add_edge(from, to, "connected")
+fn ConnectionGraph.establish_link(source, target) {
+    self.add_edge(source, target, "connected")
 }
 
 ConnectionGraph.establish_link("server1", "server2")
@@ -92,8 +92,8 @@ FixedNodes.add_node("a", 1)
 FixedNodes.add_node("b", 2)
 FixedNodes.add_method_constraint(no_node_additions, "no_node_additions")
 
-fn FixedNodes.link(from, to) {
-    self.add_edge(from, to, "link")
+fn FixedNodes.link(source, target) {
+    self.add_edge(source, target, "link")
 }
 
 fn FixedNodes.get_count() {
@@ -150,8 +150,8 @@ fn SecureGraph.update(key, value) {
     self.add_node(key, value)
 }
 
-fn SecureGraph.connect(from, to) {
-    self.add_edge(from, to, "link")
+fn SecureGraph.connect(source, target) {
+    self.add_edge(source, target, "link")
 }
 
 SecureGraph.update("key1", 200)

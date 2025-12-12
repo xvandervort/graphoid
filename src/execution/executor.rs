@@ -1,4 +1,4 @@
-use crate::ast::{AssignmentTarget, BinaryOp, Expr, GraphMethod, GraphProperty, LiteralValue, Parameter, Stmt, UnaryOp};
+use crate::ast::{AssignmentTarget, BinaryOp, Expr, GraphDirective, GraphMethod, GraphProperty, LiteralValue, Parameter, Stmt, UnaryOp};
 use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::execution::Environment;
 use crate::execution::config::{ConfigStack, ErrorMode, PrecisionMode};
@@ -197,7 +197,20 @@ impl Executor {
                 match self.env.get(name) {
                     Ok(value) => Ok(value),
                     Err(_) => {
-                        // If not in environment, check global functions table
+                        // Phase 2 Implicit Self: Check if `self` is a graph with this property
+                        if let Ok(self_value) = self.env.get("self") {
+                            if let ValueKind::Graph(ref graph) = self_value.kind {
+                                // Check for property (data node)
+                                if graph.has_node(name) {
+                                    if let Some(prop_value) = graph.get_node(name) {
+                                        return Ok(prop_value.clone());
+                                    }
+                                }
+                                // Note: Implicit method calls are handled in eval_call
+                            }
+                        }
+
+                        // If not in environment or implicit self, check global functions table
                         // For variable lookup (no arity info), return last defined overload
                         if let Some(funcs) = self.global_functions.get(name) {
                             if let Some(func) = funcs.last() {
@@ -338,7 +351,30 @@ impl Executor {
                         if self.env.exists(name) {
                             self.env.set(name, val)?;
                         } else {
-                            self.env.define(name.clone(), val);
+                            // Phase 2 Implicit Self: Check if `self` is a graph with this property
+                            // If so, assign to self.property instead of creating a local variable
+                            let assigned_to_self = if let Ok(self_value) = self.env.get("self") {
+                                if let ValueKind::Graph(mut graph) = self_value.kind {
+                                    if graph.has_node(name) {
+                                        // Update the graph property
+                                        graph.add_node(name.clone(), val.clone())?;
+                                        // Write the modified graph back to self
+                                        self.env.set("self", Value::graph(graph))?;
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            };
+
+                            // If not assigned to self, create new local variable
+                            if !assigned_to_self {
+                                self.env.define(name.clone(), val);
+                            }
                         }
                         Ok(None)
                     }
@@ -786,9 +822,10 @@ impl Executor {
                 parent,
                 properties,
                 methods,
+                directives,
                 position,
             } => {
-                self.eval_graph_decl(name, graph_type, parent, properties, methods, position)
+                self.eval_graph_decl(name, graph_type, parent, properties, methods, directives, position)
             }
         }
     }
@@ -1182,9 +1219,11 @@ impl Executor {
         parent_expr: &Option<Box<Expr>>,
         properties: &[GraphProperty],
         methods: &[GraphMethod],
+        directives: &[GraphDirective],
         _position: &SourcePosition,
     ) -> Result<Option<Value>> {
         use crate::values::{Graph, GraphType};
+        use crate::ast::DirectiveKind;
 
         // Determine base graph type
         let base_graph_type = match graph_type.as_deref() {
@@ -1230,7 +1269,55 @@ impl Executor {
             graph.add_node(prop.name.clone(), value)?;
         }
 
-        // Add methods
+        // Collect directive information for later method generation
+        let mut readable_props: Vec<String> = Vec::new();
+        let mut writable_props: Vec<String> = Vec::new();
+        let mut private_symbols: Vec<String> = Vec::new();
+
+        for directive in directives {
+            match directive.kind {
+                DirectiveKind::Readable => {
+                    readable_props.extend(directive.symbols.clone());
+                }
+                DirectiveKind::Writable => {
+                    writable_props.extend(directive.symbols.clone());
+                }
+                DirectiveKind::Accessible => {
+                    // Accessible = both readable and writable
+                    readable_props.extend(directive.symbols.clone());
+                    writable_props.extend(directive.symbols.clone());
+                }
+                DirectiveKind::Private => {
+                    private_symbols.extend(directive.symbols.clone());
+                }
+            }
+        }
+
+        // Store private symbols in graph metadata
+        for sym in &private_symbols {
+            graph.mark_private(sym.clone());
+        }
+
+        // Generate getter methods for readable properties
+        for prop_name in &readable_props {
+            // Don't generate if a method with this name already exists
+            if !graph.has_method(prop_name) {
+                let getter = self.generate_getter_method(prop_name);
+                graph.attach_method(prop_name.clone(), getter);
+            }
+        }
+
+        // Generate setter methods for writable properties
+        for prop_name in &writable_props {
+            let setter_name = format!("set_{}", prop_name);
+            // Don't generate if a setter already exists
+            if !graph.has_method(&setter_name) {
+                let setter = self.generate_setter_method(prop_name);
+                graph.attach_method(setter_name, setter);
+            }
+        }
+
+        // Add explicitly defined methods
         for method in methods {
             // For private methods declared with 'priv' keyword,
             // prefix the name with underscore (Graphoid convention)
@@ -1263,6 +1350,79 @@ impl Executor {
         self.env.define(name.to_string(), value);
 
         Ok(None)
+    }
+
+    /// Generate a getter method for a property: returns the property value
+    fn generate_getter_method(&self, prop_name: &str) -> Function {
+        // Create a function that returns self.prop_name
+        // Body: return self.prop_name
+        let body = vec![
+            Stmt::Return {
+                value: Some(Expr::PropertyAccess {
+                    object: Box::new(Expr::Variable {
+                        name: "self".to_string(),
+                        position: SourcePosition::unknown(),
+                    }),
+                    property: prop_name.to_string(),
+                    position: SourcePosition::unknown(),
+                }),
+                position: SourcePosition::unknown(),
+            }
+        ];
+
+        Function {
+            name: Some(prop_name.to_string()),
+            params: vec![],
+            parameters: vec![],
+            body,
+            pattern_clauses: None,
+            env: Rc::new(RefCell::new(self.env.clone())),
+            node_id: None,
+            is_getter: true,
+            is_setter: false,
+            is_static: false,
+            guard: None,
+        }
+    }
+
+    /// Generate a setter method for a property: sets self.prop_name = value
+    fn generate_setter_method(&self, prop_name: &str) -> Function {
+        // Create a function that sets self.prop_name = value
+        // Body: self.prop_name = value
+        let body = vec![
+            Stmt::Assignment {
+                target: AssignmentTarget::Property {
+                    object: Box::new(Expr::Variable {
+                        name: "self".to_string(),
+                        position: SourcePosition::unknown(),
+                    }),
+                    property: prop_name.to_string(),
+                },
+                value: Expr::Variable {
+                    name: "value".to_string(),
+                    position: SourcePosition::unknown(),
+                },
+                position: SourcePosition::unknown(),
+            }
+        ];
+
+        Function {
+            name: Some(format!("set_{}", prop_name)),
+            params: vec!["value".to_string()],
+            parameters: vec![Parameter {
+                name: "value".to_string(),
+                default_value: None,
+                is_variadic: false,
+            }],
+            body,
+            pattern_clauses: None,
+            env: Rc::new(RefCell::new(self.env.clone())),
+            node_id: None,
+            is_getter: false,
+            is_setter: true,
+            is_static: false,
+            guard: None,
+        }
     }
 
     /// Evaluates a conditional expression (inline if-then-else or suffix if/unless).
@@ -1572,6 +1732,18 @@ impl Executor {
                 // Don't allow access to internal nodes via property syntax
                 if property.starts_with("__") {
                     return Ok(Value::none());
+                }
+
+                // Phase 4: Check for private access
+                // Private properties can only be accessed from within the graph (when object is self)
+                if graph.is_private(property) {
+                    let is_internal_access = matches!(object, Expr::Variable { name, .. } if name == "self");
+                    if !is_internal_access {
+                        return Err(GraphoidError::runtime(format!(
+                            "Cannot access private property '{}' from outside the graph",
+                            property
+                        )));
+                    }
                 }
 
                 // First try to get a data node with this name (data takes priority)
@@ -4944,7 +5116,7 @@ impl Executor {
         // Phase 21: Get all method variants and evaluate guards to find the matching one
         let method_variants = graph.get_method_variants(method);
         if !method_variants.is_empty() {
-            // Phase 15: Private method check
+            // Phase 15: Private method check (convention-based: underscore prefix)
             // Methods starting with _ are private and can only be called from within the same graph's methods
             if method.starts_with('_') {
                 // Check if we're inside a method of this graph
@@ -4971,6 +5143,18 @@ impl Executor {
                 if !is_allowed {
                     return Err(GraphoidError::runtime(format!(
                         "Cannot call private method '{}' from outside the graph's methods",
+                        method
+                    )));
+                }
+            }
+
+            // Phase 4: Private method check (directive-based)
+            // Methods marked with `private :method_name` directive can only be called from within the graph
+            if graph.is_private(method) {
+                let is_self_call = matches!(object_expr, Expr::Variable { name, .. } if name == "self");
+                if !is_self_call {
+                    return Err(GraphoidError::runtime(format!(
+                        "Cannot call private method '{}' from outside the graph",
                         method
                     )));
                 }
@@ -6742,6 +6926,29 @@ impl Executor {
                     // Process arguments and call the matched overload
                     let arg_values = self.process_arguments(&func, args)?;
                     return self.call_function(&func, &arg_values);
+                }
+            }
+
+            // Phase 2 Implicit Self: Check if `self` is a graph with this method
+            // This allows calling methods without explicit `self.` prefix
+            if let Ok(self_value) = self.env.get("self") {
+                if let ValueKind::Graph(ref graph) = self_value.kind {
+                    if graph.has_method(name) {
+                        // Clone the graph for method call
+                        let graph_clone = graph.clone();
+                        // Create a dummy Variable expression for self to use in call_graph_method
+                        let self_expr = Expr::Variable {
+                            name: "self".to_string(),
+                            position: crate::error::SourcePosition::unknown(),
+                        };
+                        // Get the method
+                        if let Some(func) = graph_clone.get_method(name).cloned() {
+                            // Evaluate arguments
+                            let arg_values = self.eval_arguments(args)?;
+                            // Call the method with self binding
+                            return self.call_graph_method(&graph_clone, &func, &arg_values, &self_expr);
+                        }
+                    }
                 }
             }
         }

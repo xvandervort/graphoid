@@ -51,7 +51,7 @@ print("(Should have 3 users and 2 FRIEND edges)")
 print("\n=== Example 2: Extract FRIEND Network ===")
 
 # Filter for FRIEND edges only
-friend_filter = (from, to, edge_type) => edge_type == "FRIEND"
+friend_filter = (src, dest, edge_type) => edge_type == "FRIEND"
 
 # Extract with edge filter, excluding orphan nodes
 friends_only = g.extract(none, friend_filter, false)
@@ -71,7 +71,7 @@ print("\n=== Example 3: Extract Admin Management Network ===")
 admin_filter = val => val >= 10 and val < 100
 
 # Filter for MANAGES edges
-manages_filter = (from, to, edge_type) => edge_type == "MANAGES"
+manages_filter = (src, dest, edge_type) => edge_type == "MANAGES"
 
 # Extract admin management subgraph
 admin_network = g.extract(admin_filter, manages_filter, true)
@@ -105,7 +105,7 @@ print("(Should have 5 nodes - removed 2 bots)")
 print("\n=== Example 5: Delete REPORTS_TO Edges ===")
 
 # Filter for REPORTS_TO edges
-reports_filter = (from, to, edge_type) => edge_type == "REPORTS_TO"
+reports_filter = (src, dest, edge_type) => edge_type == "REPORTS_TO"
 
 # Delete reporting relationships
 no_reports = g.delete(none, reports_filter)
@@ -230,7 +230,7 @@ cleaned = chain.delete(high_val_filter, none)
 print("After delete:", cleaned.node_count(), "nodes")
 
 # Step 2: Extract only "good" edges
-good_filter = (from, to, edge_type) => edge_type == "good"
+good_filter = (src, dest, edge_type) => edge_type == "good"
 final = cleaned.extract(none, good_filter, false)
 print("After extract:", final.node_count(), "nodes,", final.edge_count(), "edges")
 
