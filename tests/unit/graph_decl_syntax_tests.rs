@@ -901,15 +901,15 @@ result = fido.speak()
 }
 
 // ============================================================================
-// PHASE 4: DIRECTIVE TESTS
+// PHASE 4: CONFIGURE BLOCK TESTS
 // ============================================================================
 
 #[test]
-fn test_directive_readable_generates_getter() {
-    // readable :x generates a getter method that returns x
+fn test_configure_readable_generates_getter() {
+    // configure { readable: [:x, :y] } generates getter methods
     let source = r#"
 graph Point {
-    readable :x, :y
+    configure { readable: [:x, :y] }
 
     x: 10
     y: 20
@@ -936,11 +936,11 @@ result_y = p.y()
 }
 
 #[test]
-fn test_directive_writable_generates_setter() {
-    // writable :x generates a set_x(value) method
+fn test_configure_writable_generates_setter() {
+    // configure { writable: :x } generates a set_x(value) method
     let source = r#"
 graph Point {
-    writable :x
+    configure { writable: :x }
 
     x: 0
 }
@@ -960,11 +960,11 @@ result = p.x
 }
 
 #[test]
-fn test_directive_accessible_generates_both() {
-    // accessible :x generates both getter and setter
+fn test_configure_accessible_generates_both() {
+    // configure { accessible: :count } generates both getter and setter
     let source = r#"
 graph Counter {
-    accessible :count
+    configure { accessible: :count }
 
     count: 0
 }
@@ -984,11 +984,11 @@ result = c.count()
 }
 
 #[test]
-fn test_directive_multiple_symbols() {
-    // Directive with multiple symbols
+fn test_configure_multiple_symbols() {
+    // configure with list of multiple symbols
     let source = r#"
 graph Rectangle {
-    readable :width, :height
+    configure { readable: [:width, :height] }
 
     width: 5
     height: 3
@@ -1015,11 +1015,11 @@ h = r.height()
 }
 
 #[test]
-fn test_directive_explicit_method_not_overwritten() {
-    // If user defines a method, directive should not overwrite it
+fn test_configure_explicit_method_not_overwritten() {
+    // If user defines a method, configure should not overwrite it
     let source = r#"
 graph Custom {
-    readable :x
+    configure { readable: :x }
 
     x: 10
 
@@ -1042,19 +1042,19 @@ result = c.x()
 }
 
 #[test]
-fn test_parse_directive_syntax() {
-    // Just verify parsing works with different directive types
+fn test_configure_syntax() {
+    // Verify parsing works with different configure options
     let source = r#"
 graph Example {
-    readable :a
-    writable :b
-    accessible :c
-    private :_internal
+    configure {
+        readable: :a
+        writable: :b
+        accessible: :c
+    }
 
     a: 1
     b: 2
     c: 3
-    _internal: 5
 }
 
 e = Example.clone()
@@ -1065,22 +1065,21 @@ e = Example.clone()
 }
 
 // ============================================================================
-// PRIVATE ENFORCEMENT TESTS
+// PRIVATE METHOD TESTS (using priv fn)
 // ============================================================================
 
 #[test]
-fn test_private_property_external_access_blocked() {
-    // External access to private property should fail
+fn test_priv_fn_external_call_blocked() {
+    // External call to private method (priv fn) should fail
     let source = r#"
 graph Secret {
-    private :secret
-
-    secret: 42
+    priv fn internal_helper() {
+        return 42
+    }
 }
 
 s = Secret.clone()
-# This should fail - accessing private property externally
-result = s.secret
+result = s._internal_helper()
 "#;
     let mut executor = Executor::new();
     let result = executor.execute_source(source);
@@ -1090,12 +1089,10 @@ result = s.secret
 }
 
 #[test]
-fn test_private_property_internal_access_allowed() {
-    // Internal access to private property should work
+fn test_priv_fn_internal_call_allowed() {
+    // Internal call to private method should work
     let source = r#"
 graph Secret {
-    private :secret
-
     secret: 42
 
     fn get_secret() {
@@ -1117,40 +1114,16 @@ result = s.get_secret()
 }
 
 #[test]
-fn test_private_method_external_call_blocked() {
-    // External call to private method should fail
+fn test_priv_fn_called_internally_via_underscore() {
+    // Private method called internally via underscore prefix
     let source = r#"
 graph Secret {
-    private :internal_helper
-
-    fn internal_helper() {
-        return 42
-    }
-}
-
-s = Secret.clone()
-result = s.internal_helper()
-"#;
-    let mut executor = Executor::new();
-    let result = executor.execute_source(source);
-    assert!(result.is_err());
-    let err_msg = result.unwrap_err().to_string();
-    assert!(err_msg.contains("private"));
-}
-
-#[test]
-fn test_private_method_internal_call_allowed() {
-    // Internal call to private method should work
-    let source = r#"
-graph Secret {
-    private :internal_helper
-
-    fn internal_helper() {
+    priv fn helper() {
         return 42
     }
 
     fn public_method() {
-        return self.internal_helper()
+        return _helper()  # Call via underscore prefix internally
     }
 }
 
@@ -1163,33 +1136,6 @@ result = s.public_method()
     let result = executor.get_variable("result").unwrap();
     match &result.kind {
         ValueKind::Number(n) => assert_eq!(*n, 42.0),
-        other => panic!("Expected number, got {:?}", other),
-    }
-}
-
-#[test]
-fn test_private_implicit_self_internal_allowed() {
-    // Implicit self access to private property should work
-    let source = r#"
-graph Secret {
-    private :secret
-
-    secret: 100
-
-    fn double_secret() {
-        return secret * 2  # implicit self.secret
-    }
-}
-
-s = Secret.clone()
-result = s.double_secret()
-"#;
-    let mut executor = Executor::new();
-    executor.execute_source(source).unwrap();
-
-    let result = executor.get_variable("result").unwrap();
-    match &result.kind {
-        ValueKind::Number(n) => assert_eq!(*n, 200.0),
         other => panic!("Expected number, got {:?}", other),
     }
 }

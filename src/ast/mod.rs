@@ -91,7 +91,7 @@ pub enum Stmt {
         finally_block: Option<Vec<Stmt>>,
         position: SourcePosition,
     },
-    /// Named graph declaration: graph Name { properties, methods, directives }
+    /// Named graph declaration: graph Name { configure {...}, properties, methods }
     /// This creates a graph type with intrinsic identity
     GraphDecl {
         name: String,
@@ -99,7 +99,7 @@ pub enum Stmt {
         parent: Option<Box<Expr>>,   // Optional: graph Name from Parent { }
         properties: Vec<GraphProperty>,
         methods: Vec<GraphMethod>,
-        directives: Vec<GraphDirective>,
+        config: std::collections::HashMap<String, Vec<String>>,  // configure { readable: [:x], writable: :y }
         position: SourcePosition,
     },
     Expression {
@@ -113,27 +113,6 @@ pub enum Stmt {
 pub struct GraphProperty {
     pub name: String,
     pub value: Expr,
-    pub position: SourcePosition,
-}
-
-/// Kind of directive for access control
-#[derive(Debug, Clone, PartialEq)]
-pub enum DirectiveKind {
-    /// Generate getter methods for these properties
-    Readable,
-    /// Generate setter methods for these properties
-    Writable,
-    /// Both readable and writable (shorthand for both)
-    Accessible,
-    /// Methods/properties only accessible from within the graph
-    Private,
-}
-
-/// A directive inside a graph body: readable :x, :y
-#[derive(Debug, Clone, PartialEq)]
-pub struct GraphDirective {
-    pub kind: DirectiveKind,
-    pub symbols: Vec<String>,
     pub position: SourcePosition,
 }
 

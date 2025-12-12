@@ -4,10 +4,11 @@
 //! for expression parsing.
 
 use crate::ast::{
-    Argument, AssignmentTarget, BinaryOp, DirectiveKind, Expr, GraphDirective, GraphMethod,
+    Argument, AssignmentTarget, BinaryOp, Expr, GraphMethod,
     GraphProperty, LiteralValue, Parameter, Pattern, PatternClause, Program, Stmt, TypeAnnotation,
     UnaryOp,
 };
+use std::collections::HashMap;
 use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::lexer::token::{Token, TokenType};
 
@@ -825,8 +826,8 @@ impl Parser {
             });
         }
 
-        // Parse graph body: properties, methods, and directives
-        let (properties, methods, directives) = self.parse_graph_body()?;
+        // Parse graph body: properties, methods, and config
+        let (properties, methods, config) = self.parse_graph_body()?;
 
         // Expect closing brace
         if !self.match_token(&TokenType::RightBrace) {
@@ -842,16 +843,16 @@ impl Parser {
             parent,
             properties,
             methods,
-            directives,
+            config,
             position,
         })
     }
 
-    /// Parse the body of a graph declaration: properties, methods, and directives
-    fn parse_graph_body(&mut self) -> Result<(Vec<GraphProperty>, Vec<GraphMethod>, Vec<GraphDirective>)> {
+    /// Parse the body of a graph declaration: properties, methods, and config
+    fn parse_graph_body(&mut self) -> Result<(Vec<GraphProperty>, Vec<GraphMethod>, HashMap<String, Vec<String>>)> {
         let mut properties = Vec::new();
         let mut methods = Vec::new();
-        let mut directives = Vec::new();
+        let mut config: HashMap<String, Vec<String>> = HashMap::new();
 
         loop {
             // Skip newlines and semicolons (flexible separators)
@@ -867,47 +868,25 @@ impl Parser {
                 continue;
             }
 
-            // Determine what we're parsing: directive, method, or property
-            // Directives: readable, writable, accessible, readonly, private (followed by symbols)
-            // Method starts with: fn, get, set, static, priv fn, priv get, priv set
-            // Property is: identifier: value
-
-            // Check for directives first (these are identifiers that start directive lists)
-            if let TokenType::Identifier(id) = &self.peek().token_type {
-                let directive_kind = match id.as_str() {
-                    "readable" => Some(DirectiveKind::Readable),
-                    "writable" => Some(DirectiveKind::Writable),
-                    "accessible" => Some(DirectiveKind::Accessible),
-                    "private" => Some(DirectiveKind::Private),
-                    _ => None,
-                };
-
-                if let Some(kind) = directive_kind {
-                    let position = self.peek().position();
-                    self.advance(); // consume the directive keyword
-
-                    // Parse symbol list: :sym1, :sym2, ...
-                    let symbols = self.parse_directive_symbols()?;
-                    if symbols.is_empty() {
-                        return Err(GraphoidError::SyntaxError {
-                            message: format!("Directive '{}' requires at least one symbol",
-                                match kind {
-                                    DirectiveKind::Readable => "readable",
-                                    DirectiveKind::Writable => "writable",
-                                    DirectiveKind::Accessible => "accessible",
-                                    DirectiveKind::Private => "private",
-                                }),
-                            position,
-                        });
-                    }
-
-                    directives.push(GraphDirective {
-                        kind,
-                        symbols,
-                        position,
+            // Check for configure block: configure { readable: :x, writable: [:y, :z] }
+            if self.match_token(&TokenType::Configure) {
+                if !self.match_token(&TokenType::LeftBrace) {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected '{' after 'configure'".to_string(),
+                        position: self.peek().position(),
                     });
-                    continue;
                 }
+
+                // Parse config entries: key: value, key: [values]
+                self.parse_graph_config(&mut config)?;
+
+                if !self.match_token(&TokenType::RightBrace) {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected '}' to close configure block".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
+                continue;
             }
 
             let is_private = self.match_token(&TokenType::Priv);
@@ -962,26 +941,112 @@ impl Parser {
             }
         }
 
-        Ok((properties, methods, directives))
+        Ok((properties, methods, config))
     }
 
-    /// Parse a list of symbols for a directive: :sym1, :sym2, ...
-    fn parse_directive_symbols(&mut self) -> Result<Vec<String>> {
+    /// Parse config entries inside a configure block: readable: :x, writable: [:y, :z]
+    fn parse_graph_config(&mut self, config: &mut HashMap<String, Vec<String>>) -> Result<()> {
+        loop {
+            // Skip newlines
+            while self.match_token(&TokenType::Newline) {}
+
+            // Check for end of config block
+            if self.check(&TokenType::RightBrace) || self.is_at_end() {
+                break;
+            }
+
+            // Skip commas between entries
+            if self.match_token(&TokenType::Comma) {
+                continue;
+            }
+
+            // Parse key: value
+            let key = if let TokenType::Identifier(id) = &self.peek().token_type {
+                let k = id.clone();
+                self.advance();
+                k
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: format!("Expected config key (readable, writable, accessible), got {:?}", self.peek().token_type),
+                    position: self.peek().position(),
+                });
+            };
+
+            // Validate key
+            if !["readable", "writable", "accessible"].contains(&key.as_str()) {
+                return Err(GraphoidError::SyntaxError {
+                    message: format!("Unknown config key '{}'. Valid keys: readable, writable, accessible", key),
+                    position: self.peek().position(),
+                });
+            }
+
+            if !self.match_token(&TokenType::Colon) {
+                return Err(GraphoidError::SyntaxError {
+                    message: format!("Expected ':' after config key '{}'", key),
+                    position: self.peek().position(),
+                });
+            }
+
+            // Parse value: either single symbol or list of symbols
+            let symbols = self.parse_config_symbols()?;
+            if symbols.is_empty() {
+                return Err(GraphoidError::SyntaxError {
+                    message: format!("Config '{}' requires at least one symbol", key),
+                    position: self.peek().position(),
+                });
+            }
+
+            // Merge with existing (allows multiple configure blocks or repeated keys)
+            config.entry(key).or_insert_with(Vec::new).extend(symbols);
+        }
+
+        Ok(())
+    }
+
+    /// Parse config value: either :symbol or [:sym1, :sym2]
+    fn parse_config_symbols(&mut self) -> Result<Vec<String>> {
         let mut symbols = Vec::new();
 
-        loop {
-            // Expect a symbol token
-            if let TokenType::Symbol(sym) = &self.peek().token_type {
-                symbols.push(sym.clone());
-                self.advance();
+        if self.match_token(&TokenType::LeftBracket) {
+            // List of symbols: [:x, :y, :z]
+            loop {
+                // Skip newlines
+                while self.match_token(&TokenType::Newline) {}
 
-                // Check for comma to continue
+                if self.check(&TokenType::RightBracket) {
+                    break;
+                }
+
                 if self.match_token(&TokenType::Comma) {
-                    // Continue parsing more symbols
                     continue;
                 }
+
+                if let TokenType::Symbol(sym) = &self.peek().token_type {
+                    symbols.push(sym.clone());
+                    self.advance();
+                } else {
+                    return Err(GraphoidError::SyntaxError {
+                        message: format!("Expected symbol in config list, got {:?}", self.peek().token_type),
+                        position: self.peek().position(),
+                    });
+                }
             }
-            break;
+
+            if !self.match_token(&TokenType::RightBracket) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected ']' to close config symbol list".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+        } else if let TokenType::Symbol(sym) = &self.peek().token_type {
+            // Single symbol: :x
+            symbols.push(sym.clone());
+            self.advance();
+        } else {
+            return Err(GraphoidError::SyntaxError {
+                message: format!("Expected symbol or symbol list, got {:?}", self.peek().token_type),
+                position: self.peek().position(),
+            });
         }
 
         Ok(symbols)

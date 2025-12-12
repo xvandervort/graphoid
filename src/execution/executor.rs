@@ -1,4 +1,5 @@
-use crate::ast::{AssignmentTarget, BinaryOp, Expr, GraphDirective, GraphMethod, GraphProperty, LiteralValue, Parameter, Stmt, UnaryOp};
+use crate::ast::{AssignmentTarget, BinaryOp, Expr, GraphMethod, GraphProperty, LiteralValue, Parameter, Stmt, UnaryOp};
+use std::collections::HashMap;
 use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::execution::Environment;
 use crate::execution::config::{ConfigStack, ErrorMode, PrecisionMode};
@@ -9,7 +10,6 @@ use crate::values::{Function, Value, ValueKind, List, Hash, ErrorObject, BigNum}
 use crate::graph::{RuleSpec, RuleInstance};
 use crate::lexer::Lexer;
 use crate::parser::Parser;
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -822,10 +822,10 @@ impl Executor {
                 parent,
                 properties,
                 methods,
-                directives,
+                config,
                 position,
             } => {
-                self.eval_graph_decl(name, graph_type, parent, properties, methods, directives, position)
+                self.eval_graph_decl(name, graph_type, parent, properties, methods, config, position)
             }
         }
     }
@@ -1210,7 +1210,7 @@ impl Executor {
         Ok(Value::graph(Graph::new(graph_type)))
     }
 
-    /// Evaluates a named graph declaration: graph Name { properties, methods }
+    /// Evaluates a named graph declaration: graph Name { configure {...}, properties, methods }
     /// This creates a graph with intrinsic type_name and binds it to the identifier.
     fn eval_graph_decl(
         &mut self,
@@ -1219,11 +1219,10 @@ impl Executor {
         parent_expr: &Option<Box<Expr>>,
         properties: &[GraphProperty],
         methods: &[GraphMethod],
-        directives: &[GraphDirective],
+        config: &HashMap<String, Vec<String>>,
         _position: &SourcePosition,
     ) -> Result<Option<Value>> {
         use crate::values::{Graph, GraphType};
-        use crate::ast::DirectiveKind;
 
         // Determine base graph type
         let base_graph_type = match graph_type.as_deref() {
@@ -1269,33 +1268,23 @@ impl Executor {
             graph.add_node(prop.name.clone(), value)?;
         }
 
-        // Collect directive information for later method generation
+        // Process configure block options
+        // readable: [:x, :y] - generates getter methods
+        // writable: [:x] - generates setter methods (set_x)
+        // accessible: [:x] - generates both getter and setter
         let mut readable_props: Vec<String> = Vec::new();
         let mut writable_props: Vec<String> = Vec::new();
-        let mut private_symbols: Vec<String> = Vec::new();
 
-        for directive in directives {
-            match directive.kind {
-                DirectiveKind::Readable => {
-                    readable_props.extend(directive.symbols.clone());
-                }
-                DirectiveKind::Writable => {
-                    writable_props.extend(directive.symbols.clone());
-                }
-                DirectiveKind::Accessible => {
-                    // Accessible = both readable and writable
-                    readable_props.extend(directive.symbols.clone());
-                    writable_props.extend(directive.symbols.clone());
-                }
-                DirectiveKind::Private => {
-                    private_symbols.extend(directive.symbols.clone());
-                }
-            }
+        if let Some(symbols) = config.get("readable") {
+            readable_props.extend(symbols.clone());
         }
-
-        // Store private symbols in graph metadata
-        for sym in &private_symbols {
-            graph.mark_private(sym.clone());
+        if let Some(symbols) = config.get("writable") {
+            writable_props.extend(symbols.clone());
+        }
+        if let Some(symbols) = config.get("accessible") {
+            // Accessible = both readable and writable
+            readable_props.extend(symbols.clone());
+            writable_props.extend(symbols.clone());
         }
 
         // Generate getter methods for readable properties
@@ -1732,18 +1721,6 @@ impl Executor {
                 // Don't allow access to internal nodes via property syntax
                 if property.starts_with("__") {
                     return Ok(Value::none());
-                }
-
-                // Phase 4: Check for private access
-                // Private properties can only be accessed from within the graph (when object is self)
-                if graph.is_private(property) {
-                    let is_internal_access = matches!(object, Expr::Variable { name, .. } if name == "self");
-                    if !is_internal_access {
-                        return Err(GraphoidError::runtime(format!(
-                            "Cannot access private property '{}' from outside the graph",
-                            property
-                        )));
-                    }
                 }
 
                 // First try to get a data node with this name (data takes priority)
@@ -5143,18 +5120,6 @@ impl Executor {
                 if !is_allowed {
                     return Err(GraphoidError::runtime(format!(
                         "Cannot call private method '{}' from outside the graph's methods",
-                        method
-                    )));
-                }
-            }
-
-            // Phase 4: Private method check (directive-based)
-            // Methods marked with `private :method_name` directive can only be called from within the graph
-            if graph.is_private(method) {
-                let is_self_call = matches!(object_expr, Expr::Variable { name, .. } if name == "self");
-                if !is_self_call {
-                    return Err(GraphoidError::runtime(format!(
-                        "Cannot call private method '{}' from outside the graph",
                         method
                     )));
                 }

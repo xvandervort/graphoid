@@ -1,13 +1,13 @@
-# Graph Directives Demo
-# Demonstrates Phase 4 access control directives
+# Graph Configure Block Demo
+# Demonstrates the configure block inside graph declarations
 
 # ============================================================================
-# READABLE DIRECTIVE
-# Generates getter methods: readable :x, :y
+# READABLE CONFIGURATION
+# Generates getter methods: configure { readable: [:x, :y] }
 # ============================================================================
 
 graph Point {
-    readable :x, :y   # Generates x() and y() getters
+    configure { readable: [:x, :y] }   # Generates x() and y() getters
 
     x: 0
     y: 0
@@ -21,12 +21,12 @@ print("x = " + p.x().to_string())   # Uses generated getter
 print("y = " + p.y().to_string())   # Uses generated getter
 
 # ============================================================================
-# WRITABLE DIRECTIVE
-# Generates setter methods: writable :name
+# WRITABLE CONFIGURATION
+# Generates setter methods: configure { writable: :name }
 # ============================================================================
 
 graph Person {
-    writable :name    # Generates set_name(value) setter
+    configure { writable: :name }    # Generates set_name(value) setter
 
     name: "Unknown"
 }
@@ -37,12 +37,12 @@ person.set_name("Alice")  # Uses generated setter
 print("Person after: " + person.name)
 
 # ============================================================================
-# ACCESSIBLE DIRECTIVE
-# Shorthand for both readable and writable: accessible :value
+# ACCESSIBLE CONFIGURATION
+# Shorthand for both readable and writable: configure { accessible: :value }
 # ============================================================================
 
 graph Counter {
-    accessible :count   # Generates count() getter AND set_count(value) setter
+    configure { accessible: :count }   # Generates count() getter AND set_count(value) setter
 
     count: 0
 
@@ -60,13 +60,29 @@ counter.set_count(100)
 print("Counter after set_count(100): " + counter.count().to_string())
 
 # ============================================================================
-# COMBINING DIRECTIVES
-# Multiple directives work together
+# SINGLE SYMBOL SYNTAX
+# For single items, the list is optional: readable: :x is same as readable: [:x]
+# ============================================================================
+
+graph Simple {
+    configure { readable: :value }   # Single symbol - no list needed
+
+    value: 42
+}
+
+s = Simple.clone()
+print("Simple value: " + s.value().to_string())
+
+# ============================================================================
+# COMBINING CONFIGURATIONS
+# Multiple options work together
 # ============================================================================
 
 graph Rectangle {
-    readable :area, :perimeter
-    accessible :width, :height
+    configure {
+        readable: [:area, :perimeter]
+        accessible: [:width, :height]
+    }
 
     width: 0
     height: 0
@@ -88,12 +104,12 @@ print("Area: " + rect.area().to_string())
 print("Perimeter: " + rect.perimeter().to_string())
 
 # ============================================================================
-# CUSTOM METHODS OVERRIDE DIRECTIVES
+# CUSTOM METHODS OVERRIDE GENERATED ONES
 # User-defined methods take precedence over generated ones
 # ============================================================================
 
 graph SmartCounter {
-    readable :value
+    configure { readable: :value }
 
     value: 0
 
@@ -108,18 +124,18 @@ sc.value = 42
 print("SmartCounter value: " + sc.value())  # Uses custom method
 
 # ============================================================================
-# PRIVATE DIRECTIVE
-# Restricts access to within the graph only: private :secret
+# PRIVATE METHODS USE priv fn
+# For privacy, use the existing `priv fn` keyword (not configure)
 # ============================================================================
 
 graph BankAccount {
-    private :balance, :calculate_interest   # Only accessible inside the graph
-    readable :account_number
+    configure { readable: :account_number }
 
     account_number: "12345"
     balance: 1000
 
-    fn calculate_interest() {
+    # Private method - use priv fn
+    priv fn calculate_interest() {
         return balance * 0.05   # 5% interest
     }
 
@@ -128,17 +144,9 @@ graph BankAccount {
         return balance
     }
 
-    fn withdraw(amount) {
-        if amount > balance {
-            return "Insufficient funds"
-        }
-        balance = balance - amount
-        return balance
-    }
-
     fn get_balance_with_interest() {
-        # Can access private method/property from inside the graph
-        return balance + calculate_interest()
+        # Can call private method from within the graph
+        return balance + _calculate_interest()
     }
 
     fn get_statement() {
@@ -154,8 +162,4 @@ print("After deposit of $500:")
 print(account.get_statement())
 print("Balance with interest: $" + account.get_balance_with_interest().to_string())
 
-# Note: The following would fail if uncommented (private access):
-# bad = account.balance      # Error: Cannot access private property
-# bad = account.calculate_interest()  # Error: Cannot call private method
-
-print("Graph directives demo complete!")
+print("Graph configure block demo complete!")
