@@ -364,7 +364,7 @@ Test files created during analysis:
 
 ## Conclusion
 
-The class-like graphs implementation is **functional and substantially complete** through Phase 12. The core method system, rule enforcement, layer visibility, visualization, and method constraints all work well.
+The class-like graphs implementation is **COMPLETE** through Phase 23. All planned features are implemented and working.
 
 ### Implementation Status Summary
 
@@ -374,21 +374,38 @@ The class-like graphs implementation is **functional and substantially complete*
 **Phases 7-12** (Enhancements): ✅ COMPLETE
 - Rule enforcement, layer visibility, visualization, rule querying, method constraints, remove_method
 
-**Phases 13-18** (Next): 📋 PLANNED
-- Property access syntax, inheritance, private methods, super calls, getters, type checking
+**Phases 13-23** (Advanced Features): ✅ COMPLETE (December 10, 2025)
+- Phase 13: Property access syntax (`self.property`)
+- Phase 14: Inheritance with `from` keyword
+- Phase 15: Private methods (underscore prefix)
+- Phase 16: Super calls (`super.method()`)
+- Phase 17: Computed properties (getters)
+- Phase 18: Type checking (`is_a()`, `type_of()`)
+- Phase 19: Setters
+- Phase 20: Static methods
+- Phase 21: Structure-based dispatch (`when` guards)
+- Phase 22: Mixins (`include()`)
+- Phase 23: Duck typing (`responds_to()`)
 
-### Next Priority: Property Access Syntax
+### Next: Unified Graph Declaration Syntax
 
-Based on design analysis (see `CLG_DESIGN_ANALYSIS.md`), **property access syntax** is the single highest-impact improvement:
+The current syntax works but is scattered. A new unified syntax is designed and approved:
 
 ```graphoid
-# Current (verbose)
-value = self.get_node("count")
-self.add_node("count", value + 1)
+# NEW (everything in one place, implicit self)
+Animal = graph {
+    sound: none
 
-# Target (natural)
-value = self.count
-self.count = value + 1
+    fn speak() {
+        print(sound)
+    }
+}
+
+Dog = graph from Animal {
+    sound: "woof"
+}
 ```
 
-See `CLG_IMPLEMENTATION_ROADMAP.md` for the complete implementation plan.
+See `GRAPH_DECLARATION_SYNTAX.md` for the complete design and implementation plan.
+
+This will **replace** the old syntax (`fn Graph.method()` etc.) rather than supplement it.

@@ -1,4 +1,4 @@
-use crate::ast::{AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Stmt, UnaryOp};
+use crate::ast::{AssignmentTarget, BinaryOp, Expr, GraphMethod, GraphProperty, LiteralValue, Parameter, Stmt, UnaryOp};
 use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::execution::Environment;
 use crate::execution::config::{ConfigStack, ErrorMode, PrecisionMode};
@@ -780,6 +780,16 @@ impl Executor {
                     control: crate::error::LoopControlType::Continue,
                 })
             }
+            Stmt::GraphDecl {
+                name,
+                graph_type,
+                parent,
+                properties,
+                methods,
+                position,
+            } => {
+                self.eval_graph_decl(name, graph_type, parent, properties, methods, position)
+            }
         }
     }
 
@@ -1161,6 +1171,98 @@ impl Executor {
         }
 
         Ok(Value::graph(Graph::new(graph_type)))
+    }
+
+    /// Evaluates a named graph declaration: graph Name { properties, methods }
+    /// This creates a graph with intrinsic type_name and binds it to the identifier.
+    fn eval_graph_decl(
+        &mut self,
+        name: &str,
+        graph_type: &Option<String>,
+        parent_expr: &Option<Box<Expr>>,
+        properties: &[GraphProperty],
+        methods: &[GraphMethod],
+        _position: &SourcePosition,
+    ) -> Result<Option<Value>> {
+        use crate::values::{Graph, GraphType};
+
+        // Determine base graph type
+        let base_graph_type = match graph_type.as_deref() {
+            Some("dag") | Some("tree") => GraphType::Directed,
+            Some("undirected") => GraphType::Undirected,
+            _ => GraphType::Directed, // Default
+        };
+
+        // Create the graph, possibly inheriting from parent
+        let mut graph = if let Some(parent_box) = parent_expr {
+            let parent_value = self.eval_expr(parent_box)?;
+            if let ValueKind::Graph(parent_graph) = parent_value.kind {
+                Graph::from_parent(parent_graph)
+            } else {
+                return Err(GraphoidError::runtime(format!(
+                    "Cannot inherit from non-graph type '{}'. Expected graph.",
+                    parent_value.type_name()
+                )));
+            }
+        } else {
+            Graph::new(base_graph_type)
+        };
+
+        // Set the intrinsic type name
+        graph.type_name = Some(name.to_string());
+
+        // Apply graph type ruleset if specified
+        if let Some(gtype) = graph_type {
+            match gtype.as_str() {
+                "dag" => {
+                    graph.rulesets.push("dag".to_string());
+                }
+                "tree" => {
+                    graph.rulesets.push("tree".to_string());
+                }
+                _ => {} // Unknown types are ignored for now
+            }
+        }
+
+        // Add properties as data nodes
+        for prop in properties {
+            let value = self.eval_expr(&prop.value)?;
+            graph.add_node(prop.name.clone(), value)?;
+        }
+
+        // Add methods
+        for method in methods {
+            // For private methods declared with 'priv' keyword,
+            // prefix the name with underscore (Graphoid convention)
+            let method_name = if method.is_private && !method.name.starts_with('_') {
+                format!("_{}", method.name)
+            } else {
+                method.name.clone()
+            };
+
+            let func = Function {
+                name: Some(method_name.clone()),
+                params: method.params.iter().map(|p| p.name.clone()).collect(),
+                parameters: method.params.clone(),
+                body: method.body.clone(),
+                pattern_clauses: None,
+                env: Rc::new(RefCell::new(self.env.clone())),
+                node_id: None,
+                is_getter: method.is_getter,
+                is_setter: method.is_setter,
+                is_static: method.is_static,
+                guard: method.guard.clone(),
+            };
+
+            // Store method in graph using the existing method storage mechanism
+            graph.attach_method(method_name, func);
+        }
+
+        // Create the value and bind it
+        let value = Value::graph(graph);
+        self.env.define(name.to_string(), value);
+
+        Ok(None)
     }
 
     /// Evaluates a conditional expression (inline if-then-else or suffix if/unless).

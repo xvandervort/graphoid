@@ -4,8 +4,8 @@
 //! for expression parsing.
 
 use crate::ast::{
-    Argument, AssignmentTarget, BinaryOp, Expr, LiteralValue, Parameter, Pattern, PatternClause,
-    Program, Stmt, TypeAnnotation, UnaryOp,
+    Argument, AssignmentTarget, BinaryOp, Expr, GraphMethod, GraphProperty, LiteralValue,
+    Parameter, Pattern, PatternClause, Program, Stmt, TypeAnnotation, UnaryOp,
 };
 use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::lexer::token::{Token, TokenType};
@@ -71,7 +71,13 @@ impl Parser {
         let is_list_static_call = self.check(&TokenType::ListType) && self.check_next(&TokenType::Dot);
         let is_string_static_call = self.check(&TokenType::StringType) && self.check_next(&TokenType::Dot);
 
-        let result = if !is_list_static_call && !is_string_static_call && (
+        // Check for named graph declaration: graph Name { }
+        // GraphType followed by Identifier (not { or from or () is a named declaration
+        let is_named_graph_decl = self.check(&TokenType::GraphType) && self.check_next_is_identifier();
+
+        let result = if is_named_graph_decl {
+            self.graph_declaration()
+        } else if !is_list_static_call && !is_string_static_call && (
             self.check(&TokenType::NumType)
             || self.check(&TokenType::BigNumType)  // Phase 1B
             || self.check(&TokenType::StringType)
@@ -751,6 +757,303 @@ impl Parser {
         Ok(Stmt::ModuleDecl {
             name,
             alias,
+            position,
+        })
+    }
+
+    /// Parse named graph declaration: graph Name { properties, methods }
+    /// or: graph Name(:type) { ... }
+    /// or: graph Name from Parent { ... }
+    fn graph_declaration(&mut self) -> Result<Stmt> {
+        let position = self.peek().position();
+
+        // Consume the 'graph' keyword
+        self.advance();
+
+        // Get the graph name (required for named declarations)
+        let name = if let TokenType::Identifier(id) = &self.peek().token_type {
+            let n = id.clone();
+            self.advance();
+            n
+        } else {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected graph name after 'graph' keyword".to_string(),
+                position: self.peek().position(),
+            });
+        };
+
+        // Check for optional graph type: graph Name(:dag) { }
+        let graph_type = if self.match_token(&TokenType::LeftParen) {
+            // Expect a symbol like :dag, :tree (tokenized as Symbol)
+            let gtype = if let TokenType::Symbol(s) = &self.peek().token_type {
+                let t = s.clone();
+                self.advance();
+                Some(t)
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected graph type symbol (e.g., :dag, :tree)".to_string(),
+                    position: self.peek().position(),
+                });
+            };
+
+            if !self.match_token(&TokenType::RightParen) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected ')' after graph type".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+
+            gtype
+        } else {
+            None
+        };
+
+        // Check for inheritance: graph Name from Parent { }
+        let parent = if self.match_token(&TokenType::From) {
+            let parent_expr = self.expression()?;
+            Some(Box::new(parent_expr))
+        } else {
+            None
+        };
+
+        // Expect opening brace
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' after graph declaration".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse graph body: properties and methods
+        let (properties, methods) = self.parse_graph_body()?;
+
+        // Expect closing brace
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' to close graph declaration".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        Ok(Stmt::GraphDecl {
+            name,
+            graph_type,
+            parent,
+            properties,
+            methods,
+            position,
+        })
+    }
+
+    /// Parse the body of a graph declaration: properties and methods
+    fn parse_graph_body(&mut self) -> Result<(Vec<GraphProperty>, Vec<GraphMethod>)> {
+        let mut properties = Vec::new();
+        let mut methods = Vec::new();
+
+        loop {
+            // Skip newlines and semicolons (flexible separators)
+            while self.match_token(&TokenType::Newline) || self.match_token(&TokenType::Semicolon) {}
+
+            // Check for end of body
+            if self.check(&TokenType::RightBrace) || self.is_at_end() {
+                break;
+            }
+
+            // Skip commas between entries
+            if self.match_token(&TokenType::Comma) {
+                continue;
+            }
+
+            // Determine what we're parsing: method or property
+            // Method starts with: fn, get, set, static, priv fn, priv get, priv set
+            // Property is: identifier: value
+
+            let is_private = self.match_token(&TokenType::Priv);
+            let is_static = if !is_private { self.match_token(&TokenType::Static) } else { false };
+
+            if self.match_token(&TokenType::Func) {
+                // fn name(...) { ... }
+                let method = self.parse_graph_method(is_private, false, false, is_static)?;
+                methods.push(method);
+            } else if self.match_token(&TokenType::Get) {
+                // get name() { ... }
+                let method = self.parse_graph_method(is_private, true, false, is_static)?;
+                methods.push(method);
+            } else if self.match_token(&TokenType::Set) {
+                // set name(value) { ... }
+                let method = self.parse_graph_method(is_private, false, true, is_static)?;
+                methods.push(method);
+            } else if is_static && self.match_token(&TokenType::Func) {
+                // static fn - already consumed static
+                let method = self.parse_graph_method(is_private, false, false, true)?;
+                methods.push(method);
+            } else if is_private {
+                // priv without fn/get/set - error
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected 'fn', 'get', or 'set' after 'priv' in graph body".to_string(),
+                    position: self.peek().position(),
+                });
+            } else if let TokenType::Identifier(id) = &self.peek().token_type {
+                // Property: name: value
+                let prop_name = id.clone();
+                let prop_pos = self.peek().position();
+                self.advance();
+
+                if !self.match_token(&TokenType::Colon) {
+                    return Err(GraphoidError::SyntaxError {
+                        message: format!("Expected ':' after property name '{}' in graph body", prop_name),
+                        position: self.peek().position(),
+                    });
+                }
+
+                let value = self.expression()?;
+                properties.push(GraphProperty {
+                    name: prop_name,
+                    value,
+                    position: prop_pos,
+                });
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: format!("Unexpected token in graph body: {:?}", self.peek().token_type),
+                    position: self.peek().position(),
+                });
+            }
+        }
+
+        Ok((properties, methods))
+    }
+
+    /// Parse a method definition inside a graph body
+    fn parse_graph_method(
+        &mut self,
+        is_private: bool,
+        is_getter: bool,
+        is_setter: bool,
+        is_static: bool,
+    ) -> Result<GraphMethod> {
+        let position = self.peek().position();
+
+        // Get method name
+        let name = if let TokenType::Identifier(id) = &self.peek().token_type {
+            let n = id.clone();
+            self.advance();
+            n
+        } else {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected method name".to_string(),
+                position: self.peek().position(),
+            });
+        };
+
+        // Parse parameters
+        if !self.match_token(&TokenType::LeftParen) {
+            return Err(GraphoidError::SyntaxError {
+                message: format!("Expected '(' after method name '{}'", name),
+                position: self.peek().position(),
+            });
+        }
+
+        // Parse parameter list
+        let mut params = Vec::new();
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                // Check for variadic parameter (...)
+                let is_variadic = self.match_token(&TokenType::DotDotDot);
+
+                let param_name = if let TokenType::Identifier(id) = &self.peek().token_type {
+                    let n = id.clone();
+                    self.advance();
+                    n
+                } else {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected parameter name".to_string(),
+                        position: self.peek().position(),
+                    });
+                };
+
+                // Variadic parameters cannot have default values
+                let default_value = if is_variadic {
+                    if self.check(&TokenType::Equal) {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Variadic parameters cannot have default values".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+                    None
+                } else if self.match_token(&TokenType::Equal) {
+                    Some(self.expression()?)
+                } else {
+                    None
+                };
+
+                params.push(Parameter {
+                    name: param_name,
+                    default_value,
+                    is_variadic,
+                });
+
+                if !self.match_token(&TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+
+        if !self.match_token(&TokenType::RightParen) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected ')' after parameters".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Validate getter/setter constraints
+        if is_getter && !params.is_empty() {
+            return Err(GraphoidError::SyntaxError {
+                message: "Getters cannot have parameters".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        if is_setter && params.len() != 1 {
+            return Err(GraphoidError::SyntaxError {
+                message: "Setters must have exactly one parameter".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Check for guard clause: when expr
+        let guard = if self.match_token(&TokenType::When) {
+            Some(Box::new(self.expression()?))
+        } else {
+            None
+        };
+
+        // Parse body
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' before method body".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        let body = self.block()?;
+
+        // Consume the closing brace of the method body
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' after method body".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        Ok(GraphMethod {
+            name,
+            params,
+            body,
+            is_static,
+            is_getter,
+            is_setter,
+            is_private,
+            guard,
             position,
         })
     }
@@ -2547,6 +2850,14 @@ impl Parser {
             return false;
         }
         std::mem::discriminant(&self.tokens[self.current + 1].token_type) == std::mem::discriminant(token_type)
+    }
+
+    /// Check if the next token is an identifier (any identifier, regardless of name)
+    fn check_next_is_identifier(&self) -> bool {
+        if self.current + 1 >= self.tokens.len() {
+            return false;
+        }
+        matches!(self.tokens[self.current + 1].token_type, TokenType::Identifier(_))
     }
 
     fn match_token(&mut self, token_type: &TokenType) -> bool {

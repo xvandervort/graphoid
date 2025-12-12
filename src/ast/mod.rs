@@ -91,10 +91,42 @@ pub enum Stmt {
         finally_block: Option<Vec<Stmt>>,
         position: SourcePosition,
     },
+    /// Named graph declaration: graph Name { properties, methods }
+    /// This creates a graph type with intrinsic identity
+    GraphDecl {
+        name: String,
+        graph_type: Option<String>,  // Optional: :dag, :tree, etc.
+        parent: Option<Box<Expr>>,   // Optional: graph Name from Parent { }
+        properties: Vec<GraphProperty>,
+        methods: Vec<GraphMethod>,
+        position: SourcePosition,
+    },
     Expression {
         expr: Expr,
         position: SourcePosition,
     },
+}
+
+/// A property declaration inside a graph body: name: value
+#[derive(Debug, Clone, PartialEq)]
+pub struct GraphProperty {
+    pub name: String,
+    pub value: Expr,
+    pub position: SourcePosition,
+}
+
+/// A method declaration inside a graph body: fn name(params) { body }
+#[derive(Debug, Clone, PartialEq)]
+pub struct GraphMethod {
+    pub name: String,
+    pub params: Vec<Parameter>,
+    pub body: Vec<Stmt>,
+    pub is_static: bool,
+    pub is_getter: bool,
+    pub is_setter: bool,
+    pub is_private: bool,
+    pub guard: Option<Box<Expr>>,
+    pub position: SourcePosition,
 }
 
 /// A catch clause in a try/catch statement

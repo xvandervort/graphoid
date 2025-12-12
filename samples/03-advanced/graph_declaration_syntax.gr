@@ -1,0 +1,114 @@
+# Graph Declaration Syntax Demo
+# Demonstrates the new unified graph declaration syntax with intrinsic naming
+
+# Simple graph with properties only
+graph Point {
+    x: 0
+    y: 0
+}
+
+# Create an instance and modify it
+p = Point.clone()
+p.x = 10
+p.y = 20
+print("Point created with x=10, y=20")
+print(p.x)
+print(p.y)
+
+# Graph with properties and methods
+graph Counter {
+    count: 0
+
+    fn increment() {
+        self.count = self.count + 1
+    }
+
+    fn decrement() {
+        self.count = self.count - 1
+    }
+
+    fn reset() {
+        self.count = 0
+    }
+
+    fn value() {
+        return self.count
+    }
+}
+
+# Test Counter
+c = Counter.clone()
+c.increment()
+c.increment()
+c.increment()
+print("Counter after 3 increments:")
+print(c.value())
+c.decrement()
+print("Counter after decrement:")
+print(c.value())
+
+# Inheritance example
+graph Animal {
+    name: "unnamed"
+    sound: "..."
+
+    fn speak() {
+        print(self.name + " says: " + self.sound)
+    }
+
+    fn greet() {
+        print("Hello, I'm " + self.name)
+    }
+}
+
+graph Dog from Animal {
+    sound: "woof!"
+    breed: "unknown"
+
+    fn fetch() {
+        print(self.name + " fetches the ball!")
+    }
+}
+
+graph Cat from Animal {
+    sound: "meow!"
+    indoor: true
+
+    fn purr() {
+        print(self.name + " purrs contentedly")
+    }
+}
+
+# Test inheritance
+fido = Dog.clone()
+fido.name = "Fido"
+fido.breed = "Labrador"
+fido.greet()
+fido.speak()
+fido.fetch()
+
+whiskers = Cat.clone()
+whiskers.name = "Whiskers"
+whiskers.greet()
+whiskers.speak()
+whiskers.purr()
+
+# Graph with utility methods
+graph MathHelper {
+    fn square(x) {
+        return x * x
+    }
+
+    fn cube(x) {
+        return x * x * x
+    }
+}
+
+# Use methods (need instance for now)
+math = MathHelper.clone()
+print("5 squared:")
+print(math.square(5))
+print("3 cubed:")
+print(math.cube(3))
+
+print("Graph declaration syntax demo complete!")

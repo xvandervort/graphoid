@@ -12,3 +12,4 @@ pub mod behavior_framework_tests;
 pub mod module_manager_tests;
 pub mod circular_dependency_tests;
 pub mod parser_module_tests;
+pub mod graph_decl_syntax_tests;
