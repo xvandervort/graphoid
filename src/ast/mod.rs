@@ -467,3 +467,154 @@ pub enum EdgeLength {
     Fixed,                      // Single edge
     Variable { min: usize, max: usize },  // Variable-length path
 }
+
+// ============================================================================
+// Semantic Edges: AST Analysis Helpers
+// ============================================================================
+
+/// Result of analyzing a method body for property references
+#[derive(Debug, Clone, Default)]
+pub struct PropertyReferences {
+    /// Properties that are read (variable access)
+    pub reads: Vec<String>,
+    /// Properties that are written (assignment targets)
+    pub writes: Vec<String>,
+}
+
+impl PropertyReferences {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+/// Extract property references from a method body
+/// Given a list of valid property names, find reads and writes
+pub fn extract_property_references(body: &[Stmt], properties: &[String]) -> PropertyReferences {
+    let mut refs = PropertyReferences::new();
+    let prop_set: std::collections::HashSet<&String> = properties.iter().collect();
+
+    for stmt in body {
+        collect_from_stmt(stmt, &prop_set, &mut refs);
+    }
+
+    // Remove duplicates
+    refs.reads.sort();
+    refs.reads.dedup();
+    refs.writes.sort();
+    refs.writes.dedup();
+
+    refs
+}
+
+fn collect_from_stmt(stmt: &Stmt, properties: &std::collections::HashSet<&String>, refs: &mut PropertyReferences) {
+    match stmt {
+        Stmt::Assignment { target, value, .. } => {
+            // Check if assignment target is a property
+            if let AssignmentTarget::Variable(name) = target {
+                if properties.contains(name) {
+                    refs.writes.push(name.clone());
+                }
+            }
+            // Also collect reads from the value expression
+            collect_from_expr(value, properties, refs);
+        }
+        Stmt::VariableDecl { value, .. } => {
+            collect_from_expr(value, properties, refs);
+        }
+        Stmt::Return { value, .. } => {
+            if let Some(expr) = value {
+                collect_from_expr(expr, properties, refs);
+            }
+        }
+        Stmt::Expression { expr, .. } => {
+            collect_from_expr(expr, properties, refs);
+        }
+        Stmt::If { condition, then_branch, else_branch, .. } => {
+            collect_from_expr(condition, properties, refs);
+            for s in then_branch {
+                collect_from_stmt(s, properties, refs);
+            }
+            if let Some(else_stmts) = else_branch {
+                for s in else_stmts {
+                    collect_from_stmt(s, properties, refs);
+                }
+            }
+        }
+        Stmt::While { condition, body, .. } => {
+            collect_from_expr(condition, properties, refs);
+            for s in body {
+                collect_from_stmt(s, properties, refs);
+            }
+        }
+        Stmt::For { iterable, body, .. } => {
+            collect_from_expr(iterable, properties, refs);
+            for s in body {
+                collect_from_stmt(s, properties, refs);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_from_expr(expr: &Expr, properties: &std::collections::HashSet<&String>, refs: &mut PropertyReferences) {
+    match expr {
+        Expr::Variable { name, .. } => {
+            if properties.contains(name) {
+                refs.reads.push(name.clone());
+            }
+        }
+        Expr::Binary { left, right, .. } => {
+            collect_from_expr(left, properties, refs);
+            collect_from_expr(right, properties, refs);
+        }
+        Expr::Unary { operand, .. } => {
+            collect_from_expr(operand, properties, refs);
+        }
+        Expr::Call { callee, args, .. } => {
+            collect_from_expr(callee, properties, refs);
+            for arg in args {
+                match arg {
+                    Argument::Positional(expr) => collect_from_expr(expr, properties, refs),
+                    Argument::Named { value, .. } => collect_from_expr(value, properties, refs),
+                }
+            }
+        }
+        Expr::MethodCall { object, args, .. } => {
+            collect_from_expr(object, properties, refs);
+            for arg in args {
+                match arg {
+                    Argument::Positional(expr) => collect_from_expr(expr, properties, refs),
+                    Argument::Named { value, .. } => collect_from_expr(value, properties, refs),
+                }
+            }
+        }
+        Expr::Index { object, index, .. } => {
+            collect_from_expr(object, properties, refs);
+            collect_from_expr(index, properties, refs);
+        }
+        Expr::PropertyAccess { object, .. } => {
+            collect_from_expr(object, properties, refs);
+        }
+        Expr::List { elements, .. } => {
+            for elem in elements {
+                collect_from_expr(elem, properties, refs);
+            }
+        }
+        Expr::Map { entries, .. } => {
+            for (_, v) in entries {
+                collect_from_expr(v, properties, refs);
+            }
+        }
+        Expr::Lambda { body, .. } => {
+            collect_from_expr(body, properties, refs);
+        }
+        Expr::Conditional { condition, then_expr, else_expr, .. } => {
+            collect_from_expr(condition, properties, refs);
+            collect_from_expr(then_expr, properties, refs);
+            if let Some(else_e) = else_expr {
+                collect_from_expr(else_e, properties, refs);
+            }
+        }
+        _ => {}
+    }
+}

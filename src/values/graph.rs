@@ -283,10 +283,57 @@ impl Graph {
     /// Create a new graph that inherits from a parent
     pub fn from_parent(parent: Graph) -> Self {
         let mut child = parent.clone();
+
+        // Store parent's type name before we lose it
+        let parent_type_name = parent.type_name.clone();
+
         child.parent = Some(Box::new(parent));
         // Phase 18: Reset type_name so the child gets its own type when assigned
         // The parent's type_name is preserved in the parent field for is_a() checks
         child.type_name = None;
+
+        // Phase 3: Add __parent__ node and inherits_from edge for graph-based inheritance
+        if let Some(parent_name) = parent_type_name {
+            // Create __parent__ node storing reference to parent graph name
+            child.nodes.insert("__parent__".to_string(), GraphNode {
+                id: "__parent__".to_string(),
+                value: Value::string(parent_name.clone()),
+                node_type: Some("parent_reference".to_string()),
+                properties: HashMap::new(),
+                neighbors: HashMap::new(),
+                predecessors: HashMap::new(),
+            });
+
+            // Create inherits_from edge from child's type node to __parent__
+            // We'll create a virtual root node representing the child graph itself
+            if !child.nodes.contains_key("__self__") {
+                child.nodes.insert("__self__".to_string(), GraphNode {
+                    id: "__self__".to_string(),
+                    value: Value::string("self".to_string()),
+                    node_type: Some("graph_self".to_string()),
+                    properties: HashMap::new(),
+                    neighbors: HashMap::new(),
+                    predecessors: HashMap::new(),
+                });
+            }
+
+            // Add inherits_from edge from __self__ to __parent__
+            if let Some(self_node) = child.nodes.get_mut("__self__") {
+                self_node.neighbors.insert("__parent__".to_string(), EdgeInfo {
+                    edge_type: "inherits_from".to_string(),
+                    weight: None,
+                    properties: HashMap::new(),
+                });
+            }
+            if let Some(parent_node) = child.nodes.get_mut("__parent__") {
+                parent_node.predecessors.insert("__self__".to_string(), EdgeInfo {
+                    edge_type: "inherits_from".to_string(),
+                    weight: None,
+                    properties: HashMap::new(),
+                });
+            }
+        }
+
         child
     }
 
@@ -902,7 +949,14 @@ impl Graph {
 
     /// Get node value
     pub fn get_node(&self, id: &str) -> Option<&Value> {
-        self.nodes.get(id).map(|n| &n.value)
+        self.nodes.get(id).and_then(|n| {
+            // Don't return computed property alias nodes - these are for dependency tracking only
+            if n.node_type.as_deref() == Some("computed_property_alias") {
+                None
+            } else {
+                Some(&n.value)
+            }
+        })
     }
 
     /// Get all node IDs (like map.keys())
@@ -2692,6 +2746,297 @@ impl Graph {
                 });
             }
         }
+    }
+
+    /// Helper to add a semantic edge between two nodes (bidirectional: neighbor + predecessor)
+    fn add_semantic_edge(&mut self, from_id: &str, to_id: &str, edge_type: &str) {
+        if !self.nodes.contains_key(to_id) {
+            return;
+        }
+        // Add edge from -> to
+        if let Some(from_node) = self.nodes.get_mut(from_id) {
+            from_node.neighbors.insert(to_id.to_string(), EdgeInfo {
+                edge_type: edge_type.to_string(),
+                weight: None,
+                properties: HashMap::new(),
+            });
+        }
+        // Add predecessor edge back
+        if let Some(to_node) = self.nodes.get_mut(to_id) {
+            to_node.predecessors.insert(from_id.to_string(), EdgeInfo {
+                edge_type: edge_type.to_string(),
+                weight: None,
+                properties: HashMap::new(),
+            });
+        }
+    }
+
+    /// Add semantic edges from a method to the properties it reads/writes
+    /// This enables graph traversal from methods to data properties
+    pub fn add_method_property_edges(&mut self, method_name: &str, reads: &[String], writes: &[String]) {
+        let method_id = Self::method_node_id(method_name);
+
+        // Only add edges if the method node exists
+        if !self.nodes.contains_key(&method_id) {
+            return;
+        }
+
+        // Add "reads" edges from method to properties
+        for prop in reads {
+            self.add_semantic_edge(&method_id, prop, "reads");
+        }
+
+        // Add "writes" edges from method to properties
+        for prop in writes {
+            self.add_semantic_edge(&method_id, prop, "writes");
+        }
+    }
+
+    /// Get list of properties that a method reads
+    pub fn method_reads(&self, method_name: &str) -> Vec<String> {
+        let method_id = Self::method_node_id(method_name);
+        if let Some(method_node) = self.nodes.get(&method_id) {
+            method_node.neighbors.iter()
+                .filter(|(_, edge)| edge.edge_type == "reads")
+                .map(|(id, _)| id.clone())
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get list of properties that a method writes
+    pub fn method_writes(&self, method_name: &str) -> Vec<String> {
+        let method_id = Self::method_node_id(method_name);
+        if let Some(method_node) = self.nodes.get(&method_id) {
+            method_node.neighbors.iter()
+                .filter(|(_, edge)| edge.edge_type == "writes")
+                .map(|(id, _)| id.clone())
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get list of methods that read a property
+    pub fn property_readers(&self, property_name: &str) -> Vec<String> {
+        if let Some(prop_node) = self.nodes.get(property_name) {
+            prop_node.predecessors.iter()
+                .filter(|(_, edge)| edge.edge_type == "reads")
+                .filter_map(|(id, _)| {
+                    // Extract method name from __methods__/name
+                    if id.starts_with("__methods__/") {
+                        Some(id.strip_prefix("__methods__/").unwrap().to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get list of methods that write to a property
+    pub fn property_writers(&self, property_name: &str) -> Vec<String> {
+        if let Some(prop_node) = self.nodes.get(property_name) {
+            prop_node.predecessors.iter()
+                .filter(|(_, edge)| edge.edge_type == "writes")
+                .filter_map(|(id, _)| {
+                    // Extract method name from __methods__/name
+                    if id.starts_with("__methods__/") {
+                        Some(id.strip_prefix("__methods__/").unwrap().to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    // ==========================================================================
+    // Phase 2: Property Dependency Edges (for getters/computed properties)
+    // ==========================================================================
+
+    /// Get the node ID for a computed property (getter)
+    fn computed_property_node_id(getter_name: &str) -> String {
+        format!("__computed__/{}", getter_name)
+    }
+
+    /// Add dependency edges for a getter/computed property.
+    /// Creates a node for the property and "depends_on" edges to its dependencies.
+    /// Note: Also creates edges FROM the raw property name for API consistency
+    pub fn add_getter_dependency_edges(&mut self, getter_name: &str, dependencies: &[String]) {
+        let computed_id = Self::computed_property_node_id(getter_name);
+
+        // Ensure the computed property node exists
+        if !self.nodes.contains_key(&computed_id) {
+            self.nodes.insert(computed_id.clone(), GraphNode {
+                id: computed_id.clone(),
+                value: Value::string(getter_name.to_string()),
+                node_type: Some("computed_property".to_string()),
+                properties: HashMap::new(),
+                neighbors: HashMap::new(),
+                predecessors: HashMap::new(),
+            });
+        }
+
+        // Also create a simple property node for the getter name if it doesn't exist
+        // This enables edges() to show "area -> width" instead of "__computed__/area -> width"
+        // But mark it with a special node_type so property access doesn't return it
+        if !self.nodes.contains_key(getter_name) {
+            self.nodes.insert(getter_name.to_string(), GraphNode {
+                id: getter_name.to_string(),
+                value: Value::string(getter_name.to_string()),
+                node_type: Some("computed_property_alias".to_string()),
+                properties: HashMap::new(),
+                neighbors: HashMap::new(),
+                predecessors: HashMap::new(),
+            });
+        }
+
+        // Add "depends_on" edges from both computed node and alias to dependencies
+        for dep in dependencies {
+            self.add_semantic_edge(&computed_id, dep, "depends_on");
+            self.add_semantic_edge(getter_name, dep, "depends_on");
+        }
+    }
+
+    /// Get list of properties that a computed property depends on
+    pub fn dependencies(&self, property_name: &str) -> Vec<String> {
+        if let Some(prop_node) = self.nodes.get(property_name) {
+            prop_node.neighbors.iter()
+                .filter(|(_, edge)| edge.edge_type == "depends_on")
+                .map(|(id, _)| id.clone())
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get list of computed properties that depend on this property
+    pub fn dependents(&self, property_name: &str) -> Vec<String> {
+        if let Some(prop_node) = self.nodes.get(property_name) {
+            prop_node.predecessors.iter()
+                .filter(|(_, edge)| edge.edge_type == "depends_on")
+                // Filter out internal __computed__/ prefixed nodes
+                .filter(|(id, _)| !id.starts_with("__computed__/"))
+                .map(|(id, _)| id.clone())
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get properties in topological order based on dependencies.
+    /// Properties with no dependencies come first, then computed properties.
+    pub fn dependency_order(&self) -> Vec<String> {
+        use std::collections::{VecDeque, HashSet};
+
+        // Collect all property nodes (excluding method nodes and internal nodes)
+        let properties: Vec<String> = self.nodes.keys()
+            .filter(|id| !id.starts_with("__methods__") && !id.starts_with("__") && !id.starts_with("__computed__/"))
+            .cloned()
+            .collect();
+
+        // Build dependency counts
+        let mut in_degree: HashMap<String, usize> = HashMap::new();
+        let mut deps_map: HashMap<String, Vec<String>> = HashMap::new();
+
+        for prop in &properties {
+            in_degree.insert(prop.clone(), 0);
+            deps_map.insert(prop.clone(), Vec::new());
+        }
+
+        // Count dependencies
+        for prop in &properties {
+            if let Some(node) = self.nodes.get(prop) {
+                for (neighbor, edge) in &node.neighbors {
+                    if edge.edge_type == "depends_on" && properties.contains(neighbor) {
+                        // prop depends on neighbor
+                        if let Some(count) = in_degree.get_mut(prop) {
+                            *count += 1;
+                        }
+                        if let Some(deps) = deps_map.get_mut(neighbor) {
+                            deps.push(prop.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Kahn's algorithm for topological sort
+        let mut result = Vec::new();
+        let mut queue: VecDeque<String> = in_degree.iter()
+            .filter(|(_, &count)| count == 0)
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        let mut visited: HashSet<String> = HashSet::new();
+
+        while let Some(prop) = queue.pop_front() {
+            if visited.contains(&prop) {
+                continue;
+            }
+            visited.insert(prop.clone());
+            result.push(prop.clone());
+
+            if let Some(dependents) = deps_map.get(&prop) {
+                for dep in dependents {
+                    if let Some(count) = in_degree.get_mut(dep) {
+                        *count = count.saturating_sub(1);
+                        if *count == 0 && !visited.contains(dep) {
+                            queue.push_back(dep.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    // ==========================================================================
+    // Phase 3: Inheritance as Graph Structure
+    // ==========================================================================
+
+    /// Finalize inheritance node by replacing __self__ with actual type name.
+    /// Called after type_name is set to update the inheritance graph structure.
+    pub fn finalize_inheritance_node(&mut self, type_name: &str) {
+        // If there's a __self__ node, replace it with the type name node
+        if let Some(mut self_node) = self.nodes.remove("__self__") {
+            // Update node ID and value
+            self_node.id = type_name.to_string();
+            self_node.value = Value::string(type_name.to_string());
+
+            // Re-insert with new ID
+            self.nodes.insert(type_name.to_string(), self_node);
+
+            // Update predecessor references in __parent__ if it exists
+            if let Some(parent_node) = self.nodes.get_mut("__parent__") {
+                if let Some(edge) = parent_node.predecessors.remove("__self__") {
+                    parent_node.predecessors.insert(type_name.to_string(), edge);
+                }
+            }
+        }
+    }
+
+    /// Get list of ancestor type names by following the inheritance chain.
+    /// Returns type names of all parent graphs in order from immediate parent to root.
+    pub fn ancestors(&self) -> Vec<String> {
+        let mut result = Vec::new();
+        let mut current = self.parent.as_ref();
+
+        while let Some(parent) = current {
+            if let Some(name) = &parent.type_name {
+                result.push(name.clone());
+            }
+            current = parent.parent.as_ref();
+        }
+
+        result
     }
 
     /// Get a method attached to this graph by name

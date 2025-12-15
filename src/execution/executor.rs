@@ -1,4 +1,4 @@
-use crate::ast::{AssignmentTarget, BinaryOp, Expr, GraphMethod, GraphProperty, GraphRule, LiteralValue, Parameter, Stmt, UnaryOp};
+use crate::ast::{AssignmentTarget, BinaryOp, Expr, GraphMethod, GraphProperty, GraphRule, LiteralValue, Parameter, Stmt, UnaryOp, extract_property_references};
 use std::collections::HashMap;
 use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::execution::Environment;
@@ -1252,6 +1252,9 @@ impl Executor {
         // Set the intrinsic type name
         graph.type_name = Some(name.to_string());
 
+        // Phase 3: Update __self__ node to use actual type name for inheritance edges
+        graph.finalize_inheritance_node(name);
+
         // Apply graph type ruleset if specified
         if let Some(gtype) = graph_type {
             match gtype.as_str() {
@@ -1332,6 +1335,9 @@ impl Executor {
             }
         }
 
+        // Get property names for semantic edge analysis
+        let property_names: Vec<String> = properties.iter().map(|p| p.name.clone()).collect();
+
         // Add explicitly defined methods
         for method in methods {
             // For private methods declared with 'priv' keyword,
@@ -1356,8 +1362,19 @@ impl Executor {
                 guard: method.guard.clone(),
             };
 
+            // Analyze method body for property references (semantic edges)
+            let prop_refs = extract_property_references(&method.body, &property_names);
+
             // Store method in graph using the existing method storage mechanism
-            graph.attach_method(method_name, func);
+            graph.attach_method(method_name.clone(), func.clone());
+
+            // Add semantic edges from method to properties it reads/writes
+            graph.add_method_property_edges(&method_name, &prop_refs.reads, &prop_refs.writes);
+
+            // Phase 2: For getters, also add "depends_on" edges from property name to dependencies
+            if func.is_getter {
+                graph.add_getter_dependency_edges(&method_name, &prop_refs.reads);
+            }
         }
 
         // Create the value and bind it
@@ -5852,6 +5869,141 @@ impl Executor {
 
                 let has_method = check_method_in_chain(&graph, &method_name);
                 Ok(Value::boolean(has_method))
+            }
+            // Semantic edges: method-property relationship introspection
+            "method_reads" => {
+                // Get list of properties that a method reads
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "method_reads() expects 1 argument (method name), but got {}",
+                        args.len()
+                    )));
+                }
+                let method_name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::runtime(
+                        "method_reads() argument must be a string (method name)".to_string()
+                    )),
+                };
+                let props = graph.method_reads(&method_name);
+                let prop_values: Vec<Value> = props.iter().map(|p| Value::string(p.clone())).collect();
+                Ok(Value::list(crate::values::List::from_vec(prop_values)))
+            }
+            "method_writes" => {
+                // Get list of properties that a method writes
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "method_writes() expects 1 argument (method name), but got {}",
+                        args.len()
+                    )));
+                }
+                let method_name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::runtime(
+                        "method_writes() argument must be a string (method name)".to_string()
+                    )),
+                };
+                let props = graph.method_writes(&method_name);
+                let prop_values: Vec<Value> = props.iter().map(|p| Value::string(p.clone())).collect();
+                Ok(Value::list(crate::values::List::from_vec(prop_values)))
+            }
+            "property_readers" => {
+                // Get list of methods that read a property
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "property_readers() expects 1 argument (property name), but got {}",
+                        args.len()
+                    )));
+                }
+                let prop_name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::runtime(
+                        "property_readers() argument must be a string (property name)".to_string()
+                    )),
+                };
+                let methods = graph.property_readers(&prop_name);
+                let method_values: Vec<Value> = methods.iter().map(|m| Value::string(m.clone())).collect();
+                Ok(Value::list(crate::values::List::from_vec(method_values)))
+            }
+            "property_writers" => {
+                // Get list of methods that write to a property
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "property_writers() expects 1 argument (property name), but got {}",
+                        args.len()
+                    )));
+                }
+                let prop_name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::runtime(
+                        "property_writers() argument must be a string (property name)".to_string()
+                    )),
+                };
+                let methods = graph.property_writers(&prop_name);
+                let method_values: Vec<Value> = methods.iter().map(|m| Value::string(m.clone())).collect();
+                Ok(Value::list(crate::values::List::from_vec(method_values)))
+            }
+            // Phase 2: Property dependency methods
+            "dependencies" => {
+                // Get list of properties that this computed property depends on
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "dependencies() expects 1 argument (property name), but got {}",
+                        args.len()
+                    )));
+                }
+                let prop_name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::runtime(
+                        "dependencies() argument must be a string (property name)".to_string()
+                    )),
+                };
+                let deps = graph.dependencies(&prop_name);
+                let dep_values: Vec<Value> = deps.iter().map(|d| Value::string(d.clone())).collect();
+                Ok(Value::list(crate::values::List::from_vec(dep_values)))
+            }
+            "dependents" => {
+                // Get list of computed properties that depend on this property
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "dependents() expects 1 argument (property name), but got {}",
+                        args.len()
+                    )));
+                }
+                let prop_name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::runtime(
+                        "dependents() argument must be a string (property name)".to_string()
+                    )),
+                };
+                let deps = graph.dependents(&prop_name);
+                let dep_values: Vec<Value> = deps.iter().map(|d| Value::string(d.clone())).collect();
+                Ok(Value::list(crate::values::List::from_vec(dep_values)))
+            }
+            "dependency_order" => {
+                // Get properties in topological order based on dependencies
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "dependency_order() expects no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                let order = graph.dependency_order();
+                let order_values: Vec<Value> = order.iter().map(|p| Value::string(p.clone())).collect();
+                Ok(Value::list(crate::values::List::from_vec(order_values)))
+            }
+            // Phase 3: Inheritance methods
+            "ancestors" => {
+                // Get list of ancestor type names
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "ancestors() expects no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                let ancestors = graph.ancestors();
+                let ancestor_values: Vec<Value> = ancestors.iter().map(|a| Value::string(a.clone())).collect();
+                Ok(Value::list(crate::values::List::from_vec(ancestor_values)))
             }
             "edges" => {
                 // Get edges as a list of lists [from, to, edge_type]

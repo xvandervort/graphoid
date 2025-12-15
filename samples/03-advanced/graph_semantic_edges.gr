@@ -1,0 +1,142 @@
+# Semantic Edges in Graph-Based Classes
+#
+# Class-like graphs automatically create semantic edges that encode
+# relationships between methods, properties, and inheritance. This enables
+# graph algorithms to analyze class structure.
+
+print("=== Phase 1: Method-Property Edges ===")
+print("")
+
+# Counter graph with methods that read/write properties
+graph Counter {
+    count: 0
+    total: 0
+
+    fn get_count() {
+        return count
+    }
+
+    fn increment() {
+        count = count + 1
+        total = total + count
+    }
+
+    fn reset() {
+        count = 0
+    }
+}
+
+print("Counter graph created with methods:")
+print("- get_count: reads 'count'")
+print("- increment: reads and writes 'count' and 'total'")
+print("- reset: writes 'count'")
+print("")
+
+# Method reads/writes analysis
+print("Method 'get_count' reads:")
+reads = Counter.method_reads("get_count")
+print(reads)
+
+print("")
+print("Method 'increment' writes:")
+writes = Counter.method_writes("increment")
+print(writes)
+
+print("")
+print("Methods that write 'count':")
+writers = Counter.property_writers("count")
+print(writers)
+
+print("")
+print("=== Phase 2: Computed Property Dependencies ===")
+print("")
+
+graph Rectangle {
+    width: 10
+    height: 20
+
+    get area() {
+        return width * height
+    }
+
+    get perimeter() {
+        return 2 * (width + height)
+    }
+}
+
+print("Rectangle has computed properties:")
+print("- area: depends on width, height")
+print("- perimeter: depends on width, height")
+print("")
+
+# Show dependency analysis
+print("Dependencies of 'area':")
+deps = Rectangle.dependencies("area")
+print(deps)
+
+print("")
+print("Dependents of 'width':")
+deps = Rectangle.dependents("width")
+print(deps)
+
+print("")
+print("Properties in topological order (base props before computed):")
+order = Rectangle.dependency_order()
+print(order)
+
+print("")
+print("=== Phase 3: Inheritance as Graph Structure ===")
+print("")
+
+graph Animal {
+    name: "unknown"
+    sound: "..."
+
+    fn speak() {
+        return name + " says " + sound
+    }
+}
+
+graph Dog from Animal {
+    sound: "woof"
+}
+
+graph Poodle from Dog {
+    sound: "yip"
+}
+
+print("Poodle inherits from Dog inherits from Animal")
+print("")
+
+print("Poodle's ancestors:")
+ancestors = Poodle.ancestors()
+print(ancestors)
+
+print("")
+print("Graph traversal from Poodle to __parent__:")
+has_path = Poodle.has_path("Poodle", "__parent__")
+print("Has path:")
+print(has_path)
+
+print("")
+print("All edges showing inheritance:")
+edges = Poodle.edges(:all)
+for edge in edges {
+    edge_type = edge[2]
+    if edge_type == "inherits_from" {
+        print(edge)
+    }
+}
+
+print("")
+print("=== Graph-Theoretic Analysis ===")
+print("")
+
+# The graph structure enables powerful queries
+print("With semantic edges, you can:")
+print("1. Find all side-effects of calling a method")
+print("2. Determine which computed properties need recalculation")
+print("3. Trace inheritance chains via graph traversal")
+print("4. Validate encapsulation (what methods access private data)")
+print("")
+print("Done!")

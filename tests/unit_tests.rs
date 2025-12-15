@@ -46,4 +46,5 @@ mod unit {
     pub mod fs_list_dir_tests;
     pub mod exec_tests;
     pub mod graph_decl_syntax_tests;
+    pub mod semantic_edges_tests;
 }
