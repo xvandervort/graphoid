@@ -16,9 +16,9 @@
 ## What Works
 
 ### ✅ Core Method System
-- `fn Graph.method()` syntax parses and executes correctly
+- `graph Name { fn method() { } }` unified declaration syntax
 - Methods are stored as graph nodes in `__methods__` branch
-- `self` binding works inside methods
+- `self` binding works inside methods (explicit or implicit)
 - Mutation persistence works (changes to `self` persist to original variable)
 - Method chaining works with explicit assignment: `x = x.method1().method2()`
 - Single method calls persist mutations directly
@@ -387,25 +387,36 @@ The class-like graphs implementation is **COMPLETE** through Phase 23. All plann
 - Phase 22: Mixins (`include()`)
 - Phase 23: Duck typing (`responds_to()`)
 
-### Next: Unified Graph Declaration Syntax
+### Unified Graph Declaration Syntax (December 12, 2025)
 
-The current syntax works but is scattered. A new unified syntax is designed and approved:
+**Phases 1-5 of GRAPH_DECLARATION_SYNTAX.md: ✅ COMPLETE**
+
+The new unified syntax is now working:
 
 ```graphoid
-# NEW (everything in one place, implicit self)
-Animal = graph {
+graph Animal {
+    configure { readable: :sound }
+    rule :no_cycles
+
     sound: none
 
     fn speak() {
-        print(sound)
+        print(sound)  # Implicit self!
     }
 }
 
-Dog = graph from Animal {
+graph Dog from Animal {
     sound: "woof"
 }
 ```
 
-See `GRAPH_DECLARATION_SYNTAX.md` for the complete design and implementation plan.
+**What's implemented:**
+- Phase 1: Named graph declaration `graph Name { }`
+- Phase 2: Implicit self resolution
+- Phase 3: Inheritance with `from` keyword
+- Phase 4: Configure block (`readable`, `writable`, `accessible`)
+- Phase 5: Static methods in body, graph types, `rule` keyword
 
-This will **replace** the old syntax (`fn Graph.method()` etc.) rather than supplement it.
+**Phase 6: ✅ COMPLETE** - Old external syntax removed (`fn Graph.method()` etc.)
+
+See `GRAPH_DECLARATION_SYNTAX.md` for the complete design and implementation plan.

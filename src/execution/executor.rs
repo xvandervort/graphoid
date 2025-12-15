@@ -1,4 +1,4 @@
-use crate::ast::{AssignmentTarget, BinaryOp, Expr, GraphMethod, GraphProperty, LiteralValue, Parameter, Stmt, UnaryOp};
+use crate::ast::{AssignmentTarget, BinaryOp, Expr, GraphMethod, GraphProperty, GraphRule, LiteralValue, Parameter, Stmt, UnaryOp};
 use std::collections::HashMap;
 use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::execution::Environment;
@@ -822,10 +822,11 @@ impl Executor {
                 parent,
                 properties,
                 methods,
+                rules,
                 config,
                 position,
             } => {
-                self.eval_graph_decl(name, graph_type, parent, properties, methods, config, position)
+                self.eval_graph_decl(name, graph_type, parent, properties, methods, rules, config, position)
             }
         }
     }
@@ -1219,10 +1220,12 @@ impl Executor {
         parent_expr: &Option<Box<Expr>>,
         properties: &[GraphProperty],
         methods: &[GraphMethod],
+        rules: &[GraphRule],
         config: &HashMap<String, Vec<String>>,
         _position: &SourcePosition,
     ) -> Result<Option<Value>> {
         use crate::values::{Graph, GraphType};
+        use crate::graph::RuleInstance;
 
         // Determine base graph type
         let base_graph_type = match graph_type.as_deref() {
@@ -1243,7 +1246,7 @@ impl Executor {
                 )));
             }
         } else {
-            Graph::new(base_graph_type)
+            Graph::new(base_graph_type.clone())
         };
 
         // Set the intrinsic type name
@@ -1266,6 +1269,29 @@ impl Executor {
         for prop in properties {
             let value = self.eval_expr(&prop.value)?;
             graph.add_node(prop.name.clone(), value)?;
+        }
+
+        // Process rule declarations (rule :name or rule :name, param)
+        for rule in rules {
+            // Get optional parameter value
+            let param = if let Some(param_expr) = &rule.param {
+                let param_value = self.eval_expr(param_expr)?;
+                match &param_value.kind {
+                    ValueKind::Number(n) => Some(*n),
+                    _ => {
+                        return Err(GraphoidError::runtime(format!(
+                            "Rule parameter must be a number, got {}",
+                            param_value.type_name()
+                        )));
+                    }
+                }
+            } else {
+                None
+            };
+
+            // Convert rule name to RuleSpec and add to graph
+            let rule_spec = Self::symbol_to_rule_spec(&rule.name, param)?;
+            graph.add_rule(RuleInstance::new(rule_spec))?;
         }
 
         // Process configure block options
@@ -7328,9 +7354,18 @@ impl Executor {
             self.function_graph.borrow_mut().push_call(func_id.clone(), arg_values.to_vec());
         }
 
-        // Use the captured environment (from method definition)
-        let parent_env = func.env.borrow().clone();
-        let call_env = Environment::with_parent(parent_env);
+        // Save current environment first
+        let saved_env_clone = self.env.clone();
+
+        // For static methods, use CURRENT env as parent (late binding)
+        // This allows static methods to reference the graph type by name
+        // For instance methods, use the captured env (closures work as expected)
+        let call_env = if func.is_static {
+            Environment::with_parent(saved_env_clone)
+        } else {
+            let parent_env = func.env.borrow().clone();
+            Environment::with_parent(parent_env)
+        };
 
         // Save current environment and switch to call environment
         let saved_env = std::mem::replace(&mut self.env, call_env);

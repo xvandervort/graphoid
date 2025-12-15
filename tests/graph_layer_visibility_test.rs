@@ -37,13 +37,14 @@ fn execute_with_result(source: &str) -> Result<Executor, String> {
 #[test]
 fn test_nodes_hides_methods_by_default() {
     let code = r#"
-        g = graph{}
+        graph G {
+            fn my_method() {
+                return 42
+            }
+        }
+        g = G.clone()
         g.add_node("A", 1)
         g.add_node("B", 2)
-
-        fn g.my_method() {
-            return 42
-        }
 
         node_list = g.nodes()
         count = node_list.len()
@@ -62,17 +63,18 @@ fn test_nodes_hides_methods_by_default() {
 #[test]
 fn test_nodes_all_includes_methods() {
     let code = r#"
-        g = graph{}
+        graph G {
+            fn method1() {
+                return 1
+            }
+
+            fn method2() {
+                return 2
+            }
+        }
+        g = G.clone()
         g.add_node("A", 1)
         g.add_node("B", 2)
-
-        fn g.method1() {
-            return 1
-        }
-
-        fn g.method2() {
-            return 2
-        }
 
         # :all should include __methods__ branch and method nodes
         all_nodes = g.nodes(:all)
@@ -93,14 +95,15 @@ fn test_nodes_all_includes_methods() {
 #[test]
 fn test_node_count_data_only() {
     let code = r#"
-        g = graph{}
+        graph G {
+            fn helper() {
+                return self.get_node("X")
+            }
+        }
+        g = G.clone()
         g.add_node("X", 10)
         g.add_node("Y", 20)
         g.add_node("Z", 30)
-
-        fn g.helper() {
-            return self.get_node("X")
-        }
 
         count = g.node_count()
     "#;
@@ -122,14 +125,15 @@ fn test_node_count_data_only() {
 #[test]
 fn test_edges_hides_method_edges_by_default() {
     let code = r#"
-        g = graph{}
+        graph G {
+            fn get_a() {
+                return self.get_node("A")
+            }
+        }
+        g = G.clone()
         g.add_node("A", 1)
         g.add_node("B", 2)
         g.add_edge("A", "B", "connected")
-
-        fn g.get_a() {
-            return self.get_node("A")
-        }
 
         edge_list = g.edges()
         edge_count = edge_list.len()
@@ -148,14 +152,15 @@ fn test_edges_hides_method_edges_by_default() {
 #[test]
 fn test_edges_all_includes_method_edges() {
     let code = r#"
-        g = graph{}
+        graph G {
+            fn method1() {
+                return 1
+            }
+        }
+        g = G.clone()
         g.add_node("A", 1)
         g.add_node("B", 2)
         g.add_edge("A", "B", "connected")
-
-        fn g.method1() {
-            return 1
-        }
 
         # :all should include edges to method nodes
         all_edges = g.edges(:all)
@@ -176,16 +181,17 @@ fn test_edges_all_includes_method_edges() {
 #[test]
 fn test_edge_count_data_only() {
     let code = r#"
-        g = graph{}
+        graph G {
+            fn method() {
+                return 0
+            }
+        }
+        g = G.clone()
         g.add_node("A", 1)
         g.add_node("B", 2)
         g.add_node("C", 3)
         g.add_edge("A", "B")
         g.add_edge("B", "C")
-
-        fn g.method() {
-            return 0
-        }
 
         count = g.edge_count()
     "#;
@@ -237,14 +243,15 @@ fn test_edges_returns_readable_format() {
 #[test]
 fn test_nodes_and_node_count_consistent() {
     let code = r#"
-        g = graph{}
+        graph G {
+            fn test() {
+                return 0
+            }
+        }
+        g = G.clone()
         g.add_node("A", 1)
         g.add_node("B", 2)
         g.add_node("C", 3)
-
-        fn g.test() {
-            return 0
-        }
 
         nodes_len = g.nodes().len()
         node_count_val = g.node_count()
@@ -261,16 +268,17 @@ fn test_nodes_and_node_count_consistent() {
 #[test]
 fn test_edges_and_edge_count_consistent() {
     let code = r#"
-        g = graph{}
+        graph G {
+            fn test() {
+                return 0
+            }
+        }
+        g = G.clone()
         g.add_node("A", 1)
         g.add_node("B", 2)
         g.add_node("C", 3)
         g.add_edge("A", "B")
         g.add_edge("B", "C")
-
-        fn g.test() {
-            return 0
-        }
 
         edges_len = g.edges().len()
         edge_count_val = g.edge_count()

@@ -91,7 +91,7 @@ pub enum Stmt {
         finally_block: Option<Vec<Stmt>>,
         position: SourcePosition,
     },
-    /// Named graph declaration: graph Name { configure {...}, properties, methods }
+    /// Named graph declaration: graph Name { configure {...}, properties, methods, rules }
     /// This creates a graph type with intrinsic identity
     GraphDecl {
         name: String,
@@ -99,6 +99,7 @@ pub enum Stmt {
         parent: Option<Box<Expr>>,   // Optional: graph Name from Parent { }
         properties: Vec<GraphProperty>,
         methods: Vec<GraphMethod>,
+        rules: Vec<GraphRule>,       // rule :no_cycles, rule :max_degree, 3
         config: std::collections::HashMap<String, Vec<String>>,  // configure { readable: [:x], writable: :y }
         position: SourcePosition,
     },
@@ -127,6 +128,14 @@ pub struct GraphMethod {
     pub is_setter: bool,
     pub is_private: bool,
     pub guard: Option<Box<Expr>>,
+    pub position: SourcePosition,
+}
+
+/// A rule declaration inside a graph body: rule :no_cycles or rule :max_degree, 3
+#[derive(Debug, Clone, PartialEq)]
+pub struct GraphRule {
+    pub name: String,                // The rule name (e.g., "no_cycles", "max_degree")
+    pub param: Option<Expr>,         // Optional parameter (e.g., 3 for :max_degree, 3)
     pub position: SourcePosition,
 }
 

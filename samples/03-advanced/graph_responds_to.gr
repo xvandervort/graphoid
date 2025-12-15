@@ -2,25 +2,25 @@
 # Check if a graph has a method with the given name
 
 # Define a base graph with methods
-Animal = graph {}
+graph Animal {
+    fn speak() {
+        return "..."
+    }
 
-fn Animal.speak() {
-    return "..."
-}
-
-fn Animal.breathe() {
-    return "breathing"
+    fn breathe() {
+        return "breathing"
+    }
 }
 
 # Define a child graph with inheritance
-Dog = graph from Animal {}
+graph Dog from Animal {
+    fn speak() {
+        return "woof!"
+    }
 
-fn Dog.speak() {
-    return "woof!"
-}
-
-fn Dog.fetch() {
-    return "fetching ball"
+    fn fetch() {
+        return "fetching ball"
+    }
 }
 
 # Test responds_to on the base type

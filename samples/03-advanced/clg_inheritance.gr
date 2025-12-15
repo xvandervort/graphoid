@@ -1,6 +1,6 @@
 # Class-Like Graphs: Inheritance Demo (Phase 14)
 #
-# Demonstrates the `graph from Parent {}` syntax for inheritance.
+# Demonstrates the `graph Name from Parent {}` syntax for inheritance.
 # Child graphs inherit all data nodes, methods, and rules from their parent.
 
 print("=== Inheritance Demo ===")
@@ -11,22 +11,24 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Basic Inheritance ---")
 
-Animal = graph{}
-Animal.name = "unknown"
-Animal.sound = "..."
+graph Animal {
+    name: "unknown"
+    sound: "..."
 
-fn Animal.speak() {
-    return self.name + " says: " + self.sound
-}
+    fn speak() {
+        return name + " says: " + sound
+    }
 
-fn Animal.describe() {
-    return "I am a " + self.name
+    fn describe() {
+        return "I am a " + name
+    }
 }
 
 # Dog inherits from Animal
-Dog = graph from Animal {}
-Dog.name = "dog"
-Dog.sound = "Woof!"
+graph Dog from Animal {
+    name: "dog"
+    sound: "Woof!"
+}
 
 print("Animal: " + Animal.speak())
 print("Dog: " + Dog.speak())
@@ -39,13 +41,14 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Method Override ---")
 
-Cat = graph from Animal {}
-Cat.name = "cat"
-Cat.sound = "Meow!"
+graph Cat from Animal {
+    name: "cat"
+    sound: "Meow!"
 
-# Override the describe method
-fn Cat.describe() {
-    return "I am a fancy " + self.name + " who says " + self.sound
+    # Override the describe method
+    fn describe() {
+        return "I am a fancy " + name + " who says " + sound
+    }
 }
 
 print("Cat speak (inherited): " + Cat.speak())
@@ -58,27 +61,30 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Chained Inheritance ---")
 
-Vehicle = graph{}
-Vehicle.wheels = 0
+graph Vehicle {
+    wheels: 0
 
-fn Vehicle.describe() {
-    return "Vehicle with " + self.wheels.to_string() + " wheels"
+    fn describe() {
+        return "Vehicle with " + wheels.to_string() + " wheels"
+    }
 }
 
-Car = graph from Vehicle {}
-Car.wheels = 4
-Car.doors = 4
+graph Car from Vehicle {
+    wheels: 4
+    doors: 4
 
-fn Car.describe() {
-    return "Car with " + self.wheels.to_string() + " wheels and " + self.doors.to_string() + " doors"
+    fn describe() {
+        return "Car with " + wheels.to_string() + " wheels and " + doors.to_string() + " doors"
+    }
 }
 
-SportsCar = graph from Car {}
-SportsCar.doors = 2
-SportsCar.top_speed = 200
+graph SportsCar from Car {
+    doors: 2
+    top_speed: 200
 
-fn SportsCar.describe() {
-    return "SportsCar with " + self.doors.to_string() + " doors, top speed " + self.top_speed.to_string() + " mph"
+    fn describe() {
+        return "SportsCar with " + doors.to_string() + " doors, top speed " + top_speed.to_string() + " mph"
+    }
 }
 
 print("Vehicle: " + Vehicle.describe())
@@ -92,44 +98,46 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Constructor Pattern ---")
 
-Shape = graph{}
-Shape.x = 0
-Shape.y = 0
+graph Shape {
+    x: 0
+    y: 0
 
-fn Shape.new(x, y) {
-    s = self.clone()
-    s.x = x
-    s.y = y
-    return s
-}
+    fn new(px, py) {
+        s = self.clone()
+        s.x = px
+        s.y = py
+        return s
+    }
 
-fn Shape.move(dx, dy) {
-    self.x = self.x + dx
-    self.y = self.y + dy
-}
+    fn move(dx, dy) {
+        x = x + dx
+        y = y + dy
+    }
 
-fn Shape.position() {
-    return "(" + self.x.to_string() + ", " + self.y.to_string() + ")"
+    fn position() {
+        return "(" + x.to_string() + ", " + y.to_string() + ")"
+    }
 }
 
 # Circle inherits from Shape
-Circle = graph from Shape {}
-Circle.radius = 1
+graph Circle from Shape {
+    radius: 1
 
-fn Circle.new(x, y, r) {
-    c = self.clone()
-    c.x = x
-    c.y = y
-    c.radius = r
-    return c
-}
+    fn new(px, py, r) {
+        c = self.clone()
+        c.x = px
+        c.y = py
+        c.radius = r
+        return c
+    }
 
-fn Circle.area() {
-    return 3.14159 * self.radius * self.radius
-}
+    fn area() {
+        return 3.14159 * radius * radius
+    }
 
-fn Circle.describe() {
-    return "Circle at " + self.position() + " with radius " + self.radius.to_string()
+    fn describe() {
+        return "Circle at " + position() + " with radius " + radius.to_string()
+    }
 }
 
 c1 = Circle.new(10, 20, 5)
@@ -146,23 +154,25 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Parent Unchanged ---")
 
-Base = graph{}
-Base.value = 100
+graph Base {
+    value: 100
 
-fn Base.get() {
-    return self.value
+    fn get_value() {
+        return value
+    }
 }
 
-Child = graph from Base {}
-Child.value = 200
+graph Child from Base {
+    value: 200
 
-fn Child.get() {
-    return self.value * 2
+    fn get_value() {
+        return value * 2
+    }
 }
 
-print("Base value: " + Base.get().to_string())
-print("Child value: " + Child.get().to_string())
-print("Base still: " + Base.get().to_string())
+print("Base value: " + Base.get_value().to_string())
+print("Child value: " + Child.get_value().to_string())
+print("Base still: " + Base.get_value().to_string())
 
 print("")
 print("=== Demo Complete ===")

@@ -10,14 +10,17 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Basic type_of() ---")
 
-Animal = graph{}
-Animal.species = "unknown"
+graph Animal {
+    species: "unknown"
+}
 
-Dog = graph from Animal {}
-Dog.species = "canine"
+graph Dog from Animal {
+    species: "canine"
+}
 
-Cat = graph from Animal {}
-Cat.species = "feline"
+graph Cat from Animal {
+    species: "feline"
+}
 
 print("Animal.type_of() = " + Animal.type_of())
 print("Dog.type_of() = " + Dog.type_of())
@@ -63,8 +66,9 @@ print("fido.is_a(\"Animal\") = " + fido.is_a("Animal").to_string())
 print("whiskers.is_a(\"Animal\") = " + whiskers.is_a("Animal").to_string())
 
 # Multi-level inheritance
-Puppy = graph from Dog {}
-Puppy.age_group = "young"
+graph Puppy from Dog {
+    age_group: "young"
+}
 
 spot = Puppy.clone()
 spot.name = "Spot"

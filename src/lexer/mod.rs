@@ -812,6 +812,7 @@ impl Lexer {
             "static" => TokenType::Static,
             "when" => TokenType::When,
             "configure" => TokenType::Configure,
+            "rule" => TokenType::Rule,
             "precision" => TokenType::Precision,
             "and" => TokenType::And,
             "or" => TokenType::Or,

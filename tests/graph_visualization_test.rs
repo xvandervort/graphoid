@@ -91,12 +91,14 @@ fn test_visualize_contains_edges() {
 #[test]
 fn test_visualize_data_only_by_default() {
     let code = r#"
-        g = graph{}
-        g.add_node("data_node", 1)
-
-        fn g.my_method() {
-            return 42
+        graph G {
+            fn my_method() {
+                return 42
+            }
         }
+
+        g = G.clone()
+        g.add_node("data_node", 1)
 
         viz = g.visualize()
         has_data = viz.contains("data_node")
@@ -115,12 +117,14 @@ fn test_visualize_data_only_by_default() {
 #[test]
 fn test_visualize_all_includes_methods() {
     let code = r#"
-        g = graph{}
-        g.add_node("data_node", 1)
-
-        fn g.my_method() {
-            return 42
+        graph G {
+            fn my_method() {
+                return 42
+            }
         }
+
+        g = G.clone()
+        g.add_node("data_node", 1)
 
         viz = g.visualize(:all)
         has_methods = viz.contains("__methods__")
@@ -207,12 +211,14 @@ fn test_to_dot_has_edge_label() {
 #[test]
 fn test_to_dot_data_only_by_default() {
     let code = r#"
-        g = graph{}
-        g.add_node("data", 1)
-
-        fn g.method() {
-            return 0
+        graph G {
+            fn method() {
+                return 0
+            }
         }
+
+        g = G.clone()
+        g.add_node("data", 1)
 
         dot = g.to_dot()
         has_methods = dot.contains("__methods__")

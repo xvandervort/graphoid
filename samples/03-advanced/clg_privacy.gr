@@ -11,32 +11,33 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Basic Private Method ---")
 
-Calculator = graph{}
-Calculator.value = 0
+graph Calculator {
+    value: 0
 
-# Private helper method - starts with _
-fn Calculator._validate(n) {
-    if n < 0 {
-        return 0  # Clamp negative to 0
+    # Private helper method - starts with _
+    fn _validate(n) {
+        if n < 0 {
+            return 0  # Clamp negative to 0
+        }
+        return n
     }
-    return n
-}
 
-# Public method that uses private helper
-fn Calculator.set(n) {
-    self.value = self._validate(n)  # OK - internal call
-}
+    # Public method that uses private helper
+    fn set_value(n) {
+        value = self._validate(n)  # OK - internal call
+    }
 
-fn Calculator.get() {
-    return self.value
+    fn get_value() {
+        return value
+    }
 }
 
 calc = Calculator.clone()
-calc.set(10)
-print("Set to 10: " + calc.get().to_string())
+calc.set_value(10)
+print("Set to 10: " + calc.get_value().to_string())
 
-calc.set(-5)
-print("Set to -5 (clamped): " + calc.get().to_string())
+calc.set_value(-5)
+print("Set to -5 (clamped): " + calc.get_value().to_string())
 
 print("")
 
@@ -45,22 +46,23 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Nested Private Calls ---")
 
-DataProcessor = graph{}
-DataProcessor.data = []
+graph DataProcessor {
+    data: []
 
-fn DataProcessor._clean(x) {
-    # Remove whitespace equivalent - just return the value for now
-    return x
-}
+    fn _clean(x) {
+        # Remove whitespace equivalent - just return the value for now
+        return x
+    }
 
-fn DataProcessor._transform(x) {
-    # Call another private method
-    return self._clean(x) * 2
-}
+    fn _transform(x) {
+        # Call another private method
+        return self._clean(x) * 2
+    }
 
-fn DataProcessor.process(x) {
-    # Public method calls private methods
-    return self._transform(x)
+    fn process(x) {
+        # Public method calls private methods
+        return self._transform(x)
+    }
 }
 
 dp = DataProcessor.clone()
@@ -74,20 +76,22 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Private Methods with Inheritance ---")
 
-Base = graph{}
-Base.factor = 1
+graph Base {
+    factor: 1
 
-fn Base._secret() {
-    return self.factor * 100
-}
+    fn _secret() {
+        return factor * 100
+    }
 
-fn Base.reveal() {
-    return self._secret()  # Public method exposes private
+    fn reveal() {
+        return self._secret()  # Public method exposes private
+    }
 }
 
 # Child inherits the private method
-Child = graph from Base {}
-Child.factor = 2
+graph Child from Base {
+    factor: 2
+}
 
 # Child can also call inherited private through public
 print("Base reveal: " + Base.reveal().to_string())
@@ -100,19 +104,20 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- External Private Call Prevention ---")
 
-Secret = graph{}
-Secret.code = 42
+graph Secret {
+    code: 42
 
-fn Secret._hidden() {
-    return self.code
-}
+    fn _hidden() {
+        return code
+    }
 
-fn Secret.public() {
-    return self._hidden()
+    fn public_method() {
+        return self._hidden()
+    }
 }
 
 # This works - going through public method
-print("Via public: " + Secret.public().to_string())
+print("Via public: " + Secret.public_method().to_string())
 
 # Uncomment to see error:
 # Secret._hidden()  # ERROR: Cannot call private method

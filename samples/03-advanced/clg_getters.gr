@@ -11,17 +11,18 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Basic Getter ---")
 
-Circle = graph{}
-Circle.radius = 0
+graph Circle {
+    radius: 0
 
-# Define area as a getter using `get` keyword
-get Circle.area() {
-    return 3.14159 * self.radius * self.radius
-}
+    # Define area as a getter using `get` keyword
+    get area() {
+        return 3.14159 * radius * radius
+    }
 
-# Define circumference as another getter
-get Circle.circumference() {
-    return 2 * 3.14159 * self.radius
+    # Define circumference as another getter
+    get circumference() {
+        return 2 * 3.14159 * radius
+    }
 }
 
 # Create instance
@@ -40,13 +41,14 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Data Node Takes Priority ---")
 
-Point = graph{}
-Point.x = 0
-Point.y = 0
+graph Point {
+    x: 0
+    y: 0
 
-# This getter would be shadowed if we set a data node with the same name
-get Point.description() {
-    return "(" + self.x.to_string() + ", " + self.y.to_string() + ")"
+    # This getter would be shadowed if we set a data node with the same name
+    get description() {
+        return "(" + x.to_string() + ", " + y.to_string() + ")"
+    }
 }
 
 p = Point.clone()
@@ -64,26 +66,28 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Getters with Inheritance ---")
 
-Shape = graph{}
-Shape.name = "shape"
+graph Shape {
+    name: "shape"
 
-get Shape.info() {
-    return "Shape: " + self.name
+    get info() {
+        return "Shape: " + name
+    }
 }
 
-Rectangle = graph from Shape {}
-Rectangle.name = "rectangle"
-Rectangle.width = 0
-Rectangle.height = 0
+graph Rectangle from Shape {
+    name: "rectangle"
+    width: 0
+    height: 0
 
-# Override the getter in child
-get Rectangle.info() {
-    return "Rectangle " + self.width.to_string() + "x" + self.height.to_string()
-}
+    # Override the getter in child
+    get info() {
+        return "Rectangle " + width.to_string() + "x" + height.to_string()
+    }
 
-# Add new getter in child
-get Rectangle.area() {
-    return self.width * self.height
+    # Add new getter in child
+    get area() {
+        return width * height
+    }
 }
 
 rect = Rectangle.clone()
@@ -102,17 +106,18 @@ print("--- Methods vs Getters ---")
 # Regular methods use `fn` and require parens
 # Getters use `get` and can be accessed without parens
 
-Counter = graph{}
-Counter.value = 0
+graph Counter {
+    value: 0
 
-# Getter - access without parens
-get Counter.doubled() {
-    return self.value * 2
-}
+    # Getter - access without parens
+    get doubled() {
+        return value * 2
+    }
 
-# Regular method - requires parens for parameters
-fn Counter.add(n) {
-    self.value = self.value + n
+    # Regular method - requires parens for parameters
+    fn add(n) {
+        value = value + n
+    }
 }
 
 counter = Counter.clone()

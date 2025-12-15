@@ -11,22 +11,23 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Setter with Validation ---")
 
-Person = graph{}
-Person._age = 0  # Private backing field
+graph Person {
+    _age: 0  # Private backing field
 
-# Getter for age
-get Person.age() {
-    return self._age
-}
+    # Getter for age
+    get age() {
+        return _age
+    }
 
-# Setter for age with validation
-set Person.age(value) {
-    if value < 0 {
-        self._age = 0
-    } else if value > 150 {
-        self._age = 150
-    } else {
-        self._age = value
+    # Setter for age with validation
+    set age(value) {
+        if value < 0 {
+            _age = 0
+        } else if value > 150 {
+            _age = 150
+        } else {
+            _age = value
+        }
     }
 }
 
@@ -47,44 +48,45 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Computed Property (getter + setter) ---")
 
-Circle = graph{}
-Circle._radius = 0
+graph Circle {
+    _radius: 0
 
-# Getter for radius
-get Circle.radius() {
-    return self._radius
-}
-
-# Setter for radius
-set Circle.radius(value) {
-    if value < 0 {
-        self._radius = 0
-    } else {
-        self._radius = value
+    # Getter for radius
+    get radius() {
+        return _radius
     }
-}
 
-# Getter for area (read-only computed property)
-get Circle.area() {
-    return 3.14159 * self._radius * self._radius
-}
-
-# Setter for area - computes radius from area
-set Circle.area(value) {
-    # area = pi * r^2, so r = sqrt(area / pi)
-    if value < 0 {
-        self._radius = 0
-    } else {
-        # Simple approximation of sqrt for positive numbers
-        r = value / 3.14159
-        # Newton's method for sqrt (10 iterations)
-        guess = r / 2
-        i = 0
-        while i < 10 {
-            guess = (guess + r / guess) / 2
-            i = i + 1
+    # Setter for radius
+    set radius(value) {
+        if value < 0 {
+            _radius = 0
+        } else {
+            _radius = value
         }
-        self._radius = guess
+    }
+
+    # Getter for area (read-only computed property)
+    get area() {
+        return 3.14159 * _radius * _radius
+    }
+
+    # Setter for area - computes radius from area
+    set area(value) {
+        # area = pi * r^2, so r = sqrt(area / pi)
+        if value < 0 {
+            _radius = 0
+        } else {
+            # Simple approximation of sqrt for positive numbers
+            r = value / 3.14159
+            # Newton's method for sqrt (10 iterations)
+            guess = r / 2
+            i = 0
+            while i < 10 {
+                guess = (guess + r / guess) / 2
+                i = i + 1
+            }
+            _radius = guess
+        }
     }
 }
 
@@ -106,34 +108,35 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Setter with Inheritance ---")
 
-Temperature = graph{}
-Temperature._celsius = 0
+graph Temperature {
+    _celsius: 0
 
-get Temperature.celsius() {
-    return self._celsius
-}
+    get celsius() {
+        return _celsius
+    }
 
-set Temperature.celsius(value) {
-    self._celsius = value
-}
+    set celsius(value) {
+        _celsius = value
+    }
 
-get Temperature.fahrenheit() {
-    return self._celsius * 9 / 5 + 32
-}
+    get fahrenheit() {
+        return _celsius * 9 / 5 + 32
+    }
 
-set Temperature.fahrenheit(value) {
-    self._celsius = (value - 32) * 5 / 9
+    set fahrenheit(value) {
+        _celsius = (value - 32) * 5 / 9
+    }
 }
 
 # Child class adds kelvin
-ScientificTemp = graph from Temperature {}
+graph ScientificTemp from Temperature {
+    get kelvin() {
+        return _celsius + 273.15
+    }
 
-get ScientificTemp.kelvin() {
-    return self._celsius + 273.15
-}
-
-set ScientificTemp.kelvin(value) {
-    self._celsius = value - 273.15
+    set kelvin(value) {
+        _celsius = value - 273.15
+    }
 }
 
 temp = ScientificTemp.clone()

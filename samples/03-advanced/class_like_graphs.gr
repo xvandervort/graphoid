@@ -7,40 +7,35 @@
 # - Instance creation via cloning
 # - Method chaining
 
-# Define a Counter "class" - a prototype graph with methods
-Counter = graph {}
-Counter.add_node("count", 0)
+# Define a Counter "class" using graph declaration syntax
+graph Counter {
+    count: 0
 
-# The .new() method is a convention for creating instances
-fn Counter.new(initial) {
-    instance = self.clone()  # Clone the prototype
-    instance.remove_node("count")
-    instance.add_node("count", initial)
-    return instance
-}
+    # The .new() method is a convention for creating instances
+    fn new(initial) {
+        instance = self.clone()  # Clone the prototype
+        instance.count = initial
+        return instance
+    }
 
-fn Counter.increment() {
-    current = self.get_node("count")
-    self.remove_node("count")
-    self.add_node("count", current + 1)
-    return self
-}
+    fn increment() {
+        count = count + 1  # Implicit self
+        return self
+    }
 
-fn Counter.decrement() {
-    current = self.get_node("count")
-    self.remove_node("count")
-    self.add_node("count", current - 1)
-    return self
-}
+    fn decrement() {
+        count = count - 1
+        return self
+    }
 
-fn Counter.value() {
-    return self.get_node("count")
-}
+    fn value() {
+        return count
+    }
 
-fn Counter.reset() {
-    self.remove_node("count")
-    self.add_node("count", 0)
-    return self
+    fn reset() {
+        count = 0
+        return self
+    }
 }
 
 # Create instances using .new()

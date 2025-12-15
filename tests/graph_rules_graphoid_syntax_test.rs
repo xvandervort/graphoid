@@ -167,12 +167,13 @@ fn test_graph_binary_tree_rule() {
 fn test_rules_ignore_methods_branch() {
     // Define a method, add rules - rules should only apply to data nodes
     let code = r#"
-        g = graph{}
-
-        fn g.get_count() {
-            return self.node_count()
+        graph G {
+            fn get_count() {
+                return self.node_count()
+            }
         }
 
+        g = G.clone()
         g.add_node("A", 1)
         g.add_node("B", 2)
         g.add_edge("A", "B")
@@ -198,16 +199,17 @@ fn test_methods_branch_not_checked_for_cycles() {
     // The __methods__ branch has cycles (method nodes reference function values)
     // But that shouldn't affect the no_cycles rule on the data layer
     let code = r#"
-        g = graph{}
+        graph G {
+            fn method_a() {
+                return 1
+            }
 
-        fn g.method_a() {
-            return 1
+            fn method_b() {
+                return 2
+            }
         }
 
-        fn g.method_b() {
-            return 2
-        }
-
+        g = G.clone()
         g.add_node("X", 10)
         g.add_node("Y", 20)
         g.add_edge("X", "Y")

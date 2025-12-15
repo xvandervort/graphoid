@@ -12,25 +12,26 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Factory Pattern ---")
 
-Circle = graph{}
-Circle.radius = 0
+graph Circle {
+    radius: 0
 
-# Instance method - requires `self`
-get Circle.area() {
-    return 3.14159 * self.radius * self.radius
-}
+    # Instance method - requires `self`
+    get area() {
+        return 3.14159 * radius * radius
+    }
 
-# Static method - called on Circle, creates instances
-static fn Circle.create_unit_circle() {
-    c = Circle.clone()
-    c.radius = 1
-    return c
-}
+    # Static method - called on Circle, creates instances
+    static fn create_unit_circle() {
+        c = Circle.clone()
+        c.radius = 1
+        return c
+    }
 
-static fn Circle.create_with_radius(r) {
-    c = Circle.clone()
-    c.radius = r
-    return c
+    static fn create_with_radius(r) {
+        c = Circle.clone()
+        c.radius = r
+        return c
+    }
 }
 
 # Use factory methods
@@ -49,30 +50,31 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Static vs Instance Methods ---")
 
-Counter = graph{}
-Counter._value = 0
-Counter._count = 0  # Tracks number of counters
+graph Counter {
+    _value: 0
+    _count: 0  # Tracks number of counters
 
-# Instance method - works on a specific counter
-fn Counter.increment() {
-    self._value = self._value + 1
-}
+    # Instance method - works on a specific counter
+    fn increment() {
+        _value = _value + 1
+    }
 
-get Counter.value() {
-    return self._value
-}
+    get value() {
+        return _value
+    }
 
-# Static method - factory that tracks count
-static fn Counter.create(initial) {
-    c = Counter.clone()
-    c._value = initial
-    Counter._count = Counter._count + 1
-    return c
-}
+    # Static method - factory that tracks count
+    static fn create(initial) {
+        c = Counter.clone()
+        c._value = initial
+        Counter._count = Counter._count + 1
+        return c
+    }
 
-# Static method - gets the count (no self needed)
-static fn Counter.get_count() {
-    return Counter._count
+    # Static method - gets the count (no self needed)
+    static fn get_count() {
+        return Counter._count
+    }
 }
 
 c1 = Counter.create(0)
@@ -95,31 +97,33 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Static Methods with Inheritance ---")
 
-Shape = graph{}
-Shape.name = "shape"
+graph Shape {
+    name: "shape"
 
-static fn Shape.describe() {
-    return "I am a Shape class"
+    static fn describe() {
+        return "I am a Shape class"
+    }
 }
 
-Rectangle = graph from Shape {}
-Rectangle.name = "rectangle"
-Rectangle.width = 0
-Rectangle.height = 0
+graph Rectangle from Shape {
+    name: "rectangle"
+    width: 0
+    height: 0
 
-static fn Rectangle.describe() {
-    return "I am a Rectangle class"
-}
+    static fn describe() {
+        return "I am a Rectangle class"
+    }
 
-static fn Rectangle.create(w, h) {
-    r = Rectangle.clone()
-    r.width = w
-    r.height = h
-    return r
-}
+    static fn create(w, h) {
+        r = Rectangle.clone()
+        r.width = w
+        r.height = h
+        return r
+    }
 
-get Rectangle.area() {
-    return self.width * self.height
+    get area() {
+        return width * height
+    }
 }
 
 # Call static methods on classes
@@ -137,27 +141,27 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Utility Functions ---")
 
-Math = graph{}
-
-static fn Math.max(a, b) {
-    if a > b {
-        return a
+graph Math {
+    static fn max(a, b) {
+        if a > b {
+            return a
+        }
+        return b
     }
-    return b
-}
 
-static fn Math.min(a, b) {
-    if a < b {
-        return a
+    static fn min(a, b) {
+        if a < b {
+            return a
+        }
+        return b
     }
-    return b
-}
 
-static fn Math.abs(n) {
-    if n < 0 {
-        return 0 - n
+    static fn abs(n) {
+        if n < 0 {
+            return 0 - n
+        }
+        return n
     }
-    return n
 }
 
 print("Math.max(5, 10) = " + Math.max(5, 10).to_string())

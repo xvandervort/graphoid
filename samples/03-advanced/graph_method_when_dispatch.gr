@@ -1,22 +1,24 @@
 # Phase 21: Structure-based Dispatch with when clauses
 # Methods can have guard conditions that dispatch based on graph state
 
-# Define a Shape graph type
-Shape = graph {}
+# Define a Shape graph type with multiple when-guarded methods
+graph Shape {
+    sides: 0
 
-# Method for triangles (3 sides)
-fn Shape.name() when self.sides == 3 {
-    return "triangle"
-}
+    # Method for triangles (3 sides)
+    fn name() when sides == 3 {
+        return "triangle"
+    }
 
-# Method for rectangles (4 sides)
-fn Shape.name() when self.sides == 4 {
-    return "rectangle"
-}
+    # Method for rectangles (4 sides)
+    fn name() when sides == 4 {
+        return "rectangle"
+    }
 
-# Fallback method (no guard)
-fn Shape.name() {
-    return "polygon"
+    # Fallback method (no guard)
+    fn name() {
+        return "polygon"
+    }
 }
 
 # Test structure-based dispatch

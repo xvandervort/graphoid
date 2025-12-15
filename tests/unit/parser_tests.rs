@@ -572,30 +572,6 @@ fn test_parse_function_declaration() {
 }
 
 #[test]
-fn test_parse_method_declaration() {
-    // Test method syntax: fn Receiver.method_name(params) { body }
-    let source = r#"fn Calculator.add(a, b) {
-        return a + b
-    }"#;
-    let mut lexer = Lexer::new(source);
-    let tokens = lexer.tokenize().unwrap();
-    let mut parser = Parser::new(tokens);
-    let program = parser.parse().unwrap();
-
-    match &program.statements[0] {
-        Stmt::FunctionDecl { name, receiver, params, body, .. } => {
-            assert_eq!(name, "add");
-            assert_eq!(receiver, &Some("Calculator".to_string()));
-            assert_eq!(params.len(), 2);
-            assert_eq!(params[0].name, "a");
-            assert_eq!(params[1].name, "b");
-            assert!(body.len() > 0);
-        }
-        _ => panic!("Expected function declaration with receiver"),
-    }
-}
-
-#[test]
 fn test_parse_regular_function_has_no_receiver() {
     let source = r#"fn add(x, y) {
         return x + y

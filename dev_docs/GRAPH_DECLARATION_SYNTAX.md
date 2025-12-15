@@ -1,10 +1,9 @@
 # Graph Declaration Syntax Design
 
 **Created**: December 10, 2025
-**Updated**: December 11, 2025
-**Status**: APPROVED - Ready for Implementation
+**Updated**: December 12, 2025
+**Status**: Phases 1-6 COMPLETE
 **Purpose**: Define proper class-like graph declaration syntax with intrinsic naming
-**Next Step**: Implement Phase 1 (basic parsing)
 
 ---
 
@@ -206,19 +205,20 @@ graph DAG {
 
 ## Access Control
 
-Use directives (Ruby-style) rather than per-property keywords:
+Use a `configure` block for auto-generating getters/setters:
 
 ```graphoid
 graph Rectangle {
-    # Directive: these properties have computed getters
-    readable :area, :perimeter
-
-    # Directive: these properties are read-only after initialization
-    readonly :id
+    configure {
+        readable: [:width, :height]    # Generates width() and height() getters
+        writable: :color               # Generates set_color(value) setter
+        accessible: :size              # Generates both getter and setter
+    }
 
     width: 0
     height: 0
-    id: none
+    color: "red"
+    size: 0
 
     fn area() {
         return width * height
@@ -227,15 +227,23 @@ graph Rectangle {
     fn perimeter() {
         return 2 * (width + height)
     }
+
+    # Private methods use priv fn, not configure
+    priv fn helper() {
+        return 42
+    }
 }
 ```
 
-**Directives:**
-- `readable :prop1, :prop2` - Generate getter methods
-- `writable :prop1, :prop2` - Generate setter methods
-- `accessible :prop1` - Both readable and writable (Ruby's `attr_accessor`)
-- `readonly :prop1` - Property cannot be changed after initialization
-- `private :method1, :method2` - Methods only callable from within
+**Configure options:**
+- `readable: :prop` or `readable: [:prop1, :prop2]` - Generate getter methods
+- `writable: :prop` or `writable: [:prop1, :prop2]` - Generate setter methods (`set_prop(value)`)
+- `accessible: :prop` - Both readable and writable
+
+**Private methods:**
+- Use `priv fn method_name() { }` syntax
+- Methods are renamed with underscore prefix internally (`_method_name`)
+- Call internally via `_method_name()` or externally blocked
 
 ---
 
@@ -366,35 +374,39 @@ graph Counter {
 
 ## Implementation Phases
 
-### Phase 1: Named Graph Declaration
+### Phase 1: Named Graph Declaration ✅ COMPLETE
 - Parse `graph Name { prop: value }` as a declaration statement
 - Store intrinsic name in the graph value
 - Bind to identifier in current scope
 - Parse `fn name() { }` inside graph body
 
-### Phase 2: Implicit Self Resolution
+### Phase 2: Implicit Self Resolution ✅ COMPLETE
 - Inside method bodies, resolve bare identifiers to graph properties
 - Maintain resolution order: params → locals → properties → methods → outer scope
 - `self` still available explicitly when needed
 
-### Phase 3: Inheritance Syntax
+### Phase 3: Inheritance Syntax ✅ COMPLETE
 - Parse `graph Name from Parent { }`
 - Inherit properties and methods from parent
 - Override support
 
-### Phase 4: Directives
-- Parse `readable :x, :y`
-- Parse `readonly :prop`
-- Parse `private :method`
-- Implement as rules on the graph
+### Phase 4: Configure Block ✅ COMPLETE (Updated from "Directives")
+- Parse `configure { readable: :x, writable: [:y, :z] }`
+- `readable: :prop` - generates getter method
+- `writable: :prop` - generates `set_prop(value)` setter
+- `accessible: :prop` - generates both getter and setter
+- Private methods use `priv fn`, NOT configure block
 
-### Phase 5: Static Methods & Graph Types
-- Parse `static fn name() { }`
+### Phase 5: Static Methods, Graph Types & Rules ✅ COMPLETE
+- Parse `static fn name() { }` inside graph body
 - Parse `graph Name(:type) { }` for typed graphs
-- Parse `rule :name` inside body
+- Parse `rule :name` or `rule :name, param` inside body
 
-### Phase 6: Remove Old Syntax
+### Phase 6: Remove Old Syntax 🔲 NEXT
 - Remove support for `fn Graph.method()` external definitions
+- Remove support for `get Graph.prop()` external getter definitions
+- Remove support for `static fn Graph.method()` external static definitions
+- Possibly deprecate `Graph = graph {}` assignment form (keep `x = graph {}` anonymous)
 - Update all samples and tests
 - Update documentation
 

@@ -44,6 +44,7 @@ pub enum TokenType {
     Static,      // static keyword for class methods (Phase 20)
     When,        // when keyword for guard clauses (Phase 21)
     Configure,
+    Rule,        // rule keyword for declaring rules in graph body
     Precision,
     And,
     Or,

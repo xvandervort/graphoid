@@ -172,5 +172,50 @@ print("Has DAG ruleset:", hybrid.has_ruleset(:dag))
 print("Has no_cycles (from DAG):", hybrid.has_rule(:no_cycles))
 print("Has max_degree (ad hoc):", hybrid.has_rule(:max_degree))
 
+# =============================================================================
+# Rule Keyword Inside Graph Declaration (Phase 5 Syntax)
+# =============================================================================
+
+print("")
+print("=== Rule Keyword in Graph Declaration ===")
+
+# NEW SYNTAX: Use 'rule' keyword directly inside graph body
+# This is cleaner than calling add_rule() after creation
+
+graph BinaryTree {
+    rule :no_cycles
+    rule :max_degree, 2
+
+    root: none
+
+    fn insert(value) {
+        if root == none {
+            root = value
+        }
+    }
+}
+
+bt = BinaryTree.clone()
+print("BinaryTree has no_cycles:", bt.has_rule(:no_cycles))
+print("BinaryTree has max_degree:", bt.has_rule(:max_degree))
+print("BinaryTree max_degree param:", bt.rule(:max_degree))
+
+# Multiple rules with configure block
+graph ValidatedCounter {
+    configure { readable: :count }
+    rule :no_cycles
+
+    count: 0
+
+    fn increment() {
+        count = count + 1
+    }
+}
+
+vc = ValidatedCounter.clone()
+vc.increment()
+print("ValidatedCounter count:", vc.count())
+print("ValidatedCounter has no_cycles:", vc.has_rule(:no_cycles))
+
 print("")
 print("=== Demo Complete ===")

@@ -7,22 +7,26 @@ print("=== Graph Layer Visibility Demo ===")
 print("")
 
 # =============================================================================
-# Create a graph with methods
+# Create a graph type with methods
 # =============================================================================
 
-counter = graph{}
-counter.add_node("value", 0)
-counter.add_node("max", 100)
+graph Counter {
+    value: 0
+    max: 100
+
+    fn get() {
+        return value
+    }
+
+    fn increment() {
+        v = value
+        value = v + 1
+    }
+}
+
+# Create an instance and add an edge
+counter = Counter.clone()
 counter.add_edge("value", "max", "bounded_by")
-
-fn counter.get() {
-    return self.get_node("value")
-}
-
-fn counter.increment() {
-    v = self.get_node("value")
-    self.add_node("value", v + 1)
-}
 
 print("Created counter graph with 2 data nodes, 1 edge, and 2 methods")
 print("")

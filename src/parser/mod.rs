@@ -4,8 +4,8 @@
 //! for expression parsing.
 
 use crate::ast::{
-    Argument, AssignmentTarget, BinaryOp, Expr, GraphMethod,
-    GraphProperty, LiteralValue, Parameter, Pattern, PatternClause, Program, Stmt, TypeAnnotation,
+    Argument, AssignmentTarget, BinaryOp, Expr, GraphMethod, GraphProperty, GraphRule,
+    LiteralValue, Parameter, Pattern, PatternClause, Program, Stmt, TypeAnnotation,
     UnaryOp,
 };
 use std::collections::HashMap;
@@ -309,36 +309,9 @@ impl Parser {
             });
         };
 
-        // Check for method syntax: fn Receiver.method_name(...)
-        let (receiver, name) = if self.match_token(&TokenType::Dot) {
-            // This is method syntax - first_ident is the receiver
-            // Method name can be an identifier OR a keyword (like "describe", "map", etc.)
-            let method_name = match &self.peek().token_type {
-                TokenType::Identifier(id) => {
-                    let n = id.clone();
-                    self.advance();
-                    n
-                }
-                // Allow keywords as method names by using their lexeme
-                _ => {
-                    let lexeme = self.peek().lexeme.clone();
-                    // Check if it's a valid method name (alphabetic + underscore)
-                    if lexeme.chars().all(|c| c.is_alphabetic() || c == '_') && !lexeme.is_empty() {
-                        self.advance();
-                        lexeme
-                    } else {
-                        return Err(GraphoidError::SyntaxError {
-                            message: "Expected method name after '.'".to_string(),
-                            position: self.peek().position(),
-                        });
-                    }
-                }
-            };
-            (Some(first_ident), method_name)
-        } else {
-            // Regular function syntax
-            (None, first_ident)
-        };
+        // Regular function syntax only
+        let name = first_ident;
+        let receiver: Option<String> = None;
 
         // ⚠️  NO GENERICS POLICY ENFORCEMENT
         // See: dev_docs/NO_GENERICS_POLICY.md
@@ -826,8 +799,8 @@ impl Parser {
             });
         }
 
-        // Parse graph body: properties, methods, and config
-        let (properties, methods, config) = self.parse_graph_body()?;
+        // Parse graph body: properties, methods, rules, and config
+        let (properties, methods, rules, config) = self.parse_graph_body()?;
 
         // Expect closing brace
         if !self.match_token(&TokenType::RightBrace) {
@@ -843,15 +816,17 @@ impl Parser {
             parent,
             properties,
             methods,
+            rules,
             config,
             position,
         })
     }
 
-    /// Parse the body of a graph declaration: properties, methods, and config
-    fn parse_graph_body(&mut self) -> Result<(Vec<GraphProperty>, Vec<GraphMethod>, HashMap<String, Vec<String>>)> {
+    /// Parse the body of a graph declaration: properties, methods, rules, and config
+    fn parse_graph_body(&mut self) -> Result<(Vec<GraphProperty>, Vec<GraphMethod>, Vec<GraphRule>, HashMap<String, Vec<String>>)> {
         let mut properties = Vec::new();
         let mut methods = Vec::new();
+        let mut rules = Vec::new();
         let mut config: HashMap<String, Vec<String>> = HashMap::new();
 
         loop {
@@ -887,6 +862,36 @@ impl Parser {
                     });
                 }
                 continue;
+            }
+
+            // Check for rule declaration: rule :name or rule :name, param
+            if self.match_token(&TokenType::Rule) {
+                let rule_pos = self.previous().position();
+
+                // Expect a symbol
+                if let TokenType::Symbol(rule_name) = &self.peek().token_type {
+                    let name = rule_name.clone();
+                    self.advance();
+
+                    // Check for optional parameter (comma followed by expression)
+                    let param = if self.match_token(&TokenType::Comma) {
+                        Some(self.expression()?)
+                    } else {
+                        None
+                    };
+
+                    rules.push(GraphRule {
+                        name,
+                        param,
+                        position: rule_pos,
+                    });
+                    continue;
+                } else {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected symbol after 'rule' (e.g., rule :no_cycles)".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
             }
 
             let is_private = self.match_token(&TokenType::Priv);
@@ -941,7 +946,7 @@ impl Parser {
             }
         }
 
-        Ok((properties, methods, config))
+        Ok((properties, methods, rules, config))
     }
 
     /// Parse config entries inside a configure block: readable: :x, writable: [:y, :z]

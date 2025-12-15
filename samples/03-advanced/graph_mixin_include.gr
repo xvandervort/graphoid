@@ -2,41 +2,42 @@
 # Allows copying methods from one graph to another without inheritance
 
 # Define a mixin with common functionality
-Comparable = graph {}
+graph Comparable {
+    fn equals(other) {
+        return self.value == other.value
+    }
 
-fn Comparable.equals(other) {
-    return self.value == other.value
-}
+    fn not_equals(other) {
+        return self.value != other.value
+    }
 
-fn Comparable.not_equals(other) {
-    return self.value != other.value
-}
+    fn greater_than(other) {
+        return self.value > other.value
+    }
 
-fn Comparable.greater_than(other) {
-    return self.value > other.value
-}
-
-# Private method - should NOT be included
-fn Comparable._internal_compare(other) {
-    return self.value - other.value
+    # Private method - should NOT be included
+    fn _internal_compare(other) {
+        return self.value - other.value
+    }
 }
 
 # Define a class that uses the mixin
-Point = graph {}
-Point.value = 0
-Point.x = 0
-Point.y = 0
+graph Point {
+    value: 0
+    x: 0
+    y: 0
 
-fn Point.new(x, y) {
-    p = self.clone()
-    p.x = x
-    p.y = y
-    p.value = x + y
-    return p
-}
+    fn new(px, py) {
+        p = self.clone()
+        p.x = px
+        p.y = py
+        p.value = px + py
+        return p
+    }
 
-fn Point.to_string() {
-    return "Point(" + self.x.to_string() + ", " + self.y.to_string() + ")"
+    fn to_string() {
+        return "Point(" + x.to_string() + ", " + y.to_string() + ")"
+    }
 }
 
 # Include the Comparable mixin

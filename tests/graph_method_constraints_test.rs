@@ -79,13 +79,14 @@ print(g.has_rule(:read_only))
 #[test]
 fn test_no_node_removals_allows_read_methods() {
     let code = r#"
-g = graph{}
+graph G {
+    fn count() {
+        return self.node_count()
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_rule(:no_node_removals)
-
-fn g.count() {
-    return self.node_count()
-}
 
 result = g.count()
 print(result)
@@ -96,13 +97,14 @@ print(result)
 #[test]
 fn test_no_node_removals_blocks_remove_node() {
     let code = r#"
-g = graph{}
+graph G {
+    fn remove_first() {
+        self.remove_node("a")
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_rule(:no_node_removals)
-
-fn g.remove_first() {
-    self.remove_node("a")
-}
 
 g.remove_first()
 "#;
@@ -112,13 +114,14 @@ g.remove_first()
 #[test]
 fn test_no_node_removals_allows_adding_nodes() {
     let code = r#"
-g = graph{}
+graph G {
+    fn add_new_node() {
+        self.add_node("b", 2)
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_rule(:no_node_removals)
-
-fn g.add_new_node() {
-    self.add_node("b", 2)
-}
 
 g.add_new_node()
 print(g.node_count())
@@ -129,14 +132,15 @@ print(g.node_count())
 #[test]
 fn test_no_node_removals_allows_adding_edges() {
     let code = r#"
-g = graph{}
+graph G {
+    fn link() {
+        self.add_edge("a", "b", "connected")
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_node("b", 2)
 g.add_rule(:no_node_removals)
-
-fn g.link() {
-    self.add_edge("a", "b", "connected")
-}
 
 g.link()
 print(g.edge_count())
@@ -151,15 +155,16 @@ print(g.edge_count())
 #[test]
 fn test_no_edge_removals_allows_read_methods() {
     let code = r#"
-g = graph{}
+graph G {
+    fn count_edges() {
+        return self.edge_count()
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_node("b", 2)
 g.add_edge("a", "b", "link")
 g.add_rule(:no_edge_removals)
-
-fn g.count_edges() {
-    return self.edge_count()
-}
 
 result = g.count_edges()
 print(result)
@@ -170,15 +175,16 @@ print(result)
 #[test]
 fn test_no_edge_removals_blocks_remove_edge() {
     let code = r#"
-g = graph{}
+graph G {
+    fn unlink() {
+        self.remove_edge("a", "b")
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_node("b", 2)
 g.add_edge("a", "b", "link")
 g.add_rule(:no_edge_removals)
-
-fn g.unlink() {
-    self.remove_edge("a", "b")
-}
 
 g.unlink()
 "#;
@@ -188,15 +194,16 @@ g.unlink()
 #[test]
 fn test_no_edge_removals_allows_adding_edges() {
     let code = r#"
-g = graph{}
+graph G {
+    fn link_nodes() {
+        self.add_edge("a", "b", "link")
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_node("b", 2)
 g.add_node("c", 3)
 g.add_rule(:no_edge_removals)
-
-fn g.link_nodes() {
-    self.add_edge("a", "b", "link")
-}
 
 g.link_nodes()
 print(g.edge_count())
@@ -207,13 +214,14 @@ print(g.edge_count())
 #[test]
 fn test_no_edge_removals_allows_adding_nodes() {
     let code = r#"
-g = graph{}
+graph G {
+    fn add_new() {
+        self.add_node("b", 2)
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_rule(:no_edge_removals)
-
-fn g.add_new() {
-    self.add_node("b", 2)
-}
 
 g.add_new()
 print(g.node_count())
@@ -228,15 +236,16 @@ print(g.node_count())
 #[test]
 fn test_read_only_allows_read_methods() {
     let code = r#"
-g = graph{}
+graph G {
+    fn get_info() {
+        return self.node_count() + self.edge_count()
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_node("b", 2)
 g.add_edge("a", "b", "link")
 g.add_rule(:read_only)
-
-fn g.get_info() {
-    return self.node_count() + self.edge_count()
-}
 
 result = g.get_info()
 print(result)
@@ -247,13 +256,14 @@ print(result)
 #[test]
 fn test_read_only_blocks_add_node() {
     let code = r#"
-g = graph{}
+graph G {
+    fn add_new() {
+        self.add_node("b", 2)
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_rule(:read_only)
-
-fn g.add_new() {
-    self.add_node("b", 2)
-}
 
 g.add_new()
 "#;
@@ -263,13 +273,14 @@ g.add_new()
 #[test]
 fn test_read_only_blocks_remove_node() {
     let code = r#"
-g = graph{}
+graph G {
+    fn remove_first() {
+        self.remove_node("a")
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_rule(:read_only)
-
-fn g.remove_first() {
-    self.remove_node("a")
-}
 
 g.remove_first()
 "#;
@@ -279,14 +290,15 @@ g.remove_first()
 #[test]
 fn test_read_only_blocks_add_edge() {
     let code = r#"
-g = graph{}
+graph G {
+    fn link() {
+        self.add_edge("a", "b", "link")
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_node("b", 2)
 g.add_rule(:read_only)
-
-fn g.link() {
-    self.add_edge("a", "b", "link")
-}
 
 g.link()
 "#;
@@ -296,15 +308,16 @@ g.link()
 #[test]
 fn test_read_only_blocks_remove_edge() {
     let code = r#"
-g = graph{}
+graph G {
+    fn unlink() {
+        self.remove_edge("a", "b")
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_node("b", 2)
 g.add_edge("a", "b", "link")
 g.add_rule(:read_only)
-
-fn g.unlink() {
-    self.remove_edge("a", "b")
-}
 
 g.unlink()
 "#;
@@ -318,16 +331,17 @@ g.unlink()
 #[test]
 fn test_multiple_constraints_all_apply() {
     let code = r#"
-g = graph{}
+graph G {
+    fn remove_stuff() {
+        self.remove_node("a")
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_node("b", 2)
 g.add_edge("a", "b", "link")
 g.add_rule(:no_node_removals)
 g.add_rule(:no_edge_removals)
-
-fn g.remove_stuff() {
-    self.remove_node("a")
-}
 
 g.remove_stuff()
 "#;
@@ -337,14 +351,15 @@ g.remove_stuff()
 #[test]
 fn test_constraint_removed_allows_operation() {
     let code = r#"
-g = graph{}
+graph G {
+    fn remove_first() {
+        self.remove_node("a")
+    }
+}
+g = G.clone()
 g.add_node("a", 1)
 g.add_rule(:no_node_removals)
 g.remove_rule(:no_node_removals)
-
-fn g.remove_first() {
-    self.remove_node("a")
-}
 
 g.remove_first()
 print(g.node_count())
@@ -377,18 +392,19 @@ print(g.node_count())
 #[test]
 fn test_clone_preserves_constraints() {
     let code = r#"
-Counter = graph{}
-Counter.add_node("count", 0)
+graph Counter {
+    count: 0
+
+    fn new(initial) {
+        instance = self.clone()
+        return instance
+    }
+
+    fn try_remove() {
+        self.remove_node("count")
+    }
+}
 Counter.add_rule(:no_node_removals)
-
-fn Counter.new(initial) {
-    instance = self.clone()
-    return instance
-}
-
-fn Counter.try_remove() {
-    self.remove_node("count")
-}
 
 c = Counter.new(0)
 c.try_remove()
@@ -435,13 +451,15 @@ fn no_node_additions(old_graph, new_graph) {
     return old_graph.node_count() >= new_graph.node_count()
 }
 
-g = graph{}
+graph G {
+    fn try_add() {
+        self.add_node("b", 2)
+    }
+}
+
+g = G.clone()
 g.add_node("a", 1)
 g.add_method_constraint(no_node_additions, "no_node_additions")
-
-fn g.try_add() {
-    self.add_node("b", 2)
-}
 
 g.try_add()
 "#;
@@ -455,14 +473,16 @@ fn no_node_additions(old_graph, new_graph) {
     return old_graph.node_count() >= new_graph.node_count()
 }
 
-g = graph{}
+graph G {
+    fn remove_first() {
+        self.remove_node("a")
+    }
+}
+
+g = G.clone()
 g.add_node("a", 1)
 g.add_node("b", 2)
 g.add_method_constraint(no_node_additions, "no_node_additions")
-
-fn g.remove_first() {
-    self.remove_node("a")
-}
 
 g.remove_first()
 print(g.node_count())
@@ -477,13 +497,15 @@ fn no_node_additions(old_graph, new_graph) {
     return old_graph.node_count() >= new_graph.node_count()
 }
 
-g = graph{}
+graph G {
+    fn get_count() {
+        return self.node_count()
+    }
+}
+
+g = G.clone()
 g.add_node("a", 1)
 g.add_method_constraint(no_node_additions, "no_node_additions")
-
-fn g.get_count() {
-    return self.node_count()
-}
 
 result = g.get_count()
 print(result)
@@ -498,14 +520,16 @@ fn no_edge_additions(old_graph, new_graph) {
     return old_graph.edge_count() >= new_graph.edge_count()
 }
 
-g = graph{}
+graph G {
+    fn link() {
+        self.add_edge("a", "b", "connected")
+    }
+}
+
+g = G.clone()
 g.add_node("a", 1)
 g.add_node("b", 2)
 g.add_method_constraint(no_edge_additions, "no_edge_additions")
-
-fn g.link() {
-    self.add_edge("a", "b", "connected")
-}
 
 g.link()
 "#;
@@ -519,13 +543,15 @@ fn my_constraint(old_graph, new_graph) {
     return old_graph.node_count() >= new_graph.node_count()
 }
 
-g = graph{}
+graph G {
+    fn try_add() {
+        self.add_node("b", 2)
+    }
+}
+
+g = G.clone()
 g.add_node("a", 1)
 g.add_method_constraint(my_constraint)
-
-fn g.try_add() {
-    self.add_node("b", 2)
-}
 
 g.try_add()
 "#;
@@ -543,15 +569,17 @@ fn no_edge_additions(old_graph, new_graph) {
     return old_graph.edge_count() >= new_graph.edge_count()
 }
 
-g = graph{}
+graph G {
+    fn try_link() {
+        self.add_edge("a", "b", "connected")
+    }
+}
+
+g = G.clone()
 g.add_node("a", 1)
 g.add_node("b", 2)
 g.add_method_constraint(no_node_additions, "no_node_additions")
 g.add_method_constraint(no_edge_additions, "no_edge_additions")
-
-fn g.try_link() {
-    self.add_edge("a", "b", "connected")
-}
 
 g.try_link()
 "#;
@@ -561,16 +589,18 @@ g.try_link()
 #[test]
 fn test_custom_constraint_with_lambda() {
     let code = r#"
-g = graph{}
+graph G {
+    fn try_add() {
+        self.add_node("b", 2)
+    }
+}
+
+g = G.clone()
 g.add_node("a", 1)
 g.add_method_constraint(
     (old_g, new_g) => old_g.node_count() >= new_g.node_count(),
     "no_additions"
 )
-
-fn g.try_add() {
-    self.add_node("b", 2)
-}
 
 g.try_add()
 "#;
@@ -584,12 +614,14 @@ g.try_add()
 #[test]
 fn test_remove_method_basic() {
     let code = r#"
-g = graph{}
-g.add_node("a", 1)
-
-fn g.get_value() {
-    return self.get_node("a")
+graph G {
+    fn get_value() {
+        return self.get_node("a")
+    }
 }
+
+g = G.clone()
+g.add_node("a", 1)
 
 # Method works before removal
 result1 = g.get_value()
@@ -605,12 +637,13 @@ print(removed)
 #[test]
 fn test_remove_method_returns_true_when_found() {
     let code = r#"
-g = graph{}
-
-fn g.foo() {
-    return 42
+graph G {
+    fn foo() {
+        return 42
+    }
 }
 
+g = G.clone()
 removed = g.remove_method("foo")
 if not removed {
     error("Expected remove_method to return true")
@@ -635,12 +668,14 @@ if removed {
 #[test]
 fn test_remove_method_makes_method_uncallable() {
     let code = r#"
-g = graph{}
-g.add_node("a", 1)
-
-fn g.get_value() {
-    return self.get_node("a")
+graph G {
+    fn get_value() {
+        return self.get_node("a")
+    }
 }
+
+g = G.clone()
+g.add_node("a", 1)
 
 g.remove_method("get_value")
 
@@ -653,16 +688,18 @@ g.get_value()
 #[test]
 fn test_remove_method_preserves_other_methods() {
     let code = r#"
-g = graph{}
+graph G {
+    fn method_a() {
+        return "a"
+    }
+
+    fn method_b() {
+        return "b"
+    }
+}
+
+g = G.clone()
 g.add_node("count", 0)
-
-fn g.method_a() {
-    return "a"
-}
-
-fn g.method_b() {
-    return "b"
-}
 
 # Remove method_a
 g.remove_method("method_a")
@@ -679,13 +716,15 @@ if result != "b" {
 #[test]
 fn test_remove_method_does_not_affect_data_nodes() {
     let code = r#"
-g = graph{}
+graph G {
+    fn get_data() {
+        return self.get_node("data1")
+    }
+}
+
+g = G.clone()
 g.add_node("data1", 100)
 g.add_node("data2", 200)
-
-fn g.get_data() {
-    return self.get_node("data1")
-}
 
 # Verify node count before
 before_count = g.node_count()
@@ -704,31 +743,25 @@ if before_count != after_count {
 
 #[test]
 fn test_remove_method_can_readd_method() {
+    // Note: With new syntax, we can't re-add methods dynamically
+    // This test verifies remove_method works, but doesn't test re-adding
     let code = r#"
-g = graph{}
-g.add_node("val", 10)
-
-fn g.get_val() {
-    return self.get_node("val")
+graph G {
+    fn get_val() {
+        return self.get_node("val")
+    }
 }
+
+g = G.clone()
+g.add_node("val", 10)
 
 result1 = g.get_val()
 
-# Remove and re-add with different implementation
+# Remove the method
 g.remove_method("get_val")
-
-fn g.get_val() {
-    return self.get_node("val") * 2
-}
-
-result2 = g.get_val()
 
 if result1 != 10 {
     error("First result should be 10")
-}
-
-if result2 != 20 {
-    error("Second result should be 20")
 }
 "#;
     assert_runs(code);
@@ -737,10 +770,10 @@ if result2 != 20 {
 #[test]
 fn test_remove_method_on_clone_does_not_affect_original() {
     let code = r#"
-Template = graph{}
-
-fn Template.greet() {
-    return "Hello"
+graph Template {
+    fn greet() {
+        return "Hello"
+    }
 }
 
 # Clone the template

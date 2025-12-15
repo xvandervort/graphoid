@@ -11,22 +11,24 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Basic Super Call ---")
 
-Animal = graph{}
-Animal.name = "Unknown"
-Animal.sound = "..."
+graph Animal {
+    name: "Unknown"
+    sound: "..."
 
-fn Animal.speak() {
-    return self.name + " says: " + self.sound
+    fn speak() {
+        return name + " says: " + sound
+    }
 }
 
 # Dog overrides speak and calls parent's implementation
-Dog = graph from Animal {}
-Dog.sound = "Woof"
+graph Dog from Animal {
+    sound: "Woof"
 
-fn Dog.speak() {
-    # Call parent's speak method
-    base = super.speak()
-    return base + "!"
+    fn speak() {
+        # Call parent's speak method
+        base = super.speak()
+        return base + "!"
+    }
 }
 
 dog = Dog.clone()
@@ -40,18 +42,18 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Super with Arguments ---")
 
-Calculator = graph{}
-
-fn Calculator.compute(x, y) {
-    return x + y
+graph Calculator {
+    fn compute(x, y) {
+        return x + y
+    }
 }
 
-AdvancedCalculator = graph from Calculator {}
-
-fn AdvancedCalculator.compute(x, y) {
-    # Call parent with arguments, then add our own processing
-    base_result = super.compute(x, y)
-    return base_result * 2  # Double the result
+graph AdvancedCalculator from Calculator {
+    fn compute(x, y) {
+        # Call parent with arguments, then add our own processing
+        base_result = super.compute(x, y)
+        return base_result * 2  # Double the result
+    }
 }
 
 calc = AdvancedCalculator.clone()
@@ -68,18 +70,20 @@ print("--- Super Accessing Child's Data ---")
 # This allows polymorphic behavior where parent methods can access
 # child's overridden data
 
-Vehicle = graph{}
-Vehicle.speed = 0
+graph Vehicle {
+    speed: 0
 
-fn Vehicle.describe() {
-    return "Vehicle traveling at " + self.speed.to_string() + " mph"
+    fn describe() {
+        return "Vehicle traveling at " + speed.to_string() + " mph"
+    }
 }
 
-Car = graph from Vehicle {}
-Car.speed = 60
+graph Car from Vehicle {
+    speed: 60
 
-fn Car.describe() {
-    return "Car: " + super.describe()  # Uses Car's speed value
+    fn describe() {
+        return "Car: " + super.describe()  # Uses Car's speed value
+    }
 }
 
 car = Car.clone()

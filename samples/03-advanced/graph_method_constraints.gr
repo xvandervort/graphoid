@@ -20,12 +20,13 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Example 1: Immutable Counter with :read_only ---")
 
-ImmutableCounter = graph{}
-ImmutableCounter.add_node("count", 42)
-ImmutableCounter.add_rule(:read_only)
+graph ImmutableCounter {
+    rule :read_only
+    count: 42
 
-fn ImmutableCounter.get_count() {
-    return self.get_node("count")
+    fn get_count() {
+        return count
+    }
 }
 
 print("Count: " + ImmutableCounter.get_count().to_string())
@@ -36,15 +37,16 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Example 2: Append-Only Log with :no_node_removals ---")
 
-AppendOnlyLog = graph{}
-AppendOnlyLog.add_rule(:no_node_removals)
+graph AppendOnlyLog {
+    rule :no_node_removals
 
-fn AppendOnlyLog.add_entry(id, message) {
-    self.add_node(id, message)
-}
+    fn add_entry(id, message) {
+        self.add_node(id, message)
+    }
 
-fn AppendOnlyLog.get_entry(id) {
-    return self.get_node(id)
+    fn get_entry(id) {
+        return self.get_node(id)
+    }
 }
 
 AppendOnlyLog.add_entry("log_1", "System started")
@@ -60,15 +62,17 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Example 3: Permanent Connections with :no_edge_removals ---")
 
-ConnectionGraph = graph{}
+graph ConnectionGraph {
+    rule :no_edge_removals
+
+    fn establish_link(source, target) {
+        self.add_edge(source, target, "connected")
+    }
+}
+
 ConnectionGraph.add_node("server1", "active")
 ConnectionGraph.add_node("server2", "active")
 ConnectionGraph.add_node("server3", "standby")
-ConnectionGraph.add_rule(:no_edge_removals)
-
-fn ConnectionGraph.establish_link(source, target) {
-    self.add_edge(source, target, "connected")
-}
 
 ConnectionGraph.establish_link("server1", "server2")
 ConnectionGraph.establish_link("server2", "server3")
@@ -87,18 +91,19 @@ fn no_node_additions(old_graph, new_graph) {
     return old_graph.node_count() >= new_graph.node_count()
 }
 
-FixedNodes = graph{}
+graph FixedNodes {
+    fn link(source, target) {
+        self.add_edge(source, target, "link")
+    }
+
+    fn get_count() {
+        return self.node_count()
+    }
+}
+
 FixedNodes.add_node("a", 1)
 FixedNodes.add_node("b", 2)
 FixedNodes.add_method_constraint(no_node_additions, "no_node_additions")
-
-fn FixedNodes.link(source, target) {
-    self.add_edge(source, target, "link")
-}
-
-fn FixedNodes.get_count() {
-    return self.node_count()
-}
 
 # Can read and add edges - constraint only blocks node additions
 FixedNodes.link("a", "b")
@@ -111,7 +116,12 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Example 5: Custom Constraint with Lambda ---")
 
-MaxNodes = graph{}
+graph MaxNodes {
+    fn add_item(id, val) {
+        self.add_node(id, val)
+    }
+}
+
 MaxNodes.add_node("a", 1)
 
 # Constraint: graph can have at most 3 nodes
@@ -119,10 +129,6 @@ MaxNodes.add_method_constraint(
     (old_g, new_g) => new_g.node_count() <= 3,
     "max_3_nodes"
 )
-
-fn MaxNodes.add_item(id, val) {
-    self.add_node(id, val)
-}
 
 MaxNodes.add_item("b", 2)
 MaxNodes.add_item("c", 3)
@@ -138,21 +144,23 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Example 6: Combining Built-in and Custom Constraints ---")
 
-SecureGraph = graph{}
+graph SecureGraph {
+    rule :no_node_removals
+
+    fn update(key, value) {
+        self.add_node(key, value)
+    }
+
+    fn connect(source, target) {
+        self.add_edge(source, target, "link")
+    }
+}
+
 SecureGraph.add_node("data", 100)
-SecureGraph.add_rule(:no_node_removals)  # Built-in
 SecureGraph.add_method_constraint(
     (old_g, new_g) => new_g.edge_count() <= 10,
     "max_10_edges"
 )
-
-fn SecureGraph.update(key, value) {
-    self.add_node(key, value)
-}
-
-fn SecureGraph.connect(source, target) {
-    self.add_edge(source, target, "link")
-}
 
 SecureGraph.update("key1", 200)
 SecureGraph.update("key2", 300)
@@ -168,16 +176,17 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Example 7: Remove Method ---")
 
-DynamicGraph = graph{}
-DynamicGraph.add_node("value", 100)
+graph DynamicGraph {
+    value: 100
 
-fn DynamicGraph.get_value() {
-    return self.get_node("value")
-}
+    fn get_value() {
+        return value
+    }
 
-fn DynamicGraph.double_value() {
-    current = self.get_node("value")
-    self.add_node("value", current * 2)
+    fn double_value() {
+        current = value
+        value = current * 2
+    }
 }
 
 # Call the methods
@@ -192,14 +201,8 @@ print("Method removed: " + removed.to_string())
 # get_value still works
 print("Value via remaining method: " + DynamicGraph.get_value().to_string())
 
-# Re-add a different implementation
-fn DynamicGraph.double_value() {
-    current = self.get_node("value")
-    self.add_node("value", current * 3)  # Actually triples now!
-}
-
-DynamicGraph.double_value()
-print("After new 'double' (triples): " + DynamicGraph.get_value().to_string())
+# NOTE: Dynamic method re-addition would use a different approach
+# For now, the method is simply removed
 
 print("")
 print("=== Demo Complete ===")

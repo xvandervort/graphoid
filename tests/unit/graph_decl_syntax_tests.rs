@@ -1139,3 +1139,122 @@ result = s.public_method()
         other => panic!("Expected number, got {:?}", other),
     }
 }
+
+// ============================================================================
+// PHASE 5: RULE KEYWORD TESTS
+// ============================================================================
+
+#[test]
+fn test_rule_keyword_basic() {
+    // rule :name inside graph body
+    let source = r#"
+graph Tree {
+    rule :no_cycles
+
+    root: "A"
+}
+
+t = Tree.clone()
+result = t.has_rule(:no_cycles)
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Boolean(b) => assert!(*b),
+        other => panic!("Expected boolean true, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_rule_keyword_with_parameter() {
+    // rule :name, param inside graph body
+    let source = r#"
+graph BinaryTree {
+    rule :max_degree, 2
+
+    root: "root"
+}
+
+bt = BinaryTree.clone()
+has_rule = bt.has_rule(:max_degree)
+param_value = bt.rule(:max_degree)
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let has_rule = executor.get_variable("has_rule").unwrap();
+    match &has_rule.kind {
+        ValueKind::Boolean(b) => assert!(*b),
+        other => panic!("Expected boolean true, got {:?}", other),
+    }
+
+    let param_value = executor.get_variable("param_value").unwrap();
+    match &param_value.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 2.0),
+        other => panic!("Expected number 2, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_rule_keyword_multiple_rules() {
+    // Multiple rule declarations
+    let source = r#"
+graph DAG {
+    rule :no_cycles
+    rule :single_root
+
+    start: "entry"
+}
+
+d = DAG.clone()
+has_no_cycles = d.has_rule(:no_cycles)
+has_single_root = d.has_rule(:single_root)
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let has_no_cycles = executor.get_variable("has_no_cycles").unwrap();
+    match &has_no_cycles.kind {
+        ValueKind::Boolean(b) => assert!(*b),
+        other => panic!("Expected boolean true, got {:?}", other),
+    }
+
+    let has_single_root = executor.get_variable("has_single_root").unwrap();
+    match &has_single_root.kind {
+        ValueKind::Boolean(b) => assert!(*b),
+        other => panic!("Expected boolean true, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_rule_keyword_with_configure() {
+    // Rules can coexist with configure block
+    let source = r#"
+graph ValidatedCounter {
+    configure { readable: :count }
+    rule :no_cycles
+
+    count: 0
+}
+
+vc = ValidatedCounter.clone()
+has_rule = vc.has_rule(:no_cycles)
+count_value = vc.count()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let has_rule = executor.get_variable("has_rule").unwrap();
+    match &has_rule.kind {
+        ValueKind::Boolean(b) => assert!(*b),
+        other => panic!("Expected boolean true, got {:?}", other),
+    }
+
+    let count_value = executor.get_variable("count_value").unwrap();
+    match &count_value.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 0.0),
+        other => panic!("Expected number 0, got {:?}", other),
+    }
+}

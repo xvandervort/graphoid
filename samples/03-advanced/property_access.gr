@@ -18,6 +18,7 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Basic Property Access ---")
 
+# Anonymous graph instance (lowercase ok)
 person = graph{}
 person.add_node("name", "Alice")
 person.add_node("age", 30)
@@ -55,27 +56,28 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Property Access in Methods ---")
 
-Counter = graph{}
-Counter.add_node("count", 0)
-Counter.add_node("step", 1)
+graph Counter {
+    count: 0
+    step: 1
 
-fn Counter.increment() {
-    # Using property syntax instead of get_node/add_node
-    self.count = self.count + self.step
-}
+    fn increment() {
+        # Using property syntax instead of get_node/add_node
+        count = count + step
+    }
 
-fn Counter.set_step(n) {
-    self.step = n
-}
+    fn set_step(n) {
+        step = n
+    }
 
-fn Counter.value() {
-    return self.count
-}
+    fn value() {
+        return count
+    }
 
-fn Counter.new(initial) {
-    c = self.clone()
-    c.count = initial
-    return c
+    fn new(initial) {
+        c = self.clone()
+        c.count = initial
+        return c
+    }
 }
 
 c = Counter.new(0)
@@ -126,9 +128,10 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Internal Node Protection ---")
 
-TestGraph = graph{}
-fn TestGraph.method() {
-    return "hello"
+graph TestGraph {
+    fn method() {
+        return "hello"
+    }
 }
 
 # Internal nodes cannot be accessed via property/index syntax
@@ -148,28 +151,29 @@ print("")
 # -----------------------------------------------------------------------------
 print("--- Complete Example: Point ---")
 
-Point = graph{}
-Point.add_node("x", 0)
-Point.add_node("y", 0)
+graph Point {
+    x: 0
+    y: 0
 
-fn Point.new(x, y) {
-    p = self.clone()
-    p.x = x
-    p.y = y
-    return p
-}
+    fn new(px, py) {
+        p = self.clone()
+        p.x = px
+        p.y = py
+        return p
+    }
 
-fn Point.distance_from_origin() {
-    return (self.x * self.x + self.y * self.y) ** 0.5
-}
+    fn distance_from_origin() {
+        return (x * x + y * y) ** 0.5
+    }
 
-fn Point.translate(dx, dy) {
-    self.x = self.x + dx
-    self.y = self.y + dy
-}
+    fn translate(dx, dy) {
+        x = x + dx
+        y = y + dy
+    }
 
-fn Point.describe() {
-    return "(" + self.x.to_string() + ", " + self.y.to_string() + ")"
+    fn describe() {
+        return "(" + x.to_string() + ", " + y.to_string() + ")"
+    }
 }
 
 p1 = Point.new(3, 4)
