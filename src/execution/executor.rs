@@ -7542,6 +7542,17 @@ impl Executor {
             Ok(())
         })();
 
+        // Enhance undefined variable errors with property suggestions
+        let execution_result = execution_result.map_err(|err| {
+            if let Some(var_name) = err.get_undefined_variable_name() {
+                let suggestions = graph.suggest_similar_properties(&var_name);
+                if !suggestions.is_empty() {
+                    return GraphoidError::undefined_variable_with_suggestions(&var_name, &suggestions);
+                }
+            }
+            err
+        });
+
         // Get the (possibly modified) `self` before restoring environment
         let modified_self = self.env.get("self").ok();
 

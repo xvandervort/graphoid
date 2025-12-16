@@ -2792,6 +2792,77 @@ impl Graph {
         }
     }
 
+    /// Get all data property names (excluding internal nodes like __methods__)
+    pub fn property_names(&self) -> Vec<String> {
+        self.nodes.keys()
+            .filter(|id| !id.starts_with("__"))
+            .filter(|id| {
+                // Also exclude computed_property_alias nodes
+                if let Some(node) = self.nodes.get(*id) {
+                    node.node_type.as_deref() != Some("computed_property_alias")
+                } else {
+                    true
+                }
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Suggest similar property names for error messages
+    /// Returns properties that are similar to the given name (prefix match or edit distance)
+    pub fn suggest_similar_properties(&self, name: &str) -> Vec<String> {
+        let properties = self.property_names();
+        let name_lower = name.to_lowercase();
+
+        let mut suggestions: Vec<(String, usize)> = properties.iter()
+            .filter_map(|prop| {
+                let prop_lower = prop.to_lowercase();
+                // Exact prefix match gets priority
+                if prop_lower.starts_with(&name_lower) || name_lower.starts_with(&prop_lower) {
+                    return Some((prop.clone(), 0));
+                }
+                // Simple edit distance (Levenshtein-like)
+                let dist = Self::edit_distance(&name_lower, &prop_lower);
+                if dist <= 2 {
+                    Some((prop.clone(), dist))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Sort by edit distance
+        suggestions.sort_by_key(|(_, dist)| *dist);
+        suggestions.into_iter().map(|(s, _)| s).take(3).collect()
+    }
+
+    /// Simple edit distance calculation
+    fn edit_distance(a: &str, b: &str) -> usize {
+        let a_chars: Vec<char> = a.chars().collect();
+        let b_chars: Vec<char> = b.chars().collect();
+        let m = a_chars.len();
+        let n = b_chars.len();
+
+        if m == 0 { return n; }
+        if n == 0 { return m; }
+
+        let mut dp = vec![vec![0usize; n + 1]; m + 1];
+
+        for i in 0..=m { dp[i][0] = i; }
+        for j in 0..=n { dp[0][j] = j; }
+
+        for i in 1..=m {
+            for j in 1..=n {
+                let cost = if a_chars[i-1] == b_chars[j-1] { 0 } else { 1 };
+                dp[i][j] = (dp[i-1][j] + 1)
+                    .min(dp[i][j-1] + 1)
+                    .min(dp[i-1][j-1] + cost);
+            }
+        }
+
+        dp[m][n]
+    }
+
     /// Get list of properties that a method reads
     pub fn method_reads(&self, method_name: &str) -> Vec<String> {
         let method_id = Self::method_node_id(method_name);

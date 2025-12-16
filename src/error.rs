@@ -103,6 +103,35 @@ impl GraphoidError {
         }
     }
 
+    /// Creates a runtime error for undefined variables with suggestions.
+    pub fn undefined_variable_with_suggestions(name: &str, suggestions: &[String]) -> Self {
+        let message = if suggestions.is_empty() {
+            format!("Undefined variable: {}", name)
+        } else if suggestions.len() == 1 {
+            format!("Undefined variable: {}. Did you mean '{}'?", name, suggestions[0])
+        } else {
+            format!("Undefined variable: {}. Did you mean one of: {}?",
+                name,
+                suggestions.iter().map(|s| format!("'{}'", s)).collect::<Vec<_>>().join(", "))
+        };
+        GraphoidError::RuntimeError { message }
+    }
+
+    /// Checks if this error is an undefined variable error
+    pub fn is_undefined_variable(&self) -> bool {
+        matches!(self, GraphoidError::RuntimeError { message } if message.starts_with("Undefined variable:"))
+    }
+
+    /// Extracts the variable name from an undefined variable error
+    pub fn get_undefined_variable_name(&self) -> Option<String> {
+        if let GraphoidError::RuntimeError { message } = self {
+            if message.starts_with("Undefined variable: ") {
+                return Some(message.trim_start_matches("Undefined variable: ").to_string());
+            }
+        }
+        None
+    }
+
     /// Creates a runtime error for type mismatches.
     pub fn type_error(expected: &str, actual: &str) -> Self {
         GraphoidError::RuntimeError {
