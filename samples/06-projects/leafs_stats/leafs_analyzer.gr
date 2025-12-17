@@ -7,7 +7,7 @@
 # - DataSet integration for statistical analysis
 # - Real sports data analysis
 
-import "dataset"
+load "dataset.gr"
 
 module leafs_analyzer_module alias leafs_analyzer
 
