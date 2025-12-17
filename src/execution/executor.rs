@@ -110,7 +110,6 @@ impl Executor {
             pattern_clauses: None,
             env: Rc::new(RefCell::new(self.env.clone())),
             node_id: None,
-            is_getter: false,
             is_setter: false,
             is_static: false,
             guard: None,
@@ -507,7 +506,6 @@ impl Executor {
                 body,
                 pattern_clauses,
                 is_private,
-                is_getter,
                 is_setter,
                 is_static,
                 guard,
@@ -527,7 +525,6 @@ impl Executor {
                     pattern_clauses: pattern_clauses.clone(),
                     env: placeholder_env.clone(),
                     node_id: None,
-                    is_getter: *is_getter,  // Phase 17: computed properties (getters)
                     is_setter: *is_setter,  // Phase 19: computed property assignment (setters)
                     is_static: *is_static,  // Phase 20: class methods
                     guard: guard.clone(),   // Phase 21: structure-based dispatch
@@ -555,7 +552,7 @@ impl Executor {
                                 // Phase 19: Attach as a setter
                                 graph_clone.attach_setter(name.clone(), func.clone());
                             } else {
-                                // Regular method or getter
+                                // Regular method
                                 graph_clone.attach_method(name.clone(), func.clone());
                             }
                             self.env.define(receiver_name.clone(), Value::graph(graph_clone));
@@ -1356,7 +1353,6 @@ impl Executor {
                 pattern_clauses: None,
                 env: Rc::new(RefCell::new(self.env.clone())),
                 node_id: None,
-                is_getter: method.is_getter,
                 is_setter: method.is_setter,
                 is_static: method.is_static,
                 guard: method.guard.clone(),
@@ -1370,11 +1366,6 @@ impl Executor {
 
             // Add semantic edges from method to properties it reads/writes
             graph.add_method_property_edges(&method_name, &prop_refs.reads, &prop_refs.writes);
-
-            // Phase 2: For getters, also add "depends_on" edges from property name to dependencies
-            if func.is_getter {
-                graph.add_getter_dependency_edges(&method_name, &prop_refs.reads);
-            }
         }
 
         // Create the value and bind it
@@ -1410,7 +1401,6 @@ impl Executor {
             pattern_clauses: None,
             env: Rc::new(RefCell::new(self.env.clone())),
             node_id: None,
-            is_getter: true,
             is_setter: false,
             is_static: false,
             guard: None,
@@ -1450,7 +1440,6 @@ impl Executor {
             pattern_clauses: None,
             env: Rc::new(RefCell::new(self.env.clone())),
             node_id: None,
-            is_getter: false,
             is_setter: true,
             is_static: false,
             guard: None,
@@ -1525,7 +1514,6 @@ impl Executor {
             pattern_clauses: None,
             env: Rc::new(RefCell::new(self.env.clone())),
             node_id: None,
-            is_getter: false,  // Lambdas are never getters
             is_setter: false,  // Lambdas are never setters
             is_static: false,  // Lambdas are never static
             guard: None,       // Lambdas don't have guards
@@ -1753,7 +1741,7 @@ impl Executor {
     }
 
     /// Evaluates a property access expression (object.property without parentheses).
-    /// For graphs: Returns data node value, or calls a getter method if one exists.
+    /// For graphs: Returns data node value.
     /// For hashes: Returns the value for the key.
     /// Returns none if property doesn't exist.
     fn eval_property_access(&mut self, object: &Expr, property: &str) -> Result<Value> {
@@ -1766,19 +1754,9 @@ impl Executor {
                     return Ok(Value::none());
                 }
 
-                // First try to get a data node with this name (data takes priority)
+                // Try to get a data node with this name
                 if let Some(value) = graph.get_node(property) {
                     return Ok(value.clone());
-                }
-
-                // Phase 17: Check for getter method
-                // If there's a method with this name that's a getter, call it
-                if let Some(func) = graph.get_method(property) {
-                    if func.is_getter {
-                        // Call the getter method with no arguments
-                        // Pass the original object expression for proper self binding and mutation persistence
-                        return self.call_graph_method(graph, &func, &[], object);
-                    }
                 }
 
                 // Nothing found, return none

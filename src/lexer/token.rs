@@ -39,7 +39,6 @@ pub enum TokenType {
     Match,       // match keyword for pattern matching
     From,        // from keyword for inheritance (graph from Parent {})
     Super,       // super keyword for calling parent method
-    Get,         // get keyword for computed properties (getters)
     Set,         // set keyword for setters (Phase 19)
     Static,      // static keyword for class methods (Phase 20)
     When,        // when keyword for guard clauses (Phase 21)

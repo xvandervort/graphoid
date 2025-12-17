@@ -1,0 +1,64 @@
+# Toronto Maple Leafs Statistics Analysis
+# Demonstrates: CLG composition, real sports data analysis, DataSet integration
+#
+# Run: graphoid samples/06-projects/leafs_stats/main.gr
+
+import "leafs_analyzer"
+import "json"
+import "io"
+
+print("Loading Toronto Maple Leafs data (2014-2024)...")
+print("")
+
+# Load the season data
+content = io.read_file("samples/06-projects/leafs_stats/data/maple_leafs_2014_2024.json")
+parsed = json.parse(content)
+records = parsed["seasons"]
+
+# Create analyzer and load data
+leafs = leafs_analyzer.LeafsAnalyzer.new("Toronto Maple Leafs")
+leafs = leafs.load_json(records)
+
+# Generate the comprehensive report
+leafs.report()
+
+# Additional deep-dive statistics
+print("")
+print("=== ADDITIONAL STATISTICS ===")
+print("")
+
+# Wins volatility
+wins_stats = leafs.wins_statistics()
+print("Wins Analysis:")
+print("  Average: " + wins_stats["mean"].to_string() + " wins/season")
+print("  Std Dev: " + wins_stats["std_dev"].to_string() + " (consistency measure)")
+print("  Range: " + wins_stats["min"].to_string() + " to " + wins_stats["max"].to_string() + " wins")
+print("")
+
+# The rebuild story
+print("=== THE REBUILD STORY ===")
+print("")
+print("The Leafs' journey from basement to contender:")
+print("")
+print("2014-16: The Dark Years")
+print("  - Back-to-back 68-69 point seasons")
+print("  - Strategic tank for draft picks")
+print("  - Result: Auston Matthews #1 overall (2016)")
+print("")
+print("2016-17: The Turnaround")
+print("  - Rookie trio: Matthews (40G), Marner (61pts), Nylander (61pts)")
+print("  - First playoffs since 2013")
+print("")
+print("2017-24: The Contender Era")
+print("  - 7 consecutive playoff appearances")
+print("  - 5 first-round exits (4 in Game 7!)")
+print("  - 2022-23: Finally won a playoff round")
+print("  - 2021-22: Matthews wins MVP (60 goals)")
+print("  - 2023-24: Matthews scores 69 goals (franchise record)")
+print("")
+print("The Painful Pattern: Game 7 Losses to Boston")
+print("  - 2018: Lost Game 7")
+print("  - 2019: Lost Game 7")
+print("  - 2024: Lost Game 7")
+print("")
+print("Analysis complete.")

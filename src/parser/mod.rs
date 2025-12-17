@@ -91,11 +91,9 @@ impl Parser {
         ) {
             self.variable_declaration(is_private)
         } else if self.match_token(&TokenType::Func) {
-            self.function_declaration(is_private, false, false, false)  // fn = not a getter, not a setter, not static
-        } else if self.match_token(&TokenType::Get) {
-            self.function_declaration(is_private, true, false, false)   // get = getter
+            self.function_declaration(is_private, false, false)  // fn = not a setter, not static
         } else if self.match_token(&TokenType::Set) {
-            self.function_declaration(is_private, false, true, false)   // set = setter
+            self.function_declaration(is_private, true, false)   // set = setter
         } else if self.match_token(&TokenType::Static) {
             // static fn ... - expect fn keyword next
             if !self.match_token(&TokenType::Func) {
@@ -104,7 +102,7 @@ impl Parser {
                     position: self.peek().position(),
                 });
             }
-            self.function_declaration(is_private, false, false, true)   // static fn = static method
+            self.function_declaration(is_private, false, true)   // static fn = static method
         } else if self.match_token(&TokenType::If) {
             self.if_statement()
         } else if self.match_token(&TokenType::While) {
@@ -294,7 +292,7 @@ impl Parser {
         })
     }
 
-    fn function_declaration(&mut self, is_private: bool, is_getter: bool, is_setter: bool, is_static: bool) -> Result<Stmt> {
+    fn function_declaration(&mut self, is_private: bool, is_setter: bool, is_static: bool) -> Result<Stmt> {
         let position = self.previous_position();
 
         // Expect identifier (could be function name or receiver for method syntax)
@@ -390,14 +388,6 @@ impl Parser {
             });
         }
 
-        // Phase 17: Getters cannot have parameters
-        if is_getter && !params.is_empty() {
-            return Err(GraphoidError::SyntaxError {
-                message: "Getters cannot have parameters. Use `fn` instead of `get` for methods with parameters.".to_string(),
-                position: self.peek().position(),
-            });
-        }
-
         // Phase 19: Setters must have exactly one parameter (the value being assigned)
         if is_setter && params.len() != 1 {
             return Err(GraphoidError::SyntaxError {
@@ -479,7 +469,6 @@ impl Parser {
             body,
             pattern_clauses,
             is_private,  // Phase 10: priv keyword support
-            is_getter,   // Phase 17: computed properties
             is_setter,   // Phase 19: computed property assignment
             is_static,   // Phase 20: class methods
             guard,       // Phase 21: structure-based dispatch
@@ -899,24 +888,20 @@ impl Parser {
 
             if self.match_token(&TokenType::Func) {
                 // fn name(...) { ... }
-                let method = self.parse_graph_method(is_private, false, false, is_static)?;
-                methods.push(method);
-            } else if self.match_token(&TokenType::Get) {
-                // get name() { ... }
-                let method = self.parse_graph_method(is_private, true, false, is_static)?;
+                let method = self.parse_graph_method(is_private, false, is_static)?;
                 methods.push(method);
             } else if self.match_token(&TokenType::Set) {
                 // set name(value) { ... }
-                let method = self.parse_graph_method(is_private, false, true, is_static)?;
+                let method = self.parse_graph_method(is_private, true, is_static)?;
                 methods.push(method);
             } else if is_static && self.match_token(&TokenType::Func) {
                 // static fn - already consumed static
-                let method = self.parse_graph_method(is_private, false, false, true)?;
+                let method = self.parse_graph_method(is_private, false, true)?;
                 methods.push(method);
             } else if is_private {
-                // priv without fn/get/set - error
+                // priv without fn/set - error
                 return Err(GraphoidError::SyntaxError {
-                    message: "Expected 'fn', 'get', or 'set' after 'priv' in graph body".to_string(),
+                    message: "Expected 'fn' or 'set' after 'priv' in graph body".to_string(),
                     position: self.peek().position(),
                 });
             } else if let TokenType::Identifier(id) = &self.peek().token_type {
@@ -1061,7 +1046,6 @@ impl Parser {
     fn parse_graph_method(
         &mut self,
         is_private: bool,
-        is_getter: bool,
         is_setter: bool,
         is_static: bool,
     ) -> Result<GraphMethod> {
@@ -1139,14 +1123,7 @@ impl Parser {
             });
         }
 
-        // Validate getter/setter constraints
-        if is_getter && !params.is_empty() {
-            return Err(GraphoidError::SyntaxError {
-                message: "Getters cannot have parameters".to_string(),
-                position: self.peek().position(),
-            });
-        }
-
+        // Validate setter constraints
         if is_setter && params.len() != 1 {
             return Err(GraphoidError::SyntaxError {
                 message: "Setters must have exactly one parameter".to_string(),
@@ -1184,7 +1161,6 @@ impl Parser {
             params,
             body,
             is_static,
-            is_getter,
             is_setter,
             is_private,
             guard,

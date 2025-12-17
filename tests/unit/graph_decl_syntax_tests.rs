@@ -220,34 +220,6 @@ graph TaskGraph(:dag) {
 }
 
 #[test]
-fn test_parse_graph_with_getter() {
-    let source = r#"
-graph Rectangle {
-    width: 0
-    height: 0
-
-    get area() {
-        return self.width * self.height
-    }
-}
-"#;
-    let mut lexer = Lexer::new(source);
-    let tokens = lexer.tokenize().unwrap();
-    let mut parser = Parser::new(tokens);
-    let program = parser.parse().unwrap();
-
-    match &program.statements[0] {
-        Stmt::GraphDecl { methods, .. } => {
-            assert_eq!(methods.len(), 1);
-            assert_eq!(methods[0].name, "area");
-            assert!(methods[0].is_getter);
-            assert!(!methods[0].is_setter);
-        }
-        other => panic!("Expected GraphDecl, got {:?}", other),
-    }
-}
-
-#[test]
 fn test_parse_graph_with_setter() {
     let source = r#"
 graph Temperature {
@@ -267,7 +239,6 @@ graph Temperature {
         Stmt::GraphDecl { methods, .. } => {
             assert_eq!(methods.len(), 1);
             assert_eq!(methods[0].name, "celsius");
-            assert!(!methods[0].is_getter);
             assert!(methods[0].is_setter);
             assert_eq!(methods[0].params.len(), 1);
         }
@@ -837,34 +808,6 @@ result = p.distance_from_origin()
     let result = executor.get_variable("result").unwrap();
     match &result.kind {
         ValueKind::Number(n) => assert_eq!(*n, 25.0),  // 3*3 + 4*4 = 25
-        other => panic!("Expected number, got {:?}", other),
-    }
-}
-
-#[test]
-fn test_implicit_self_in_getter() {
-    // Implicit self should work in getters too
-    let source = r#"
-graph Rectangle {
-    width: 0
-    height: 0
-
-    get area() {
-        return width * height  # implicit self
-    }
-}
-
-r = Rectangle.clone()
-r.width = 5
-r.height = 3
-result = r.area
-"#;
-    let mut executor = Executor::new();
-    executor.execute_source(source).unwrap();
-
-    let result = executor.get_variable("result").unwrap();
-    match &result.kind {
-        ValueKind::Number(n) => assert_eq!(*n, 15.0),
         other => panic!("Expected number, got {:?}", other),
     }
 }

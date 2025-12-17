@@ -55,11 +55,11 @@ graph Rectangle {
     width: 10
     height: 20
 
-    get area() {
+    fn area() {
         return width * height
     }
 
-    get perimeter() {
+    fn perimeter() {
         return 2 * (width + height)
     }
 }

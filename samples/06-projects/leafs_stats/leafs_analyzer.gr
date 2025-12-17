@@ -1,0 +1,389 @@
+# LeafsAnalyzer - A CLG for analyzing Toronto Maple Leafs hockey statistics
+# Demonstrates: CLG composition with DataSet, private methods
+#
+# Showcases:
+# - Class-like graphs with state and methods
+# - Private helper methods
+# - DataSet integration for statistical analysis
+# - Real sports data analysis
+
+import "dataset"
+
+module leafs_analyzer_module alias leafs_analyzer
+
+graph LeafsAnalyzer {
+    seasons: []
+    team_name: "Toronto Maple Leafs"
+
+    fn new(name) {
+        instance = self.clone()
+        instance.team_name = name
+        instance.seasons = []
+        return instance
+    }
+
+    fn load_json(season_records) {
+        # Load from parsed JSON season records
+        for record in season_records {
+            seasons = seasons.append(record)
+        }
+        return self
+    }
+
+    fn add_season(season_data) {
+        seasons = seasons.append(season_data)
+        return self
+    }
+
+    fn season_count() { return seasons.length() }
+
+    fn first_season() {
+        if season_count() == 0 { return none }
+        return seasons[0]["season"]
+    }
+
+    fn last_season() {
+        if season_count() == 0 { return none }
+        return seasons[season_count() - 1]["season"]
+    }
+
+    fn total_wins() {
+        total = 0
+        for s in seasons {
+            total = total + s["wins"]
+        }
+        return total
+    }
+
+    fn total_losses() {
+        total = 0
+        for s in seasons {
+            total = total + s["losses"]
+        }
+        return total
+    }
+
+    fn total_ot_losses() {
+        total = 0
+        for s in seasons {
+            total = total + s["ot_losses"]
+        }
+        return total
+    }
+
+    fn total_fights() {
+        total = 0
+        for s in seasons {
+            total = total + s["fights"]
+        }
+        return total
+    }
+
+    # Statistical analysis of wins using DataSet
+    fn wins_statistics() {
+        wins_list = []
+        for s in seasons {
+            wins_list = wins_list.append(s["wins"])
+        }
+        ds = dataset.DataSet.new(wins_list)
+        return ds.summary()
+    }
+
+    fn points_statistics() {
+        points_list = []
+        for s in seasons {
+            points_list = points_list.append(s["points"])
+        }
+        ds = dataset.DataSet.new(points_list)
+        return ds.summary()
+    }
+
+    fn goals_for_statistics() {
+        gf_list = []
+        for s in seasons {
+            gf_list = gf_list.append(s["goals_for"])
+        }
+        ds = dataset.DataSet.new(gf_list)
+        return ds.summary()
+    }
+
+    fn goals_against_statistics() {
+        ga_list = []
+        for s in seasons {
+            ga_list = ga_list.append(s["goals_against"])
+        }
+        ds = dataset.DataSet.new(ga_list)
+        return ds.summary()
+    }
+
+    fn fights_statistics() {
+        fights_list = []
+        for s in seasons {
+            fights_list = fights_list.append(s["fights"])
+        }
+        ds = dataset.DataSet.new(fights_list)
+        return ds.summary()
+    }
+
+    # Home vs Away analysis
+    fn home_away_comparison() {
+        home_wins = 0
+        home_losses = 0
+        away_wins = 0
+        away_losses = 0
+
+        for s in seasons {
+            home_wins = home_wins + s["home_wins"]
+            home_losses = home_losses + s["home_losses"] + s["home_ot"]
+            away_wins = away_wins + s["away_wins"]
+            away_losses = away_losses + s["away_losses"] + s["away_ot"]
+        }
+
+        home_pct = (home_wins * 100) / (home_wins + home_losses)
+        away_pct = (away_wins * 100) / (away_wins + away_losses)
+
+        return {
+            "home_wins": home_wins,
+            "home_losses": home_losses,
+            "home_win_pct": home_pct,
+            "away_wins": away_wins,
+            "away_losses": away_losses,
+            "away_win_pct": away_pct,
+            "home_advantage": home_pct - away_pct
+        }
+    }
+
+    # Find best/worst seasons
+    fn best_season() {
+        if season_count() == 0 { return none }
+        best = seasons[0]
+        for s in seasons {
+            if s["points"] > best["points"] {
+                best = s
+            }
+        }
+        return best
+    }
+
+    fn worst_season() {
+        if season_count() == 0 { return none }
+        worst = seasons[0]
+        for s in seasons {
+            if s["points"] < worst["points"] {
+                worst = s
+            }
+        }
+        return worst
+    }
+
+    fn most_goals_season() {
+        if season_count() == 0 { return none }
+        best = seasons[0]
+        for s in seasons {
+            if s["goals_for"] > best["goals_for"] {
+                best = s
+            }
+        }
+        return best
+    }
+
+    fn most_fights_season() {
+        if season_count() == 0 { return none }
+        most = seasons[0]
+        for s in seasons {
+            if s["fights"] > most["fights"] {
+                most = s
+            }
+        }
+        return most
+    }
+
+    fn least_fights_season() {
+        if season_count() == 0 { return none }
+        least = seasons[0]
+        for s in seasons {
+            if s["fights"] < least["fights"] {
+                least = s
+            }
+        }
+        return least
+    }
+
+    # Top scorers analysis
+    fn top_scorers_by_season() {
+        result = []
+        for s in seasons {
+            scorer = s["top_scorer"]
+            result = result.append({
+                "season": s["season"],
+                "name": scorer["name"],
+                "points": scorer["points"],
+                "goals": scorer["goals"],
+                "assists": scorer["assists"]
+            })
+        }
+        return result
+    }
+
+    fn count_scoring_titles(player_name) {
+        count = 0
+        for s in seasons {
+            if s["top_scorer"]["name"] == player_name {
+                count = count + 1
+            }
+        }
+        return count
+    }
+
+    # Playoff analysis
+    fn playoff_record() {
+        made_playoffs = 0
+        missed_playoffs = 0
+        round1_exits = 0
+        advanced = 0
+
+        for s in seasons {
+            result = s["playoff_result"]
+            if result == "Missed playoffs" {
+                missed_playoffs = missed_playoffs + 1
+            } else {
+                made_playoffs = made_playoffs + 1
+                # Check if they advanced: look for "Round 2" or "Won Round 1"
+                if result.contains("Round 2") || result.contains("Won Round 1") {
+                    advanced = advanced + 1
+                } else {
+                    round1_exits = round1_exits + 1
+                }
+            }
+        }
+
+        return {
+            "made_playoffs": made_playoffs,
+            "missed_playoffs": missed_playoffs,
+            "round1_exits": round1_exits,
+            "advanced_past_round1": advanced,
+            "playoff_rate": (made_playoffs * 100) / season_count()
+        }
+    }
+
+    # Generate comprehensive report
+    fn report() {
+        print("=" + _repeat("=", 50))
+        print("  " + team_name + " - 10 Year Analysis")
+        print("=" + _repeat("=", 50))
+        print("")
+
+        print("Period: " + first_season() + " to " + last_season())
+        print("Seasons analyzed: " + season_count().to_string())
+        print("")
+
+        # Overall record
+        print("--- OVERALL RECORD ---")
+        print("Total Wins: " + total_wins().to_string())
+        print("Total Losses: " + total_losses().to_string())
+        print("Total OT Losses: " + total_ot_losses().to_string())
+        win_pct = (total_wins() * 100) / (total_wins() + total_losses() + total_ot_losses())
+        print("Win Percentage: " + _format_pct(win_pct))
+        print("")
+
+        # Home vs Away
+        print("--- HOME vs AWAY ---")
+        ha = home_away_comparison()
+        print("Home Record: " + ha["home_wins"].to_string() + "-" + ha["home_losses"].to_string())
+        print("Home Win %: " + _format_pct(ha["home_win_pct"]))
+        print("Away Record: " + ha["away_wins"].to_string() + "-" + ha["away_losses"].to_string())
+        print("Away Win %: " + _format_pct(ha["away_win_pct"]))
+        print("Home Ice Advantage: +" + _format_pct(ha["home_advantage"]))
+        print("")
+
+        # Best/Worst seasons
+        print("--- SEASON EXTREMES ---")
+        best = best_season()
+        worst = worst_season()
+        print("Best Season: " + best["season"] + " (" + best["points"].to_string() + " pts)")
+        print("  " + best["wins"].to_string() + "-" + best["losses"].to_string() + "-" + best["ot_losses"].to_string())
+        print("  " + best["notes"])
+        print("")
+        print("Worst Season: " + worst["season"] + " (" + worst["points"].to_string() + " pts)")
+        print("  " + worst["wins"].to_string() + "-" + worst["losses"].to_string() + "-" + worst["ot_losses"].to_string())
+        print("  " + worst["notes"])
+        print("")
+
+        # Points statistics
+        print("--- POINTS ANALYSIS ---")
+        pts_stats = points_statistics()
+        print("Average Points/Season: " + _format_num(pts_stats["mean"]))
+        print("Std Deviation: " + _format_num(pts_stats["std_dev"]))
+        print("Min: " + pts_stats["min"].to_string() + " | Max: " + pts_stats["max"].to_string())
+        print("")
+
+        # Goals analysis
+        print("--- GOALS ANALYSIS ---")
+        gf_stats = goals_for_statistics()
+        ga_stats = goals_against_statistics()
+        print("Goals For - Avg: " + _format_num(gf_stats["mean"]) + ", Range: " + gf_stats["min"].to_string() + "-" + gf_stats["max"].to_string())
+        print("Goals Against - Avg: " + _format_num(ga_stats["mean"]) + ", Range: " + ga_stats["min"].to_string() + "-" + ga_stats["max"].to_string())
+        most_gf = most_goals_season()
+        print("Most Prolific: " + most_gf["season"] + " with " + most_gf["goals_for"].to_string() + " goals")
+        print("")
+
+        # Fights analysis
+        print("--- FIGHTING ANALYSIS ---")
+        fight_stats = fights_statistics()
+        print("Total Fights (10 seasons): " + total_fights().to_string())
+        print("Average Fights/Season: " + _format_num(fight_stats["mean"]))
+        most_f = most_fights_season()
+        least_f = least_fights_season()
+        print("Most Fights: " + most_f["season"] + " (" + most_f["fights"].to_string() + " fights)")
+        print("Least Fights: " + least_f["season"] + " (" + least_f["fights"].to_string() + " fights)")
+        print("Trend: Fighting declined from " + seasons[0]["fights"].to_string() + " to " + seasons[season_count() - 1]["fights"].to_string() + " (league-wide trend)")
+        print("")
+
+        # Playoff analysis
+        print("--- PLAYOFF PERFORMANCE ---")
+        playoffs = playoff_record()
+        print("Made Playoffs: " + playoffs["made_playoffs"].to_string() + "/" + season_count().to_string() + " seasons (" + _format_pct(playoffs["playoff_rate"]) + ")")
+        print("First Round Exits: " + playoffs["round1_exits"].to_string())
+        print("Advanced Past Round 1: " + playoffs["advanced_past_round1"].to_string())
+        print("")
+
+        # Top scorers
+        print("--- SCORING LEADERS ---")
+        matthews_titles = count_scoring_titles("Auston Matthews")
+        marner_titles = count_scoring_titles("Mitch Marner")
+        print("Auston Matthews led team: " + matthews_titles.to_string() + " times")
+        print("Mitch Marner led team: " + marner_titles.to_string() + " times")
+        print("")
+        print("Season-by-season leaders:")
+        scorers = top_scorers_by_season()
+        for scorer in scorers {
+            print("  " + scorer["season"] + ": " + scorer["name"] + " - " + scorer["points"].to_string() + " pts (" + scorer["goals"].to_string() + "G, " + scorer["assists"].to_string() + "A)")
+        }
+
+        print("")
+        print("=" + _repeat("=", 50))
+    }
+
+    # Private helper methods
+    priv fn format_pct(value) {
+        # Format as percentage with 1 decimal
+        rounded = (value * 10).round() / 10
+        return rounded.to_string() + "%"
+    }
+
+    priv fn format_num(value) {
+        if value == none { return "N/A" }
+        rounded = (value * 100).round() / 100
+        return rounded.to_string()
+    }
+
+    priv fn repeat(char, times) {
+        result = ""
+        i = 0
+        while i < times {
+            result = result + char
+            i = i + 1
+        }
+        return result
+    }
+}

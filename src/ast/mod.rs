@@ -28,7 +28,6 @@ pub enum Stmt {
         body: Vec<Stmt>,
         pattern_clauses: Option<Vec<PatternClause>>,  // Phase 7: Pattern matching
         is_private: bool,  // Phase 10: priv keyword support
-        is_getter: bool,  // Phase 17: True if defined with `get` keyword (computed property)
         is_setter: bool,  // Phase 19: True if defined with `set` keyword (computed property assignment)
         is_static: bool,  // Phase 20: True if defined with `static` keyword (class method)
         guard: Option<Box<Expr>>,  // Phase 21: Guard clause for structure-based dispatch (`when` clause)
@@ -124,7 +123,6 @@ pub struct GraphMethod {
     pub params: Vec<Parameter>,
     pub body: Vec<Stmt>,
     pub is_static: bool,
-    pub is_getter: bool,
     pub is_setter: bool,
     pub is_private: bool,
     pub guard: Option<Box<Expr>>,

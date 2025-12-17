@@ -15,8 +15,7 @@ print("--- Factory Pattern ---")
 graph Circle {
     radius: 0
 
-    # Instance method - requires `self`
-    get area() {
+    fn area() {
         return 3.14159 * radius * radius
     }
 
@@ -37,11 +36,11 @@ graph Circle {
 # Use factory methods
 unit = Circle.create_unit_circle()
 print("Unit circle radius: " + unit.radius.to_string())
-print("Unit circle area: " + unit.area.to_string())
+print("Unit circle area: " + unit.area().to_string())
 
 big = Circle.create_with_radius(10)
 print("Big circle radius: " + big.radius.to_string())
-print("Big circle area: " + big.area.to_string())
+print("Big circle area: " + big.area().to_string())
 
 print("")
 
@@ -59,7 +58,7 @@ graph Counter {
         _value = _value + 1
     }
 
-    get value() {
+    fn value() {
         return _value
     }
 
@@ -85,9 +84,9 @@ c1.increment()
 c1.increment()
 c2.increment()
 
-print("Counter 1 value: " + c1.value.to_string())
-print("Counter 2 value: " + c2.value.to_string())
-print("Counter 3 value: " + c3.value.to_string())
+print("Counter 1 value: " + c1.value().to_string())
+print("Counter 2 value: " + c2.value().to_string())
+print("Counter 3 value: " + c3.value().to_string())
 print("Total counters created: " + Counter.get_count().to_string())
 
 print("")
@@ -121,7 +120,7 @@ graph Rectangle from Shape {
         return r
     }
 
-    get area() {
+    fn area() {
         return width * height
     }
 }
@@ -132,7 +131,7 @@ print("Rectangle.describe(): " + Rectangle.describe())
 
 # Create instances with static factory
 rect = Rectangle.create(10, 5)
-print("Rectangle area: " + rect.area.to_string())
+print("Rectangle area: " + rect.area().to_string())
 
 print("")
 

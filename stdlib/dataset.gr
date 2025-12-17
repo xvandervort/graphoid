@@ -1,0 +1,209 @@
+# DataSet - Statistical Analysis CLG
+# A Class-Like Graph for storing and analyzing numerical data
+#
+# Demonstrates:
+# - Private helper methods
+# - Method chaining
+#
+# Usage:
+#   import "dataset"
+#   ds = DataSet.new([1, 2, 3, 4, 5])
+#   print(ds.mean())      # 3.0
+#   print(ds.std_dev())   # 1.414...
+#   print(ds.summary())   # Full statistics
+
+module dataset_module alias dataset
+
+graph DataSet {
+    data: []
+
+    fn new(values) {
+        instance = self.clone()
+        if values == none {
+            instance.data = []
+        } else {
+            instance.data = values
+        }
+        return instance
+    }
+
+    fn count() {
+        return data.length()
+    }
+
+    fn sum() {
+        return _calculate_sum()
+    }
+
+    fn mean() {
+        if count() == 0 { return none }
+        return sum() / count()
+    }
+
+    fn variance() {
+        return _calculate_variance()
+    }
+
+    fn std_dev() {
+        if variance() == none { return none }
+        return variance().sqrt()
+    }
+
+    fn min() {
+        return _find_min()
+    }
+
+    fn max() {
+        return _find_max()
+    }
+
+    fn range() {
+        if min() == none || max() == none { return none }
+        return max() - min()
+    }
+
+    # Methods
+
+    fn add(value) {
+        data = data.append(value)
+        return self
+    }
+
+    fn add_all(values) {
+        for v in values {
+            data = data.append(v)
+        }
+        return self
+    }
+
+    fn clear() {
+        data = []
+        return self
+    }
+
+    fn summary() {
+        return {
+            "count": count(),
+            "sum": sum(),
+            "mean": mean(),
+            "variance": variance(),
+            "std_dev": std_dev(),
+            "min": min(),
+            "max": max(),
+            "range": range()
+        }
+    }
+
+    fn quantile(q) {
+        # Calculate the q-th quantile (0.0 to 1.0)
+        if count() == 0 { return none }
+        if q < 0 || q > 1 { return none }
+
+        sorted = _sort_data()
+        pos = q * (count() - 1)
+        lower = pos.down()
+        upper = lower + 1
+
+        if upper >= count() {
+            return sorted[lower]
+        }
+
+        # Linear interpolation
+        fraction = pos - lower
+        return sorted[lower] + fraction * (sorted[upper] - sorted[lower])
+    }
+
+    fn median() {
+        return self.quantile(0.5)
+    }
+
+    fn percentile(p) {
+        # Calculate the p-th percentile (0 to 100)
+        return self.quantile(p / 100)
+    }
+
+    fn to_list() {
+        return data
+    }
+
+    # Private helper methods
+
+    priv fn calculate_sum() {
+        if count() == 0 { return 0 }
+        total = 0
+        for value in data {
+            total = total + value
+        }
+        return total
+    }
+
+    priv fn calculate_variance() {
+        if count() == 0 { return none }
+        if count() == 1 { return 0 }
+
+        m = mean()
+        sum_sq = 0
+        for value in data {
+            diff = value - m
+            sum_sq = sum_sq + (diff * diff)
+        }
+        return sum_sq / count()
+    }
+
+    priv fn find_min() {
+        if count() == 0 { return none }
+        result = data[0]
+        for value in data {
+            if value < result {
+                result = value
+            }
+        }
+        return result
+    }
+
+    priv fn find_max() {
+        if count() == 0 { return none }
+        result = data[0]
+        for value in data {
+            if value > result {
+                result = value
+            }
+        }
+        return result
+    }
+
+    priv fn sort_data() {
+        # Simple insertion sort for quantile calculation
+        if count() == 0 { return [] }
+
+        sorted = []
+        for value in data {
+            sorted = _insert_sorted(sorted, value)
+        }
+        return sorted
+    }
+
+    priv fn insert_sorted(sorted_list, value) {
+        # Insert value into sorted list maintaining order
+        if sorted_list.length() == 0 {
+            return [value]
+        }
+
+        result = []
+        inserted = false
+
+        for item in sorted_list {
+            if inserted == false && value < item {
+                result = result.append(value)
+                inserted = true
+            }
+            result = result.append(item)
+        }
+
+        if inserted == false {
+            result = result.append(value)
+        }
+
+        return result
+    }
+}

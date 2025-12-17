@@ -6,8 +6,7 @@ This directory contains 30 carefully curated educational examples demonstrating 
 
 **New to Graphoid?** Start here:
 ```bash
-# From the project root
-cargo run --release -- samples/01-basics/hello_world.gr
+graphoid samples/01-basics/hello_world.gr
 ```
 
 Then work through the basics in order:
@@ -53,7 +52,7 @@ Topics:
 - String methods (`.upper()`, `.len()`, `.replace()`)
 
 ```bash
-cargo run -- samples/01-basics/hello_world.gr
+graphoid samples/01-basics/hello_world.gr
 ```
 
 Expected output:
@@ -76,7 +75,7 @@ Topics:
 - Pattern matching basics
 
 ```bash
-cargo run -- samples/01-basics/functions.gr
+graphoid samples/01-basics/functions.gr
 ```
 
 ### `collections.gr` ⭐⭐⭐
@@ -89,7 +88,7 @@ Topics:
 - Immutability by default
 
 ```bash
-cargo run -- samples/01-basics/collections.gr
+graphoid samples/01-basics/collections.gr
 ```
 
 ### `graphs.gr` ⭐⭐
@@ -102,7 +101,7 @@ Topics:
 - Understanding "everything is a graph"
 
 ```bash
-cargo run -- samples/01-basics/graphs.gr
+graphoid samples/01-basics/graphs.gr
 ```
 
 ---
@@ -122,7 +121,7 @@ Topics:
 - Self-managing data structures
 
 ```bash
-cargo run -- samples/02-intermediate/behaviors.gr
+graphoid samples/02-intermediate/behaviors.gr
 ```
 
 **Key Concept:** Rules transform values automatically, eliminating repetitive validation code.
@@ -137,7 +136,7 @@ Topics:
 - Binding variables in patterns
 
 ```bash
-cargo run -- samples/02-intermediate/pattern_matching.gr
+graphoid samples/02-intermediate/pattern_matching.gr
 ```
 
 ### `string_generators.gr` ⭐⭐⭐
@@ -149,7 +148,7 @@ Topics:
 - Practical uses: bar charts, tables, padding
 
 ```bash
-cargo run -- samples/02-intermediate/string_generators.gr
+graphoid samples/02-intermediate/string_generators.gr
 ```
 
 ### `string_mutating_methods.gr` ⭐⭐
@@ -162,7 +161,7 @@ Topics:
 - `.trim()` vs `.trim!()`
 
 ```bash
-cargo run -- samples/02-intermediate/string_mutating_methods.gr
+graphoid samples/02-intermediate/string_mutating_methods.gr
 ```
 
 **Key Principle:** If you don't see `!`, nothing mutates.
@@ -177,7 +176,7 @@ Topics:
 - `.find()` - find positions
 
 ```bash
-cargo run -- samples/02-intermediate/string_pattern_methods.gr
+graphoid samples/02-intermediate/string_pattern_methods.gr
 ```
 
 ### `number_methods.gr` ⭐⭐
@@ -190,7 +189,7 @@ Topics:
 - Practical examples
 
 ```bash
-cargo run -- samples/02-intermediate/number_methods.gr
+graphoid samples/02-intermediate/number_methods.gr
 ```
 
 ### `universal_casting.gr` ⭐⭐⭐
@@ -203,7 +202,7 @@ Topics:
 - Practical examples with conditionals
 
 ```bash
-cargo run -- samples/02-intermediate/universal_casting.gr
+graphoid samples/02-intermediate/universal_casting.gr
 ```
 
 ### `integer_mode.gr` ⭐⭐
@@ -216,7 +215,7 @@ Topics:
 - When to use integer mode
 
 ```bash
-cargo run -- samples/02-intermediate/integer_mode.gr
+graphoid samples/02-intermediate/integer_mode.gr
 ```
 
 ### `function_overloading.gr` ⭐⭐
@@ -228,7 +227,7 @@ Topics:
 - Module function overloading
 
 ```bash
-cargo run -- samples/02-intermediate/function_overloading.gr
+graphoid samples/02-intermediate/function_overloading.gr
 ```
 
 ### `bitwise_operations.gr` ⭐⭐⭐
@@ -242,7 +241,7 @@ Topics:
 - Binary literals (`0b1010`)
 
 ```bash
-cargo run -- samples/02-intermediate/bitwise_operations.gr
+graphoid samples/02-intermediate/bitwise_operations.gr
 ```
 
 ### `bitwise_unsigned.gr` ⭐⭐
@@ -255,7 +254,7 @@ Topics:
 - Use cases for unsigned shifts
 
 ```bash
-cargo run -- samples/02-intermediate/bitwise_unsigned.gr
+graphoid samples/02-intermediate/bitwise_unsigned.gr
 ```
 
 ---
@@ -274,7 +273,7 @@ Topics:
 - Node property extraction
 
 ```bash
-cargo run -- samples/03-advanced/property_projection.gr
+graphoid samples/03-advanced/property_projection.gr
 ```
 
 **Prerequisites:** Understanding of graphs and pattern matching.
@@ -289,7 +288,7 @@ Topics:
 - Conflict resolution strategies
 
 ```bash
-cargo run -- samples/03-advanced/subgraph_operations.gr
+graphoid samples/03-advanced/subgraph_operations.gr
 ```
 
 ### `recommendation_system.gr` ⭐⭐
@@ -302,7 +301,7 @@ Topics:
 - Social network algorithms
 
 ```bash
-cargo run -- samples/03-advanced/recommendation_system.gr
+graphoid samples/03-advanced/recommendation_system.gr
 ```
 
 ### `social_network_patterns.gr` ⭐⭐
@@ -315,7 +314,7 @@ Topics:
 - Result projection
 
 ```bash
-cargo run -- samples/03-advanced/social_network_patterns.gr
+graphoid samples/03-advanced/social_network_patterns.gr
 ```
 
 ### `variable_length_paths.gr` ⭐⭐
@@ -328,7 +327,7 @@ Topics:
 - Reachability queries
 
 ```bash
-cargo run -- samples/03-advanced/variable_length_paths.gr
+graphoid samples/03-advanced/variable_length_paths.gr
 ```
 
 ---
@@ -347,7 +346,7 @@ Topics:
 - Demonstrates: `app → service → utils`
 
 ```bash
-cargo run -- samples/04-modules/app_main.gr
+graphoid samples/04-modules/app_main.gr
 ```
 
 **Key Example:** Shows how modules can import other modules, creating a dependency chain.
@@ -362,7 +361,7 @@ Topics:
 - API design
 
 ```bash
-cargo run -- samples/04-modules/priv_keyword.gr
+graphoid samples/04-modules/priv_keyword.gr
 ```
 
 **Best Practice:** Hide implementation details, expose clean APIs.
@@ -377,7 +376,7 @@ Topics:
 - Practical examples
 
 ```bash
-cargo run -- samples/04-modules/load_vs_import.gr
+graphoid samples/04-modules/load_vs_import.gr
 ```
 
 **Critical Distinction:**
@@ -408,7 +407,7 @@ Topics:
 - Physical constants: c (speed of light), G (gravitational), h (Planck)
 
 ```bash
-cargo run -- samples/05-stdlib/constants.gr
+graphoid samples/05-stdlib/constants.gr
 ```
 
 ### `random.gr` ⭐⭐⭐
@@ -427,7 +426,7 @@ Topics:
 - `random.uuid()` - generate UUIDs
 
 ```bash
-cargo run -- samples/05-stdlib/random.gr
+graphoid samples/05-stdlib/random.gr
 ```
 
 ### `approx_demo.gr` ⭐⭐⭐
@@ -441,7 +440,7 @@ Topics:
 - Floating-point safety
 
 ```bash
-cargo run -- samples/05-stdlib/approx_demo.gr
+graphoid samples/05-stdlib/approx_demo.gr
 ```
 
 **Use Case:** Comparing floating-point numbers safely.
@@ -456,7 +455,7 @@ Topics:
 - Practical examples
 
 ```bash
-cargo run -- samples/05-stdlib/time_type.gr
+graphoid samples/05-stdlib/time_type.gr
 ```
 
 ---
@@ -466,26 +465,28 @@ cargo run -- samples/05-stdlib/time_type.gr
 ### Basic Execution
 ```bash
 # From rust/ directory
-cargo run -- samples/01-basics/hello_world.gr
+graphoid samples/01-basics/hello_world.gr
 ```
 
 ### With Stdlib (if needed)
 ```bash
 # Set stdlib path
-cargo run -- samples/05-stdlib/random.gr
+graphoid samples/05-stdlib/random.gr
 ```
 
 ### Release Mode (faster)
+If running from source without installing:
 ```bash
 cargo run --release -- samples/02-intermediate/behaviors.gr
 ```
+If installed, `graphoid` already runs at release speed.
 
 ### Run Multiple Examples
 ```bash
 # Test all basics
 for f in samples/01-basics/*.gr; do
     echo "Running $f..."
-    cargo run --quiet -- "$f"
+    graphoid "$f"
 done
 ```
 
@@ -553,7 +554,7 @@ print("Key takeaway: [main point]")
 
 2. Add file to directory
 3. Update this README with description
-4. Test that it runs: `cargo run -- samples/XX-category/your_example.gr`
+4. Test that it runs: `graphoid samples/XX-category/your_example.gr`
 5. Ensure it produces clear, educational output
 
 ---
@@ -576,7 +577,7 @@ import "./module_name"
 
 Some examples require the stdlib:
 ```bash
-cargo run -- samples/05-stdlib/random.gr
+graphoid samples/05-stdlib/random.gr
 ```
 
 ### Example Runs but Output is Unexpected

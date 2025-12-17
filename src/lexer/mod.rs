@@ -807,7 +807,6 @@ impl Lexer {
             "match" => TokenType::Match,
             "from" => TokenType::From,
             "super" => TokenType::Super,
-            "get" => TokenType::Get,
             "set" => TokenType::Set,
             "static" => TokenType::Static,
             "when" => TokenType::When,

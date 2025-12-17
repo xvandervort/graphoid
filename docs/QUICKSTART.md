@@ -12,22 +12,47 @@ Plus, Graphoid includes a powerful **behavior system** that automatically transf
 
 ### Prerequisites
 
-You need Rust and Cargo installed. The Graphoid binary is built from the Rust implementation.
-
-### Building Graphoid
+You need Rust and Cargo installed. If you don't have them:
 
 ```bash
-cd rust/
-~/.cargo/bin/cargo build --release
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-The compiled binary will be at `rust/target/release/graphoid`.
+### Installing Graphoid
+
+The recommended way to install Graphoid system-wide:
+
+```bash
+# Ensure ~/.cargo/bin is in your PATH (add to ~/.bashrc if not already there)
+echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# Install Graphoid
+cargo install --path /path/to/grang
+```
+
+After installation, `graphoid` will be available anywhere:
+
+```bash
+graphoid --version
+graphoid samples/01-basics/hello_world.gr
+graphoid   # Starts the REPL
+```
+
+### Building from Source (Alternative)
+
+If you prefer not to install system-wide:
+
+```bash
+cargo build --release
+```
+
+The compiled binary will be at `target/release/graphoid`.
 
 ### Quick Test
 
 ```bash
-# From rust/ directory
-~/.cargo/bin/cargo run --quiet
+graphoid
 ```
 
 You should see the Graphoid REPL prompt:
@@ -104,7 +129,7 @@ print("Even numbers:", evens)
 Run it:
 
 ```bash
-~/.cargo/bin/cargo run --quiet hello.gr
+graphoid hello.gr
 ```
 
 Output:
@@ -518,15 +543,14 @@ print("Area:", area)
 
 ### Working Examples
 
-See `rust/examples/` for complete working module examples:
-- `modules_basic.gr` - Concepts and syntax
-- `modules_math.gr` - Complete module implementation
-- `modules_main.gr` - Using an imported module
+See `samples/04-modules/` for complete working module examples:
+- `load_vs_import.gr` - Understanding load vs import
+- `priv_keyword.gr` - Private symbols and encapsulation
+- `app_main.gr` - Multi-file project with module hierarchy
 
 Run them:
 ```bash
-cd rust
-cargo run --quiet examples/modules_main.gr
+graphoid samples/04-modules/app_main.gr
 ```
 
 ---
@@ -702,19 +726,18 @@ print("Highest:", sorted_scores.last())
 
 ### Explore More Examples
 
-Check out the `rust/examples/` directory for more complete examples:
+Check out the `samples/` directory for more complete examples:
 
 ```bash
-# From rust/ directory
-~/.cargo/bin/cargo run --quiet examples/hello_world.gr
-~/.cargo/bin/cargo run --quiet examples/collections.gr
-~/.cargo/bin/cargo run --quiet examples/behaviors.gr
-~/.cargo/bin/cargo run --quiet examples/modules_main.gr
-~/.cargo/bin/cargo run --quiet examples/functions.gr
-~/.cargo/bin/cargo run --quiet examples/graphs.gr
+graphoid samples/01-basics/hello_world.gr
+graphoid samples/01-basics/collections.gr
+graphoid samples/02-intermediate/behaviors.gr
+graphoid samples/04-modules/app_main.gr
+graphoid samples/01-basics/functions.gr
+graphoid samples/01-basics/graphs.gr
 ```
 
-See `rust/examples/README.md` for detailed descriptions.
+See `samples/README.md` for detailed descriptions.
 
 ### Learn the Language
 
@@ -727,10 +750,10 @@ See `rust/examples/README.md` for detailed descriptions.
 See the comprehensive test suite:
 
 ```bash
-~/.cargo/bin/cargo test
+cargo test --lib
 ```
 
-Currently **768+ tests passing** with zero failures!
+Currently **2,228+ tests passing** with zero failures!
 
 ## Quick Reference Card
 
@@ -821,10 +844,10 @@ m.PI                 # Access constant
 
 ## Getting Help
 
-- **Examples**: `rust/examples/`
+- **Examples**: `samples/`
 - **Documentation**: `docs/` and `dev_docs/`
-- **Tests**: Run `~/.cargo/bin/cargo test` to see working examples
-- **REPL**: Try things interactively with `~/.cargo/bin/cargo run --quiet`
+- **Tests**: Run `cargo test --lib` to see working examples
+- **REPL**: Try things interactively with `graphoid`
 
 ## Tips & Tricks
 

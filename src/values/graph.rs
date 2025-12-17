@@ -2649,7 +2649,6 @@ impl Graph {
     ///     pattern_clauses: None,
     ///     env: Rc::new(RefCell::new(Environment::new())),
     ///     node_id: None,
-    ///     is_getter: false,
     ///     is_setter: false,
     ///     is_static: false,
     ///     guard: None,
@@ -2928,52 +2927,8 @@ impl Graph {
     }
 
     // ==========================================================================
-    // Phase 2: Property Dependency Edges (for getters/computed properties)
+    // Property Dependency Edges
     // ==========================================================================
-
-    /// Get the node ID for a computed property (getter)
-    fn computed_property_node_id(getter_name: &str) -> String {
-        format!("__computed__/{}", getter_name)
-    }
-
-    /// Add dependency edges for a getter/computed property.
-    /// Creates a node for the property and "depends_on" edges to its dependencies.
-    /// Note: Also creates edges FROM the raw property name for API consistency
-    pub fn add_getter_dependency_edges(&mut self, getter_name: &str, dependencies: &[String]) {
-        let computed_id = Self::computed_property_node_id(getter_name);
-
-        // Ensure the computed property node exists
-        if !self.nodes.contains_key(&computed_id) {
-            self.nodes.insert(computed_id.clone(), GraphNode {
-                id: computed_id.clone(),
-                value: Value::string(getter_name.to_string()),
-                node_type: Some("computed_property".to_string()),
-                properties: HashMap::new(),
-                neighbors: HashMap::new(),
-                predecessors: HashMap::new(),
-            });
-        }
-
-        // Also create a simple property node for the getter name if it doesn't exist
-        // This enables edges() to show "area -> width" instead of "__computed__/area -> width"
-        // But mark it with a special node_type so property access doesn't return it
-        if !self.nodes.contains_key(getter_name) {
-            self.nodes.insert(getter_name.to_string(), GraphNode {
-                id: getter_name.to_string(),
-                value: Value::string(getter_name.to_string()),
-                node_type: Some("computed_property_alias".to_string()),
-                properties: HashMap::new(),
-                neighbors: HashMap::new(),
-                predecessors: HashMap::new(),
-            });
-        }
-
-        // Add "depends_on" edges from both computed node and alias to dependencies
-        for dep in dependencies {
-            self.add_semantic_edge(&computed_id, dep, "depends_on");
-            self.add_semantic_edge(getter_name, dep, "depends_on");
-        }
-    }
 
     /// Get list of properties that a computed property depends on
     pub fn dependencies(&self, property_name: &str) -> Vec<String> {
