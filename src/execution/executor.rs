@@ -15,6 +15,15 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 
 /// The executor evaluates AST nodes and produces values.
+/// Info for writing back mutable argument values after a function call
+#[derive(Debug, Clone)]
+struct WritebackInfo {
+    /// Name of the parameter in the called function
+    param_name: String,
+    /// Name of the variable in the caller's scope to write back to
+    source_var_name: String,
+}
+
 pub struct Executor {
     env: Environment,
     call_stack: Vec<String>,
@@ -41,6 +50,9 @@ pub struct Executor {
     /// When executing a method, this tracks which graph's method we're in,
     /// so super.method() can find the correct parent.
     super_context_stack: Vec<crate::values::Graph>,
+    /// Pending write-backs for mutable arguments (arg! syntax)
+    /// Stack of vectors - one per active function call
+    writeback_stack: Vec<Vec<WritebackInfo>>,
 }
 
 impl Executor {
@@ -61,6 +73,7 @@ impl Executor {
             output_buffer: String::new(),
             method_context_stack: Vec::new(),
             super_context_stack: Vec::new(),
+            writeback_stack: Vec::new(),
         }
     }
 
@@ -81,6 +94,7 @@ impl Executor {
             output_buffer: String::new(),
             method_context_stack: Vec::new(),
             super_context_stack: Vec::new(),
+            writeback_stack: Vec::new(),
         }
     }
 
@@ -1858,7 +1872,7 @@ impl Executor {
         let mut arg_values = Vec::new();
         for arg in args {
             match arg {
-                Argument::Positional(expr) => {
+                Argument::Positional { expr, .. } => {
                     arg_values.push(self.eval_expr(expr)?);
                 }
                 Argument::Named { name, .. } => {
@@ -2026,7 +2040,7 @@ impl Executor {
         // Get the predicate expression (NOT evaluated yet)
         // Extract expression from Argument enum
         let predicate_expr = match &args[0] {
-            crate::ast::Argument::Positional(expr) => expr,
+            crate::ast::Argument::Positional { expr, .. } => expr,
             crate::ast::Argument::Named { value, .. } => value,
         };
 
@@ -2109,7 +2123,7 @@ impl Executor {
         let return_exprs: Vec<&Expr> = args
             .iter()
             .map(|arg| match arg {
-                crate::ast::Argument::Positional(expr) => expr,
+                crate::ast::Argument::Positional { expr, .. } => expr,
                 crate::ast::Argument::Named { value, .. } => value,
             })
             .collect();
@@ -6719,7 +6733,7 @@ impl Executor {
                         }
 
                         let value = match arg {
-                            Argument::Positional(expr) => self.eval_expr(expr)?,
+                            Argument::Positional { expr, .. } => self.eval_expr(expr)?,
                             Argument::Named { .. } => {
                                 return Err(GraphoidError::runtime(
                                     "print() does not accept named arguments".to_string()
@@ -6764,7 +6778,7 @@ impl Executor {
                         )));
                     }
                     let message_value = match &args[0] {
-                        Argument::Positional(expr) => self.eval_expr(expr)?,
+                        Argument::Positional { expr, .. } => self.eval_expr(expr)?,
                         Argument::Named { .. } => {
                             return Err(GraphoidError::runtime(format!(
                                 "{} constructor does not support named arguments",
@@ -6835,7 +6849,7 @@ impl Executor {
                     }
 
                     let path_value = match &args[0] {
-                        Argument::Positional(expr) => self.eval_expr(expr)?,
+                        Argument::Positional { expr, .. } => self.eval_expr(expr)?,
                         Argument::Named { .. } => {
                             return Err(GraphoidError::runtime(
                                 "exec() does not accept named arguments".to_string()
@@ -6881,7 +6895,7 @@ impl Executor {
 
                     for arg in args {
                         match arg {
-                            Argument::Positional(expr) => {
+                            Argument::Positional { expr, .. } => {
                                 if variable.is_some() {
                                     return Err(GraphoidError::runtime(
                                         "node() accepts at most one positional argument (variable)".to_string()
@@ -6890,7 +6904,7 @@ impl Executor {
                                 let val = self.eval_expr(expr)?;
                                 variable = Some(val.to_string_value());
                             }
-                            Argument::Named { name: param_name, value } => {
+                            Argument::Named { name: param_name, value, .. } => {
                                 if param_name == "type" {
                                     let val = self.eval_expr(value)?;
                                     node_type = Some(val.to_string_value());
@@ -6914,12 +6928,12 @@ impl Executor {
 
                     for arg in args {
                         match arg {
-                            Argument::Positional(_) => {
+                            Argument::Positional { .. } => {
                                 return Err(GraphoidError::runtime(
                                     "edge() does not accept positional arguments, use named parameters: type, direction".to_string()
                                 ));
                             }
-                            Argument::Named { name: param_name, value } => {
+                            Argument::Named { name: param_name, value, .. } => {
                                 let val = self.eval_expr(value)?;
                                 match param_name.as_str() {
                                     "type" => {
@@ -6959,12 +6973,12 @@ impl Executor {
 
                     for arg in args {
                         match arg {
-                            Argument::Positional(_) => {
+                            Argument::Positional { .. } => {
                                 return Err(GraphoidError::runtime(
                                     "path() does not accept positional arguments, use named parameters: edge_type, min, max, direction".to_string()
                                 ));
                             }
-                            Argument::Named { name: param_name, value } => {
+                            Argument::Named { name: param_name, value, .. } => {
                                 let val = self.eval_expr(value)?;
                                 match param_name.as_str() {
                                     "edge_type" | "type" => {
@@ -7046,6 +7060,11 @@ impl Executor {
                 if let Some(func) = overloads.iter().find(|f| f.parameters.len() == arity).cloned() {
                     // Process arguments and call the matched overload
                     let arg_values = self.process_arguments(&func, args)?;
+
+                    // Collect writeback info for mutable arguments
+                    let writebacks = self.collect_writebacks(&func, args);
+                    self.writeback_stack.push(writebacks);
+
                     return self.call_function(&func, &arg_values);
                 }
             }
@@ -7091,8 +7110,61 @@ impl Executor {
         // Process arguments (positional and named) and match to parameters
         let arg_values = self.process_arguments(&func, args)?;
 
+        // Collect writeback info for mutable arguments
+        let writebacks = self.collect_writebacks(&func, args);
+        self.writeback_stack.push(writebacks);
+
         // Delegate to call_function (which has graph tracking)
-        self.call_function(&func, &arg_values)
+        let result = self.call_function(&func, &arg_values);
+
+        // Process writebacks (pop happens inside call_function before env restore)
+        // The actual writeback is done in call_function
+
+        result
+    }
+
+    /// Collect writeback info for mutable arguments (arg! syntax).
+    /// Returns a list of WritebackInfo for parameters that need to be written back.
+    fn collect_writebacks(&self, func: &Function, args: &[crate::ast::Argument]) -> Vec<WritebackInfo> {
+        use crate::ast::Argument;
+
+        let mut writebacks = Vec::new();
+        let mut positional_idx = 0;
+
+        for arg in args {
+            match arg {
+                Argument::Positional { expr, mutable } => {
+                    if *mutable {
+                        // Get the source variable name (only simple variables can be written back)
+                        if let Expr::Variable { name, .. } = expr {
+                            // Get the parameter name at this position
+                            if positional_idx < func.parameters.len() {
+                                writebacks.push(WritebackInfo {
+                                    param_name: func.parameters[positional_idx].name.clone(),
+                                    source_var_name: name.clone(),
+                                });
+                            }
+                        }
+                        // For non-variable expressions with !, we silently ignore
+                        // (could add a warning later)
+                    }
+                    positional_idx += 1;
+                }
+                Argument::Named { name, value, mutable } => {
+                    if *mutable {
+                        // Get the source variable name
+                        if let Expr::Variable { name: var_name, .. } = value {
+                            writebacks.push(WritebackInfo {
+                                param_name: name.clone(),
+                                source_var_name: var_name.clone(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        writebacks
     }
 
     /// Process function arguments (positional and named) and match them to parameters.
@@ -7124,7 +7196,7 @@ impl Executor {
         // Process each argument
         for arg in args {
             match arg {
-                Argument::Named { name, value } => {
+                Argument::Named { name, value, .. } => {
                     // Find parameter by name
                     let idx = param_index.get(name).ok_or_else(|| {
                         GraphoidError::runtime(format!(
@@ -7147,7 +7219,7 @@ impl Executor {
                     assigned[*idx] = Some(val);
                     assigned_names.insert(name.clone());
                 }
-                Argument::Positional(expr) => {
+                Argument::Positional { expr, .. } => {
                     // Find next unassigned positional parameter
                     while next_positional_idx < param_count && assigned[next_positional_idx].is_some() {
                         next_positional_idx += 1;
@@ -7338,6 +7410,21 @@ impl Executor {
             Ok(())
         })();
 
+        // Process writebacks for mutable arguments (arg! syntax)
+        // Capture parameter values before restoring the environment
+        let writeback_values: Vec<(String, Value)> = if let Some(writebacks) = self.writeback_stack.pop() {
+            writebacks
+                .iter()
+                .filter_map(|wb| {
+                    self.env.get(&wb.param_name).ok().map(|val| {
+                        (wb.source_var_name.clone(), val)
+                    })
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
         // Save modifications back to the captured environment (for closure state)
         // Extract the parent environment from call_env (which may have been modified)
         if let Some(modified_parent) = self.env.take_parent() {
@@ -7347,6 +7434,12 @@ impl Executor {
 
         // Restore original environment
         self.env = saved_env;
+
+        // Write back mutable argument values to the caller's scope
+        for (var_name, value) in writeback_values {
+            // Try to set in the restored environment
+            let _ = self.env.set(&var_name, value);
+        }
 
         // Pop function from call stack (traditional)
         self.call_stack.pop();

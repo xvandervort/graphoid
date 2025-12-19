@@ -1,13 +1,21 @@
 # Graphoid/Glang: Rust Implementation Roadmap
 
-**Version**: 2.2
-**Last Updated**: November 12, 2025
-**Status**: Phase 8 ✅ Complete, Phase 12 (Stdlib) 44% Complete
+**Version**: 2.3
+**Last Updated**: December 19, 2025
+**Status**: Phases 0-13 ✅ Complete, Phase 14 (gspec) Ready to Begin
 
-**🚨 CRITICAL UPDATE (November 6, 2025)**: An executability audit revealed that features implemented at the Rust API level are not accessible from .gr user-facing files. Phase completion claims are being revised based on actual .gr file executability. See `EXECUTABILITY_AUDIT.md` for details.
+**December 2025 Milestone**:
+- 2,400+ tests passing (unit + doc tests)
+- TLS 1.3 and HTTPS working in pure Graphoid
+- Mutable argument passing (`arg!` syntax) implemented for closure writeback
+- Test framework architecture validated with working prototype
 
-**Previous Status**: Phase 7 claimed complete (1,609 Rust tests passing), Phase 8 ~75% complete
-**Revised Status**: Phases 3-9 usability uncertain, comprehensive audit in progress
+**Core Language Status**: All 14 core phases complete. The language is fully functional with:
+- Graph-theoretic data model (lists, maps, graphs as first-class citizens)
+- Pattern matching (function overloads, graph patterns)
+- Behavior system (intrinsic data transformations)
+- Module system (imports, stdlib auto-discovery)
+- Pure Graphoid stdlib (tls, http, json, time, crypto, etc.)
 
 **⚠️ IMPORTANT**: This roadmap has been significantly updated based on new language features. See [archived updates document](archive/sessions/2025-01-roadmap-updates/ROADMAP_UPDATES_FOR_NEW_FEATURES.md) for complete details of changes.
 
@@ -3489,11 +3497,14 @@ Create examples demonstrating use cases:
 
 ---
 
-## Phase 14: Testing Framework (7-10 days)
+## Phase 14: gspec - Testing Framework (7-10 days)
 
-**Goal**: Built-in RSpec-style testing framework enabling proper test-driven development for Graphoid itself.
+**Goal**: Built-in RSpec-style testing framework ("gspec") enabling proper test-driven development for Graphoid itself.
 
 **Why Now**: Testing framework MUST come before stdlib translation. We need proper testing infrastructure to validate that translated modules work correctly.
+
+**Prerequisites**:
+- ✅ Mutable argument passing (`arg!` syntax) - needed for closure state writeback in nested test blocks
 
 ### Core Features
 
@@ -3506,12 +3517,65 @@ Create examples demonstrating use cases:
 - Mocking and stubbing system
 - Property-based testing
 
+### Matcher Reference
+
+Streamlined matcher API using `to` and `not_to` properties for natural English syntax:
+
+```graphoid
+expect(result).to.equal(5)
+expect(result).not_to.equal(5)
+```
+
+| Category | Matcher | Example |
+|----------|---------|---------|
+| **Equality** | `equal(expected)` | `expect(x).to.equal(5)` |
+| | `deeply_equal(expected)` | `expect(nested).to.deeply_equal(expected)` |
+| | `be_close_to(target, tolerance)` | `expect(pi).to.be_close_to(3.14, 0.01)` |
+| **Value** | `be(value)` | `expect(done).to.be(true)` |
+| | `be_truthy()` | `expect(result).to.be_truthy()` |
+| | `be_falsy()` | `expect(result).to.be_falsy()` |
+| **Type** | `be_a(type)` | `expect(items).to.be_a(list)` |
+| **Comparison** | `be_greater_than(n)` | `expect(age).to.be_greater_than(0)` |
+| | `be_less_than(n)` | `expect(age).to.be_less_than(150)` |
+| | `be_between(min, max)` | `expect(score).to.be_between(0, 100)` |
+| **Collection** | `contain(element)` | `expect(items).to.contain("apple")` |
+| | `be_empty()` | `expect(errors).to.be_empty()` |
+| | `have_length(n)` | `expect(items).to.have_length(3)` |
+| **Exception** | `raise()` | `expect(fn() { bad() }).to.raise()` |
+| | `raise(error_type)` | `expect(fn() { x/0 }).to.raise("DivisionByZero")` |
+| **Pattern** | `match(pattern)` | `expect(email).to.match("@")` |
+| **Custom** | `satisfy(predicate)` | `expect(n).to.satisfy(x => x % 2 == 0)` |
+
+**14 matchers total** - All support negation via `not_to`:
+- `expect(errors).to.be_empty()` → "expect errors to be empty"
+- `expect(errors).not_to.be_empty()` → "expect errors not to be empty"
+
+### Type Constants
+
+To enable natural type checking syntax like `expect(x).to.be_a(list)`, add type constants to the global environment:
+
+```rust
+// In executor initialization (~10 lines)
+env.set("string", Value::Symbol("string".to_string()));
+env.set("num", Value::Symbol("num".to_string()));
+env.set("list", Value::Symbol("list".to_string()));
+env.set("map", Value::Symbol("map".to_string()));
+env.set("graph", Value::Symbol("graph".to_string()));
+env.set("bool", Value::Symbol("bool".to_string()));
+```
+
+This allows both forms:
+```graphoid
+expect(items).to.be_a(list)     # bare type name (recommended)
+expect(items).to.be_a(:list)    # explicit symbol (also works)
+```
+
 ### Implementation Strategy
 
 **Day 1-2: Core Assertion Module**
 ```graphoid
-# stdlib/spec.gr
-# RSpec-style testing framework
+# stdlib/gspec.gr
+# gspec - RSpec-style testing framework for Graphoid
 
 fn describe(name, block) {
     # Create a test group
@@ -3531,10 +3595,10 @@ fn it(description, block) {
 }
 
 fn expect(actual) {
-    # Return expectation builder
     return Expectation.new(actual)
 }
 
+# Expectation returns matcher builders via .to and .not_to properties
 graph Expectation {
     _actual
 
@@ -3542,41 +3606,214 @@ graph Expectation {
         return Expectation { _actual: actual }
     }
 
-    fn to_equal(expected) {
-        if _actual != expected {
-            raise "Expected " + expected.to_string() + " but got " + _actual.to_string()
-        }
+    fn to() {
+        return MatcherBuilder.new(_actual, false)
     }
 
-    fn to_be_truthy() {
-        if !_actual {
-            raise "Expected truthy value but got " + _actual.to_string()
-        }
+    fn not_to() {
+        return MatcherBuilder.new(_actual, true)
+    }
+}
+
+# MatcherBuilder contains all matcher methods
+graph MatcherBuilder {
+    _actual
+    _negated
+
+    fn new(actual, negated) {
+        return MatcherBuilder { _actual: actual, _negated: negated }
     }
 
-    fn to_be_falsy() {
-        if _actual {
-            raise "Expected falsy value but got " + _actual.to_string()
-        }
-    }
-
-    fn to_contain(item) {
-        if !_actual.contains(item) {
-            raise "Expected " + _actual.to_string() + " to contain " + item.to_string()
-        }
-    }
-
-    fn to_raise(error_type) {
-        # For testing that code raises errors
-        # _actual should be a lambda
-        try {
-            _actual()
-            raise "Expected error but none was raised"
-        } catch e {
-            if !e.to_string().contains(error_type) {
-                raise "Expected " + error_type + " but got " + e.to_string()
+    # Helper for negation-aware assertions
+    fn _assert(condition, positive_msg, negative_msg) {
+        if _negated {
+            if condition {
+                raise negative_msg
+            }
+        } else {
+            if !condition {
+                raise positive_msg
             }
         }
+    }
+
+    # === Equality ===
+
+    fn equal(expected) {
+        self._assert(
+            _actual == expected,
+            "Expected " + expected.to_string() + " but got " + _actual.to_string(),
+            "Expected " + _actual.to_string() + " not to equal " + expected.to_string()
+        )
+    }
+
+    fn deeply_equal(expected) {
+        self._assert(
+            deep_equals(_actual, expected),
+            "Expected deep equality but structures differ",
+            "Expected structures to differ but they are equal"
+        )
+    }
+
+    fn be_close_to(target, tolerance) {
+        diff = (_actual - target).abs()
+        self._assert(
+            diff <= tolerance,
+            "Expected " + _actual.to_string() + " to be within " + tolerance.to_string() + " of " + target.to_string(),
+            "Expected " + _actual.to_string() + " not to be close to " + target.to_string()
+        )
+    }
+
+    # === Value ===
+
+    fn be(expected) {
+        self._assert(
+            _actual == expected,
+            "Expected " + expected.to_string() + " but got " + _actual.to_string(),
+            "Expected not " + expected.to_string() + " but got it"
+        )
+    }
+
+    fn be_truthy() {
+        self._assert(
+            _actual,
+            "Expected truthy value but got " + _actual.to_string(),
+            "Expected falsy value but got " + _actual.to_string()
+        )
+    }
+
+    fn be_falsy() {
+        self._assert(
+            !_actual,
+            "Expected falsy value but got " + _actual.to_string(),
+            "Expected truthy value but got " + _actual.to_string()
+        )
+    }
+
+    # === Type ===
+
+    fn be_a(expected_type) {
+        # expected_type can be bare name (list) or symbol (:list)
+        type_name = expected_type.to_string()
+        actual_type = type(_actual)
+        self._assert(
+            actual_type == type_name,
+            "Expected " + type_name + " but got " + actual_type,
+            "Expected not to be " + type_name + " but it was"
+        )
+    }
+
+    # === Comparison ===
+
+    fn be_greater_than(threshold) {
+        self._assert(
+            _actual > threshold,
+            "Expected " + _actual.to_string() + " > " + threshold.to_string(),
+            "Expected " + _actual.to_string() + " <= " + threshold.to_string()
+        )
+    }
+
+    fn be_less_than(threshold) {
+        self._assert(
+            _actual < threshold,
+            "Expected " + _actual.to_string() + " < " + threshold.to_string(),
+            "Expected " + _actual.to_string() + " >= " + threshold.to_string()
+        )
+    }
+
+    fn be_between(min, max) {
+        in_range = _actual >= min and _actual <= max
+        self._assert(
+            in_range,
+            "Expected " + _actual.to_string() + " to be between " + min.to_string() + " and " + max.to_string(),
+            "Expected " + _actual.to_string() + " not to be between " + min.to_string() + " and " + max.to_string()
+        )
+    }
+
+    # === Collection ===
+
+    fn contain(element) {
+        self._assert(
+            _actual.contains(element),
+            "Expected " + _actual.to_string() + " to contain " + element.to_string(),
+            "Expected " + _actual.to_string() + " not to contain " + element.to_string()
+        )
+    }
+
+    fn be_empty() {
+        self._assert(
+            _actual.length() == 0,
+            "Expected empty but got " + _actual.length().to_string() + " elements",
+            "Expected not empty but it was"
+        )
+    }
+
+    fn have_length(expected) {
+        actual_len = _actual.length()
+        self._assert(
+            actual_len == expected,
+            "Expected length " + expected.to_string() + " but got " + actual_len.to_string(),
+            "Expected length not to be " + expected.to_string()
+        )
+    }
+
+    # === Exception ===
+
+    fn raise() {
+        error_raised = false
+        try {
+            _actual()
+        } catch e {
+            error_raised = true
+        }
+        self._assert(
+            error_raised,
+            "Expected error but none was raised",
+            "Expected no error but one was raised"
+        )
+    }
+
+    fn raise(error_type) {
+        error_raised = false
+        error_matches = false
+        try {
+            _actual()
+        } catch e {
+            error_raised = true
+            error_matches = e.to_string().contains(error_type)
+        }
+        if _negated {
+            if error_raised and error_matches {
+                raise "Expected not to raise " + error_type + " but it did"
+            }
+        } else {
+            if !error_raised {
+                raise "Expected " + error_type + " but no error was raised"
+            }
+            if !error_matches {
+                raise "Expected " + error_type + " but got different error"
+            }
+        }
+    }
+
+    # === Pattern ===
+
+    fn match(pattern) {
+        self._assert(
+            _actual.matches(pattern),
+            "Expected " + _actual.to_string() + " to match pattern",
+            "Expected " + _actual.to_string() + " not to match pattern"
+        )
+    }
+
+    # === Custom ===
+
+    fn satisfy(predicate) {
+        self._assert(
+            predicate(_actual),
+            "Expected value to satisfy predicate",
+            "Expected value not to satisfy predicate"
+        )
     }
 }
 ```
@@ -3678,29 +3915,29 @@ graph Mock {
 
 **Day 9-10: Integration and CLI**
 
-Add `graphoid spec` command:
+Add `graphoid gspec` command:
 ```bash
 # Run all specs in current directory
-graphoid spec
+graphoid gspec
 
 # Run specific spec file
-graphoid spec tests/math.spec.gr
+graphoid gspec tests/math.spec.gr
 
 # Run with verbose output
-graphoid spec --verbose
+graphoid gspec --verbose
 
 # Run with coverage
-graphoid spec --coverage
+graphoid gspec --coverage
 ```
 
 ### Success Criteria
 
 - ✅ `describe`, `context`, `it` blocks working
-- ✅ `expect().to_equal()`, `to_be_truthy()`, etc. assertions
+- ✅ `expect().to.equal()`, `to.be_a()`, etc. matchers (14 total)
 - ✅ `before_each`, `after_each` hooks
 - ✅ Test file discovery (`.spec.gr`)
 - ✅ Color-coded test output
-- ✅ `graphoid spec` CLI command
+- ✅ `graphoid gspec` CLI command
 - ✅ At least 50 self-tests for the framework itself
 
 ---
@@ -4345,25 +4582,304 @@ graph RegistryClient {
 
 ## Phase 18: Stdlib Translation to Pure Graphoid (7-10 days) - Deferred
 
-**Goal**: Translate Rust stdlib modules to pure Graphoid, achieving 90%+ self-hosting.
+**Goal**: Translate remaining Rust stdlib modules to pure Graphoid, achieving 95%+ self-hosting.
 
 **Why Deferred**: This phase requires a solid testing framework (Phase 14) to validate that translated modules work correctly. Without proper tests, we can't verify that the pure Graphoid implementations match the Rust originals.
 
 **Prerequisites**:
 - ✅ Phase 13 (Bitwise Operators) - needed for crypto, random
-- ✅ Phase 14 (Testing Framework) - needed to validate translations
+- 🔲 Phase 14 (Testing Framework) - needed to validate translations
 
-### Translation Priority
+### Current State Analysis
 
-1. **Constants** → `stdlib/constants.gr` - Pure data, 1 day
-2. **Random** → `stdlib/random.gr` - Requires bitwise, 2 days
-3. **UUID** → `stdlib/uuid.gr` - Requires bitwise, 1 day
-4. **Crypto** → `stdlib/crypto.gr` - Requires bitwise, 3 days
+**Already Pure Graphoid** (22 modules in `stdlib/`):
+- `tls.gr` - TLS 1.3 (X25519, AES-GCM, HKDF) ✅
+- `http.gr` - HTTP client using TLS ✅
+- `json.gr` - JSON parsing/serialization ✅
+- `time.gr` - Date/time handling ✅
+- `statistics.gr` - Statistical analysis ✅
+- `regex.gr` - Regular expression matching ✅
+- `csv.gr` - CSV parsing ✅
+- `x509.gr` - X.509 certificate parsing ✅
+- `asn1.gr` - ASN.1 encoding/decoding ✅
+- And 13 more utility modules
 
-**Keep in Rust (Core System Functions)**:
-- **I/O** - File system operations (system calls)
-- **OS** - Process management, environment variables
-- **Net** - Socket operations (system calls)
+**Still Native Rust** (6 modules in `src/stdlib/`):
+- `constants.rs` - Mathematical constants (~2KB)
+- `crypto.rs` - Cryptographic primitives (~45KB) - NOTE: Much already in tls.gr
+- `random.rs` - Random number generation (~11KB)
+- `fs.rs` - File system operations (~8KB) - KEEP NATIVE
+- `net.rs` - Network socket operations (~13KB) - KEEP NATIVE
+- `os.rs` - OS interface (~7KB) - KEEP NATIVE
+
+### Translation Strategy
+
+**Principle**: Only system calls require native code. Everything else is pure computation and should be Graphoid.
+
+#### Modules to Translate (3)
+
+| Module | Size | Complexity | Priority | Reason to Translate |
+|--------|------|------------|----------|---------------------|
+| `constants` | ~2KB | Low | High | Pure data, no computation |
+| `crypto` | ~45KB | High | Medium | Most already in tls.gr, consolidate |
+| `random` | ~11KB | Medium | Medium | Only OS randomness needs native |
+
+#### Modules to Keep Native (3)
+
+| Module | Size | Why Native |
+|--------|------|------------|
+| `fs` | ~8KB | File system syscalls (open, read, write, close) |
+| `net` | ~13KB | Socket syscalls (connect, send, recv) |
+| `os` | ~7KB | Environment, process, platform info syscalls |
+
+### Day-by-Day Implementation Plan
+
+**Day 1: Constants Module Translation**
+
+```graphoid
+# stdlib/constants.gr - Mathematical and Physical Constants
+
+# === Mathematical Constants ===
+PI = 3.141592653589793
+E = 2.718281828459045
+TAU = 6.283185307179586
+PHI = 1.618033988749895       # Golden ratio
+SQRT_2 = 1.4142135623730951
+SQRT_3 = 1.7320508075688772
+LN_2 = 0.6931471805599453
+LN_10 = 2.302585092994046
+
+# === Physical Constants (SI Units) ===
+SPEED_OF_LIGHT = 299792458.0       # m/s
+PLANCK = 6.62607015e-34            # J·s
+AVOGADRO = 6.02214076e23           # mol⁻¹
+BOLTZMANN = 1.380649e-23           # J/K
+ELECTRON_MASS = 9.1093837015e-31   # kg
+PROTON_MASS = 1.67262192369e-27    # kg
+GRAVITATIONAL = 6.67430e-11        # m³/(kg·s²)
+```
+
+**Testing**: Create `constants.spec.gr` with property-based tests:
+```graphoid
+describe "Constants" {
+    it "has PI close to expected" {
+        expect(constants.PI).to_be_close_to(3.14159, 0.00001)
+    }
+
+    it "has TAU equal to 2*PI" {
+        expect(constants.TAU).to_be_close_to(constants.PI * 2, 0.00001)
+    }
+}
+```
+
+**Day 2-3: Random Module Refactoring**
+
+**Strategy**: Keep only `os_random_bytes()` as native (for `/dev/urandom` access). Everything else in pure Graphoid.
+
+```graphoid
+# stdlib/random.gr - Random Number Generation
+
+import "os"  # For os_random_bytes() primitive
+
+# === Secure Random Primitives (uses OS entropy) ===
+fn bytes(count) {
+    # Only this needs OS access - get raw random bytes
+    return os.random_bytes(count)
+}
+
+# === PRNG (Pure Graphoid - xorshift128+) ===
+graph PRNG {
+    _state0: 0
+    _state1: 0
+
+    fn new(seed) {
+        # Initialize from seed
+        instance = self.clone()
+        instance._state0 = seed
+        instance._state1 = seed ^ 0x5DEECE66D
+        return instance
+    }
+
+    fn next() {
+        # xorshift128+ algorithm
+        s1 = _state0
+        s0 = _state1
+        result = s0 + s1
+
+        s1 = s1 ^ (s1 << 23)
+        _state1 = s1 ^ s0 ^ (s1 >> 18) ^ (s0 >> 5)
+        _state0 = s0
+
+        return result
+    }
+}
+
+# === High-Level Functions ===
+fn int(min, max) {
+    range = max - min
+    raw = bytes(8).to_int()
+    return min + (raw.abs() % range)
+}
+
+fn float() {
+    raw = bytes(8).to_int()
+    return raw.abs() / (2 ** 63)
+}
+
+fn choice(list) {
+    idx = int(0, list.length())
+    return list[idx]
+}
+
+fn shuffle(list) {
+    result = list.clone()
+    n = result.length()
+    for i in range(n - 1, 0, -1) {
+        j = int(0, i + 1)
+        temp = result[i]
+        result[i] = result[j]
+        result[j] = temp
+    }
+    return result
+}
+
+fn sample(list, count) {
+    return shuffle(list).sublist(0, count)
+}
+
+fn uuid4() {
+    # RFC 4122 UUID v4
+    b = bytes(16)
+    # Set version (4) and variant bits
+    b[6] = (b[6] & 0x0F) | 0x40
+    b[8] = (b[8] & 0x3F) | 0x80
+    return bytes_to_uuid_string(b)
+}
+```
+
+**Day 4-5: Crypto Module Consolidation**
+
+**Strategy**: The `tls.gr` already implements core crypto (AES-GCM, X25519, HKDF, SHA-256). Factor out into `crypto.gr`:
+
+```graphoid
+# stdlib/crypto.gr - Cryptographic Primitives
+# Consolidates implementations from tls.gr, x509.gr, etc.
+
+import "random"
+
+# === Hashing ===
+fn sha256(data) {
+    # Already implemented in tls.gr, expose here
+    return _sha256_internal(data)
+}
+
+fn sha512(data) {
+    # Extend SHA-256 implementation
+    return _sha512_internal(data)
+}
+
+fn hmac(algorithm, key, data) {
+    # Already in tls.gr
+    return _hmac_internal(algorithm, key, data)
+}
+
+# === Key Derivation ===
+fn hkdf(algorithm, key, salt, info, length) {
+    # Already in tls.gr
+    return _hkdf_internal(algorithm, key, salt, info, length)
+}
+
+fn pbkdf2(password, salt, iterations, key_length) {
+    # Password-based key derivation
+    return _pbkdf2_internal(password, salt, iterations, key_length)
+}
+
+# === Symmetric Encryption ===
+fn aes_gcm_encrypt(key, nonce, plaintext, aad) {
+    # Already in tls.gr
+    return _aes_gcm_encrypt_internal(key, nonce, plaintext, aad)
+}
+
+fn aes_gcm_decrypt(key, nonce, ciphertext, aad, tag) {
+    # Already in tls.gr
+    return _aes_gcm_decrypt_internal(key, nonce, ciphertext, aad, tag)
+}
+
+# === Key Exchange ===
+fn x25519_generate_keypair() {
+    # Already in tls.gr
+    private = random.bytes(32)
+    public = _x25519_public(private)
+    return { "private": private, "public": public }
+}
+
+fn x25519_shared_secret(private_key, their_public) {
+    # Already in tls.gr
+    return _x25519_multiply(private_key, their_public)
+}
+
+# === Digital Signatures (Future) ===
+# Ed25519 and RSA to be added
+```
+
+**Day 6-7: Integration and Testing**
+
+1. **Create comprehensive test suites**:
+   - `tests/stdlib/constants.spec.gr`
+   - `tests/stdlib/random.spec.gr`
+   - `tests/stdlib/crypto.spec.gr`
+
+2. **Verify compatibility** with existing code:
+   - Run all existing sample files
+   - Ensure `http.get()` still works
+   - Verify TLS handshake unchanged
+
+3. **Performance benchmarks**:
+   - Compare pure Graphoid vs Rust implementations
+   - Document any performance regression
+
+**Day 8-9: Documentation and Cleanup**
+
+1. **Remove translated Rust code**:
+   - Delete `src/stdlib/constants.rs`
+   - Slim down `src/stdlib/crypto.rs` to just syscall wrappers
+   - Keep only `os_random_bytes()` in random
+
+2. **Update documentation**:
+   - API reference for new stdlib modules
+   - Migration guide for any API changes
+
+**Day 10: Final Verification**
+
+1. Run full test suite
+2. Verify all sample programs work
+3. Update CLAUDE.md with new status
+
+### Success Criteria
+
+- [ ] `constants.gr` provides all mathematical/physical constants
+- [ ] `random.gr` provides all RNG functions (using minimal native bridge)
+- [ ] `crypto.gr` consolidates all crypto from tls.gr/x509.gr
+- [ ] All 30+ sample files still execute correctly
+- [ ] Full test suite passes (2,400+ tests)
+- [ ] Native Rust stdlib reduced to ~3 modules (fs, net, os primitives)
+- [ ] Self-hosting percentage: 95%+ (by module count)
+
+### Metrics
+
+**Before Phase 18**:
+- Pure Graphoid stdlib: 22 modules
+- Native Rust stdlib: 6 modules
+- Self-hosting: ~79%
+
+**After Phase 18**:
+- Pure Graphoid stdlib: 25 modules
+- Native Rust stdlib: 3 modules (fs, net, os)
+- Self-hosting: ~89%
+
+**Future (Post-1.0)**:
+- Native code only for syscalls
+- Self-hosting: 95%+
 
 ---
 
@@ -4436,11 +4952,12 @@ Enhanced error handling beyond current capabilities:
 ### Core Language Complete (Phases 0-13) ✅
 **Status**: COMPLETE as of December 2025
 - Phases 0-13 all complete
-- 1168+ unit tests passing
+- 2,400+ tests passing (unit + doc tests)
 - Full language features: pattern matching, behaviors, graph querying
 - Native stdlib modules (os, fs, net, random, constants)
 - Bitwise operators and integer types
-- Pure Graphoid stdlib (tls, http, json, time, etc.)
+- Pure Graphoid stdlib (tls, http, json, time, crypto, etc.)
+- Mutable argument passing (`arg!` syntax) for closure writeback
 
 ### Testing & Concurrency (Phases 14-15)
 **Estimated**: 3-4 weeks

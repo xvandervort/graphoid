@@ -2095,7 +2095,7 @@ impl Parser {
                 // Check for trailing block: function(args) { |params| body }
                 if self.is_trailing_block() {
                     let block_lambda = self.parse_trailing_block()?;
-                    args.push(Argument::Positional(block_lambda));
+                    args.push(Argument::Positional { expr: block_lambda, mutable: false });
                 }
 
                 expr = Expr::Call {
@@ -2172,7 +2172,7 @@ impl Parser {
                         // Check for trailing block: method(args) { |params| body }
                         if self.is_trailing_block() {
                             let block_lambda = self.parse_trailing_block()?;
-                            args.push(Argument::Positional(block_lambda));
+                            args.push(Argument::Positional { expr: block_lambda, mutable: false });
                         }
 
                     expr = Expr::MethodCall {
@@ -2187,7 +2187,7 @@ impl Parser {
                     // Otherwise, treat as property access: self.name
                     if self.is_trailing_block() {
                         let block_lambda = self.parse_trailing_block()?;
-                        let args = vec![Argument::Positional(block_lambda)];
+                        let args = vec![Argument::Positional { expr: block_lambda, mutable: false }];
                         expr = Expr::MethodCall {
                             object: Box::new(expr),
                             method,
@@ -2233,9 +2233,14 @@ impl Parser {
                             self.advance(); // consume identifier
                             self.advance(); // consume colon
                             let value = self.lambda_or_expression()?;
+
+                            // Check for mutable marker: name: value!
+                            let mutable = self.match_token(&TokenType::Bang);
+
                             args.push(Argument::Named {
                                 name: param_name,
                                 value,
+                                mutable,
                             });
 
                             // Skip newlines before comma check
@@ -2251,7 +2256,12 @@ impl Parser {
 
                 // Positional argument
                 let expr = self.lambda_or_expression()?;
-                args.push(Argument::Positional(expr));
+
+                // Check for mutable marker: expr!
+                // This enables write-back semantics for the argument (e.g., self!)
+                let mutable = self.match_token(&TokenType::Bang);
+
+                args.push(Argument::Positional { expr, mutable });
 
                 // Skip newlines before comma check
                 self.skip_newlines();
@@ -2673,7 +2683,7 @@ impl Parser {
             return Ok(Expr::MethodCall {
                 object: Box::new(graph_expr),
                 method: "with_ruleset".to_string(),
-                args: vec![crate::ast::Argument::Positional(symbol_expr)],
+                args: vec![crate::ast::Argument::Positional { expr: symbol_expr, mutable: false }],
                 position,
             });
         }

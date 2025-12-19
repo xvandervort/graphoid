@@ -147,14 +147,20 @@ pub struct CatchClause {
 }
 
 /// Function call argument - can be positional or named
+/// Arguments can be marked as mutable with `!` suffix (e.g., `self!`) to enable
+/// write-back semantics where mutations are propagated back to the source variable.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Argument {
     /// Positional argument: just the expression
-    Positional(Expr),
+    /// If mutable is true, the argument was passed with `!` suffix (e.g., `self!`)
+    /// and mutations should be written back to the source variable after the call.
+    Positional { expr: Expr, mutable: bool },
     /// Named argument: name and expression (e.g., name: "Alice")
+    /// If mutable is true, the argument was passed with `!` suffix
     Named {
         name: String,
         value: Expr,
+        mutable: bool,
     },
 }
 
@@ -572,7 +578,7 @@ fn collect_from_expr(expr: &Expr, properties: &std::collections::HashSet<&String
             collect_from_expr(callee, properties, refs);
             for arg in args {
                 match arg {
-                    Argument::Positional(expr) => collect_from_expr(expr, properties, refs),
+                    Argument::Positional { expr, .. } => collect_from_expr(expr, properties, refs),
                     Argument::Named { value, .. } => collect_from_expr(value, properties, refs),
                 }
             }
@@ -581,7 +587,7 @@ fn collect_from_expr(expr: &Expr, properties: &std::collections::HashSet<&String
             collect_from_expr(object, properties, refs);
             for arg in args {
                 match arg {
-                    Argument::Positional(expr) => collect_from_expr(expr, properties, refs),
+                    Argument::Positional { expr, .. } => collect_from_expr(expr, properties, refs),
                     Argument::Named { value, .. } => collect_from_expr(value, properties, refs),
                 }
             }

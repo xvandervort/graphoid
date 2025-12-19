@@ -855,7 +855,7 @@ fn test_parse_lambda_as_argument() {
                     assert_eq!(method, "map");
                     assert_eq!(args.len(), 1);
                     match &args[0] {
-                        Argument::Positional(Expr::Lambda { params, .. }) => {
+                        Argument::Positional { expr: Expr::Lambda { params, .. }, .. } => {
                             assert_eq!(params.len(), 1);
                             assert_eq!(params[0], "x");
                         }

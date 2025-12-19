@@ -488,6 +488,8 @@ fn test_integer_division_in_expression() {
 
 #[test]
 fn test_bang_operator() {
+    // After the mutable argument passing feature, ! is now a separate token
+    // The parser handles combining identifier + ! for mutating methods
     let mut lexer = Lexer::new("items.sort!()");
     let tokens = lexer.tokenize().unwrap();
 
@@ -497,11 +499,12 @@ fn test_bang_operator() {
     }
     assert_eq!(tokens[1].token_type, TokenType::Dot);
     match &tokens[2].token_type {
-        TokenType::Identifier(s) => assert_eq!(s, "sort!"), // ! is now part of identifier
+        TokenType::Identifier(s) => assert_eq!(s, "sort"), // ! is now separate token
         _ => panic!("Expected identifier"),
     }
-    assert_eq!(tokens[3].token_type, TokenType::LeftParen);
-    assert_eq!(tokens[4].token_type, TokenType::RightParen);
+    assert_eq!(tokens[3].token_type, TokenType::Bang); // ! as separate token
+    assert_eq!(tokens[4].token_type, TokenType::LeftParen);
+    assert_eq!(tokens[5].token_type, TokenType::RightParen);
 }
 
 #[test]
@@ -814,6 +817,7 @@ fn test_invalid_number() {
 
 #[test]
 fn test_complete_mutation_expression() {
+    // After the mutable argument passing feature, ! is now a separate token
     let mut lexer = Lexer::new("items.sort!()");
     let tokens = lexer.tokenize().unwrap();
 
@@ -823,11 +827,12 @@ fn test_complete_mutation_expression() {
     }
     assert_eq!(tokens[1].token_type, TokenType::Dot);
     match &tokens[2].token_type {
-        TokenType::Identifier(s) => assert_eq!(s, "sort!"), // ! is now part of identifier
+        TokenType::Identifier(s) => assert_eq!(s, "sort"), // ! is now separate token
         _ => panic!("Expected identifier"),
     }
-    assert_eq!(tokens[3].token_type, TokenType::LeftParen);
-    assert_eq!(tokens[4].token_type, TokenType::RightParen);
+    assert_eq!(tokens[3].token_type, TokenType::Bang); // ! as separate token
+    assert_eq!(tokens[4].token_type, TokenType::LeftParen);
+    assert_eq!(tokens[5].token_type, TokenType::RightParen);
 }
 
 #[test]
@@ -906,12 +911,10 @@ message = "OK" unless error"#;
     let has_int_div = tokens.iter().any(|t| t.token_type == TokenType::SlashSlash);
     assert!(has_int_div, "Should have integer division operator");
 
-    // Find method names with ! suffix (mutating methods)
-    let has_bang_method = tokens.iter().any(|t| match &t.token_type {
-        TokenType::Identifier(s) => s.ends_with('!'),
-        _ => false,
-    });
-    assert!(has_bang_method, "Should have mutating method with ! suffix");
+    // Find mutating method pattern: identifier followed by Bang token
+    // After the mutable argument passing feature, ! is now a separate token
+    let has_bang_token = tokens.iter().any(|t| t.token_type == TokenType::Bang);
+    assert!(has_bang_token, "Should have Bang token for mutating method");
 
     // Find element-wise operator
     let has_element_wise = tokens.iter().any(|t| t.token_type == TokenType::DotStar);
