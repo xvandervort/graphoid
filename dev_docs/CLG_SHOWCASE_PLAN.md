@@ -1347,16 +1347,17 @@ print(network.to_dot())
    - `README.md`, `data/global_temperature.json`
    - `climate_analyzer.gr` (CLG using DataSet)
    - `main.gr` (demo)
-3. **NEXT:** Elevator project (`samples/06-projects/elevator/`):
-   - `README.md`
-   - `queue.gr` - graph-based FIFO CLG
-   - `call_box.gr` - emergency phone CLG
-   - `elevator.gr` - main controller (imports Queue, CallBox)
-   - `main.gr` - **interactive** demo
-4. Social project (`samples/06-projects/social/`):
-   - `README.md`
-   - `social_network.gr` (CLG)
-   - `main.gr` (demo)
+3. ✅ Elevator project (`samples/06-projects/elevator/`) - DONE (December 17, 2025)
+   - `README.md` - Documentation with planned enhancements
+   - `queue.gr` - graph-based FIFO CLG (data structure IS a graph)
+   - `call_box.gr` - emergency phone state machine CLG
+   - `elevator.gr` - main controller (composes Queue, CallBox)
+   - `main.gr` - automated demo showing all features
+   - **Planned:** Multiple elevators (up to 4), interactive mode, virtual passengers
+4. ✅ **COMPLETE:** Social project (`samples/06-projects/social/`) - December 18, 2025
+   - `README.md` - Full documentation
+   - `social_network.gr` - SocialNetwork CLG with BFS path finding
+   - `main.gr` - Demo with 8 users, friendships, follows, analysis
 
 ### Phase C: Documentation
 1. Write user guide chapter
@@ -1371,6 +1372,17 @@ print(network.to_dot())
 
 ## Files Summary
 
+**Created (December 17, 2025):**
+- ✅ `samples/06-projects/elevator/README.md`
+- ✅ `samples/06-projects/elevator/queue.gr` (graph-based FIFO)
+- ✅ `samples/06-projects/elevator/call_box.gr` (emergency phone CLG)
+- ✅ `samples/06-projects/elevator/elevator.gr` (composes Queue, CallBox)
+- ✅ `samples/06-projects/elevator/main.gr` (automated demo)
+
+**Modified (December 17, 2025):**
+- ✅ `src/execution/executor.rs` - Bug fix for method calls on implicit self properties
+- ✅ `src/values/graph.rs` - `add_node()` now preserves edges when updating existing nodes
+
 **Created (December 16, 2025):**
 - ✅ `stdlib/dataset.gr`
 - ✅ `samples/06-projects/climate/README.md`
@@ -1383,12 +1395,6 @@ print(network.to_dot())
 
 **Still To Create:**
 - `stdlib/datetime.gr` (deferred - lower priority)
-
-- `samples/06-projects/elevator/README.md`
-- `samples/06-projects/elevator/queue.gr` (graph-based FIFO)
-- `samples/06-projects/elevator/call_box.gr` (emergency phone CLG)
-- `samples/06-projects/elevator/elevator.gr` (imports Queue, CallBox)
-- `samples/06-projects/elevator/main.gr` (interactive demo)
 
 - `samples/06-projects/social/README.md`
 - `samples/06-projects/social/social_network.gr`
@@ -1404,19 +1410,37 @@ print(network.to_dot())
 
 ---
 
-## Progress (December 16, 2025)
+## Progress
 
-### Completed
+### December 17, 2025
+- [x] `samples/06-projects/elevator/` - **Elevator Simulator complete**
+  - `queue.gr` - Graph-based FIFO queue (data structure IS a graph)
+  - `call_box.gr` - Emergency phone state machine CLG
+  - `elevator.gr` - Main controller composing Queue and CallBox
+  - `main.gr` - Automated demo showing all features
+  - `README.md` - Full documentation
+
+- **Bug Fixed: Method calls on implicit self properties**
+  - `_inner.method()` was failing while `x = _inner; x.method()` worked
+  - Root cause: After method execution, mutation persistence used `env.set(name)` which failed for implicit self properties
+  - Fix: Check if variable is an implicit self property; if so, update via `add_node()` on outer graph
+  - Also improved `add_node()` to preserve edges when updating existing nodes
+
+**Planned Enhancements (Elevator):**
+- Multiple elevators (up to 4) controlled by a single button panel
+- Interactive mode where users enter floor requests in real-time
+- Virtual passenger simulation for automated testing
+
+### December 16, 2025
 - [x] `stdlib/dataset.gr` - DataSet CLG with full statistical analysis
 - [x] `samples/06-projects/climate/` - Climate Analyzer project complete
   - README.md, climate_analyzer.gr, main.gr
   - Uses NASA GISTEMP data (1880-2023)
   - Demonstrates CLG composition with DataSet
 
-### Bug Fixed
-- **Private methods couldn't access computed properties (getters)**
-- Fix in `src/execution/executor.rs` lines 209-220
-- Added getter check in implicit self resolution
+- **Bug Fixed: Private methods couldn't access computed properties (getters)**
+  - Fix in `src/execution/executor.rs` lines 209-220
+  - Added getter check in implicit self resolution
 
 ### Issues Discovered
 | Issue | Solution |
@@ -1427,21 +1451,23 @@ print(network.to_dot())
 | Private method self-calls | Use `_methodname()` not `self._methodname()` |
 | `io.read` doesn't exist | Use `io.read_file` |
 | Method chaining doesn't persist | Requires reassignment: `obj = obj.method()` |
+| Method on implicit self property fails | Fixed Dec 17 - update outer graph property |
 
 ### Next Up
-- [ ] **Elevator project** - Queue CLG, CallBox CLG, Elevator CLG, interactive demo
-- [ ] **Social network project** - SocialNetwork CLG
+- [x] **Elevator enhancements** - Multiple elevators, interactive mode, virtual passengers ✅ DONE Dec 18
+- [x] **Social network project** - SocialNetwork CLG ✅ DONE Dec 18
 - [ ] **Documentation** - User guide chapter, API reference
+- [ ] **Flesh out roadmap phases** - Add detail to Phases 14-18
 
 ---
 
 ## Notes for Implementation
 
 1. **Module declaration required** - Every CLG file needs `module name_module alias name`
-2. **Elevator is the flagship** - 3 CLGs composing together, interactive mode, emergencies
+2. **Elevator is the flagship** - 3 CLGs composing together, state machines, emergencies
 3. **Queue CLG demonstrates "everything is a graph"** - Data structure as graph nodes/edges
-4. **Test count: 1187** (1174 unit + 13 doc tests) - System is stable
-5. **Run climate project to verify**:
+4. **Test count: 1168** unit + 13 doc tests - System is stable
+5. **Run elevator project to verify**:
    ```bash
-   ~/.cargo/bin/cargo run --quiet samples/06-projects/climate/main.gr
+   ~/.cargo/bin/cargo run --quiet samples/06-projects/elevator/main.gr
    ```

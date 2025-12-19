@@ -1,0 +1,98 @@
+# CallBox - Emergency Phone State Machine
+#
+# Demonstrates: Small focused CLG, state machine as graph structure
+# States: idle -> connecting -> connected -> idle
+#         connected <-> on_hold
+
+graph CallBox {
+    _state: "idle"
+    _call_duration: 0
+    _dispatcher_message: ""
+
+    fn new() {
+        instance = self.clone()
+        instance._state = "idle"
+        instance._call_duration = 0
+        instance._dispatcher_message = ""
+
+        # Build state machine as graph structure
+        instance.add_node("idle", "state")
+        instance.add_node("connecting", "state")
+        instance.add_node("connected", "state")
+        instance.add_node("on_hold", "state")
+
+        instance.add_edge("idle", "connecting", "pick_up")
+        instance.add_edge("connecting", "connected", "dispatcher_answers")
+        instance.add_edge("connecting", "idle", "timeout")
+        instance.add_edge("connected", "idle", "hang_up")
+        instance.add_edge("connected", "on_hold", "hold")
+        instance.add_edge("on_hold", "connected", "resume")
+        instance.add_edge("on_hold", "idle", "hang_up")
+
+        return instance
+    }
+
+    fn state() {
+        return _state
+    }
+
+    fn is_active() {
+        return _state != "idle"
+    }
+
+    fn pick_up() {
+        if _state == "idle" {
+            _state = "connecting"
+            print("    [CallBox] Connecting to emergency dispatch...")
+            return true
+        }
+        return false
+    }
+
+    fn dispatcher_answers(message) {
+        if _state == "connecting" {
+            _state = "connected"
+            _dispatcher_message = message
+            print("    [CallBox] Dispatcher: " + message)
+            return true
+        }
+        return false
+    }
+
+    fn hang_up() {
+        if _state != "idle" {
+            _state = "idle"
+            _dispatcher_message = ""
+            _call_duration = 0
+            print("    [CallBox] Call ended")
+            return true
+        }
+        return false
+    }
+
+    fn speak(message) {
+        if _state == "connected" {
+            print("    [CallBox] Passenger: " + message)
+            return true
+        }
+        return false
+    }
+
+    fn hold() {
+        if _state == "connected" {
+            _state = "on_hold"
+            print("    [CallBox] Call on hold...")
+            return true
+        }
+        return false
+    }
+
+    fn resume() {
+        if _state == "on_hold" {
+            _state = "connected"
+            print("    [CallBox] Call resumed")
+            return true
+        }
+        return false
+    }
+}

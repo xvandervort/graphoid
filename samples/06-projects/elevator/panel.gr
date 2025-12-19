@@ -1,0 +1,156 @@
+# ButtonPanel - Hall Call Button Panel CLG
+#
+# Demonstrates: State tracking as a graph
+# Each floor has up/down buttons represented as graph nodes
+# Button states: "off", "pressed", "served"
+#
+# The panel is a graph where:
+#   - Nodes are button states (floor_N_up, floor_N_down)
+#   - Values are the button state
+
+graph ButtonPanel {
+    _num_floors: 10
+    _building: none
+
+    fn new(building) {
+        instance = self.clone()
+        instance._building = building
+        instance._num_floors = building.num_floors()
+
+        # Create button nodes for each floor
+        # Ground floor only has UP, top floor only has DOWN
+        i = 1
+        while i <= instance._num_floors {
+            if i < instance._num_floors {
+                # Not top floor - has UP button
+                up_id = "floor_" + i.to_string() + "_up"
+                instance.add_node(up_id, "off")
+            }
+
+            if i > 1 {
+                # Not ground floor - has DOWN button
+                down_id = "floor_" + i.to_string() + "_down"
+                instance.add_node(down_id, "off")
+            }
+
+            i = i + 1
+        }
+
+        return instance
+    }
+
+    # Press the UP button on a floor
+    fn press_up(floor) {
+        if floor >= _num_floors {
+            print("  No UP button on top floor")
+            return self
+        }
+        if floor < 1 {
+            print("  Invalid floor")
+            return self
+        }
+
+        button_id = "floor_" + floor.to_string() + "_up"
+        current_state = self.get_node(button_id)
+
+        if current_state == "off" {
+            self.add_node(button_id, "pressed")
+            print("  [Floor " + floor.to_string() + "] UP button pressed")
+            _building.call(floor, "up")
+        } else {
+            print("  [Floor " + floor.to_string() + "] UP already pressed")
+        }
+
+        return self
+    }
+
+    # Press the DOWN button on a floor
+    fn press_down(floor) {
+        if floor <= 1 {
+            print("  No DOWN button on ground floor")
+            return self
+        }
+        if floor > _num_floors {
+            print("  Invalid floor")
+            return self
+        }
+
+        button_id = "floor_" + floor.to_string() + "_down"
+        current_state = self.get_node(button_id)
+
+        if current_state == "off" {
+            self.add_node(button_id, "pressed")
+            print("  [Floor " + floor.to_string() + "] DOWN button pressed")
+            _building.call(floor, "down")
+        } else {
+            print("  [Floor " + floor.to_string() + "] DOWN already pressed")
+        }
+
+        return self
+    }
+
+    # Clear a button when elevator arrives (called by building/elevator)
+    fn clear_button(floor, direction) {
+        button_id = "floor_" + floor.to_string() + "_" + direction
+        if self.has_node(button_id) {
+            self.add_node(button_id, "off")
+        }
+        return self
+    }
+
+    # Show status of all pressed buttons
+    fn status() {
+        pressed = []
+
+        i = 1
+        while i <= _num_floors {
+            if i < _num_floors {
+                up_id = "floor_" + i.to_string() + "_up"
+                if self.get_node(up_id) == "pressed" {
+                    pressed = pressed.append("F" + i.to_string() + " UP")
+                }
+            }
+
+            if i > 1 {
+                down_id = "floor_" + i.to_string() + "_down"
+                if self.get_node(down_id) == "pressed" {
+                    pressed = pressed.append("F" + i.to_string() + " DOWN")
+                }
+            }
+
+            i = i + 1
+        }
+
+        if pressed.length() == 0 {
+            print("  Panel: No buttons pressed")
+        } else {
+            print("  Panel: " + pressed.to_string())
+        }
+    }
+
+    # Get all pressed buttons as a list of [floor, direction] pairs
+    fn pressed_buttons() {
+        result = []
+
+        i = 1
+        while i <= _num_floors {
+            if i < _num_floors {
+                up_id = "floor_" + i.to_string() + "_up"
+                if self.get_node(up_id) == "pressed" {
+                    result = result.append([i, "up"])
+                }
+            }
+
+            if i > 1 {
+                down_id = "floor_" + i.to_string() + "_down"
+                if self.get_node(down_id) == "pressed" {
+                    result = result.append([i, "down"])
+                }
+            }
+
+            i = i + 1
+        }
+
+        return result
+    }
+}

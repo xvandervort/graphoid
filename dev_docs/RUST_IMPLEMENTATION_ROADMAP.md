@@ -3489,311 +3489,881 @@ Create examples demonstrating use cases:
 
 ---
 
-## Phase 14: Stdlib Translation to Pure Graphoid (7-10 days)
+## Phase 14: Testing Framework (7-10 days)
 
-**Goal**: Translate Rust stdlib modules to pure Graphoid, achieving 90%+ self-hosting.
+**Goal**: Built-in RSpec-style testing framework enabling proper test-driven development for Graphoid itself.
 
-**Vision**: Only lexer, parser, and core executor remain in Rust. All standard library code written in Graphoid itself.
+**Why Now**: Testing framework MUST come before stdlib translation. We need proper testing infrastructure to validate that translated modules work correctly.
 
-### Translation Priority
+### Core Features
 
-**Immediate (Can Translate Now)**:
-1. **Constants** → `stdlib/constants.gr`
-   - Pure data, no algorithms
-   - 15 constants: pi, e, tau, phi, sqrt2, ln2, etc.
-   - **Effort**: 1 day
-
-**After Phase 13 (Requires Bitwise Operators)**:
-2. **Random** → `stdlib/random.gr`
-   - Implement xoshiro256** PRNG in pure Graphoid
-   - Requires bitwise: `^`, `<<`, `>>`, `|`
-   - **Effort**: 2 days
-
-3. **UUID** → `stdlib/uuid.gr`
-   - UUID v4 generation
-   - Requires bitwise: `&`, `|` for version/variant bits
-   - **Effort**: 1 day
-
-4. **Crypto** → `stdlib/crypto.gr`
-   - SHA-256, MD5 hashing
-   - HMAC authentication
-   - Requires extensive bitwise operations
-   - **Effort**: 3 days
-
-**Keep in Rust (Core System Functions)**:
-- **I/O** - File system operations (system calls)
-- **OS** - Process management, environment variables
-- **Time** (partial) - System time access (rest can be Graphoid)
-- **Regex** - Complex parsing (for now)
-
-### Implementation Strategy
-
-**Day 1: Constants Module**
-```graphoid
-# stdlib/constants.gr
-# Pure Graphoid implementation of constants module
-
-export const.pi = 3.141592653589793
-export const.e = 2.718281828459045
-export const.tau = 6.283185307179586
-export const.phi = 1.618033988749895
-export const.sqrt2 = 1.4142135623730951
-export const.sqrt3 = 1.7320508075688772
-export const.ln2 = 0.6931471805599453
-export const.ln10 = 2.302585092994046
-export const.log2e = 1.4426950408889634
-export const.log10e = 0.4342944819032518
-export const.euler_gamma = 0.5772156649015329
-export const.speed_of_light = 299792458.0
-export const.planck_constant = 6.62607015e-34
-export const.avogadro_number = 6.02214076e23
-export const.boltzmann_constant = 1.380649e-23
-```
-
-**Day 2-3: Random Module**
-```graphoid
-# stdlib/random.gr
-# Pure Graphoid implementation of random number generation
-
-class XoShiRo256StarStar {
-    priv state = [0, 0, 0, 0]  # Four 64-bit integers
-
-    fn seed(seed_value) {
-        # Initialize state from seed using SplitMix64
-        self.state = self.splitmix64_init(seed_value)
-    }
-
-    fn next() {
-        # xoshiro256** algorithm
-        result = self.rotl(self.state[1] * 5, 7) * 9
-        t = self.state[1] << 17
-
-        self.state[2] = self.state[2] ^ self.state[0]
-        self.state[3] = self.state[3] ^ self.state[1]
-        self.state[1] = self.state[1] ^ self.state[2]
-        self.state[0] = self.state[0] ^ self.state[3]
-
-        self.state[2] = self.state[2] ^ t
-        self.state[3] = self.rotl(self.state[3], 45)
-
-        return result
-    }
-
-    fn rotl(x, k) {
-        return (x << k) | (x >> (64 - k))
-    }
-}
-
-# Global RNG instance
-priv _global_rng = XoShiRo256StarStar()
-_global_rng.seed(os.system_time_nanos())
-
-export fn random() {
-    return _global_rng.next() / (2 ** 64)
-}
-
-export fn randint(a, b) {
-    range = b - a + 1
-    return a + (_global_rng.next() % range)
-}
-
-export fn choice(list) {
-    return list[randint(0, list.length() - 1)]
-}
-
-# ... rest of random functions
-```
-
-**Day 4: UUID Module**
-```graphoid
-# stdlib/uuid.gr
-import "random"
-
-export fn uuid4() {
-    # Generate random bytes
-    bytes = []
-    for i in 0..16 {
-        bytes.append(rand.randint(0, 255))
-    }
-
-    # Set version 4 bits
-    bytes[6] = (bytes[6] & 0x0F) | 0x40
-
-    # Set variant bits (RFC 4122)
-    bytes[8] = (bytes[8] & 0x3F) | 0x80
-
-    # Format as UUID string
-    return format_uuid(bytes)
-}
-
-priv fn format_uuid(bytes) {
-    # Convert to hex and format with hyphens
-    hex = bytes.map(b => to_hex(b, 2))
-    return hex[0..4].join("") + "-" +
-           hex[4..6].join("") + "-" +
-           hex[6..8].join("") + "-" +
-           hex[8..10].join("") + "-" +
-           hex[10..16].join("")
-}
-
-priv fn to_hex(num, width) {
-    # Convert number to hex string
-    hex_digits = "0123456789abcdef"
-    result = ""
-    for i in 0..width {
-        digit = (num >> ((width - i - 1) * 4)) & 0xF
-        result = result + hex_digits[digit]
-    }
-    return result
-}
-```
-
-**Day 5-7: Crypto Module (Hashing)**
-```graphoid
-# stdlib/crypto.gr
-# Pure Graphoid implementation of SHA-256
-
-class SHA256 {
-    priv K = [  # SHA-256 constants
-        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
-        # ... 60 more constants
-    ]
-
-    fn hash(message) {
-        # SHA-256 algorithm
-        # 1. Padding
-        padded = self.pad_message(message)
-
-        # 2. Initialize hash values
-        h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-             0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]
-
-        # 3. Process 512-bit blocks
-        for block in padded.chunks(64) {
-            w = self.prepare_schedule(block)
-            h = self.compress(h, w)
-        }
-
-        # 4. Return hex digest
-        return h.map(x => to_hex(x, 8)).join("")
-    }
-
-    priv fn ch(x, y, z) {
-        return (x & y) ^ (~x & z)
-    }
-
-    priv fn maj(x, y, z) {
-        return (x & y) ^ (x & z) ^ (y & z)
-    }
-
-    priv fn rotr(x, n) {
-        return (x >> n) | (x << (32 - n))
-    }
-
-    priv fn sigma0(x) {
-        return self.rotr(x, 2) ^ self.rotr(x, 13) ^ self.rotr(x, 22)
-    }
-
-    priv fn sigma1(x) {
-        return self.rotr(x, 6) ^ self.rotr(x, 11) ^ self.rotr(x, 25)
-    }
-
-    # ... rest of SHA-256 implementation
-}
-
-export fn sha256(message) {
-    hasher = SHA256()
-    return hasher.hash(message)
-}
-```
-
-**Day 8-10: Integration & Testing**
-
-Update module system to prefer `.gr` implementations:
-```rust
-// In module_manager.rs
-pub fn resolve_module_path(&self, module_name: &str) -> Result<PathBuf> {
-    // 1. Check for .gr implementation in stdlib/
-    let stdlib_gr = PathBuf::from("stdlib").join(module_name).with_extension("gr");
-    if stdlib_gr.exists() {
-        return Ok(stdlib_gr);
-    }
-
-    // 2. Fall back to native Rust implementation
-    if self.is_native_module(module_name) {
-        return Ok(PathBuf::from(format!("<native:{}>", module_name)));
-    }
-
-    // ... rest of resolution
-}
-```
-
-Create comprehensive tests:
-- `tests/stdlib_gr/constants_tests.gr`
-- `tests/stdlib_gr/random_tests.gr`
-- `tests/stdlib_gr/uuid_tests.gr`
-- `tests/stdlib_gr/crypto_tests.gr`
-
-**Success Criteria**:
-- ✅ Constants, Random, UUID, Crypto translated to pure .gr
-- ✅ All functionality matches Rust implementation
-- ✅ 150+ tests passing for .gr stdlib
-- ✅ Module system prefers .gr over native when available
-- ✅ 90%+ of stdlib in pure Graphoid (by line count)
-- ✅ Only I/O, OS, Time (partial), Regex remain in Rust
-- ✅ Self-hosting goal achieved!
-
-**Documentation**:
-- Update CLAUDE.md to reflect self-hosting status
-- Document translation guidelines for future modules
-- Show performance comparison (Rust vs .gr implementations)
-
----
-
-## Phase 15: Testing Framework (7-10 days)
-
-Built-in RSpec-style testing framework:
-
-- Built-in `assert` module with rich assertions
-- Test file discovery (.test.gr files)
+- Built-in `spec` module with BDD-style assertions
+- Test file discovery (`.spec.gr` files)
 - Test runner with color output
-- Setup/teardown hooks
-- Test groups and organization
+- Setup/teardown hooks (`before_each`, `after_each`, `before_all`, `after_all`)
+- Hierarchical test organization (`describe`, `context`, `it`)
 - Coverage reporting
 - Mocking and stubbing system
 - Property-based testing
 
+### Implementation Strategy
+
+**Day 1-2: Core Assertion Module**
+```graphoid
+# stdlib/spec.gr
+# RSpec-style testing framework
+
+fn describe(name, block) {
+    # Create a test group
+    _current_group = TestGroup.new(name)
+    block()
+    _current_group.run()
+}
+
+fn context(name, block) {
+    # Alias for describe (semantic difference)
+    describe(name, block)
+}
+
+fn it(description, block) {
+    # Define a single test case
+    _current_group.add_test(description, block)
+}
+
+fn expect(actual) {
+    # Return expectation builder
+    return Expectation.new(actual)
+}
+
+graph Expectation {
+    _actual
+
+    fn new(actual) {
+        return Expectation { _actual: actual }
+    }
+
+    fn to_equal(expected) {
+        if _actual != expected {
+            raise "Expected " + expected.to_string() + " but got " + _actual.to_string()
+        }
+    }
+
+    fn to_be_truthy() {
+        if !_actual {
+            raise "Expected truthy value but got " + _actual.to_string()
+        }
+    }
+
+    fn to_be_falsy() {
+        if _actual {
+            raise "Expected falsy value but got " + _actual.to_string()
+        }
+    }
+
+    fn to_contain(item) {
+        if !_actual.contains(item) {
+            raise "Expected " + _actual.to_string() + " to contain " + item.to_string()
+        }
+    }
+
+    fn to_raise(error_type) {
+        # For testing that code raises errors
+        # _actual should be a lambda
+        try {
+            _actual()
+            raise "Expected error but none was raised"
+        } catch e {
+            if !e.to_string().contains(error_type) {
+                raise "Expected " + error_type + " but got " + e.to_string()
+            }
+        }
+    }
+}
+```
+
+**Day 3-4: Test Runner**
+```graphoid
+# Test runner with colored output
+
+graph TestRunner {
+    _groups = []
+    _passed = 0
+    _failed = 0
+    _errors = []
+
+    fn run_file(path) {
+        load path
+        self.report()
+    }
+
+    fn run_directory(dir) {
+        for file in fs.glob(dir + "/**/*.spec.gr") {
+            print("Running: " + file)
+            self.run_file(file)
+        }
+        self.summary()
+    }
+
+    fn report() {
+        for group in _groups {
+            print("  " + group.name)
+            for test in group.tests {
+                if test.passed {
+                    print("    ✓ " + test.description)
+                    _passed = _passed + 1
+                } else {
+                    print("    ✗ " + test.description)
+                    print("      " + test.error)
+                    _failed = _failed + 1
+                }
+            }
+        }
+    }
+
+    fn summary() {
+        print("")
+        print(_passed.to_string() + " passed, " + _failed.to_string() + " failed")
+    }
+}
+```
+
+**Day 5-6: Hooks and Setup/Teardown**
+```graphoid
+# Test lifecycle hooks
+
+fn before_each(block) {
+    _current_group.before_each = block
+}
+
+fn after_each(block) {
+    _current_group.after_each = block
+}
+
+fn before_all(block) {
+    _current_group.before_all = block
+}
+
+fn after_all(block) {
+    _current_group.after_all = block
+}
+```
+
+**Day 7-8: Mocking and Stubbing**
+```graphoid
+# Mock objects for testing
+
+fn mock(name) {
+    return Mock.new(name)
+}
+
+graph Mock {
+    _name
+    _expectations = {}
+    _calls = []
+
+    fn expect_call(method, returns) {
+        _expectations[method] = returns
+    }
+
+    fn verify() {
+        # Verify all expected calls were made
+        for method in _expectations.keys() {
+            if !_calls.contains(method) {
+                raise "Expected call to " + method + " but it was not made"
+            }
+        }
+    }
+}
+```
+
+**Day 9-10: Integration and CLI**
+
+Add `graphoid spec` command:
+```bash
+# Run all specs in current directory
+graphoid spec
+
+# Run specific spec file
+graphoid spec tests/math.spec.gr
+
+# Run with verbose output
+graphoid spec --verbose
+
+# Run with coverage
+graphoid spec --coverage
+```
+
+### Success Criteria
+
+- ✅ `describe`, `context`, `it` blocks working
+- ✅ `expect().to_equal()`, `to_be_truthy()`, etc. assertions
+- ✅ `before_each`, `after_each` hooks
+- ✅ Test file discovery (`.spec.gr`)
+- ✅ Color-coded test output
+- ✅ `graphoid spec` CLI command
+- ✅ At least 50 self-tests for the framework itself
+
 ---
 
-## Phase 16: Debugger (10-14 days)
+## Phase 15: Concurrency & Async (10-14 days)
 
-Interactive debugging and profiling tools:
+**Goal**: Add async/await syntax and concurrency primitives for real-world applications.
 
-- Breakpoint support (`debug.break()`)
-- Debug REPL with inspection commands
-- Variable and stack inspection
-- Step-through execution
-- Debug module API
-- Performance profiling tools
-- DAP (Debug Adapter Protocol) integration for IDEs
-- Graph visualization in debugger
+**Why Now**: Real applications need concurrent operations. Web servers, parallel processing, and I/O-bound operations require async support.
+
+### Core Features
+
+- **Async/await syntax** - Non-blocking operations
+- **Channels** - Message passing between concurrent tasks
+- **Actors** - Lightweight concurrent entities
+- **Parallel graph operations** - Concurrent node/edge processing
+- **Event loop** - Single-threaded async runtime
+
+### Architecture Decisions Required
+
+Before implementation, these key decisions must be made:
+
+**1. Runtime Model: Single-threaded vs Multi-threaded**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Single-threaded event loop** (like Node.js) | Simple, no race conditions, easier debugging | No CPU parallelism |
+| **Multi-threaded with work stealing** (like Tokio) | True parallelism, better performance | Complexity, potential race conditions |
+| **Hybrid** (single-threaded default, opt-in threads) | Best of both worlds | More implementation work |
+
+**Recommendation**: Start with single-threaded event loop. Add multi-threading in a future phase if needed.
+
+**2. Async Runtime: Tokio vs Custom**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Use Tokio** | Battle-tested, full-featured, great ecosystem | Large dependency, may be overkill |
+| **Use async-std** | Simpler, lighter than Tokio | Less mature ecosystem |
+| **Custom minimal runtime** | Full control, minimal dependencies | Significant implementation effort |
+
+**Recommendation**: Use Tokio for initial implementation. It handles I/O, timers, and scheduling well.
+
+**3. Executor Integration**
+
+The async system must integrate with the existing `Executor`:
+
+```rust
+// Option A: Extend current executor with async state
+struct Executor {
+    // ... existing fields ...
+    async_runtime: tokio::runtime::Runtime,
+    pending_futures: Vec<BoxFuture<'static, Value>>,
+}
+
+// Option B: Separate async executor that wraps sync executor
+struct AsyncExecutor {
+    sync_executor: Executor,
+    runtime: tokio::runtime::Runtime,
+}
+```
+
+**Recommendation**: Option A - Extend current executor. Keeps single execution model.
+
+**4. Value System Changes**
+
+Async functions return `Future<Value>` which needs representation:
+
+```rust
+enum Value {
+    // ... existing variants ...
+    Future(Box<dyn Future<Output = Value>>),
+    Channel(mpsc::Sender<Value>, mpsc::Receiver<Value>),
+    Actor(ActorHandle),
+}
+```
+
+**5. Syntax Additions**
+
+New tokens and AST nodes required:
+- `async` keyword for function definitions
+- `await` keyword for awaiting futures
+- `spawn` keyword for creating actors
+- `channel()` built-in function
+- `actor` keyword for actor definitions
+
+### Implementation Strategy
+
+**Day 1-3: Async/Await Syntax**
+```graphoid
+# Async function declaration
+async fn fetch_data(url) {
+    response = await http.get(url)
+    return response["body"]
+}
+
+# Calling async functions
+async fn main() {
+    data = await fetch_data("https://api.example.com/data")
+    print(data)
+}
+
+# Running async code
+async.run(main())
+```
+
+**Day 4-6: Channels**
+```graphoid
+# Create a channel
+ch = channel()
+
+# Send and receive
+async fn producer(ch) {
+    for i in 1..10 {
+        await ch.send(i)
+    }
+    ch.close()
+}
+
+async fn consumer(ch) {
+    while true {
+        value = await ch.recv()
+        if value == none {
+            break
+        }
+        print("Got: " + value.to_string())
+    }
+}
+
+# Run concurrently
+async.run_all([producer(ch), consumer(ch)])
+```
+
+**Day 7-9: Actor Model**
+```graphoid
+# Define an actor
+actor Counter {
+    _count = 0
+
+    fn increment() {
+        _count = _count + 1
+    }
+
+    fn get() {
+        return _count
+    }
+}
+
+# Spawn actors
+counter = spawn Counter()
+
+# Send messages (async)
+await counter.increment()
+await counter.increment()
+value = await counter.get()
+print(value)  # 2
+```
+
+**Day 10-12: Parallel Graph Operations**
+```graphoid
+# Parallel map over graph nodes
+results = await graph.nodes().parallel_map(fn(node) {
+    return expensive_computation(node.value())
+})
+
+# Parallel filter
+filtered = await graph.nodes().parallel_filter(fn(node) {
+    return node.value() > threshold
+})
+```
+
+**Day 13-14: Event Loop and Integration**
+
+### Success Criteria
+
+- ✅ `async` and `await` keywords working
+- ✅ `channel()` for message passing
+- ✅ `spawn` for actors
+- ✅ `async.run()` and `async.run_all()`
+- ✅ Parallel graph operations
+- ✅ Non-blocking I/O with async net module
+- ✅ At least 30 concurrency tests
 
 ---
 
-## Phase 17: Package Manager (14-21 days)
+## Phase 16: Debugger (10-14 days) - Nice to Have
 
-Graph-based dependency management:
+**Goal**: Interactive debugging and profiling tools for Graphoid development.
 
-- Package manifest format (`graphoid.toml`)
-- Dependency resolution algorithm (graph-based!)
-- Lock file generation (`graphoid.lock`)
-- `graphoid new` - Project scaffolding
-- `graphoid install` - Dependency installation
-- `graphoid publish` - Package publishing
-- `graphoid test` - Run test suite
-- Package registry client
-- SemVer version constraint handling
-- Build scripts support
+**Philosophy**:
+- Interactive debugging - Pause and inspect at any point
+- REPL integration - Debug from the REPL
+- Graph visualization - See graph structures visually
+- Time travel - Step backwards through execution (stretch goal)
+
+### Implementation Strategy
+
+**Day 1-2: Debug Module Foundation**
+```graphoid
+# stdlib/debug.gr - Core debug API
+
+fn break() {
+    # Pause execution and enter debug REPL
+    _enter_debug_repl()
+}
+
+fn break_if(condition, message) {
+    if condition {
+        print("Breakpoint: " + message)
+        break()
+    }
+}
+
+fn trace() {
+    # Print current call stack
+    for frame in _get_stack_frames() {
+        print("  at " + frame["function"] + " (" + frame["file"] + ":" + frame["line"].to_string() + ")")
+    }
+}
+```
+
+**Day 3-4: Debug REPL Commands**
+```
+Debug commands when paused at breakpoint:
+> continue (c)     - Continue execution
+> step (s)         - Step to next line
+> step_into (si)   - Step into function call
+> step_out (so)    - Step out of current function
+> next (n)         - Step over function calls
+
+> print <expr>     - Evaluate and print expression
+> locals           - Show local variables
+> globals          - Show global variables
+> stack            - Show call stack
+
+> watch <expr>     - Watch expression value
+> unwatch <expr>   - Stop watching expression
+> watches          - Show all watch expressions
+
+> breakpoints      - List all breakpoints
+> break <line>     - Set breakpoint at line number
+> delete <id>      - Delete breakpoint by ID
+
+> graph <var>      - Visualize graph structure (ASCII)
+> quit (q)         - Exit debugger and stop program
+```
+
+**Day 5-6: Variable and Stack Inspection**
+```graphoid
+# Debug module API for programmatic inspection
+
+fn locals() {
+    # Returns hash of local variable names to values
+    return _get_local_scope()
+}
+
+fn globals() {
+    # Returns hash of global variable names to values
+    return _get_global_scope()
+}
+
+fn stack_trace() {
+    # Returns list of stack frames
+    # Each frame: {function, file, line, locals}
+    return _get_stack_frames()
+}
+
+fn memory_usage() {
+    # Returns memory usage in bytes
+    return _get_memory_usage()
+}
+```
+
+**Day 7-8: Performance Profiling**
+```graphoid
+# Profile function execution time
+
+fn start_profile() {
+    _profiler_start()
+}
+
+fn stop_profile() {
+    data = _profiler_stop()
+    return ProfileReport.new(data)
+}
+
+graph ProfileReport {
+    _data
+
+    fn new(data) {
+        return ProfileReport { _data: data }
+    }
+
+    fn total_time() {
+        return _data["total_ms"]
+    }
+
+    fn top_functions(n) {
+        # Return top N functions by time
+        return _data["functions"].slice(0, n)
+    }
+
+    fn report() {
+        print("=== Profile Report ===")
+        print("Total time: " + total_time().to_string() + "ms")
+        print("")
+        print("Top functions:")
+        for f in top_functions(10) {
+            print("  " + f["name"] + ": " + f["time"].to_string() + "ms (" + f["calls"].to_string() + " calls)")
+        }
+    }
+}
+```
+
+**Day 9-10: Graph Visualization**
+```graphoid
+# ASCII visualization for graphs in debugger
+
+fn visualize_graph(g) {
+    # Simple ASCII representation
+    print("Nodes:")
+    for node in g.nodes() {
+        print("  [" + node + "]")
+    }
+    print("")
+    print("Edges:")
+    for edge in g.edges() {
+        print("  " + edge[0] + " --" + edge[2] + "--> " + edge[1])
+    }
+}
+
+fn graph_stats(g) {
+    return {
+        "nodes": g.node_count(),
+        "edges": g.edge_count(),
+        "density": g.edge_count() / (g.node_count() * (g.node_count() - 1))
+    }
+}
+```
+
+**Day 11-12: DAP Integration (Optional)**
+
+Implement Debug Adapter Protocol for IDE integration:
+- VSCode extension using DAP
+- Breakpoint synchronization
+- Variable hover inspection
+- Watch panel support
+
+**Day 13-14: Integration and Testing**
+
+### Rust Implementation Notes
+
+```rust
+// In executor.rs - Handle debug.break()
+fn handle_debug_break(&mut self) -> Result<Value, RuntimeError> {
+    // Enter debug REPL mode
+    self.debug_mode = true;
+    self.run_debug_repl()?;
+    Ok(Value::None)
+}
+
+fn run_debug_repl(&mut self) -> Result<(), RuntimeError> {
+    loop {
+        print!("> ");
+        let input = read_line();
+        match self.parse_debug_command(&input) {
+            DebugCommand::Continue => break,
+            DebugCommand::Step => { self.step_mode = true; break; }
+            DebugCommand::Print(expr) => {
+                let value = self.eval_expression(&expr)?;
+                println!("{}", value);
+            }
+            DebugCommand::Locals => {
+                for (name, value) in self.current_scope() {
+                    println!("  {}: {}", name, value);
+                }
+            }
+            DebugCommand::Quit => return Err(RuntimeError::DebuggerQuit),
+            // ... other commands
+        }
+    }
+    Ok(())
+}
+```
+
+### Success Criteria
+
+- ✅ `debug.break()` pauses execution
+- ✅ `debug.break_if(cond, msg)` conditional breakpoints
+- ✅ Debug REPL with continue, step, print, locals, stack commands
+- ✅ `debug.trace()` prints stack trace
+- ✅ `debug.start_profile()` / `debug.stop_profile()` for profiling
+- ✅ Graph visualization in debug REPL (`graph <var>`)
+- ✅ At least 25 debugger tests
+- ⭐ (Stretch) DAP integration for VSCode
+
+---
+
+## Phase 17: Package Manager (14-21 days) - Nice to Have
+
+**Goal**: Graph-based dependency management system for Graphoid projects.
+
+**Philosophy**:
+- Simple and fast - Like npm, cargo, pip
+- Semantic versioning - Clear version constraints
+- Graph-based dependencies - Use graphs for dependency resolution (dogfooding!)
+- Reproducible builds - Lock files ensure consistency
+- Decentralized - GitHub, GitLab, or custom registries
+
+### Implementation Strategy
+
+**Day 1-3: Package Manifest (`graphoid.toml`)**
+```toml
+[package]
+name = "my-awesome-lib"
+version = "1.2.3"
+description = "An awesome library for Graphoid"
+authors = ["Alice <alice@example.com>"]
+license = "MIT"
+repository = "https://github.com/alice/my-awesome-lib"
+
+# Entry points
+main = "src/main.gr"
+lib = "src/lib.gr"
+
+# Minimum Graphoid version
+graphoid_version = ">=0.5.0"
+
+[dependencies]
+# From registry
+graph-utils = "^2.0.0"           # Caret: 2.x.x compatible
+json-parser = "~1.4.0"           # Tilde: 1.4.x only
+
+# From git
+internal-lib = { git = "https://github.com/org/lib", tag = "v1.0.0" }
+
+# From local path
+local-module = { path = "../local-module" }
+
+[dev-dependencies]
+test-helpers = "^1.0.0"
+
+[scripts]
+test = "graphoid test"
+docs = "graphoid docs generate"
+```
+
+**Day 4-6: Lock File Generation**
+```toml
+# graphoid.lock - Auto-generated
+
+[[package]]
+name = "graph-utils"
+version = "2.1.5"
+source = "registry+https://packages.graphoid.org"
+checksum = "sha256:abc123..."
+dependencies = ["data-structures 1.0.0"]
+
+[[package]]
+name = "data-structures"
+version = "1.0.0"
+source = "registry+https://packages.graphoid.org"
+checksum = "sha256:def456..."
+dependencies = []
+```
+
+**Day 7-9: Dependency Resolution (Graph-Based!)**
+```graphoid
+# The resolver IS a graph algorithm - dogfooding!
+
+graph DependencyResolver {
+    _packages = graph {}  # Package dependency graph
+    _versions = {}        # Available versions per package
+
+    fn resolve(root_deps) {
+        # Build dependency graph
+        for dep in root_deps {
+            self._add_package(dep)
+        }
+
+        # Check for cycles
+        if self._packages.has_cycle() {
+            raise "Circular dependency detected"
+        }
+
+        # Topological sort for installation order
+        return self._packages.topological_sort()
+    }
+
+    fn _add_package(dep) {
+        # Fetch package metadata
+        versions = self._fetch_versions(dep["name"])
+
+        # Find best version matching constraint
+        version = self._best_match(versions, dep["constraint"])
+
+        # Add to graph
+        self._packages.add_node(dep["name"], version)
+
+        # Recursively add dependencies
+        for sub_dep in version["dependencies"] {
+            self._add_package(sub_dep)
+            self._packages.add_edge(dep["name"], sub_dep["name"], "depends_on")
+        }
+    }
+
+    fn _best_match(versions, constraint) {
+        # SemVer matching logic
+        for v in versions.reverse() {
+            if semver.satisfies(v, constraint) {
+                return v
+            }
+        }
+        raise "No version matches constraint: " + constraint
+    }
+}
+```
+
+**Day 10-12: CLI Commands**
+```bash
+# Project scaffolding
+graphoid new myproject          # Create new project
+graphoid new --lib mylib        # Create new library
+graphoid init                   # Initialize in current directory
+
+# Dependency management
+graphoid install                # Install all dependencies
+graphoid install graph-utils    # Install specific package
+graphoid install --dev testing  # Install as dev dependency
+graphoid update                 # Update dependencies
+graphoid uninstall graph-utils  # Remove package
+
+# Project management
+graphoid check                  # Verify dependencies
+graphoid list                   # List dependencies
+graphoid list --tree            # Show dependency tree
+
+# Building and testing
+graphoid build                  # Build project
+graphoid test                   # Run tests
+graphoid run                    # Run main.gr
+
+# Publishing
+graphoid publish                # Publish to registry
+graphoid publish --dry-run      # Test publish
+graphoid yank 1.2.2             # Mark version as broken
+```
+
+**Day 13-15: Project Scaffolding**
+```rust
+// graphoid new myproject creates:
+// myproject/
+// ├── graphoid.toml
+// ├── src/
+// │   └── main.gr
+// ├── tests/
+// │   └── main.spec.gr
+// └── README.md
+
+fn create_project(name: &str, is_lib: bool) -> Result<(), Error> {
+    fs::create_dir_all(format!("{}/src", name))?;
+    fs::create_dir_all(format!("{}/tests", name))?;
+
+    // Write graphoid.toml
+    let manifest = generate_manifest(name, is_lib);
+    fs::write(format!("{}/graphoid.toml", name), manifest)?;
+
+    // Write starter files
+    if is_lib {
+        fs::write(format!("{}/src/lib.gr", name), LIB_TEMPLATE)?;
+    } else {
+        fs::write(format!("{}/src/main.gr", name), MAIN_TEMPLATE)?;
+    }
+
+    Ok(())
+}
+```
+
+**Day 16-18: Registry Client**
+```graphoid
+# Package registry interaction
+
+graph RegistryClient {
+    _registry_url = "https://packages.graphoid.org"
+
+    fn search(query) {
+        response = http.get(_registry_url + "/search?q=" + query)
+        return json.parse(response["body"])
+    }
+
+    fn fetch_package(name, version) {
+        url = _registry_url + "/packages/" + name + "/" + version
+        response = http.get(url)
+        return json.parse(response["body"])
+    }
+
+    fn publish(manifest, tarball) {
+        # Requires authentication token
+        response = http.post(_registry_url + "/publish", {
+            "manifest": manifest,
+            "tarball": base64.encode(tarball)
+        }, {
+            "Authorization": "Bearer " + _auth_token
+        })
+        return response["status"] == 200
+    }
+}
+```
+
+**Day 19-21: Integration and Polish**
+- SemVer constraint parsing (^, ~, >=, <, etc.)
+- Conflict resolution when multiple versions needed
+- Cache management for downloaded packages
+- Offline mode support
+- Progress indicators for large installs
+
+### Directory Structure
+```
+~/.graphoid/
+├── cache/              # Downloaded package cache
+│   ├── graph-utils-2.1.5.tar.gz
+│   └── json-parser-1.4.2.tar.gz
+├── packages/           # Installed global packages
+│   └── cli-tool/
+├── config.toml         # User configuration
+└── credentials.toml    # Registry credentials
+```
+
+### Success Criteria
+
+- ✅ `graphoid.toml` manifest parsing
+- ✅ `graphoid.lock` generation and parsing
+- ✅ Graph-based dependency resolution (dogfooding!)
+- ✅ `graphoid new`, `graphoid init` project scaffolding
+- ✅ `graphoid install`, `graphoid update`, `graphoid uninstall`
+- ✅ `graphoid build`, `graphoid test`, `graphoid run`
+- ✅ SemVer version constraint handling (^, ~, >=, <)
+- ✅ Registry client for package search and download
+- ✅ At least 40 package manager tests
+- ⭐ (Stretch) `graphoid publish` to registry
+
+---
+
+## Phase 18: Stdlib Translation to Pure Graphoid (7-10 days) - Deferred
+
+**Goal**: Translate Rust stdlib modules to pure Graphoid, achieving 90%+ self-hosting.
+
+**Why Deferred**: This phase requires a solid testing framework (Phase 14) to validate that translated modules work correctly. Without proper tests, we can't verify that the pure Graphoid implementations match the Rust originals.
+
+**Prerequisites**:
+- ✅ Phase 13 (Bitwise Operators) - needed for crypto, random
+- ✅ Phase 14 (Testing Framework) - needed to validate translations
+
+### Translation Priority
+
+1. **Constants** → `stdlib/constants.gr` - Pure data, 1 day
+2. **Random** → `stdlib/random.gr` - Requires bitwise, 2 days
+3. **UUID** → `stdlib/uuid.gr` - Requires bitwise, 1 day
+4. **Crypto** → `stdlib/crypto.gr` - Requires bitwise, 3 days
+
+**Keep in Rust (Core System Functions)**:
+- **I/O** - File system operations (system calls)
+- **OS** - Process management, environment variables
+- **Net** - Socket operations (system calls)
 
 ---
 
@@ -3801,7 +4371,7 @@ Graph-based dependency management:
 
 These phases are planned for after the initial production release:
 
-### Phase 18: JavaScript Execution (TBD)
+### Phase 19: JavaScript Execution (TBD)
 
 Enable execution of JavaScript within Graphoid for web scraping and browser automation:
 
@@ -3814,23 +4384,18 @@ Enable execution of JavaScript within Graphoid for web scraping and browser auto
   - WebDriver protocol support
 - **Use cases**: Web scraping, browser testing, SPA interaction
 
-### Phase 19: GUI Toolkit (TBD)
+### Phase 20: GUI Toolkit (TBD)
 
-Native GUI application development:
+Native GUI application development - Deferred indefinitely. The REPL and CLI provide sufficient interactive capability. GUI can be added much later if needed.
 
-- Cross-platform windowing
-- Widget library
-- Event handling
-- Graphics/canvas support
+### Phase 21: Advanced Error Handling (TBD)
 
-### Phase 20: Concurrency & Async (TBD)
+Enhanced error handling beyond current capabilities:
 
-Advanced concurrency primitives:
-
-- Async/await syntax
-- Channels and message passing
-- Actor model support
-- Parallel graph operations
+- Configurable error modes (`strict`, `lenient`, `collect`)
+- Error recovery strategies
+- Custom error types
+- Stack trace improvements
 
 ---
 
@@ -3866,58 +4431,43 @@ Advanced concurrency primitives:
 
 ## Timeline Estimates
 
-**NOTE**: These estimates have been revised based on 10 new language features, standard graph types library, and documentation milestones.
+**NOTE**: Phase ordering revised December 2025 to prioritize testing framework before stdlib translation, and to move concurrency earlier in the roadmap.
 
-### Basic Language (Updated)
-**8-11 weeks** - Basic language with collections (+2-3 weeks from original)
-- Phases 0-5 complete (with mutation operators)
-- Documentation Milestone 1: Basic samples
-- Can run simple programs
-- Basic REPL works
-- **WHY LONGER**: Mutation operator convention doubles method surface area
+### Core Language Complete (Phases 0-13) ✅
+**Status**: COMPLETE as of December 2025
+- Phases 0-13 all complete
+- 1168+ unit tests passing
+- Full language features: pattern matching, behaviors, graph querying
+- Native stdlib modules (os, fs, net, random, constants)
+- Bitwise operators and integer types
+- Pure Graphoid stdlib (tls, http, json, time, etc.)
 
-### Feature Complete (Updated - Revised Phase Ordering)
-**20-25 weeks** - Full language specification (+8-9 weeks from original)
-- Phases 0-14 complete (includes pattern matching in Phases 7 & 9)
-- Phase 6.5: Standard graph types (BST, DAG, Heap, AVL, Trie)
-- Function pattern matching (Phase 7) + Graph pattern matching (Phase 9)
-- Complete behavior system (Phase 8)
-- 5-level graph querying system (Phases 6 & 9)
-- Error handling with configurable modes (✅ already done)
-- Module system complete (Phase 10)
-- Pure Graphoid stdlib (Phase 11)
-- Native stdlib modules (Phase 12)
-- Bitwise operators & integer types (Phase 13)
-- Stdlib translation to pure Graphoid (Phase 14) - 90%+ self-hosting!
-- Documentation Milestones 1-4 complete
-- **WHY LONGER**: Graph querying is massive (+7 days), pattern matching is critical (+12 days), behaviors complete, bitwise operators (+7 days), stdlib translation (+10 days)
+### Testing & Concurrency (Phases 14-15)
+**Estimated**: 3-4 weeks
+- Phase 14: Testing Framework (7-10 days) - RSpec-style BDD testing
+- Phase 15: Concurrency & Async (10-14 days) - async/await, channels, actors
+- **Why This Order**: Testing framework is critical infrastructure. Async is needed for real-world applications.
 
-### Production Tools Complete (Updated - Revised Phase Ordering)
-**24-32 weeks** - Professional tooling added (+8-10 weeks from original)
-- Phases 0-17 complete
-- Testing framework operational (Phase 15 - RSpec-style)
-- Debugger functional (Phase 16)
-- Package manager working (Phase 17)
-- **WHY LONGER**: More features to test, REPL/CLI parity for everything, self-hosting validation
+### Nice-to-Have Features (Phases 16-18)
+**Estimated**: 5-8 weeks (if pursued)
+- Phase 16: Debugger (10-14 days) - Breakpoints, step-through, DAP
+- Phase 17: Package Manager (14-21 days) - graphoid.toml, dependency resolution
+- Phase 18: Stdlib Translation (7-10 days) - Translate remaining Rust stdlib to pure Graphoid
+- **Note**: These are valuable but not blocking for most use cases
 
-### Production Ready (Updated)
-**32-40 weeks** - Optimized, polished, and professional (+8-12 weeks from original)
-- All phases complete (0-17)
-- Performance tuning done
-- Comprehensive testing (500+ tests)
-- Full documentation with samples
-- Examples and tutorials
-- Package registry live
-- 90%+ self-hosting with pure .gr stdlib
+### Phase Summary (Revised December 2025)
 
-### Comparison
-
-| Milestone | Old Estimate | New Estimate | Increase |
-|-----------|-------------|--------------|----------|
-| Basic Language | 6-8 weeks | 8-11 weeks | +2-3 weeks |
-| Feature Complete | 12-16 weeks | 20-25 weeks | +8-9 weeks |
-| Production Tools | 16-22 weeks | 24-32 weeks | +8-10 weeks |
-| **Production Ready** | **24-28 weeks** | **32-40 weeks** | **+8-12 weeks** |
+| Phase | Name | Status | Notes |
+|-------|------|--------|-------|
+| 0-11 | Core Language | ✅ Complete | All language features working |
+| 12 | Native Stdlib | ✅ Complete | os, fs, net, random, constants |
+| 13 | Bitwise Operators | ✅ Complete | &, \|, ^, ~, <<, >>, ** |
+| **14** | **Testing Framework** | 🔲 Next | RSpec-style BDD testing |
+| **15** | **Concurrency & Async** | 🔲 Planned | async/await, channels, actors |
+| 16 | Debugger | 🔲 Nice-to-have | DAP integration |
+| 17 | Package Manager | 🔲 Nice-to-have | Dependency management |
+| 18 | Stdlib Translation | 🔲 Deferred | After testing framework |
+| 19+ | Future | 🔲 Post-1.0 | JS execution, GUI, etc. |
 
 **We're building this right, not fast.**
 

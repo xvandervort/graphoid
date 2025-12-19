@@ -1,0 +1,177 @@
+# Social Network Demo
+#
+# Demonstrates CLG-based social network analysis
+# Run: graphoid samples/06-projects/social/main.gr
+
+load "social_network.gr"
+
+print("=== Social Network Analyzer ===")
+print("Demonstrating graph-based social network analysis")
+print("")
+
+# Create network
+network = SocialNetwork.new("Tech Community")
+
+# === Add Users ===
+print("--- Building Network ---")
+print("")
+
+# Add users with profile data
+network.add_user("alice", {"role": "engineer", "company": "TechCorp", "city": "Toronto"})
+network.add_user("bob", {"role": "designer", "company": "DesignCo", "city": "Vancouver"})
+network.add_user("charlie", {"role": "manager", "company": "TechCorp", "city": "Toronto"})
+network.add_user("diana", {"role": "engineer", "company": "StartupX", "city": "Montreal"})
+network.add_user("eve", {"role": "data scientist", "company": "DataCo", "city": "Toronto"})
+network.add_user("frank", {"role": "engineer", "company": "BigTech", "city": "Seattle"})
+network.add_user("grace", {"role": "product manager", "company": "StartupX", "city": "Montreal"})
+network.add_user("henry", {"role": "designer", "company": "TechCorp", "city": "Toronto"})
+
+print("Added 8 users to the network")
+
+# === Add Friendships ===
+
+# Alice is well-connected
+network.add_friendship("alice", "bob")
+network.add_friendship("alice", "charlie")
+network.add_friendship("alice", "diana")
+network.add_friendship("alice", "eve")
+
+# Bob knows a few people
+network.add_friendship("bob", "charlie")
+network.add_friendship("bob", "henry")
+
+# Charlie is the manager, knows everyone at TechCorp
+network.add_friendship("charlie", "eve")
+network.add_friendship("charlie", "henry")
+
+# Diana and Grace work together at StartupX
+network.add_friendship("diana", "grace")
+network.add_friendship("diana", "eve")
+
+# Eve knows people from data community
+network.add_friendship("eve", "frank")
+
+# Frank is somewhat isolated (only knows Eve)
+# Grace only knows Diana
+
+print("Added friendships between users")
+print("")
+
+# === Add Some Follows (one-directional) ===
+network.add_follow("henry", "alice")  # Henry follows Alice
+network.add_follow("frank", "alice")  # Frank follows Alice
+network.add_follow("grace", "eve")    # Grace follows Eve
+
+print("Added follow relationships")
+print("")
+
+# === Network Report ===
+network.report()
+
+# === Individual User Reports ===
+print("--- User Profiles ---")
+print("")
+
+network.user_report("alice")
+network.user_report("frank")
+
+# === Analysis Features ===
+print("--- Network Analysis ---")
+print("")
+
+# Mutual friends
+print("Mutual Friends Analysis:")
+mutual_ab = network.mutual_friends("alice", "bob")
+print("  Alice & Bob share: " + mutual_ab.to_string())
+
+mutual_de = network.mutual_friends("diana", "eve")
+print("  Diana & Eve share: " + mutual_de.to_string())
+
+mutual_af = network.mutual_friends("alice", "frank")
+print("  Alice & Frank share: " + mutual_af.to_string())
+print("")
+
+# Degrees of separation
+print("Degrees of Separation:")
+deg_ab = network.degrees_of_separation("alice", "bob")
+print("  Alice -> Bob: " + deg_ab.to_string() + " degree(s)")
+
+deg_ag = network.degrees_of_separation("alice", "grace")
+print("  Alice -> Grace: " + deg_ag.to_string() + " degree(s)")
+
+deg_fg = network.degrees_of_separation("frank", "grace")
+print("  Frank -> Grace: " + deg_fg.to_string() + " degree(s)")
+
+deg_bh = network.degrees_of_separation("bob", "henry")
+print("  Bob -> Henry: " + deg_bh.to_string() + " degree(s)")
+print("")
+
+# Friends of friends
+print("Friends of Friends (2nd degree connections):")
+fof_frank = network.friends_of_friends("frank")
+print("  Frank's potential new friends: " + fof_frank.to_string())
+
+fof_grace = network.friends_of_friends("grace")
+print("  Grace's potential new friends: " + fof_grace.to_string())
+print("")
+
+# === Friend Suggestions ===
+print("--- Friend Suggestions ---")
+print("")
+
+print("Suggestions for Frank (based on mutual friends):")
+suggestions = network.suggest_friends("frank")
+for s in suggestions {
+    print("  " + s["user"] + " - " + s["mutual_count"].to_string() + " mutual friend(s): " + s["mutual_friends"].to_string())
+}
+print("")
+
+print("Suggestions for Grace:")
+suggestions = network.suggest_friends("grace")
+for s in suggestions {
+    print("  " + s["user"] + " - " + s["mutual_count"].to_string() + " mutual friend(s): " + s["mutual_friends"].to_string())
+}
+print("")
+
+# === Check Specific Relationships ===
+print("--- Relationship Checks ---")
+print("")
+
+if network.are_friends("alice", "bob") {
+    print("Alice and Bob are friends")
+}
+
+if network.are_friends("frank", "grace") == false {
+    print("Frank and Grace are NOT friends (yet)")
+    deg = network.degrees_of_separation("frank", "grace")
+    print("  They are " + deg.to_string() + " degrees apart")
+}
+print("")
+
+# === The Graph Structure ===
+print("--- Graph Structure ---")
+print("")
+print("This social network IS a graph:")
+print("  Nodes (users): " + network.node_count().to_string())
+print("  Edges (relationships): " + network.edge_count().to_string())
+print("    - Friend edges: " + (network.connection_count() * 2).to_string() + " (bidirectional)")
+print("    - Follow edges: " + network.follow_count().to_string() + " (unidirectional)")
+print("")
+
+# Show the raw graph structure for Alice
+print("Alice's connections in the graph:")
+for edge in network.edges() {
+    if edge[0] == "alice" {
+        print("  alice --" + edge[2] + "--> " + edge[1])
+    }
+}
+print("")
+
+print("=== Demo Complete ===")
+print("")
+print("Key Takeaways:")
+print("1. Social networks ARE graphs - users are nodes, relationships are edges")
+print("2. Friend relationships are bidirectional edges")
+print("3. Follow relationships are unidirectional edges")
+print("4. Graph algorithms (BFS) enable network analysis")
+print("5. CLGs encapsulate the network logic cleanly")

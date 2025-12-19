@@ -1,0 +1,127 @@
+# Queue - A Graph-Based FIFO Data Structure
+#
+# Demonstrates: "Everything is a graph" - a queue IS a graph!
+# The queue is implemented as linked graph nodes:
+#   head -> item(5) -> item(8) -> item(3) -> tail
+#
+# Each item is a node, connected by "next" edges.
+# This is not a wrapper around a list - it's a true graph structure.
+
+graph Queue {
+    _head_id: none
+    _tail_id: none
+    _size: 0
+    _counter: 0
+
+    fn new() {
+        instance = self.clone()
+        instance._head_id = none
+        instance._tail_id = none
+        instance._size = 0
+        instance._counter = 0
+        return instance
+    }
+
+    fn length() {
+        return _size
+    }
+
+    fn is_empty() {
+        return _size == 0
+    }
+
+    fn enqueue(value) {
+        # Create node for this item
+        _counter = _counter + 1
+        node_id = "__queue_node_" + _counter.to_string()
+        self.add_node(node_id, value)
+
+        if _size == 0 {
+            _head_id = node_id
+            _tail_id = node_id
+        } else {
+            # Link from current tail to new node
+            self.add_edge(_tail_id, node_id, "next")
+            _tail_id = node_id
+        }
+
+        _size = _size + 1
+        return self
+    }
+
+    fn dequeue() {
+        if _size == 0 {
+            return none
+        }
+
+        # Get value from head
+        value = self.get_node(_head_id)
+        old_head = _head_id
+
+        # Find next node (if any)
+        next_id = _find_next(_head_id)
+
+        if next_id == none {
+            # Queue is now empty
+            _head_id = none
+            _tail_id = none
+        } else {
+            _head_id = next_id
+        }
+
+        # Remove old head node
+        self.remove_node(old_head)
+        _size = _size - 1
+
+        return value
+    }
+
+    fn peek() {
+        if _size == 0 {
+            return none
+        }
+        return self.get_node(_head_id)
+    }
+
+    fn contains(value) {
+        current = _head_id
+        while current != none {
+            node_value = self.get_node(current)
+            if node_value == value {
+                return true
+            }
+            current = _find_next(current)
+        }
+        return false
+    }
+
+    fn to_list() {
+        result = []
+        current = _head_id
+        while current != none {
+            value = self.get_node(current)
+            result = result.append(value)
+            current = _find_next(current)
+        }
+        return result
+    }
+
+    fn clear() {
+        # Remove all nodes
+        while _size > 0 {
+            self.dequeue()
+        }
+        return self
+    }
+
+    # Private helper to find the next node in the chain
+    priv fn find_next(node_id) {
+        edges = self.edges(:all)
+        for edge in edges {
+            if edge[0] == node_id && edge[2] == "next" {
+                return edge[1]
+            }
+        }
+        return none
+    }
+}

@@ -7648,7 +7648,22 @@ impl Executor {
         if let Some(modified_graph) = modified_self {
             // Only update if object_expr is a simple variable reference
             if let Expr::Variable { name, .. } = object_expr {
-                self.env.set(name, modified_graph)?;
+                // Try to set in environment first
+                if self.env.set(name, modified_graph.clone()).is_err() {
+                    // Variable not in environment - check if it's accessed via implicit self
+                    // If so, update the property on the outer `self` graph
+                    if let Ok(outer_self) = self.env.get("self") {
+                        if let ValueKind::Graph(mut outer_graph) = outer_self.kind.clone() {
+                            if outer_graph.has_node(name) {
+                                // Update the property on the outer self (add_node preserves edges)
+                                outer_graph.add_node(name.to_string(), modified_graph)?;
+                                self.env.set("self", Value::graph(outer_graph))?;
+                            }
+                            // If it's not a property on outer self either, ignore
+                            // (could be a read-only method call on a computed expression)
+                        }
+                    }
+                }
             }
         }
 

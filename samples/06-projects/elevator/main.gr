@@ -1,0 +1,190 @@
+# Elevator Simulator - Demo
+#
+# Demonstrates: CLG composition, state machines, graph-based data structures
+# Run: graphoid samples/06-projects/elevator/main.gr
+
+load "elevator.gr"
+
+print("=== Elevator Simulator ===")
+print("A 10-floor elevator demonstrating Class-Like Graphs")
+print("")
+
+# Create elevator
+elevator = Elevator.new(10)
+
+# === Demo 1: Basic Operation ===
+print("--- Demo 1: Basic Operation ---")
+print("")
+
+elevator.status()
+print("")
+
+print("Requesting floors 5 and 8...")
+elevator.request(5)
+elevator.request(8)
+print("")
+
+print("Running elevator to completion...")
+elevator.run()
+print("")
+
+elevator.status()
+print("")
+
+# === Demo 2: Multiple Requests ===
+print("--- Demo 2: Multiple Requests from Different Floors ---")
+print("")
+
+print("Requesting floors 3, 7, 2, 10...")
+elevator.request(3)
+elevator.request(7)
+elevator.request(2)
+elevator.request(10)
+print("")
+
+print("Running elevator...")
+elevator.run()
+print("")
+
+elevator.status()
+print("")
+
+# === Demo 3: Step-by-Step Execution ===
+print("--- Demo 3: Step-by-Step Execution ---")
+print("")
+
+print("Requesting floor 6...")
+elevator.request(6)
+print("")
+
+print("Stepping through manually:")
+i = 0
+while i < 15 && elevator.is_idle() == false {
+    elevator.step()
+    i = i + 1
+}
+print("")
+
+elevator.status()
+print("")
+
+# === Demo 4: Fire Alarm ===
+print("--- Demo 4: Fire Alarm Emergency ---")
+print("")
+
+print("Requesting floors 8 and 9...")
+elevator.request(8)
+elevator.request(9)
+print("")
+
+print("Taking a few steps...")
+elevator.step()
+elevator.step()
+elevator.step()
+print("")
+
+print("FIRE ALARM triggered!")
+elevator.trigger_fire_alarm()
+print("")
+
+print("Fire mode descends to ground floor:")
+i = 0
+while elevator.floor() > 1 && i < 20 {
+    elevator.step()
+    i = i + 1
+}
+print("")
+
+# Reset for next demo
+elevator = Elevator.new(10)
+
+# === Demo 5: Emergency Stop ===
+print("--- Demo 5: Emergency Stop ---")
+print("")
+
+print("Requesting floor 7...")
+elevator.request(7)
+elevator.step()
+elevator.step()
+print("")
+
+print("EMERGENCY triggered!")
+elevator.trigger_emergency()
+print("")
+
+elevator.status()
+print("")
+
+print("Using emergency phone...")
+phone = elevator.get_phone()
+phone.dispatcher_answers("Emergency services. What is your situation?")
+phone.speak("I'm stuck in the elevator at floor " + elevator.floor().to_string())
+print("")
+
+print("Resetting elevator...")
+elevator.reset()
+elevator.status()
+print("")
+
+# === Demo 6: Queue as Graph ===
+print("--- Demo 6: Queue is a Graph! ---")
+print("")
+
+print("Creating fresh elevator and adding requests...")
+elevator = Elevator.new(10)
+elevator.request(3)
+elevator.request(7)
+elevator.request(5)
+elevator.request(9)
+print("")
+
+queue = elevator.get_queue()
+print("Queue contents: " + queue.to_list().to_string())
+print("Queue is a graph with " + queue.node_count().to_string() + " nodes")
+print("Queue has " + queue.edge_count().to_string() + " edges (linking items)")
+print("")
+
+print("Queue edges (showing graph structure):")
+edges = queue.edges(:all)
+for edge in edges {
+    if edge[2] == "next" {
+        from_val = queue.get_node(edge[0])
+        to_val = queue.get_node(edge[1])
+        print("  " + from_val.to_string() + " -> " + to_val.to_string())
+    }
+}
+print("")
+
+# === Demo 7: Elevator State Machine as Graph ===
+print("--- Demo 7: State Machine is a Graph! ---")
+print("")
+
+print("Elevator states (nodes):")
+print("  Normal: idle, moving_up, moving_down, doors_opening, doors_open, doors_closing")
+print("  Emergency: emergency_stop, fire_mode, door_obstruction")
+print("")
+
+print("Sample transitions from 'idle':")
+edges = elevator.edges(:all)
+for edge in edges {
+    if edge[0] == "idle" {
+        print("  idle --[" + edge[2] + "]--> " + edge[1])
+    }
+}
+print("")
+
+print("Sample transitions from 'moving_up':")
+for edge in edges {
+    if edge[0] == "moving_up" {
+        print("  moving_up --[" + edge[2] + "]--> " + edge[1])
+    }
+}
+print("")
+
+print("=== Demo Complete ===")
+print("")
+print("Key Takeaways:")
+print("1. Queue is implemented as linked graph nodes, not a list wrapper")
+print("2. State machine transitions are graph edges")
+print("3. Three CLGs compose together: Elevator, Queue, CallBox")
+print("4. Emergency states and recovery are modeled in the graph structure")

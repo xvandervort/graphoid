@@ -1,0 +1,205 @@
+# Elevator Simulation - Virtual Passenger Stress Test
+#
+# Demonstrates: Automated testing with random passenger generation
+# Run: graphoid samples/06-projects/elevator/sim_demo.gr
+#
+# Generates random passengers who want to travel between floors,
+# tracks metrics like wait times, and produces a summary report.
+
+load "building.gr"
+load "passenger.gr"
+
+graph Simulation {
+    _building: none
+    _waiting: []
+    _riding: []
+    _completed: []
+    _next_id: 1
+    _tick: 0
+    _num_floors: 10
+    _num_elevators: 3
+
+    fn new(floors, elevators) {
+        instance = self.clone()
+        instance._num_floors = floors
+        instance._num_elevators = elevators
+        instance._building = Building.new(floors, elevators)
+        instance._waiting = []
+        instance._riding = []
+        instance._completed = []
+        instance._next_id = 1
+        instance._tick = 0
+        return instance
+    }
+
+    # Add a passenger with specific start/destination
+    fn add_passenger(start, dest) {
+        p = Passenger.new(_next_id, start, dest)
+        _next_id = _next_id + 1
+        _waiting = _waiting.append(p)
+
+        # Call elevator for this passenger
+        _building.call(start, p.direction())
+
+        return p
+    }
+
+    # Run one simulation tick
+    fn tick() {
+        _tick = _tick + 1
+
+        # Increment wait/ride times
+        new_waiting = []
+        for p in _waiting {
+            p.tick_wait()
+            new_waiting = new_waiting.append(p)
+        }
+        _waiting = new_waiting
+
+        new_riding = []
+        for p in _riding {
+            p.tick_ride()
+            new_riding = new_riding.append(p)
+        }
+        _riding = new_riding
+
+        # Step the building
+        _building.step()
+
+        # Check for boarding opportunities
+        _do_boarding()
+
+        # Check for arrivals
+        _do_arrivals()
+
+        return self
+    }
+
+    # Run until all passengers have arrived
+    fn run_until_complete() {
+        max_ticks = 1000
+        while (_waiting.length() > 0 || _riding.length() > 0) && _tick < max_ticks {
+            tick()
+        }
+        return self
+    }
+
+    # Get counts
+    fn waiting_count() {
+        return _waiting.length()
+    }
+
+    fn riding_count() {
+        return _riding.length()
+    }
+
+    fn completed_count() {
+        return _completed.length()
+    }
+
+    fn current_tick() {
+        return _tick
+    }
+
+    # Generate statistics report
+    fn report() {
+        print("")
+        print("=== Simulation Report ===")
+        print("  Total ticks: " + _tick.to_string())
+        print("  Passengers completed: " + _completed.length().to_string())
+        print("  Passengers waiting: " + _waiting.length().to_string())
+        print("  Passengers riding: " + _riding.length().to_string())
+        print("")
+
+        if _completed.length() > 0 {
+            total_wait = 0
+            total_ride = 0
+            max_wait = 0
+            max_ride = 0
+
+            for p in _completed {
+                w = p.wait_time()
+                r = p.ride_time()
+                total_wait = total_wait + w
+                total_ride = total_ride + r
+
+                if w > max_wait {
+                    max_wait = w
+                }
+                if r > max_ride {
+                    max_ride = r
+                }
+            }
+
+            avg_wait = total_wait / _completed.length()
+            avg_ride = total_ride / _completed.length()
+            avg_total = avg_wait + avg_ride
+
+            print("  Average wait time: " + avg_wait.to_string() + " ticks")
+            print("  Average ride time: " + avg_ride.to_string() + " ticks")
+            print("  Average total time: " + avg_total.to_string() + " ticks")
+            print("  Max wait time: " + max_wait.to_string() + " ticks")
+            print("  Max ride time: " + max_ride.to_string() + " ticks")
+        }
+
+        print("")
+    }
+
+    fn building() {
+        return _building
+    }
+
+    # Private: Check if any waiting passengers can board
+    priv fn do_boarding() {
+        still_waiting = []
+
+        for p in _waiting {
+            boarded = false
+
+            # Check each elevator
+            e_idx = 1
+            while e_idx <= _num_elevators && boarded == false {
+                e = _building.elevator(e_idx)
+
+                # Passenger can board if elevator is at their floor with doors open
+                if e != none && e.floor() == p.start_floor() && e.state() == "doors_open" {
+                    p.board(e_idx)
+                    _building.cabin_call(e_idx, p.destination())
+                    _riding = _riding.append(p)
+                    boarded = true
+                }
+
+                e_idx = e_idx + 1
+            }
+
+            if boarded == false {
+                still_waiting = still_waiting.append(p)
+            }
+        }
+
+        _waiting = still_waiting
+    }
+
+    # Private: Check if any riding passengers have arrived
+    priv fn do_arrivals() {
+        still_riding = []
+
+        for p in _riding {
+            arrived = false
+
+            # Check if at destination with doors open
+            e = _building.elevator(p._elevator)
+            if e != none && e.floor() == p.destination() && e.state() == "doors_open" {
+                p.arrive()
+                _completed = _completed.append(p)
+                arrived = true
+            }
+
+            if arrived == false {
+                still_riding = still_riding.append(p)
+            }
+        }
+
+        _riding = still_riding
+    }
+}

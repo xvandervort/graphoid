@@ -388,7 +388,7 @@ impl Graph {
         ValidationResult::Allowed
     }
 
-    /// Add a node to the graph
+    /// Add a node to the graph, or update an existing node's value (preserving edges)
     pub fn add_node(&mut self, id: String, value: Value) -> Result<(), GraphoidError> {
         // Check if graph is frozen
         if self.frozen {
@@ -406,17 +406,23 @@ impl Graph {
         match self.validate_rules(operation) {
             ValidationResult::Allowed => {
                 // All rules passed - perform the operation
-                self.nodes.insert(
-                    id.clone(),
-                    GraphNode {
-                        id,
-                        value,
-                        node_type: None,
-                        properties: HashMap::new(),
-                        neighbors: HashMap::new(),
-                        predecessors: HashMap::new(),
-                    },
-                );
+                // If node exists, update value while preserving edges and properties
+                if let Some(existing) = self.nodes.get_mut(&id) {
+                    existing.value = value;
+                } else {
+                    // New node - create fresh
+                    self.nodes.insert(
+                        id.clone(),
+                        GraphNode {
+                            id,
+                            value,
+                            node_type: None,
+                            properties: HashMap::new(),
+                            neighbors: HashMap::new(),
+                            predecessors: HashMap::new(),
+                        },
+                    );
+                }
                 Ok(())
             }
             ValidationResult::Rejected {

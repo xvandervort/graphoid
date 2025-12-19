@@ -8,12 +8,14 @@
 //! - platform() - Get OS platform name
 //! - arch() - Get CPU architecture
 //! - args() - Get command-line arguments
+//! - input(prompt) - Read a line from stdin
 
 use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::stdlib::{NativeFunction, NativeModule};
 use crate::values::{Hash, List, Value, ValueKind};
 use std::collections::HashMap;
 use std::env;
+use std::io::{self, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// OS module for system primitives
@@ -48,6 +50,7 @@ impl NativeModule for OSModule {
         functions.insert("platform".to_string(), platform as NativeFunction);
         functions.insert("arch".to_string(), arch as NativeFunction);
         functions.insert("args".to_string(), args as NativeFunction);
+        functions.insert("input".to_string(), input as NativeFunction);
 
         functions
     }
@@ -181,4 +184,55 @@ fn args(args: &[Value]) -> Result<Value> {
     }
 
     Ok(Value::list(list))
+}
+
+/// Read a line from stdin with optional prompt
+fn input(args: &[Value]) -> Result<Value> {
+    // Optional prompt argument
+    let prompt = if args.is_empty() {
+        String::new()
+    } else if args.len() == 1 {
+        match &args[0].kind {
+            ValueKind::String(s) => s.clone(),
+            _ => {
+                return Err(GraphoidError::TypeError {
+                    message: format!(
+                        "input() requires string argument, got {}",
+                        args[0].type_name()
+                    ),
+                    position: SourcePosition::unknown(),
+                })
+            }
+        }
+    } else {
+        return Err(GraphoidError::RuntimeError {
+            message: "input() takes at most one argument (prompt)".to_string(),
+        });
+    };
+
+    // Print prompt without newline
+    if !prompt.is_empty() {
+        print!("{}", prompt);
+        io::stdout().flush().map_err(|e| GraphoidError::RuntimeError {
+            message: format!("Failed to flush stdout: {}", e),
+        })?;
+    }
+
+    // Read line from stdin
+    let mut line = String::new();
+    io::stdin()
+        .read_line(&mut line)
+        .map_err(|e| GraphoidError::RuntimeError {
+            message: format!("Failed to read from stdin: {}", e),
+        })?;
+
+    // Remove trailing newline
+    if line.ends_with('\n') {
+        line.pop();
+        if line.ends_with('\r') {
+            line.pop();
+        }
+    }
+
+    Ok(Value::string(line))
 }

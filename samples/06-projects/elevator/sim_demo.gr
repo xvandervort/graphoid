@@ -1,0 +1,155 @@
+# Elevator Simulation Demo
+#
+# Runs automated passenger simulation to stress test the elevator system
+# Run: graphoid samples/06-projects/elevator/sim_demo.gr
+
+import "random"
+
+load "simulation.gr"
+
+print("=== Elevator Simulation Demo ===")
+print("Testing 3 elevators, 10 floors with virtual passengers")
+print("")
+
+num_floors = 10
+
+# === Demo 1: Small batch of passengers ===
+print("--- Demo 1: Small Batch (5 passengers) ---")
+print("")
+
+sim = Simulation.new(num_floors, 3)
+
+print("Spawning 5 random passengers...")
+i = 0
+while i < 5 {
+    start = rand.randint(1, num_floors)
+    dest = rand.randint(1, num_floors)
+    while dest == start {
+        dest = rand.randint(1, num_floors)
+    }
+    sim.add_passenger(start, dest)
+    print("  P" + (i + 1).to_string() + ": " + start.to_string() + " -> " + dest.to_string())
+    i = i + 1
+}
+print("")
+
+print("Waiting: " + sim.waiting_count().to_string())
+print("Running simulation...")
+sim.run_until_complete()
+print("")
+
+sim.report()
+
+# === Demo 2: Larger batch ===
+print("--- Demo 2: Larger Batch (15 passengers) ---")
+print("")
+
+sim = Simulation.new(num_floors, 3)
+
+print("Spawning 15 random passengers...")
+i = 0
+while i < 15 {
+    start = rand.randint(1, num_floors)
+    dest = rand.randint(1, num_floors)
+    while dest == start {
+        dest = rand.randint(1, num_floors)
+    }
+    sim.add_passenger(start, dest)
+    i = i + 1
+}
+print("  (spawned " + i.to_string() + " passengers)")
+print("")
+
+print("Waiting: " + sim.waiting_count().to_string())
+print("Running simulation...")
+sim.run_until_complete()
+print("")
+
+sim.report()
+
+# === Demo 3: Rush hour simulation ===
+print("--- Demo 3: Rush Hour (Ground floor exodus) ---")
+print("")
+
+sim = Simulation.new(num_floors, 3)
+
+print("Morning rush: 10 people at ground floor going up...")
+i = 0
+while i < 10 {
+    dest = rand.randint(2, 10)
+    sim.add_passenger(1, dest)
+    i = i + 1
+}
+print("")
+
+print("Waiting: " + sim.waiting_count().to_string())
+print("Running simulation...")
+sim.run_until_complete()
+print("")
+
+sim.report()
+
+# === Demo 4: Lunch rush ===
+print("--- Demo 4: Lunch Rush (Everyone to ground floor) ---")
+print("")
+
+sim = Simulation.new(num_floors, 3)
+
+print("Lunch rush: 10 people going to ground floor...")
+i = 0
+while i < 10 {
+    start = rand.randint(2, 10)
+    sim.add_passenger(start, 1)
+    i = i + 1
+}
+print("")
+
+print("Waiting: " + sim.waiting_count().to_string())
+print("Running simulation...")
+sim.run_until_complete()
+print("")
+
+sim.report()
+
+# === Demo 5: Continuous simulation ===
+print("--- Demo 5: Continuous Simulation (60 ticks) ---")
+print("")
+
+sim = Simulation.new(num_floors, 3)
+
+print("Running 60 ticks with passengers spawning every 10 ticks...")
+print("")
+
+tick = 0
+while tick < 60 {
+    # Spawn a passenger every 10 ticks
+    if tick % 10 == 0 {
+        start = rand.randint(1, num_floors)
+        dest = rand.randint(1, num_floors)
+        while dest == start {
+            dest = rand.randint(1, num_floors)
+        }
+        sim.add_passenger(start, dest)
+        print("  Tick " + tick.to_string() + ": Spawned P(" + start.to_string() + " -> " + dest.to_string() + ")")
+    }
+
+    sim.tick()
+    tick = tick + 1
+}
+print("")
+
+# Run until complete
+print("Running remaining passengers to completion...")
+sim.run_until_complete()
+print("")
+
+sim.report()
+
+print("=== Demo Complete ===")
+print("")
+print("The simulation demonstrates:")
+print("1. Random passenger generation")
+print("2. Automatic elevator dispatch")
+print("3. Boarding and arrival detection")
+print("4. Performance metrics tracking")
+print("5. Different traffic patterns (rush hour, lunch, continuous)")

@@ -1,0 +1,202 @@
+# Multi-Elevator Simulator - Demo
+#
+# Demonstrates: Multiple elevators with intelligent dispatch
+# Run: graphoid samples/06-projects/elevator/multi_main.gr
+
+load "building.gr"
+load "panel.gr"
+
+print("=== Multi-Elevator Simulator ===")
+print("A building with multiple elevators demonstrating CLG composition")
+print("")
+
+# Create a 10-floor building with 3 elevators
+building = Building.new(10, 3)
+
+print("--- Demo 1: Building Setup ---")
+print("")
+building.status()
+print("")
+
+# === Demo 2: Simple Dispatch ===
+print("--- Demo 2: Intelligent Dispatch ---")
+print("")
+
+print("All elevators start at floor 1")
+print("Call from floor 5 (going up)...")
+building.call(5, "up")
+print("")
+
+print("Running elevators...")
+building.run()
+print("")
+
+building.status()
+print("")
+
+# === Demo 3: Multiple Simultaneous Calls ===
+print("--- Demo 3: Multiple Simultaneous Calls ---")
+print("")
+
+print("Calls from floors 3, 7, and 9...")
+building.call(3, "up")
+building.call(7, "down")
+building.call(9, "down")
+print("")
+
+print("Running elevators...")
+building.run()
+print("")
+
+building.status()
+print("")
+
+# === Demo 4: Dispatch Algorithm in Action ===
+print("--- Demo 4: Dispatch Prefers Nearby Elevators ---")
+print("")
+
+# Reset - move elevators to different floors
+print("Setting up: Moving elevators to floors 2, 5, and 8...")
+building.cabin_call(1, 2)
+building.cabin_call(2, 5)
+building.cabin_call(3, 8)
+building.run()
+print("")
+
+building.status()
+print("")
+
+print("Call from floor 6 (going up)...")
+print("Dispatch should choose Elevator 2 (at floor 5, closest)")
+building.call(6, "up")
+print("")
+
+print("Call from floor 9 (going down)...")
+print("Dispatch should choose Elevator 3 (at floor 8, closest)")
+building.call(9, "down")
+print("")
+
+building.status()
+print("")
+
+print("Running elevators...")
+building.run()
+print("")
+
+building.status()
+print("")
+
+# === Demo 5: Button Panel ===
+print("--- Demo 5: Button Panel Interface ---")
+print("")
+
+# Create fresh building
+building = Building.new(10, 3)
+panel = ButtonPanel.new(building)
+
+print("Button panel created for the building")
+panel.status()
+print("")
+
+print("Pressing UP on floor 3...")
+panel.press_up(3)
+print("")
+
+print("Pressing DOWN on floor 8...")
+panel.press_down(8)
+print("")
+
+print("Pressing UP on floor 3 again (already pressed)...")
+panel.press_up(3)
+print("")
+
+panel.status()
+print("")
+
+# Note: Panel holds a copy of building (CLGs are values, not references)
+# So we need to get the modified building from the panel
+# In a real system, we'd use a different architecture (events, shared state, etc.)
+# For this demo, we'll run the panel's internal building
+print("Running elevators (via panel's internal building)...")
+panel._building.run()
+print("")
+
+print("Panel's building status:")
+panel._building.status()
+print("")
+
+# === Demo 6: Building Fire Alarm ===
+print("--- Demo 6: Building-Wide Fire Alarm ---")
+print("")
+
+building = Building.new(10, 3)
+
+print("Sending elevators to different floors...")
+building.cabin_call(1, 4)
+building.cabin_call(2, 7)
+building.cabin_call(3, 9)
+building.run()
+print("")
+
+building.status()
+print("")
+
+print("Adding pending requests...")
+building.call(5, "up")
+building.call(8, "down")
+print("")
+
+print("!!! FIRE ALARM !!!")
+building.fire_alarm()
+print("")
+
+print("All elevators returning to ground floor...")
+i = 0
+while i < 30 {
+    building.step()
+    i = i + 1
+
+    # Check if all at ground
+    all_at_ground = true
+    j = 1
+    while j <= building.num_elevators() {
+        e = building.elevator(j)
+        if e.floor() > 1 {
+            all_at_ground = false
+        }
+        j = j + 1
+    }
+    if all_at_ground {
+        break
+    }
+}
+print("")
+
+building.status()
+print("")
+
+# === Demo 7: Graph Structure ===
+print("--- Demo 7: Building is a Graph! ---")
+print("")
+
+building = Building.new(10, 4)
+
+print("Building with 4 elevators")
+print("Each elevator is a node in the building graph")
+print("")
+
+print("Building nodes (elevator IDs):")
+for eid in building._elevators {
+    e = building.get_node(eid)
+    print("  " + eid + " -> Elevator at floor " + e.floor().to_string())
+}
+print("")
+
+print("=== Demo Complete ===")
+print("")
+print("Key Takeaways:")
+print("1. Building CLG manages multiple Elevator CLGs")
+print("2. Dispatch algorithm considers distance and direction")
+print("3. Button panel tracks hall calls as graph nodes")
+print("4. Fire alarm affects all elevators simultaneously")
+print("5. Everything composes: Building > Elevator > Queue/CallBox")

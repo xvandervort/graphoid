@@ -1,0 +1,309 @@
+# Elevator - Main Controller CLG
+#
+# Demonstrates: CLG composition, multiple imports, complex state machine
+# Composes: Queue (for floor requests), CallBox (emergency phone)
+#
+# Normal states: idle, moving_up, moving_down, doors_opening, doors_open, doors_closing
+# Emergency states: emergency_stop, fire_mode, door_obstruction
+
+load "queue.gr"
+load "call_box.gr"
+
+graph Elevator {
+    _floor: 1
+    _state: "idle"
+    _direction: "none"
+    _num_floors: 10
+    _obstruction_count: 0
+    _request_queue: none
+    _phone: none
+
+    fn new(floors) {
+        instance = self.clone()
+        instance._num_floors = floors
+        instance._floor = 1
+        instance._state = "idle"
+        instance._direction = "none"
+        instance._obstruction_count = 0
+
+        # Compose with other CLGs
+        instance._request_queue = Queue.new()
+        instance._phone = CallBox.new()
+
+        # Build state machine structure as graph
+        # Normal states
+        instance.add_node("idle", "normal")
+        instance.add_node("moving_up", "normal")
+        instance.add_node("moving_down", "normal")
+        instance.add_node("doors_opening", "normal")
+        instance.add_node("doors_open", "normal")
+        instance.add_node("doors_closing", "normal")
+
+        # Emergency states
+        instance.add_node("emergency_stop", "emergency")
+        instance.add_node("fire_mode", "emergency")
+        instance.add_node("door_obstruction", "emergency")
+
+        # Normal transitions
+        instance.add_edge("idle", "moving_up", "go_up")
+        instance.add_edge("idle", "moving_down", "go_down")
+        instance.add_edge("idle", "doors_opening", "open_doors")
+        instance.add_edge("moving_up", "doors_opening", "arrive")
+        instance.add_edge("moving_down", "doors_opening", "arrive")
+        instance.add_edge("doors_opening", "doors_open", "opened")
+        instance.add_edge("doors_open", "doors_closing", "close_doors")
+        instance.add_edge("doors_closing", "idle", "closed")
+        instance.add_edge("doors_closing", "door_obstruction", "obstruction")
+
+        # Emergency transitions
+        instance.add_edge("idle", "emergency_stop", "emergency")
+        instance.add_edge("moving_up", "emergency_stop", "emergency")
+        instance.add_edge("moving_down", "emergency_stop", "emergency")
+        instance.add_edge("doors_open", "emergency_stop", "emergency")
+
+        instance.add_edge("idle", "fire_mode", "fire_alarm")
+        instance.add_edge("moving_up", "fire_mode", "fire_alarm")
+        instance.add_edge("moving_down", "fire_mode", "fire_alarm")
+        instance.add_edge("doors_open", "fire_mode", "fire_alarm")
+
+        # Recovery transitions
+        instance.add_edge("emergency_stop", "idle", "reset")
+        instance.add_edge("door_obstruction", "doors_opening", "clear")
+        instance.add_edge("door_obstruction", "emergency_stop", "max_retries")
+
+        return instance
+    }
+
+    fn floor() {
+        return _floor
+    }
+
+    fn state() {
+        return _state
+    }
+
+    fn pending_requests() {
+        return _request_queue.length()
+    }
+
+    fn is_idle() {
+        return _state == "idle" && _request_queue.length() == 0
+    }
+
+    fn is_emergency() {
+        state_type = self.get_node(_state)
+        return state_type == "emergency"
+    }
+
+    fn request(target_floor) {
+        if is_emergency() {
+            print("  Cannot accept requests during emergency")
+            return self
+        }
+
+        if target_floor < 1 || target_floor > _num_floors {
+            print("  Invalid floor: " + target_floor.to_string())
+            return self
+        }
+
+        if _request_queue.contains(target_floor) == false {
+            _request_queue.enqueue(target_floor)
+            print("  Request queued: floor " + target_floor.to_string())
+        }
+
+        return self
+    }
+
+    fn step() {
+        if is_emergency() {
+            _handle_emergency_step()
+            return self
+        }
+
+        if _state == "idle" {
+            if _request_queue.length() == 0 {
+                return self
+            }
+
+            next_floor = _choose_next_floor()
+
+            if next_floor > _floor {
+                _direction = "up"
+                _state = "moving_up"
+                print("  Moving up...")
+            } else if next_floor < _floor {
+                _direction = "down"
+                _state = "moving_down"
+                print("  Moving down...")
+            } else {
+                _state = "doors_opening"
+                print("  Opening doors at floor " + _floor.to_string())
+            }
+
+        } else if _state == "moving_up" {
+            _floor = _floor + 1
+            print("  Floor " + _floor.to_string())
+
+            if _should_stop() {
+                _state = "doors_opening"
+                print("  Stopping - opening doors")
+            }
+
+        } else if _state == "moving_down" {
+            _floor = _floor - 1
+            print("  Floor " + _floor.to_string())
+
+            if _should_stop() {
+                _state = "doors_opening"
+                print("  Stopping - opening doors")
+            }
+
+        } else if _state == "doors_opening" {
+            _state = "doors_open"
+            _remove_current_floor_request()
+            print("  Doors open")
+
+        } else if _state == "doors_open" {
+            _state = "doors_closing"
+            print("  Doors closing...")
+
+        } else if _state == "doors_closing" {
+            _state = "idle"
+            _obstruction_count = 0
+            print("  Doors closed")
+
+        } else if _state == "door_obstruction" {
+            _obstruction_count = _obstruction_count + 1
+            if _obstruction_count >= 3 {
+                _state = "emergency_stop"
+                print("  Max retries - emergency stop!")
+                _phone.pick_up()
+            } else {
+                _state = "doors_opening"
+                print("  Obstruction cleared, retry " + _obstruction_count.to_string())
+            }
+        }
+
+        return self
+    }
+
+    fn trigger_emergency() {
+        print("  !!! EMERGENCY STOP !!!")
+        _state = "emergency_stop"
+        _phone.pick_up()
+        return self
+    }
+
+    fn trigger_fire_alarm() {
+        print("  !!! FIRE ALARM - RETURNING TO GROUND FLOOR !!!")
+        _state = "fire_mode"
+        # Clear all requests
+        _request_queue.clear()
+        return self
+    }
+
+    fn trigger_obstruction() {
+        if _state == "doors_closing" {
+            print("  Obstruction detected!")
+            _state = "door_obstruction"
+        }
+        return self
+    }
+
+    fn reset() {
+        if _state == "emergency_stop" {
+            print("  System reset")
+            _state = "idle"
+            _phone.hang_up()
+        }
+        return self
+    }
+
+    fn run() {
+        step_count = 0
+        max_steps = 100
+
+        while is_idle() == false && is_emergency() == false && step_count < max_steps {
+            step()
+            step_count = step_count + 1
+        }
+
+        return self
+    }
+
+    fn status() {
+        emergency_flag = ""
+        if is_emergency() {
+            emergency_flag = " [EMERGENCY]"
+        }
+
+        msg = "  Floor: " + _floor.to_string() + " | State: " + _state + " | Queue: " + _request_queue.to_list().to_string() + emergency_flag
+        print(msg)
+    }
+
+    fn get_phone() {
+        return _phone
+    }
+
+    fn get_queue() {
+        return _request_queue
+    }
+
+    # Private helpers
+    priv fn choose_next_floor() {
+        if _request_queue.length() == 0 {
+            return _floor
+        }
+
+        queue_list = _request_queue.to_list()
+
+        # SCAN algorithm: continue in current direction if requests exist
+        if _direction == "up" {
+            for f in queue_list {
+                if f > _floor {
+                    return f
+                }
+            }
+        } else if _direction == "down" {
+            for f in queue_list {
+                if f < _floor {
+                    return f
+                }
+            }
+        }
+
+        # No requests in current direction, pick first
+        return queue_list[0]
+    }
+
+    priv fn should_stop() {
+        return _request_queue.contains(_floor)
+    }
+
+    priv fn remove_current_floor_request() {
+        # Rebuild queue without current floor
+        temp_list = []
+        while _request_queue.length() > 0 {
+            f = _request_queue.dequeue()
+            if f != _floor {
+                temp_list = temp_list.append(f)
+            }
+        }
+        for f in temp_list {
+            _request_queue.enqueue(f)
+        }
+    }
+
+    priv fn handle_emergency_step() {
+        if _state == "fire_mode" {
+            if _floor > 1 {
+                _floor = _floor - 1
+                print("  [FIRE MODE] Descending... floor " + _floor.to_string())
+            } else {
+                print("  [FIRE MODE] Ground floor reached. Doors open. Elevator disabled.")
+            }
+        } else if _state == "emergency_stop" {
+            print("  [EMERGENCY] Elevator stopped. Use 'phone' to call for help or 'reset' to restart.")
+        }
+    }
+}

@@ -1,0 +1,110 @@
+# Passenger - A virtual person using the elevator
+#
+# Demonstrates: CLG for entity modeling
+# Each passenger has: start floor, destination floor, wait time tracking
+
+graph Passenger {
+    _id: 0
+    _start_floor: 1
+    _destination: 1
+    _state: "waiting"  # waiting, riding, arrived
+    _wait_time: 0
+    _ride_time: 0
+    _elevator: none
+
+    fn new(id, start_floor, destination) {
+        instance = self.clone()
+        instance._id = id
+        instance._start_floor = start_floor
+        instance._destination = destination
+        instance._state = "waiting"
+        instance._wait_time = 0
+        instance._ride_time = 0
+        instance._elevator = none
+        return instance
+    }
+
+    fn id() {
+        return _id
+    }
+
+    fn start_floor() {
+        return _start_floor
+    }
+
+    fn destination() {
+        return _destination
+    }
+
+    fn state() {
+        return _state
+    }
+
+    fn wait_time() {
+        return _wait_time
+    }
+
+    fn ride_time() {
+        return _ride_time
+    }
+
+    fn total_time() {
+        return _wait_time + _ride_time
+    }
+
+    fn direction() {
+        if _destination > _start_floor {
+            return "up"
+        }
+        return "down"
+    }
+
+    fn is_waiting() {
+        return _state == "waiting"
+    }
+
+    fn is_riding() {
+        return _state == "riding"
+    }
+
+    fn has_arrived() {
+        return _state == "arrived"
+    }
+
+    # Called each tick while waiting
+    fn tick_wait() {
+        if _state == "waiting" {
+            _wait_time = _wait_time + 1
+        }
+        return self
+    }
+
+    # Called each tick while riding
+    fn tick_ride() {
+        if _state == "riding" {
+            _ride_time = _ride_time + 1
+        }
+        return self
+    }
+
+    # Passenger boards an elevator
+    fn board(elevator_num) {
+        if _state == "waiting" {
+            _state = "riding"
+            _elevator = elevator_num
+        }
+        return self
+    }
+
+    # Passenger arrives at destination
+    fn arrive() {
+        if _state == "riding" {
+            _state = "arrived"
+        }
+        return self
+    }
+
+    fn to_string() {
+        return "P" + _id.to_string() + "(" + _start_floor.to_string() + "->" + _destination.to_string() + ")"
+    }
+}

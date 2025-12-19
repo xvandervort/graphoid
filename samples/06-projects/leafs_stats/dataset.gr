@@ -6,13 +6,11 @@
 # - Method chaining
 #
 # Usage:
-#   import "dataset"
+#   load "dataset.gr"
 #   ds = DataSet.new([1, 2, 3, 4, 5])
 #   print(ds.mean())      # 3.0
 #   print(ds.std_dev())   # 1.414...
 #   print(ds.summary())   # Full statistics
-
-module dataset_module alias dataset
 
 graph DataSet {
     data: []

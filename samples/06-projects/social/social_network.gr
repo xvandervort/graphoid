@@ -1,0 +1,385 @@
+# Social Network - Graph-Based Social Network Analysis
+#
+# Demonstrates:
+# - CLG for network modeling (users as nodes, relationships as edges)
+# - Graph traversal methods (shortest_path, nodes_within)
+# - Network analysis (mutual friends, degrees of separation)
+# - "Everything is a graph" - social networks ARE graphs
+#
+# Usage:
+#   load "social_network.gr"
+#   network = SocialNetwork.new("My Network")
+#   network.add_user("alice", {"role": "engineer"})
+#   network.add_friendship("alice", "bob")
+
+graph SocialNetwork {
+    _name: "Social Network"
+
+    fn new(network_name) {
+        instance = self.clone()
+        instance._name = network_name
+        return instance
+    }
+
+    # === Property Accessors ===
+
+    fn name() {
+        return _name
+    }
+
+    fn user_count() {
+        # Don't count internal property nodes (like _name)
+        count = 0
+        for node in self.nodes() {
+            if _is_user_node(node) {
+                count = count + 1
+            }
+        }
+        return count
+    }
+
+    priv fn _is_user_node(node_id) {
+        # Property nodes start with underscore
+        if node_id.starts_with("_") {
+            return false
+        }
+        return true
+    }
+
+    fn connection_count() {
+        # Count unique friendships (edges are doubled for bidirectional)
+        friend_edges = 0
+        for edge in self.edges() {
+            if edge[2] == "friend" {
+                friend_edges = friend_edges + 1
+            }
+        }
+        return friend_edges / 2
+    }
+
+    fn follow_count() {
+        count = 0
+        for edge in self.edges() {
+            if edge[2] == "follows" {
+                count = count + 1
+            }
+        }
+        return count
+    }
+
+    # === User Management ===
+
+    fn add_user(username, profile) {
+        # Users are nodes in the social graph
+        self.add_node(username, profile)
+        return self
+    }
+
+    fn get_user(username) {
+        return self.get_node(username)
+    }
+
+    fn remove_user(username) {
+        self.remove_node(username)
+        return self
+    }
+
+    # === Relationship Management ===
+
+    fn add_friendship(user1, user2) {
+        # Friendships are bidirectional edges
+        self.add_edge(user1, user2, "friend")
+        self.add_edge(user2, user1, "friend")
+        return self
+    }
+
+    fn add_follow(follower, followed) {
+        # Follows are unidirectional edges
+        self.add_edge(follower, followed, "follows")
+        return self
+    }
+
+    fn remove_friendship(user1, user2) {
+        self.remove_edge(user1, user2, "friend")
+        self.remove_edge(user2, user1, "friend")
+        return self
+    }
+
+    # === Friend Analysis ===
+
+    fn friends_of(username) {
+        # Get all friends of a user
+        result = []
+        for edge in self.edges() {
+            if edge[0] == username && edge[2] == "friend" {
+                result = result.append(edge[1])
+            }
+        }
+        return result
+    }
+
+    fn followers_of(username) {
+        # Get all followers of a user
+        result = []
+        for edge in self.edges() {
+            if edge[1] == username && edge[2] == "follows" {
+                result = result.append(edge[0])
+            }
+        }
+        return result
+    }
+
+    fn following(username) {
+        # Get all users this person follows
+        result = []
+        for edge in self.edges() {
+            if edge[0] == username && edge[2] == "follows" {
+                result = result.append(edge[1])
+            }
+        }
+        return result
+    }
+
+    fn friend_count(username) {
+        return friends_of(username).length()
+    }
+
+    fn mutual_friends(user1, user2) {
+        # Find friends common to both users
+        friends1 = friends_of(user1)
+        friends2 = friends_of(user2)
+
+        result = []
+        for f1 in friends1 {
+            i = 0
+            while i < friends2.length() {
+                if f1 == friends2[i] {
+                    result = result.append(f1)
+                }
+                i = i + 1
+            }
+        }
+        return result
+    }
+
+    fn are_friends(user1, user2) {
+        friends = friends_of(user1)
+        i = 0
+        while i < friends.length() {
+            if friends[i] == user2 {
+                return true
+            }
+            i = i + 1
+        }
+        return false
+    }
+
+    # === Network Analysis ===
+
+    fn degrees_of_separation(user1, user2) {
+        # BFS to find shortest path through friend edges
+        if user1 == user2 {
+            return 0
+        }
+
+        # BFS queue: each entry is [node, distance]
+        queue = [[user1, 0]]
+        visited = [user1]
+
+        while queue.length() > 0 {
+            current = queue[0]
+            queue = queue.slice(1, queue.length())
+
+            current_node = current[0]
+            current_dist = current[1]
+
+            # Get friends of current node
+            friends = friends_of(current_node)
+            for friend in friends {
+                if friend == user2 {
+                    return current_dist + 1
+                }
+
+                # Check if already visited
+                already_visited = false
+                for v in visited {
+                    if v == friend {
+                        already_visited = true
+                    }
+                }
+
+                if already_visited == false {
+                    visited = visited.append(friend)
+                    queue = queue.append([friend, current_dist + 1])
+                }
+            }
+        }
+
+        return -1  # Not connected
+    }
+
+    fn friends_of_friends(username) {
+        # Get second-degree connections (not already friends)
+        direct_friends = friends_of(username)
+        result = []
+
+        for friend in direct_friends {
+            their_friends = friends_of(friend)
+            for fof in their_friends {
+                # Skip if it's the original user or already a direct friend
+                if fof != username {
+                    is_direct = false
+                    i = 0
+                    while i < direct_friends.length() {
+                        if direct_friends[i] == fof {
+                            is_direct = true
+                        }
+                        i = i + 1
+                    }
+
+                    if is_direct == false {
+                        # Check not already in result
+                        already_added = false
+                        j = 0
+                        while j < result.length() {
+                            if result[j] == fof {
+                                already_added = true
+                            }
+                            j = j + 1
+                        }
+                        if already_added == false {
+                            result = result.append(fof)
+                        }
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    fn most_connected() {
+        # Find the user with the most friends
+        max_friends = 0
+        top_user = none
+
+        for node in self.nodes() {
+            if _is_user_node(node) {
+                count = friend_count(node)
+                if count > max_friends {
+                    max_friends = count
+                    top_user = node
+                }
+            }
+        }
+
+        return {"user": top_user, "friends": max_friends}
+    }
+
+    fn least_connected() {
+        # Find the user with the fewest friends
+        min_friends = -1
+        bottom_user = none
+
+        for node in self.nodes() {
+            if _is_user_node(node) {
+                count = friend_count(node)
+                if min_friends == -1 || count < min_friends {
+                    min_friends = count
+                    bottom_user = node
+                }
+            }
+        }
+
+        return {"user": bottom_user, "friends": min_friends}
+    }
+
+    fn average_connections() {
+        # Calculate average number of friends per user
+        total_users = user_count()
+        if total_users == 0 {
+            return 0
+        }
+        total = 0
+        for node in self.nodes() {
+            if _is_user_node(node) {
+                total = total + friend_count(node)
+            }
+        }
+        return total / total_users
+    }
+
+    # === Friend Suggestions ===
+
+    fn suggest_friends(username) {
+        # Suggest friends based on mutual connections
+        # Returns list of {user, mutual_count} sorted by mutual count
+        fof = friends_of_friends(username)
+        suggestions = []
+
+        for potential in fof {
+            mutual = mutual_friends(username, potential)
+            suggestions = suggestions.append({
+                "user": potential,
+                "mutual_count": mutual.length(),
+                "mutual_friends": mutual
+            })
+        }
+
+        # Sort by mutual count (simple bubble sort)
+        i = 0
+        while i < suggestions.length() {
+            j = i + 1
+            while j < suggestions.length() {
+                if suggestions[j]["mutual_count"] > suggestions[i]["mutual_count"] {
+                    temp = suggestions[i]
+                    suggestions = suggestions.set(i, suggestions[j])
+                    suggestions = suggestions.set(j, temp)
+                }
+                j = j + 1
+            }
+            i = i + 1
+        }
+
+        return suggestions
+    }
+
+    # === Reporting ===
+
+    fn report() {
+        print("=== " + _name + " Report ===")
+        print("")
+        print("Network Size:")
+        print("  Users: " + user_count().to_string())
+        print("  Friendships: " + connection_count().to_string())
+        print("  Follows: " + follow_count().to_string())
+        print("")
+
+        most = most_connected()
+        least = least_connected()
+        print("Connectivity:")
+        print("  Most connected: " + most["user"] + " (" + most["friends"].to_string() + " friends)")
+        print("  Least connected: " + least["user"] + " (" + least["friends"].to_string() + " friends)")
+        print("  Average connections: " + average_connections().to_string())
+        print("")
+    }
+
+    fn user_report(username) {
+        profile = get_user(username)
+        friends = friends_of(username)
+        user_followers = followers_of(username)
+        user_following = following(username)
+
+        print("=== User: " + username + " ===")
+        if profile != none {
+            print("Profile: " + profile.to_string())
+        }
+        print("Friends (" + friends.length().to_string() + "): " + friends.to_string())
+        if user_followers.length() > 0 {
+            print("Followers (" + user_followers.length().to_string() + "): " + user_followers.to_string())
+        }
+        if user_following.length() > 0 {
+            print("Following (" + user_following.length().to_string() + "): " + user_following.to_string())
+        }
+        print("")
+    }
+}

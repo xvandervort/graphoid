@@ -1,0 +1,214 @@
+# Interactive Elevator Controller
+#
+# A REPL-style interface to control multiple elevators in real-time.
+# Run: graphoid samples/06-projects/elevator/interactive.gr
+#
+# Commands:
+#   call <floor> <up|down>  - Hall call (press button on floor)
+#   go <elevator> <floor>   - Cabin call (inside elevator, go to floor)
+#   step                    - Advance one time tick
+#   run                     - Run until all idle
+#   status                  - Show all elevator status
+#   fire                    - Trigger building fire alarm
+#   reset                   - Reset all elevators from emergency
+#   help                    - Show commands
+#   quit/exit               - Exit
+
+load "building.gr"
+
+import "os"
+
+# Parse a string to a number (simple implementation)
+fn parse_int(s) {
+    result = 0
+    i = 0
+    size = s.size()
+
+    while i < size {
+        c = s.char_code(i)  # Get ASCII code at position i
+        # ASCII '0' is 48, '9' is 57
+        if c >= 48 && c <= 57 {
+            digit = c - 48
+            result = result * 10 + digit
+        }
+        i = i + 1
+    }
+
+    return result
+}
+
+# Split string by spaces (simple tokenizer)
+fn tokenize(s) {
+    tokens = []
+    current = ""
+    i = 0
+    size = s.size()
+
+    while i < size {
+        c = s[i]
+        if c == " " || c == "\t" {
+            if current != "" {
+                tokens = tokens.append(current)
+                current = ""
+            }
+        } else {
+            current = current + c
+        }
+        i = i + 1
+    }
+
+    if current != "" {
+        tokens = tokens.append(current)
+    }
+
+    return tokens
+}
+
+fn print_help() {
+    print("")
+    print("Commands:")
+    print("  call <floor> <up|down>  - Press hall button on a floor")
+    print("  go <elevator> <floor>   - From inside elevator, select floor")
+    print("  step [n]                - Advance n time ticks (default 1)")
+    print("  run                     - Run until all elevators idle")
+    print("  status                  - Show all elevator status")
+    print("  fire                    - Trigger building fire alarm")
+    print("  reset                   - Reset all elevators from emergency")
+    print("  help                    - Show this help")
+    print("  quit / exit             - Exit the controller")
+    print("")
+}
+
+fn main() {
+    print("=== Interactive Elevator Controller ===")
+    print("")
+
+    # Configuration
+    num_floors = 10
+    num_elevators = 3
+
+    print("Building: " + num_floors.to_string() + " floors, " + num_elevators.to_string() + " elevators")
+    print("Type 'help' for commands, 'quit' to exit")
+    print("")
+
+    # Create building
+    building = Building.new(num_floors, num_elevators)
+    building.status()
+    print("")
+
+    # Main loop
+    running = true
+    while running {
+        line = os.input("> ")
+
+        # Handle empty input
+        if line == "" {
+            continue
+        }
+
+        tokens = tokenize(line)
+
+        if tokens.length() == 0 {
+            continue
+        }
+
+        cmd = tokens[0].lower()
+
+        if cmd == "quit" || cmd == "exit" || cmd == "q" {
+            print("Goodbye!")
+            running = false
+
+        } else if cmd == "help" || cmd == "h" || cmd == "?" {
+            print_help()
+
+        } else if cmd == "status" || cmd == "s" {
+            print("")
+            building.status()
+            print("")
+
+        } else if cmd == "step" {
+            steps = 1
+            if tokens.length() > 1 {
+                steps = parse_int(tokens[1])
+                if steps < 1 {
+                    steps = 1
+                }
+            }
+
+            print("")
+            i = 0
+            while i < steps {
+                building.step()
+                i = i + 1
+            }
+            print("")
+
+        } else if cmd == "run" || cmd == "r" {
+            print("")
+            building.run()
+            print("")
+            building.status()
+            print("")
+
+        } else if cmd == "call" || cmd == "c" {
+            if tokens.length() < 3 {
+                print("Usage: call <floor> <up|down>")
+                print("Example: call 5 up")
+            } else {
+                floor = parse_int(tokens[1])
+                direction = tokens[2].lower()
+
+                if floor < 1 || floor > num_floors {
+                    print("Invalid floor: " + tokens[1] + " (must be 1-" + num_floors.to_string() + ")")
+                } else if direction != "up" && direction != "down" && direction != "u" && direction != "d" {
+                    print("Invalid direction: " + tokens[2] + " (use 'up' or 'down')")
+                } else {
+                    if direction == "u" {
+                        direction = "up"
+                    } else if direction == "d" {
+                        direction = "down"
+                    }
+                    print("")
+                    building.call(floor, direction)
+                    print("")
+                }
+            }
+
+        } else if cmd == "go" || cmd == "g" {
+            if tokens.length() < 3 {
+                print("Usage: go <elevator> <floor>")
+                print("Example: go 1 8")
+            } else {
+                elevator_num = parse_int(tokens[1])
+                floor = parse_int(tokens[2])
+
+                if elevator_num < 1 || elevator_num > num_elevators {
+                    print("Invalid elevator: " + tokens[1] + " (must be 1-" + num_elevators.to_string() + ")")
+                } else if floor < 1 || floor > num_floors {
+                    print("Invalid floor: " + tokens[2] + " (must be 1-" + num_floors.to_string() + ")")
+                } else {
+                    print("")
+                    building.cabin_call(elevator_num, floor)
+                    print("")
+                }
+            }
+
+        } else if cmd == "fire" {
+            print("")
+            building.fire_alarm()
+            print("")
+
+        } else if cmd == "reset" {
+            print("")
+            building.reset_all()
+            building.status()
+            print("")
+
+        } else {
+            print("Unknown command: " + cmd)
+            print("Type 'help' for available commands")
+        }
+    }
+}
+
+main()

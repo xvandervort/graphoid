@@ -1,0 +1,274 @@
+# Building - Multi-Elevator Controller CLG
+#
+# Demonstrates: CLG composition at scale - Building contains multiple Elevators
+# Each elevator is a node in the building graph, dispatch uses graph algorithms
+#
+# Dispatch Algorithm (SCAN-aware):
+#   1. Prefer idle elevators closest to the call
+#   2. Prefer elevators moving toward the call floor
+#   3. Avoid elevators in emergency state
+#   4. Load balance when multiple elevators are equidistant
+
+load "elevator.gr"
+
+graph Building {
+    _num_floors: 10
+    _num_elevators: 1
+    _elevators: []
+
+    fn new(floors, elevator_count) {
+        instance = self.clone()
+        instance._num_floors = floors
+
+        # Clamp elevator count between 1 and 4
+        if elevator_count < 1 {
+            elevator_count = 1
+        }
+        if elevator_count > 4 {
+            elevator_count = 4
+        }
+        instance._num_elevators = elevator_count
+
+        # Create elevators and store as graph nodes
+        instance._elevators = []
+        i = 0
+        while i < elevator_count {
+            elevator_id = "elevator_" + (i + 1).to_string()
+            elevator = Elevator.new(floors)
+            instance.add_node(elevator_id, elevator)
+            instance._elevators = instance._elevators.append(elevator_id)
+            i = i + 1
+        }
+
+        return instance
+    }
+
+    fn num_elevators() {
+        return _num_elevators
+    }
+
+    fn num_floors() {
+        return _num_floors
+    }
+
+    # Get a specific elevator by number (1-indexed)
+    fn elevator(n) {
+        if n < 1 || n > _num_elevators {
+            print("  Invalid elevator number: " + n.to_string())
+            return none
+        }
+        elevator_id = "elevator_" + n.to_string()
+        return self.get_node(elevator_id)
+    }
+
+    # Hall call - request an elevator to a floor (going up or down)
+    # This is what happens when someone presses the up/down button on a floor
+    fn call(floor, direction) {
+        if floor < 1 || floor > _num_floors {
+            print("  Invalid floor: " + floor.to_string())
+            return self
+        }
+
+        # Find best elevator using dispatch algorithm
+        best_elevator_id = _dispatch(floor, direction)
+
+        if best_elevator_id == none {
+            print("  No elevator available for floor " + floor.to_string())
+            return self
+        }
+
+        # Get elevator number for display
+        elevator_num = best_elevator_id.replace("elevator_", "")
+        print("  Dispatching Elevator " + elevator_num + " to floor " + floor.to_string())
+
+        # Send request to chosen elevator
+        elevator = self.get_node(best_elevator_id)
+        elevator.request(floor)
+
+        # Update the node with modified elevator
+        self.add_node(best_elevator_id, elevator)
+
+        return self
+    }
+
+    # Cabin call - request from inside an elevator to go to a floor
+    fn cabin_call(elevator_num, floor) {
+        if elevator_num < 1 || elevator_num > _num_elevators {
+            print("  Invalid elevator number: " + elevator_num.to_string())
+            return self
+        }
+
+        elevator_id = "elevator_" + elevator_num.to_string()
+        elevator = self.get_node(elevator_id)
+        elevator.request(floor)
+        self.add_node(elevator_id, elevator)
+
+        return self
+    }
+
+    # Step all elevators one tick
+    fn step() {
+        for elevator_id in _elevators {
+            elevator = self.get_node(elevator_id)
+            elevator_num = elevator_id.replace("elevator_", "")
+
+            # Only print if elevator is doing something
+            if elevator.is_idle() == false || elevator.is_emergency() {
+                print("  [Elevator " + elevator_num + "]")
+                elevator.step()
+                self.add_node(elevator_id, elevator)
+            }
+        }
+        return self
+    }
+
+    # Run all elevators until idle
+    fn run() {
+        step_count = 0
+        max_steps = 200
+
+        while _any_active() && step_count < max_steps {
+            step()
+            step_count = step_count + 1
+        }
+
+        return self
+    }
+
+    # Status of all elevators
+    fn status() {
+        print("  Building Status (" + _num_elevators.to_string() + " elevators, " + _num_floors.to_string() + " floors)")
+        print("  " + string.generate("-", 50))
+
+        for elevator_id in _elevators {
+            elevator = self.get_node(elevator_id)
+            elevator_num = elevator_id.replace("elevator_", "")
+
+            floor_str = elevator.floor().to_string()
+            state_str = elevator.state()
+            queue_str = elevator.get_queue().to_list().to_string()
+
+            emergency_flag = ""
+            if elevator.is_emergency() {
+                emergency_flag = " [EMERGENCY]"
+            }
+
+            print("  Elevator " + elevator_num + ": Floor " + floor_str + " | " + state_str + " | Queue: " + queue_str + emergency_flag)
+        }
+    }
+
+    # Trigger fire alarm in entire building
+    fn fire_alarm() {
+        print("  !!! BUILDING FIRE ALARM !!!")
+        for elevator_id in _elevators {
+            elevator = self.get_node(elevator_id)
+            elevator.trigger_fire_alarm()
+            self.add_node(elevator_id, elevator)
+        }
+        return self
+    }
+
+    # Reset all elevators
+    fn reset_all() {
+        for elevator_id in _elevators {
+            elevator = self.get_node(elevator_id)
+            if elevator.is_emergency() {
+                elevator.reset()
+                self.add_node(elevator_id, elevator)
+            }
+        }
+        return self
+    }
+
+    # Private: Dispatch algorithm - find best elevator for a floor request
+    priv fn dispatch(floor, direction) {
+        best_id = none
+        best_score = 9999
+
+        for elevator_id in _elevators {
+            elevator = self.get_node(elevator_id)
+
+            # Skip elevators in emergency state
+            if elevator.is_emergency() {
+                continue
+            }
+
+            score = _calculate_score(elevator, floor, direction)
+
+            if score < best_score {
+                best_score = score
+                best_id = elevator_id
+            }
+        }
+
+        return best_id
+    }
+
+    # Private: Calculate dispatch score (lower is better)
+    priv fn calculate_score(elevator, target_floor, direction) {
+        current_floor = elevator.floor()
+        state = elevator.state()
+        distance = current_floor - target_floor
+        if distance < 0 {
+            distance = 0 - distance
+        }
+
+        # Base score is distance
+        score = distance
+
+        # Idle elevators get a bonus (lower score)
+        if elevator.is_idle() {
+            return score
+        }
+
+        # Check if elevator is moving toward the target
+        elevator_direction = "none"
+        if state == "moving_up" {
+            elevator_direction = "up"
+        } else if state == "moving_down" {
+            elevator_direction = "down"
+        }
+
+        # Elevator moving toward call in same direction - best case
+        if direction == "up" && elevator_direction == "up" && current_floor < target_floor {
+            return score  # On the way, good!
+        }
+        if direction == "down" && elevator_direction == "down" && current_floor > target_floor {
+            return score  # On the way, good!
+        }
+
+        # Elevator moving toward call but opposite direction - will pass by
+        if elevator_direction == "up" && current_floor < target_floor {
+            return score + 5  # Will get there but won't stop for down call
+        }
+        if elevator_direction == "down" && current_floor > target_floor {
+            return score + 5  # Will get there but won't stop for up call
+        }
+
+        # Elevator moving away - penalize heavily
+        if elevator_direction == "up" && current_floor > target_floor {
+            return score + 20  # Moving away upward
+        }
+        if elevator_direction == "down" && current_floor < target_floor {
+            return score + 20  # Moving away downward
+        }
+
+        # Elevator is in door operation - slight penalty
+        if state == "doors_opening" || state == "doors_open" || state == "doors_closing" {
+            return score + 3
+        }
+
+        return score + 10  # Default penalty for busy elevators
+    }
+
+    # Private: Check if any elevator is active
+    priv fn any_active() {
+        for elevator_id in _elevators {
+            elevator = self.get_node(elevator_id)
+            if elevator.is_idle() == false && elevator.is_emergency() == false {
+                return true
+            }
+        }
+        return false
+    }
+}

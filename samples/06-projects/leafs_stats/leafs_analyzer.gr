@@ -85,7 +85,7 @@ graph LeafsAnalyzer {
         for s in seasons {
             wins_list = wins_list.append(s["wins"])
         }
-        ds = dataset.DataSet.new(wins_list)
+        ds = DataSet.new(wins_list)
         return ds.summary()
     }
 
@@ -94,7 +94,7 @@ graph LeafsAnalyzer {
         for s in seasons {
             points_list = points_list.append(s["points"])
         }
-        ds = dataset.DataSet.new(points_list)
+        ds = DataSet.new(points_list)
         return ds.summary()
     }
 
@@ -103,7 +103,7 @@ graph LeafsAnalyzer {
         for s in seasons {
             gf_list = gf_list.append(s["goals_for"])
         }
-        ds = dataset.DataSet.new(gf_list)
+        ds = DataSet.new(gf_list)
         return ds.summary()
     }
 
@@ -112,7 +112,7 @@ graph LeafsAnalyzer {
         for s in seasons {
             ga_list = ga_list.append(s["goals_against"])
         }
-        ds = dataset.DataSet.new(ga_list)
+        ds = DataSet.new(ga_list)
         return ds.summary()
     }
 
@@ -121,7 +121,7 @@ graph LeafsAnalyzer {
         for s in seasons {
             fights_list = fights_list.append(s["fights"])
         }
-        ds = dataset.DataSet.new(fights_list)
+        ds = DataSet.new(fights_list)
         return ds.summary()
     }
 
