@@ -79,6 +79,44 @@ Graphoid is built on three levels of graph abstraction:
 
 ---
 
+## Common Anti-Patterns to Avoid
+
+Before writing code, review these patterns that violate Graphoid's design principles:
+
+### In Graphoid Code (.gr files)
+
+| ❌ Anti-Pattern | ✅ Correct Approach |
+|----------------|---------------------|
+| Boilerplate `new()` or `create()` methods | Use `ClassName { prop: value }` instantiation syntax |
+| Explicit getter methods like `fn name() { return name }` | Use `configure { readable: :name }` directive |
+| Prefixed property names (`_name`, `__internal`) | Properties auto-use `__properties__/` branch internally |
+| Manual iteration with index (`i = 0; while i < list.length()`) | Use `for item in list` or functional methods (`.map()`, `.filter()`) |
+| Reimplementing existing stdlib functionality | Check stdlib modules first (math, string, list, etc.) |
+| Multiple similar methods (`remove_first`, `remove_all`) | One method with parameters: `remove(item, :all)` |
+
+### In Rust Implementation
+
+| ❌ Anti-Pattern | ✅ Correct Approach |
+|----------------|---------------------|
+| Magic strings for internal nodes (`"__properties__/name"`) | Use helper methods: `Graph::property_node_id("name")` |
+| Inline `format!()` for repeated patterns | Extract to helper method for consistency |
+| Adding new syntax when existing features suffice | Check if behaviors, rules, or configure already solve it |
+| Features only tested in Rust, not accessible from .gr | Register in executor AND create .gr example file |
+| `#[cfg(test)]` modules in `src/` files | Place tests in `tests/unit/` directory |
+
+### Design Review Questions
+
+Before finalizing any feature, ask:
+1. Does this add boilerplate that syntax sugar could eliminate?
+2. Does an existing feature (configure, behaviors, rules) already handle this?
+3. Is the naming consistent with existing conventions?
+4. Can a user actually use this from a .gr file?
+5. Is there a helper method that should be extracted for reuse?
+
+Run `/design-review` to check your changes against these patterns.
+
+---
+
 ## Ultimate Goal: Self-Hosting & Zero External Dependencies
 
 **The Rust implementation is a bootstrap, not a foundation.**
