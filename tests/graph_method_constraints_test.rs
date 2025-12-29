@@ -391,22 +391,24 @@ print(g.node_count())
 
 #[test]
 fn test_clone_preserves_constraints() {
+    // Test that cloned graphs preserve constraints
+    // Note: CLG properties are stored at __properties__/name, not as regular nodes
+    // So we test with actual data nodes instead
     let code = r#"
-graph Counter {
-    count: 0
-
-    fn new(initial) {
+graph Container {
+    fn new() {
         instance = self.clone()
+        instance.add_node("data", 123)
         return instance
     }
 
     fn try_remove() {
-        self.remove_node("count")
+        self.remove_node("data")
     }
 }
-Counter.add_rule(:no_node_removals)
+Container.add_rule(:no_node_removals)
 
-c = Counter.new(0)
+c = Container.new()
 c.try_remove()
 "#;
     assert_fails_with(code, "no_node_removals");

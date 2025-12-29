@@ -2617,6 +2617,12 @@ impl Graph {
         format!("__methods__/{}", name)
     }
 
+    /// Get the full node ID for a CLG property
+    /// Properties are stored at __properties__/name to keep them separate from user data nodes
+    pub fn property_node_id(name: &str) -> String {
+        format!("__properties__/{}", name)
+    }
+
     /// Ensure the __methods__ branch node exists
     fn ensure_methods_branch(&mut self) {
         if !self.nodes.contains_key(Self::METHOD_BRANCH) {
@@ -3310,11 +3316,52 @@ impl Graph {
         self.nodes.contains_key(&static_id)
     }
 
-    /// Get all data node IDs (excluding method branch and method nodes)
-    /// Use this when you want to iterate over "real" data nodes only
+    /// Get all data node IDs (excluding internal branches)
+    /// Filters out:
+    /// - Method branch nodes (__methods__/*)
+    /// - Property branch nodes (__properties__/*)
+    /// - Internal nodes (__parent__, __self__)
+    /// Use this when you want to iterate over user-added data nodes only
     pub fn data_node_ids(&self) -> Vec<String> {
         self.nodes.keys()
-            .filter(|id| !id.starts_with("__methods__"))
+            .filter(|id| {
+                // Exclude method branch nodes
+                if id.starts_with("__methods__") {
+                    return false;
+                }
+                // Exclude property branch nodes
+                if id.starts_with("__properties__") {
+                    return false;
+                }
+                // Exclude internal nodes
+                if *id == "__parent__" || *id == "__self__" {
+                    return false;
+                }
+                true
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Get all CLG property names (from __properties__/ branch)
+    /// Returns just the property names without the __properties__/ prefix
+    /// Use this to access the class-defined properties of a CLG
+    pub fn property_node_ids(&self) -> Vec<String> {
+        self.nodes.keys()
+            .filter(|id| id.starts_with("__properties__/"))
+            .map(|id| id.strip_prefix("__properties__/").unwrap().to_string())
+            .collect()
+    }
+
+    /// Get all constrainable node IDs (for rule enforcement)
+    /// Excludes only method branch nodes, includes property nodes
+    /// Used by constraint checking to detect node additions/removals
+    pub fn constrainable_node_ids(&self) -> Vec<String> {
+        self.nodes.keys()
+            .filter(|id| {
+                // Only exclude method branch nodes and internal system nodes
+                !id.starts_with("__methods__") && *id != "__parent__" && *id != "__self__"
+            })
             .cloned()
             .collect()
     }

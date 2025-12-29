@@ -254,6 +254,12 @@ pub enum Expr {
         arms: Vec<MatchArm>,
         position: SourcePosition,
     },
+    /// CLG instantiation with optional property overrides: ClassName { prop: value }
+    Instantiate {
+        class_name: Box<Expr>,           // The class/graph to instantiate (usually Variable)
+        overrides: Vec<(String, Expr)>,  // Property overrides
+        position: SourcePosition,
+    },
 }
 
 /// A single arm in a match expression
@@ -300,6 +306,7 @@ impl Expr {
             Expr::Raise { position, .. } => position,
             Expr::Match { position, .. } => position,
             Expr::SuperMethodCall { position, .. } => position,
+            Expr::Instantiate { position, .. } => position,
         }
     }
 }

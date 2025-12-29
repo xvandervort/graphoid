@@ -6,7 +6,7 @@ use crate::execution::config::{ConfigStack, ErrorMode, PrecisionMode};
 use crate::execution::error_collector::ErrorCollector;
 use crate::execution::function_graph::FunctionGraph;
 use crate::execution::module_manager::{ModuleManager, Module, ConfigScope, ErrorMode as ModuleErrorMode, BoundsMode};
-use crate::values::{Function, Value, ValueKind, List, Hash, ErrorObject, BigNum};
+use crate::values::{Function, Value, ValueKind, List, Hash, ErrorObject, BigNum, Graph};
 use crate::graph::{RuleSpec, RuleInstance};
 use crate::lexer::Lexer;
 use crate::parser::Parser;
@@ -213,9 +213,10 @@ impl Executor {
                         // Phase 2 Implicit Self: Check if `self` is a graph with this property
                         if let Ok(self_value) = self.env.get("self") {
                             if let ValueKind::Graph(ref graph) = self_value.kind {
-                                // Check for property (data node)
-                                if graph.has_node(name) {
-                                    if let Some(prop_value) = graph.get_node(name) {
+                                // Check for property in __properties__/ branch
+                                let property_node_id = Graph::property_node_id(name);
+                                if graph.has_node(&property_node_id) {
+                                    if let Some(prop_value) = graph.get_node(&property_node_id) {
                                         return Ok(prop_value.clone());
                                     }
                                 }
@@ -296,6 +297,48 @@ impl Executor {
                 }
             }
             Expr::Match { value, arms, position } => self.eval_match(value, arms, position),
+            Expr::Instantiate { class_name, overrides, .. } => {
+                // CLG instantiation: ClassName { prop: value, ... }
+                // 1. Evaluate the class expression (usually a Variable)
+                let class_value = self.eval_expr(class_name)?;
+
+                // 2. The class must be a graph (CLG)
+                let graph = match &class_value.kind {
+                    ValueKind::Graph(g) => g.clone(),
+                    _ => {
+                        return Err(GraphoidError::type_error(
+                            "graph (CLG)",
+                            class_value.type_name(),
+                        ));
+                    }
+                };
+
+                // 3. If no overrides, just return the clone (accessing a graph already clones it)
+                if overrides.is_empty() {
+                    return Ok(class_value);
+                }
+
+                // 4. Apply property overrides
+                let mut instance = graph;
+                for (prop_name, prop_expr) in overrides {
+                    let prop_value = self.eval_expr(prop_expr)?;
+                    let property_node_id = Graph::property_node_id(&prop_name);
+
+                    // Check if property exists
+                    if !instance.has_node(&property_node_id) {
+                        return Err(GraphoidError::runtime(format!(
+                            "Property '{}' does not exist on this graph. Available properties: {:?}",
+                            prop_name,
+                            instance.property_node_ids()
+                        )));
+                    }
+
+                    // Update the property
+                    instance.add_node(property_node_id, prop_value)?;
+                }
+
+                Ok(Value::graph(instance))
+            }
         }
     }
 
@@ -366,11 +409,13 @@ impl Executor {
                         } else {
                             // Phase 2 Implicit Self: Check if `self` is a graph with this property
                             // If so, assign to self.property instead of creating a local variable
+                            // Properties are stored in __properties__/ branch
+                            let property_node_id = Graph::property_node_id(&name);
                             let assigned_to_self = if let Ok(self_value) = self.env.get("self") {
                                 if let ValueKind::Graph(mut graph) = self_value.kind {
-                                    if graph.has_node(name) {
-                                        // Update the graph property
-                                        graph.add_node(name.clone(), val.clone())?;
+                                    if graph.has_node(&property_node_id) {
+                                        // Update the graph property in __properties__/ branch
+                                        graph.add_node(property_node_id, val.clone())?;
                                         // Write the modified graph back to self
                                         self.env.set("self", Value::graph(graph))?;
                                         true
@@ -482,8 +527,16 @@ impl Executor {
                                     // The graph is already updated in the environment by call_graph_method
                                     Ok(None)
                                 } else {
-                                    // No setter - add or update the data node directly
-                                    graph.add_node(property.clone(), val)?;
+                                    // No setter - update property or data node directly
+                                    // First, check if this is a CLG property in __properties__/ branch
+                                    let property_node_id = Graph::property_node_id(&property);
+                                    if graph.has_node(&property_node_id) {
+                                        // Update CLG property
+                                        graph.add_node(property_node_id, val)?;
+                                    } else {
+                                        // Add/update as regular user data node
+                                        graph.add_node(property.clone(), val)?;
+                                    }
 
                                     // Update the graph in the environment
                                     if let Expr::Variable { name, .. } = object.as_ref() {
@@ -1279,10 +1332,13 @@ impl Executor {
             }
         }
 
-        // Add properties as data nodes
+        // Add properties under __properties__/ branch
+        // This follows the same pattern as methods stored under __methods__/ branch
+        // Properties are stored at __properties__/name, keeping them separate from user data
         for prop in properties {
             let value = self.eval_expr(&prop.value)?;
-            graph.add_node(prop.name.clone(), value)?;
+            let property_node_id = Graph::property_node_id(&prop.name);
+            graph.add_node(property_node_id, value)?;
         }
 
         // Process rule declarations (rule :name or rule :name, param)
@@ -1348,6 +1404,12 @@ impl Executor {
 
         // Get property names for semantic edge analysis
         let property_names: Vec<String> = properties.iter().map(|p| p.name.clone()).collect();
+
+        // IMPORTANT: Temporarily bind the graph to its name BEFORE creating methods.
+        // This allows methods to capture an environment that includes the class name,
+        // enabling patterns like `instance = ClassName {}` inside instance methods.
+        // The binding will be updated with the final graph (including methods) at the end.
+        self.env.define(name.to_string(), Value::graph(graph.clone()));
 
         // Add explicitly defined methods
         for method in methods {
@@ -1768,7 +1830,13 @@ impl Executor {
                     return Ok(Value::none());
                 }
 
-                // Try to get a data node with this name
+                // First, check for CLG property in __properties__/ branch
+                let property_node_id = Graph::property_node_id(&property);
+                if let Some(value) = graph.get_node(&property_node_id) {
+                    return Ok(value.clone());
+                }
+
+                // Then, try to get a user data node with this name
                 if let Some(value) = graph.get_node(property) {
                     return Ok(value.clone());
                 }
@@ -5453,6 +5521,62 @@ impl Executor {
                 let has_path = graph.has_path(from, to);
                 Ok(Value::boolean(has_path))
             }
+            "shortest_path" => {
+                // Find the shortest path between two nodes
+                // shortest_path(from, to) - unweighted BFS
+                // shortest_path(from, to, edge_type) - unweighted BFS with edge type filter
+                // shortest_path(from, to, edge_type, :weighted) - weighted Dijkstra's algorithm
+                if args.is_empty() || args.len() > 4 {
+                    return Err(GraphoidError::runtime(format!(
+                        "shortest_path() expects 2-4 arguments (from, to, [edge_type], [:weighted]), but got {}",
+                        args.len()
+                    )));
+                }
+
+                // Get from node ID
+                let from = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+
+                // Get to node ID
+                let to = match &args[1].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::type_error("string", args[1].type_name())),
+                };
+
+                // Parse optional edge_type and weighted flag
+                let mut edge_type: Option<String> = None;
+                let mut weighted = false;
+
+                for arg in args.iter().skip(2) {
+                    match &arg.kind {
+                        ValueKind::String(s) => {
+                            edge_type = Some(s.clone());
+                        }
+                        ValueKind::Symbol(s) if s == "weighted" => {
+                            weighted = true;
+                        }
+                        _ => {
+                            return Err(GraphoidError::runtime(format!(
+                                "shortest_path() optional arguments must be edge_type (string) or :weighted symbol, got {}",
+                                arg.type_name()
+                            )));
+                        }
+                    }
+                }
+
+                // Find shortest path
+                let path = graph.shortest_path(&from, &to, edge_type.as_deref(), weighted);
+
+                match path {
+                    Some(nodes) => {
+                        let list: Vec<Value> = nodes.into_iter().map(Value::string).collect();
+                        Ok(Value::list(List::from_vec(list)))
+                    }
+                    None => Ok(Value::none()),
+                }
+            }
             "distance" => {
                 // Get shortest path distance between two nodes
                 if args.len() != 2 {
@@ -7548,7 +7672,9 @@ impl Executor {
         }
 
         // Capture graph state before method execution for constraint checking
-        let before_node_ids: std::collections::HashSet<String> = graph.data_node_ids().into_iter().collect();
+        // Use constrainable_node_ids() which includes CLG properties (for accurate constraint checking)
+        // but excludes internal nodes like __methods__, __parent__, __self__
+        let before_node_ids: std::collections::HashSet<String> = graph.constrainable_node_ids().into_iter().collect();
         let before_edge_count = graph.data_edge_list().len();
 
         // Push method onto call stack
@@ -7596,6 +7722,19 @@ impl Executor {
         // Bind `self` to the graph
         self.env.define("self".to_string(), Value::graph(graph.clone()));
 
+        // IMPORTANT: For instance methods, bind the class name from the CURRENT environment.
+        // This enables patterns like `instance = ClassName {}` inside methods, where methods
+        // need access to the final class definition (with all methods attached).
+        // Without this, methods would only see the class as it was when the method was defined,
+        // which doesn't include the methods themselves.
+        if !func.is_static {
+            if let Some(type_name) = &graph.type_name {
+                if let Ok(class_value) = saved_env.get(type_name) {
+                    self.env.define(type_name.clone(), class_value);
+                }
+            }
+        }
+
         // Bind parameters to argument values
         for (param, arg) in func.parameters.iter().zip(arg_values.iter()) {
             self.env.define(param.name.clone(), arg.clone());
@@ -7632,8 +7771,8 @@ impl Executor {
 
         // Check method constraints before persisting changes
         if let Some(Value { kind: ValueKind::Graph(ref modified_graph), .. }) = modified_self {
-            // Get the after state
-            let after_node_ids: std::collections::HashSet<String> = modified_graph.data_node_ids().into_iter().collect();
+            // Get the after state (use constrainable_node_ids for accurate constraint checking)
+            let after_node_ids: std::collections::HashSet<String> = modified_graph.constrainable_node_ids().into_iter().collect();
             let after_edge_count = modified_graph.data_edge_list().len();
 
             // Check for constraint violations

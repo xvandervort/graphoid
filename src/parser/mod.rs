@@ -15,11 +15,18 @@ use crate::lexer::token::{Token, TokenType};
 pub struct Parser {
     tokens: Vec<Token>,
     current: usize,
+    /// When true, disables parsing ClassName {} as instantiation in postfix()
+    /// Used when parsing graph parent expressions where {} is the graph body
+    disable_brace_instantiation: bool,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, current: 0 }
+        Self {
+            tokens,
+            current: 0,
+            disable_brace_instantiation: false,
+        }
     }
 
     pub fn parse(&mut self) -> Result<Program> {
@@ -774,7 +781,11 @@ impl Parser {
 
         // Check for inheritance: graph Name from Parent { }
         let parent = if self.match_token(&TokenType::From) {
+            // Disable brace instantiation so `Parent { ... }` isn't parsed as
+            // an instantiation - the { } is the graph body, not instantiation overrides
+            self.disable_brace_instantiation = true;
             let parent_expr = self.expression()?;
+            self.disable_brace_instantiation = false;
             Some(Box::new(parent_expr))
         } else {
             None
@@ -2070,14 +2081,112 @@ impl Parser {
             while self.match_token(&TokenType::Newline) {}
 
             // Check if we have a postfix operator
+            // LeftBrace is only a postfix for CLG instantiation (e.g., Point { x: 10 })
             let has_postfix = self.check(&TokenType::LeftParen)
                 || self.check(&TokenType::LeftBracket)
-                || self.check(&TokenType::Dot);
+                || self.check(&TokenType::Dot)
+                || self.check(&TokenType::LeftBrace);
 
             // If we skipped newlines but don't have a postfix operator, rewind
             // This prevents suffix conditionals from crossing line boundaries
             if checkpoint != self.current && !has_postfix {
                 self.current = checkpoint;
+                break;
+            }
+
+            // CLG instantiation: ClassName { } or ClassName { prop: value, ... }
+            // Only valid after a Variable expression (the class name)
+            // Must distinguish from control structure blocks like `for x in list { ... }`
+            // Also disabled when parsing graph parent expressions (graph Child from Parent { })
+            if self.check(&TokenType::LeftBrace) && !self.disable_brace_instantiation {
+                if let Expr::Variable { .. } = &expr {
+                    // Look ahead to see if this is instantiation (empty or key:value pairs)
+                    // vs a block (statements like `i = 0`)
+                    let brace_pos = self.current;
+                    self.advance(); // consume '{'
+
+                    // Skip newlines
+                    while self.match_token(&TokenType::Newline) {}
+
+                    // Check what follows the '{'
+                    let is_instantiation = if self.check(&TokenType::RightBrace) {
+                        // Empty braces: ClassName {}
+                        true
+                    } else if let TokenType::Identifier(_) = &self.peek().token_type {
+                        // Look ahead: is the next token after identifier a ':'?
+                        // If so, this is instantiation. If '=' or other, it's a block.
+                        self.check_next(&TokenType::Colon)
+                    } else {
+                        // Not an identifier - not instantiation syntax
+                        false
+                    };
+
+                    if !is_instantiation {
+                        // Not instantiation - rewind and let block parsing handle it
+                        self.current = brace_pos;
+                        break;
+                    }
+
+                    // This IS instantiation - parse property overrides
+                    let position = expr.position().clone();
+                    let mut overrides = Vec::new();
+
+                    if !self.check(&TokenType::RightBrace) {
+                        loop {
+                            // Skip newlines before each entry
+                            while self.match_token(&TokenType::Newline) {}
+
+                            // Parse key (must be identifier)
+                            let key = if let TokenType::Identifier(id) = &self.peek().token_type {
+                                let k = id.clone();
+                                self.advance();
+                                k
+                            } else {
+                                return Err(GraphoidError::SyntaxError {
+                                    message: "Expected property name in instantiation".to_string(),
+                                    position: self.peek().position(),
+                                });
+                            };
+
+                            // Expect ':'
+                            if !self.match_token(&TokenType::Colon) {
+                                return Err(GraphoidError::SyntaxError {
+                                    message: "Expected ':' after property name".to_string(),
+                                    position: self.peek().position(),
+                                });
+                            }
+
+                            // Parse value
+                            let value = self.expression()?;
+                            overrides.push((key, value));
+
+                            // Skip newlines before comma/closing brace
+                            while self.match_token(&TokenType::Newline) {}
+
+                            if !self.match_token(&TokenType::Comma) {
+                                break;
+                            }
+                        }
+                    }
+
+                    // Skip newlines before closing brace
+                    while self.match_token(&TokenType::Newline) {}
+
+                    if !self.match_token(&TokenType::RightBrace) {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected '}' after instantiation properties".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+
+                    expr = Expr::Instantiate {
+                        class_name: Box::new(expr),
+                        overrides,
+                        position,
+                    };
+                    continue;
+                }
+                // If not a Variable, don't treat {} as instantiation - fall through
                 break;
             }
 

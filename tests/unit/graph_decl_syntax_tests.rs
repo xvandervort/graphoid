@@ -347,9 +347,10 @@ graph Point {
     let point = executor.get_variable("Point").unwrap();
     match &point.kind {
         ValueKind::Graph(g) => {
-            assert!(g.has_node("x"));
-            assert!(g.has_node("y"));
-            let x_val = g.get_node("x").unwrap();
+            // Properties are stored under __properties__/ branch
+            assert!(g.has_node("__properties__/x"), "Should have __properties__/x");
+            assert!(g.has_node("__properties__/y"), "Should have __properties__/y");
+            let x_val = g.get_node("__properties__/x").unwrap();
             match &x_val.kind {
                 ValueKind::Number(n) => assert_eq!(*n, 10.0),
                 _ => panic!("Expected number"),
@@ -1197,6 +1198,496 @@ count_value = vc.count()
 
     let count_value = executor.get_variable("count_value").unwrap();
     match &count_value.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 0.0),
+        other => panic!("Expected number 0, got {:?}", other),
+    }
+}
+
+// ============================================================================
+// CLG new() WITH {} SYNTAX TESTS
+// ============================================================================
+
+#[test]
+fn test_clg_new_with_class_instantiation_syntax() {
+    // Test that ClassName {} works inside instance methods (the new() pattern)
+    let source = r#"
+graph Counter {
+    _count: 0
+
+    fn new() {
+        instance = Counter {}
+        return instance
+    }
+
+    fn count() {
+        return _count
+    }
+
+    fn increment() {
+        _count = _count + 1
+        return self
+    }
+}
+
+c = Counter.new()
+c.increment()
+c.increment()
+result = c.count()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 2.0),
+        other => panic!("Expected number 2, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_clg_new_with_initialization() {
+    // Test new() pattern with parameter initialization
+    let source = r#"
+graph Point {
+    _x: 0
+    _y: 0
+
+    fn new(x, y) {
+        p = Point {}
+        p._x = x
+        p._y = y
+        return p
+    }
+
+    fn x() { return _x }
+    fn y() { return _y }
+
+    fn distance_from_origin() {
+        return (_x * _x + _y * _y)
+    }
+}
+
+p1 = Point.new(3, 4)
+x_val = p1.x()
+y_val = p1.y()
+dist = p1.distance_from_origin()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let x_val = executor.get_variable("x_val").unwrap();
+    match &x_val.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 3.0),
+        other => panic!("Expected number 3, got {:?}", other),
+    }
+
+    let y_val = executor.get_variable("y_val").unwrap();
+    match &y_val.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 4.0),
+        other => panic!("Expected number 4, got {:?}", other),
+    }
+
+    let dist = executor.get_variable("dist").unwrap();
+    match &dist.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 25.0),  // 3^2 + 4^2 = 9 + 16 = 25
+        other => panic!("Expected number 25, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_clg_new_multiple_instances_are_independent() {
+    // Verify that each instance created via new() is independent
+    let source = r#"
+graph Counter {
+    _value: 0
+
+    fn new(initial) {
+        c = Counter {}
+        c._value = initial
+        return c
+    }
+
+    fn value() { return _value }
+
+    fn increment() {
+        _value = _value + 1
+    }
+}
+
+c1 = Counter.new(10)
+c2 = Counter.new(20)
+c1.increment()
+c1.increment()
+c2.increment()
+v1 = c1.value()
+v2 = c2.value()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let v1 = executor.get_variable("v1").unwrap();
+    match &v1.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 12.0),  // 10 + 2
+        other => panic!("Expected number 12, got {:?}", other),
+    }
+
+    let v2 = executor.get_variable("v2").unwrap();
+    match &v2.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 21.0),  // 20 + 1
+        other => panic!("Expected number 21, got {:?}", other),
+    }
+}
+
+// ============================================================================
+// SHORTEST_PATH METHOD TESTS
+// ============================================================================
+
+#[test]
+fn test_graph_shortest_path_basic() {
+    // Test basic BFS shortest path
+    let source = r#"
+g = graph {}
+g.add_node("A", 1)
+g.add_node("B", 2)
+g.add_node("C", 3)
+g.add_node("D", 4)
+g.add_edge("A", "B", "edge")
+g.add_edge("B", "C", "edge")
+g.add_edge("C", "D", "edge")
+g.add_edge("A", "D", "shortcut")
+
+path = g.shortest_path("A", "D")
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let path = executor.get_variable("path").unwrap();
+    match &path.kind {
+        ValueKind::List(list) => {
+            let items: Vec<String> = list.to_vec().iter().map(|v| {
+                match &v.kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => panic!("Expected string in path"),
+                }
+            }).collect();
+            // Should find shortest path A -> D (2 nodes)
+            assert_eq!(items.len(), 2);
+            assert_eq!(items[0], "A");
+            assert_eq!(items[1], "D");
+        }
+        other => panic!("Expected list, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_graph_shortest_path_with_edge_type_filter() {
+    // Test shortest path with edge type filtering
+    let source = r#"
+g = graph {}
+g.add_node("A", 1)
+g.add_node("B", 2)
+g.add_node("C", 3)
+g.add_node("D", 4)
+g.add_edge("A", "B", "road")
+g.add_edge("B", "C", "road")
+g.add_edge("C", "D", "road")
+g.add_edge("A", "D", "highway")
+
+path_road = g.shortest_path("A", "D", "road")
+path_highway = g.shortest_path("A", "D", "highway")
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // Road path: A -> B -> C -> D (4 nodes)
+    let path_road = executor.get_variable("path_road").unwrap();
+    match &path_road.kind {
+        ValueKind::List(list) => {
+            assert_eq!(list.len(), 4);
+        }
+        other => panic!("Expected list for road path, got {:?}", other),
+    }
+
+    // Highway path: A -> D (2 nodes)
+    let path_highway = executor.get_variable("path_highway").unwrap();
+    match &path_highway.kind {
+        ValueKind::List(list) => {
+            assert_eq!(list.len(), 2);
+        }
+        other => panic!("Expected list for highway path, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_graph_shortest_path_no_path_returns_none() {
+    // Test that no path returns none
+    let source = r#"
+g = graph {}
+g.add_node("A", 1)
+g.add_node("B", 2)
+g.add_node("C", 3)
+g.add_edge("A", "B", "edge")
+
+path = g.shortest_path("B", "C")
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let path = executor.get_variable("path").unwrap();
+    match &path.kind {
+        ValueKind::None => {}  // Expected
+        other => panic!("Expected none for non-existent path, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_graph_shortest_path_same_node() {
+    // Test path from node to itself
+    let source = r#"
+g = graph {}
+g.add_node("A", 1)
+
+path = g.shortest_path("A", "A")
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let path = executor.get_variable("path").unwrap();
+    match &path.kind {
+        ValueKind::List(list) => {
+            assert_eq!(list.len(), 1);
+            match &list.to_vec()[0].kind {
+                ValueKind::String(s) => assert_eq!(s, "A"),
+                _ => panic!("Expected string 'A'"),
+            }
+        }
+        other => panic!("Expected list with single element, got {:?}", other),
+    }
+}
+
+// ============================================================================
+// CLG PROPERTIES BRANCH ARCHITECTURE TESTS
+// ============================================================================
+// Properties should be stored under __properties__/ branch, not as regular nodes.
+// This follows the same pattern as methods stored under __methods__/ branch.
+
+#[test]
+fn test_clg_properties_stored_under_properties_branch() {
+    // CLG properties should be stored at __properties__/name, not just "name"
+    let source = r#"
+graph Point {
+    x: 10
+    y: 20
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let point = executor.get_variable("Point").unwrap();
+    match &point.kind {
+        ValueKind::Graph(g) => {
+            // Properties should be under __properties__/ branch
+            assert!(g.has_node("__properties__/x"), "Property x should be at __properties__/x");
+            assert!(g.has_node("__properties__/y"), "Property y should be at __properties__/y");
+
+            // Properties should NOT be stored as top-level nodes
+            assert!(!g.has_node("x"), "Property x should NOT be a top-level node");
+            assert!(!g.has_node("y"), "Property y should NOT be a top-level node");
+        }
+        _ => panic!("Expected graph"),
+    }
+}
+
+#[test]
+fn test_clg_data_node_ids_excludes_properties_branch() {
+    // data_node_ids() should exclude __properties__/* nodes (like it excludes __methods__/*)
+    let source = r#"
+graph Counter {
+    count: 0
+
+    fn increment() {
+        count = count + 1
+    }
+}
+
+c = Counter {}
+c.add_node("user_data", 42)
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let c = executor.get_variable("c").unwrap();
+    match &c.kind {
+        ValueKind::Graph(g) => {
+            let data_nodes = g.data_node_ids();
+
+            // User-added node should be in data_node_ids
+            assert!(data_nodes.contains(&"user_data".to_string()),
+                "User-added nodes should be in data_node_ids()");
+
+            // Properties should NOT be in data_node_ids
+            assert!(!data_nodes.iter().any(|id| id.starts_with("__properties__")),
+                "Properties branch should be excluded from data_node_ids()");
+            assert!(!data_nodes.contains(&"count".to_string()),
+                "Property 'count' should not be a top-level data node");
+        }
+        _ => panic!("Expected graph"),
+    }
+}
+
+#[test]
+fn test_clg_property_access_reads_from_properties_branch() {
+    // Implicit property access in methods should read from __properties__/name
+    let source = r#"
+graph Counter {
+    count: 100
+
+    fn get_count() {
+        return count
+    }
+}
+
+c = Counter {}
+result = c.get_count()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 100.0),
+        other => panic!("Expected number 100, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_clg_property_assignment_writes_to_properties_branch() {
+    // Property assignment should write to __properties__/name
+    let source = r#"
+graph Counter {
+    count: 0
+
+    fn set_count(val) {
+        count = val
+    }
+
+    fn get_count() {
+        return count
+    }
+}
+
+c = Counter {}
+c.set_count(42)
+result = c.get_count()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let result = executor.get_variable("result").unwrap();
+    match &result.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 42.0),
+        other => panic!("Expected number 42, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_clg_property_node_ids_returns_property_names() {
+    // property_node_ids() should return just the property names (without __properties__/ prefix)
+    let source = r#"
+graph Point {
+    x: 0
+    y: 0
+    label: "origin"
+}
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let point = executor.get_variable("Point").unwrap();
+    match &point.kind {
+        ValueKind::Graph(g) => {
+            let props = g.property_node_ids();
+            assert_eq!(props.len(), 3, "Should have 3 properties");
+            assert!(props.contains(&"x".to_string()), "Should have property 'x'");
+            assert!(props.contains(&"y".to_string()), "Should have property 'y'");
+            assert!(props.contains(&"label".to_string()), "Should have property 'label'");
+        }
+        _ => panic!("Expected graph"),
+    }
+}
+
+#[test]
+fn test_clg_nodes_method_excludes_properties() {
+    // The nodes() method exposed to Graphoid should exclude CLG properties
+    let source = r#"
+graph Container {
+    name: "test"
+}
+
+c = Container {}
+c.add_node("item1", 1)
+c.add_node("item2", 2)
+node_list = c.nodes()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    let node_list = executor.get_variable("node_list").unwrap();
+    match &node_list.kind {
+        ValueKind::List(list) => {
+            let nodes: Vec<String> = list.to_vec().iter().map(|v| {
+                match &v.kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => panic!("Expected string"),
+                }
+            }).collect();
+
+            // Should have user-added nodes
+            assert!(nodes.contains(&"item1".to_string()), "Should contain item1");
+            assert!(nodes.contains(&"item2".to_string()), "Should contain item2");
+
+            // Should NOT have CLG property
+            assert!(!nodes.contains(&"name".to_string()), "Should NOT contain property 'name'");
+            assert!(!nodes.iter().any(|n| n.starts_with("__properties__")),
+                "Should NOT contain __properties__ nodes");
+        }
+        _ => panic!("Expected list"),
+    }
+}
+
+#[test]
+fn test_clg_user_nodes_not_affected_by_properties_branch() {
+    // User-added nodes with names like "count" should work normally
+    // and be distinct from CLG properties
+    let source = r#"
+graph Container {
+    internal_count: 0
+
+    fn get_internal() {
+        return internal_count
+    }
+}
+
+c = Container {}
+c.add_node("count", 999)
+c.add_node("data", 123)
+
+user_count = c.get_node("count")
+internal = c.get_internal()
+"#;
+    let mut executor = Executor::new();
+    executor.execute_source(source).unwrap();
+
+    // User-added "count" node should be accessible
+    let user_count = executor.get_variable("user_count").unwrap();
+    match &user_count.kind {
+        ValueKind::Number(n) => assert_eq!(*n, 999.0),
+        other => panic!("Expected number 999, got {:?}", other),
+    }
+
+    // CLG property should still work via method using implicit self
+    let internal = executor.get_variable("internal").unwrap();
+    match &internal.kind {
         ValueKind::Number(n) => assert_eq!(*n, 0.0),
         other => panic!("Expected number 0, got {:?}", other),
     }

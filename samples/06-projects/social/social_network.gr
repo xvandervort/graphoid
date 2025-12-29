@@ -8,42 +8,18 @@
 #
 # Usage:
 #   load "social_network.gr"
-#   network = SocialNetwork.new("My Network")
+#   network = SocialNetwork { name: "My Network" }
 #   network.add_user("alice", {"role": "engineer"})
 #   network.add_friendship("alice", "bob")
 
 graph SocialNetwork {
-    _name: "Social Network"
+    configure { readable: :name }
 
-    fn new(network_name) {
-        instance = self.clone()
-        instance._name = network_name
-        return instance
-    }
-
-    # === Property Accessors ===
-
-    fn name() {
-        return _name
-    }
+    name: "Social Network"
 
     fn user_count() {
-        # Don't count internal property nodes (like _name)
-        count = 0
-        for node in self.nodes() {
-            if _is_user_node(node) {
-                count = count + 1
-            }
-        }
-        return count
-    }
-
-    priv fn _is_user_node(node_id) {
-        # Property nodes start with underscore
-        if node_id.starts_with("_") {
-            return false
-        }
-        return true
+        # nodes() automatically filters out CLG properties
+        return self.nodes().length()
     }
 
     fn connection_count() {
@@ -177,45 +153,18 @@ graph SocialNetwork {
     # === Network Analysis ===
 
     fn degrees_of_separation(user1, user2) {
-        # BFS to find shortest path through friend edges
+        # Use built-in shortest_path with "friend" edge type filter
         if user1 == user2 {
             return 0
         }
 
-        # BFS queue: each entry is [node, distance]
-        queue = [[user1, 0]]
-        visited = [user1]
-
-        while queue.length() > 0 {
-            current = queue[0]
-            queue = queue.slice(1, queue.length())
-
-            current_node = current[0]
-            current_dist = current[1]
-
-            # Get friends of current node
-            friends = friends_of(current_node)
-            for friend in friends {
-                if friend == user2 {
-                    return current_dist + 1
-                }
-
-                # Check if already visited
-                already_visited = false
-                for v in visited {
-                    if v == friend {
-                        already_visited = true
-                    }
-                }
-
-                if already_visited == false {
-                    visited = visited.append(friend)
-                    queue = queue.append([friend, current_dist + 1])
-                }
-            }
+        path = self.shortest_path(user1, user2, "friend")
+        if path == none {
+            return -1  # Not connected
         }
 
-        return -1  # Not connected
+        # Degrees of separation = path length - 1 (number of edges)
+        return path.length() - 1
     }
 
     fn friends_of_friends(username) {
@@ -263,12 +212,10 @@ graph SocialNetwork {
         top_user = none
 
         for node in self.nodes() {
-            if _is_user_node(node) {
-                count = friend_count(node)
-                if count > max_friends {
-                    max_friends = count
-                    top_user = node
-                }
+            count = friend_count(node)
+            if count > max_friends {
+                max_friends = count
+                top_user = node
             }
         }
 
@@ -281,12 +228,10 @@ graph SocialNetwork {
         bottom_user = none
 
         for node in self.nodes() {
-            if _is_user_node(node) {
-                count = friend_count(node)
-                if min_friends == -1 || count < min_friends {
-                    min_friends = count
-                    bottom_user = node
-                }
+            count = friend_count(node)
+            if min_friends == -1 || count < min_friends {
+                min_friends = count
+                bottom_user = node
             }
         }
 
@@ -301,9 +246,7 @@ graph SocialNetwork {
         }
         total = 0
         for node in self.nodes() {
-            if _is_user_node(node) {
-                total = total + friend_count(node)
-            }
+            total = total + friend_count(node)
         }
         return total / total_users
     }
@@ -346,7 +289,7 @@ graph SocialNetwork {
     # === Reporting ===
 
     fn report() {
-        print("=== " + _name + " Report ===")
+        print("=== " + name + " Report ===")
         print("")
         print("Network Size:")
         print("  Users: " + user_count().to_string())
