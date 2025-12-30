@@ -53,6 +53,17 @@ pub struct Executor {
     /// Pending write-backs for mutable arguments (arg! syntax)
     /// Stack of vectors - one per active function call
     writeback_stack: Vec<Vec<WritebackInfo>>,
+    /// Stack of `self` values for block context propagation
+    /// When a method is called, push its receiver. Blocks called from within
+    /// that method will have access to this `self` for implicit method resolution.
+    block_self_stack: Vec<BlockSelfEntry>,
+}
+
+/// Entry in the block_self_stack tracking the `self` value for block context
+#[derive(Clone)]
+struct BlockSelfEntry {
+    /// The graph value that should be used as `self` in blocks
+    value: Value,
 }
 
 impl Executor {
@@ -74,6 +85,7 @@ impl Executor {
             method_context_stack: Vec::new(),
             super_context_stack: Vec::new(),
             writeback_stack: Vec::new(),
+            block_self_stack: Vec::new(),
         }
     }
 
@@ -95,6 +107,7 @@ impl Executor {
             method_context_stack: Vec::new(),
             super_context_stack: Vec::new(),
             writeback_stack: Vec::new(),
+            block_self_stack: Vec::new(),
         }
     }
 
@@ -7452,7 +7465,21 @@ impl Executor {
         let call_env = Environment::with_parent(parent_env);
 
         // Save current environment and switch to call environment
-        let saved_env = std::mem::replace(&mut self.env, call_env);
+        let mut saved_env = std::mem::replace(&mut self.env, call_env);
+
+        // Implicit self in blocks: If this is an anonymous closure (block) and we're
+        // inside a method context, inject the method's `self` into the block's environment.
+        // This enables DSL-style syntax like: runner.describe("x") { it("y") { ... } }
+        //
+        // Priority: Use the parent environment's `self` if it exists (in case the method
+        // modified self before calling the block), otherwise fall back to block_self_stack.
+        if func.name.is_none() {
+            let block_self = saved_env.get("self").ok()
+                .or_else(|| self.block_self_stack.last().map(|e| e.value.clone()));
+            if let Some(self_value) = block_self {
+                self.env.define("self".to_string(), self_value);
+            }
+        }
 
         // Execute function body - either pattern matching or traditional
         let mut return_value = Value::none();
@@ -7554,6 +7581,22 @@ impl Executor {
         if let Some(modified_parent) = self.env.take_parent() {
             // Update the captured environment with modifications
             *func.env.borrow_mut() = *modified_parent;
+        }
+
+        // Implicit self writeback: If this was an anonymous block with injected `self`,
+        // propagate any modifications to `self` back to the block_self_stack AND
+        // to the parent environment (so the method's `self` stays in sync).
+        // This enables DSL patterns where blocks modify state through method calls.
+        if func.name.is_none() {
+            if let Some(modified_self) = self.env.get("self").ok() {
+                // Update block_self_stack so outer methods see the change
+                if let Some(entry) = self.block_self_stack.last_mut() {
+                    entry.value = modified_self.clone();
+                }
+                // Also update `self` in the saved (parent) environment
+                // This ensures the enclosing method's `self` is updated
+                let _ = saved_env.set("self", modified_self);
+            }
         }
 
         // Restore original environment
@@ -7697,6 +7740,12 @@ impl Executor {
         if manage_super_context {
             self.super_context_stack.push(graph.clone());
         }
+
+        // Push self onto block_self_stack for implicit self in blocks
+        // This allows closures called from within this method to access `self`
+        self.block_self_stack.push(BlockSelfEntry {
+            value: Value::graph(graph.clone()),
+        });
 
         // Push function call onto the graph
         if let Some(ref func_id) = func.node_id {
@@ -7911,6 +7960,9 @@ impl Executor {
         if manage_super_context {
             self.super_context_stack.pop();
         }
+
+        // Pop block_self_stack (we always push, so always pop)
+        self.block_self_stack.pop();
 
         // Pop function from graph with return value
         if func.node_id.is_some() {

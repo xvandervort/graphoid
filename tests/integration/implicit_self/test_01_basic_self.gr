@@ -1,0 +1,30 @@
+# Test 1.1: Block Receives Caller's Self
+# Expected: Block passed to a method should have access to that method's `self`
+
+graph Greeter {
+    configure { readable: :name }
+    name: "World"
+
+    fn run(block) {
+        block()
+    }
+
+    fn get_name() {
+        return name
+    }
+}
+
+g = Greeter { name: "Test" }
+passed = false
+
+g.run() { ||
+    # Inside this block, `self` should be bound to `g` (the Greeter instance)
+    if self.type_of() == "Greeter" and self.get_name() == "Test" {
+        print("PASS: Block has access to caller's self")
+        print("  self.type_of() = " + self.type_of())
+        print("  self.get_name() = " + self.get_name())
+    } else {
+        print("FAIL: self not correctly bound")
+        print("  self.type_of() = " + self.type_of())
+    }
+}

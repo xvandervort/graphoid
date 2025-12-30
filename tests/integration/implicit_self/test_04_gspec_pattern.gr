@@ -1,0 +1,69 @@
+# Test 3.1: Full gspec Pattern
+# This is the main use case - RSpec-style testing syntax
+
+graph TestRunner {
+    passed: 0
+    failed: 0
+
+    fn describe(name, block) {
+        print("describe " + name)
+        block()
+    }
+
+    fn context(name, block) {
+        print("  context " + name)
+        block()
+    }
+
+    fn it(name, block) {
+        result = block()
+        if result == true {
+            passed = passed + 1
+            print("    ✓ " + name)
+        } else {
+            failed = failed + 1
+            print("    ✗ " + name)
+        }
+    }
+
+    fn get_passed() { return passed }
+    fn get_failed() { return failed }
+}
+
+runner = TestRunner {}
+
+runner.describe("Calculator") { ||
+    # context() should resolve to self.context()
+    context("addition") { ||
+        # it() should resolve to self.it()
+        it("adds positive numbers") { ||
+            return 2 + 3 == 5
+        }
+
+        it("adds negative numbers") { ||
+            return -2 + -3 == -5
+        }
+    }
+
+    context("comparison") { ||
+        it("compares correctly") { ||
+            return 10 > 5
+        }
+
+        it("fails intentionally") { ||
+            return 1 == 2
+        }
+    }
+}
+
+p = runner.get_passed()
+f = runner.get_failed()
+
+print("")
+print("Results: " + p.to_string() + " passed, " + f.to_string() + " failed")
+
+if p == 3 and f == 1 {
+    print("PASS: gspec pattern works!")
+} else {
+    print("FAIL: Expected 3 passed and 1 failed")
+}

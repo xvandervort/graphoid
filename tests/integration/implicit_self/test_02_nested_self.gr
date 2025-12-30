@@ -1,0 +1,40 @@
+# Test 1.2: Self Available in Nested Calls
+# Expected: When a method calls a block, and that block calls another method
+#           which calls another block, self should propagate through
+
+graph Runner {
+    configure { readable: :value }
+    value: 42
+
+    fn outer(block) {
+        block()
+    }
+
+    fn inner(block) {
+        block()
+    }
+
+    fn get_value() {
+        return value
+    }
+}
+
+r = Runner { value: 99 }
+
+r.outer() { ||
+    # self should be r here
+    print("In outer block, self.type_of() = " + self.type_of())
+
+    # Now call self.inner() with another block
+    self.inner() { ||
+        # self should still be r here
+        print("In inner block, self.type_of() = " + self.type_of())
+        print("self.get_value() = " + self.get_value().to_string())
+
+        if self.get_value() == 99 {
+            print("PASS: Nested blocks propagate self")
+        } else {
+            print("FAIL: Expected 99, got " + self.get_value().to_string())
+        }
+    }
+}

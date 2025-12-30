@@ -1,0 +1,211 @@
+# DSL Patterns in Graphoid
+#
+# Graphoid's block syntax enables clean domain-specific languages.
+# These examples show practical patterns for testing, configuration, and builders.
+
+print("=== DSL Patterns ===\n")
+
+# ============================================
+# Pattern 1: Test Runner DSL
+# ============================================
+print("--- Test Runner ---")
+
+graph TestRunner {
+    passed: 0
+    failed: 0
+
+    fn describe(name, block) {
+        print("describe " + name)
+        block()
+    }
+
+    fn context(name, block) {
+        print("  context " + name)
+        block()
+    }
+
+    fn it(name, block) {
+        if block() {
+            passed = passed + 1
+            print("    PASS: " + name)
+        } else {
+            failed = failed + 1
+            print("    FAIL: " + name)
+        }
+    }
+
+    fn results() {
+        return passed.to_string() + " passed, " + failed.to_string() + " failed"
+    }
+}
+
+tests = TestRunner {}
+
+tests.describe("String") { ||
+    context("length") { ||
+        it("returns correct length") { ||
+            return "hello".length() == 5
+        }
+        it("handles empty strings") { ||
+            return "".length() == 0
+        }
+    }
+    context("concatenation") { ||
+        it("joins strings") { ||
+            return "a" + "b" == "ab"
+        }
+    }
+}
+
+print("\nResults: " + tests.results() + "\n")
+
+# ============================================
+# Pattern 2: Server Configuration DSL
+# ============================================
+print("--- Server Configuration ---")
+
+graph ServerConfig {
+    host: "localhost"
+    port: 8080
+    ssl: false
+    route_count: 0
+
+    fn setup(block) {
+        block()
+        print("Server configured: " + host + ":" + port.to_string())
+        if ssl {
+            print("  SSL enabled")
+        }
+        print("  Routes: " + route_count.to_string())
+    }
+
+    fn listen_on(h, p) {
+        host = h
+        port = p
+    }
+
+    fn enable_ssl() {
+        ssl = true
+    }
+
+    fn route(path, handler) {
+        route_count = route_count + 1
+        print("  Added route: " + path)
+    }
+}
+
+server = ServerConfig {}
+
+server.setup() { ||
+    listen_on("0.0.0.0", 3000)
+    enable_ssl()
+    route("/api/users", "users_handler")
+    route("/api/posts", "posts_handler")
+}
+
+# ============================================
+# Pattern 3: HTML Builder DSL
+# ============================================
+print("\n--- HTML Builder ---")
+
+graph HtmlBuilder {
+    output: ""
+    indent: 0
+
+    fn build(block) {
+        block()
+        return output
+    }
+
+    fn get_indent() {
+        spaces = ""
+        i = 0
+        while i < indent {
+            spaces = spaces + "  "
+            i = i + 1
+        }
+        return spaces
+    }
+
+    fn tag(name, content) {
+        spaces = get_indent()
+        output = output + spaces + "<" + name + ">" + content + "</" + name + ">\n"
+    }
+
+    fn container(name, block) {
+        spaces = get_indent()
+        output = output + spaces + "<" + name + ">\n"
+        indent = indent + 1
+        block()
+        indent = indent - 1
+        output = output + spaces + "</" + name + ">\n"
+    }
+}
+
+html = HtmlBuilder {}
+
+result = html.build() { ||
+    container("html") { ||
+        container("head") { ||
+            tag("title", "My Page")
+        }
+        container("body") { ||
+            tag("h1", "Welcome")
+            tag("p", "Hello, world!")
+        }
+    }
+}
+
+print(result)
+
+# ============================================
+# Pattern 4: Query Builder DSL
+# ============================================
+print("--- Query Builder ---")
+
+graph QueryBuilder {
+    table_name: ""
+    columns: "*"
+    where_clause: ""
+    order_col: none
+
+    fn table(t) {
+        table_name = t
+        return self
+    }
+
+    fn select(cols) {
+        columns = cols
+        return self
+    }
+
+    fn where_eq(col, val) {
+        if where_clause == "" {
+            where_clause = col + " = '" + val + "'"
+        } else {
+            where_clause = where_clause + " AND " + col + " = '" + val + "'"
+        }
+        return self
+    }
+
+    fn order_by(col) {
+        order_col = col
+        return self
+    }
+
+    fn to_sql() {
+        sql = "SELECT " + columns + " FROM " + table_name
+        if where_clause != "" {
+            sql = sql + " WHERE " + where_clause
+        }
+        if order_col != none {
+            sql = sql + " ORDER BY " + order_col
+        }
+        return sql
+    }
+}
+
+query = QueryBuilder {}
+query = query.table("users").select("name, email").where_eq("status", "active").where_eq("role", "admin").order_by("name")
+
+print(query.to_sql())

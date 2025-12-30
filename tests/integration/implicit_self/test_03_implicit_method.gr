@@ -1,0 +1,35 @@
+# Test 2.1: Method Name Resolves to Self
+# Expected: When a name is not found locally, check if self has a method with that name
+# NOTE: We use self property mutation to capture results since closures don't capture by reference
+
+graph Calculator {
+    configure { readable: :result, writable: :result }
+    result: none
+
+    fn run(block) {
+        block()
+    }
+
+    fn add(a, b) {
+        return a + b
+    }
+
+    fn store_result(val) {
+        result = val
+    }
+}
+
+calc = Calculator {}
+
+calc.run() { ||
+    # add() should resolve to self.add() since self is calc
+    # store_result() should also resolve to self.store_result()
+    r = add(2, 3)
+    store_result(r)
+}
+
+if calc.result == 5 {
+    print("PASS: add() resolves to self.add()")
+} else {
+    print("FAIL: Expected 5, got '" + calc.result.to_string() + "'")
+}
