@@ -436,7 +436,7 @@ pub enum Pattern {
 // ============================================================================
 
 /// Graph pattern match expression (Phase 9)
-/// Represents Cypher-style graph patterns: (node:Type) -[:EDGE]-> (other:Type)
+/// Represents explicit pattern matching: node("var", type: "Type"), edge(type: "EDGE")
 #[derive(Debug, Clone, PartialEq)]
 pub struct GraphPattern {
     pub nodes: Vec<PatternNode>,

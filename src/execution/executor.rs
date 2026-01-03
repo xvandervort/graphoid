@@ -5025,7 +5025,7 @@ impl Executor {
             }
             "select" | "return" => {
                 // Unified select/return method - projects variables and/or properties
-                // Both names supported: select() (Rust-friendly) and return() (Cypher-like)
+                // Both names supported: select() and return()
                 // Accepts list of specifiers:
                 //   "person" -> returns full variable binding
                 //   "person.name" -> returns property value

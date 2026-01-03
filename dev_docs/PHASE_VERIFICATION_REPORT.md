@@ -85,11 +85,11 @@ All phase plans (7-12) have been systematically verified against the language sp
 **Verification**:
 
 **Level 3: Pattern-Based Querying** (correctly targeted by Phase 9):
-- ✅ Cypher-style syntax: `(node:Type) -[:EDGE_TYPE]-> (other:Type)`
-- ✅ Node type constraints: `(person:User)`
-- ✅ Edge type constraints: `-[:FRIEND]->`
-- ✅ Bidirectional edges: `-[:FRIEND]-`
-- ✅ Variable-length paths: `-[:FOLLOWS*1..3]->`
+- ✅ Explicit function-based syntax: `node("var", type: "Type"), edge(type: "EDGE")`
+- ✅ Node type constraints: `node("person", type: "User")`
+- ✅ Edge type constraints: `edge(type: "FRIEND", direction: :outgoing)`
+- ✅ Bidirectional edges: `edge(type: "FRIEND", direction: :both)`
+- ✅ Variable-length paths: `edge(type: "FOLLOWS", min_hops: 1, max_hops: 3)`
 - ✅ `.where()` filter predicates
 - ✅ `.return()` field selection
 - ✅ Multiple patterns in single query
