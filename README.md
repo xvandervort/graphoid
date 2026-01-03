@@ -53,7 +53,7 @@ fn describe(value) {
 
 ### Graph Pattern Matching
 
-Query your graphs with a declarative syntax inspired by Cypher:
+Query your graphs with explicit, readable pattern syntax:
 
 ```graphoid
 # Find friends of friends
