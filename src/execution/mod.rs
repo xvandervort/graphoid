@@ -2,7 +2,9 @@
 //!
 //! This module executes AST nodes.
 
+pub mod arithmetic;
 pub mod config;
+pub mod methods;
 pub mod environment;
 pub mod error_collector;
 pub mod executor;
