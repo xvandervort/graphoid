@@ -781,7 +781,7 @@ impl Executor {
                 // Get the type name to check against
                 let check_type = match &args[0].kind {
                     ValueKind::String(s) => s.clone(),
-                    ValueKind::Graph(g) => g.type_name.clone().unwrap_or_else(|| "graph".to_string()),
+                    ValueKind::Graph(ref g) => g.borrow().type_name.clone().unwrap_or_else(|| "graph".to_string()),
                     _ => return Err(GraphoidError::runtime(format!(
                         "is_a() expects a type name (string) or graph, but got {}",
                         args[0].type_name()
@@ -844,7 +844,7 @@ impl Executor {
                 }
 
                 let other_graph = match &args[0].kind {
-                    ValueKind::Graph(g) => g.clone(),
+                    ValueKind::Graph(ref g) => g.borrow().clone(),
                     _ => {
                         return Err(GraphoidError::runtime(
                             "include() argument must be a graph".to_string()
@@ -1260,7 +1260,7 @@ impl Executor {
                 }
 
                 let other_graph = match &args[0].kind {
-                    ValueKind::Graph(g) => g,
+                    ValueKind::Graph(ref g) => g.borrow(),
                     _ => return Err(GraphoidError::type_error("graph", args[0].type_name())),
                 };
 
@@ -1270,7 +1270,7 @@ impl Executor {
                     None
                 };
 
-                let result = graph.add_subgraph(other_graph, conflict_strategy)?;
+                let result = graph.add_subgraph(&other_graph, conflict_strategy)?;
                 Ok(Value::graph(result))
             }
             "node_count" => {

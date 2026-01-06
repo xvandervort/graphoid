@@ -47,4 +47,5 @@ mod unit {
     pub mod exec_tests;
     pub mod graph_decl_syntax_tests;
     pub mod semantic_edges_tests;
+    pub mod exception_handling_tests;
 }

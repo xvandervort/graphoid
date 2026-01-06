@@ -1,0 +1,258 @@
+# exception_handling.gr - Error handling with try/catch/finally
+#
+# This example demonstrates Graphoid's exception handling system.
+# Topics covered:
+# - Basic try/catch blocks
+# - Catching specific error types
+# - The finally block (cleanup code)
+# - Raising custom errors
+# - Error object methods
+# - Nested exception handling
+
+print("=== Exception Handling in Graphoid ===")
+print("")
+
+# -----------------------------------------------------------------------------
+# Section 1: Basic Try/Catch
+# -----------------------------------------------------------------------------
+print("--- 1. Basic Try/Catch ---")
+
+# Catch any error with a catch-all clause
+result = "unknown"
+try {
+    x = 10 / 0  # This will cause a division by zero error
+    result = "no error"
+} catch as e {
+    result = "caught error"
+    print("Caught: " + e.message())
+}
+print("Result: " + result)
+print("")
+
+# -----------------------------------------------------------------------------
+# Section 2: Catching Specific Error Types
+# -----------------------------------------------------------------------------
+print("--- 2. Catching Specific Error Types ---")
+
+# Graphoid has several built-in error types:
+# - RuntimeError: General runtime errors (division by zero, etc.)
+# - ValueError: Invalid values
+# - TypeError: Type mismatches
+# - IOError: File/IO operations
+# - NetworkError: Network operations
+# - ParseError: Parsing failures
+
+# Catch a specific error type
+fn demonstrate_valueerror() {
+    error_type = ""
+    try {
+        raise ValueError("The input must be positive")
+    } catch ValueError as e {
+        error_type = e.type()
+        print("Caught ValueError: " + e.message())
+    }
+    return error_type
+}
+
+type_caught = demonstrate_valueerror()
+print("Error type was: " + type_caught)
+print("")
+
+# -----------------------------------------------------------------------------
+# Section 3: Multiple Catch Clauses
+# -----------------------------------------------------------------------------
+print("--- 3. Multiple Catch Clauses ---")
+
+# You can have multiple catch clauses for different error types
+fn process_data(data_type) {
+    try {
+        if data_type == "type" {
+            raise TypeError("Expected number, got string")
+        }
+        if data_type == "value" {
+            raise ValueError("Value out of range")
+        }
+        if data_type == "io" {
+            raise IOError("File not found")
+        }
+        return "success"
+    } catch TypeError as e {
+        return "TypeError: " + e.message()
+    } catch ValueError as e {
+        return "ValueError: " + e.message()
+    } catch IOError as e {
+        return "IOError: " + e.message()
+    } catch as e {
+        return "Other error: " + e.message()
+    }
+}
+
+print("Type error: " + process_data("type"))
+print("Value error: " + process_data("value"))
+print("IO error: " + process_data("io"))
+print("No error: " + process_data("ok"))
+print("")
+
+# -----------------------------------------------------------------------------
+# Section 4: The Finally Block
+# -----------------------------------------------------------------------------
+print("--- 4. The Finally Block ---")
+
+# The finally block ALWAYS runs, whether an error occurred or not
+# This is useful for cleanup code (closing files, releasing resources, etc.)
+
+fn demonstrate_finally(should_fail) {
+    steps = []
+    try {
+        steps = steps.append("try started")
+        if should_fail {
+            raise ValueError("Intentional failure")
+        }
+        steps = steps.append("try completed")
+    } catch ValueError as e {
+        steps = steps.append("catch ran")
+    } finally {
+        steps = steps.append("finally ran")
+    }
+    return steps
+}
+
+print("Without error: " + demonstrate_finally(false).to_string())
+print("With error: " + demonstrate_finally(true).to_string())
+print("")
+
+# -----------------------------------------------------------------------------
+# Section 5: Error Object Methods
+# -----------------------------------------------------------------------------
+print("--- 5. Error Object Methods ---")
+
+# Error objects have several useful methods
+try {
+    raise ValueError("Something went wrong with the input")
+} catch as e {
+    print("e.type(): " + e.type())
+    print("e.message(): " + e.message())
+    print("e.stack_trace(): " + e.stack_trace())
+}
+print("")
+
+# -----------------------------------------------------------------------------
+# Section 6: Raising Errors
+# -----------------------------------------------------------------------------
+print("--- 6. Raising Errors ---")
+
+# You can raise errors with a message
+fn validate_age(age) {
+    if age < 0 {
+        raise ValueError("Age cannot be negative: " + age.to_string())
+    }
+    if age > 150 {
+        raise ValueError("Age seems unrealistic: " + age.to_string())
+    }
+    return "Valid age: " + age.to_string()
+}
+
+# Test with valid and invalid ages
+ages = [25, -5, 200]
+for age in ages {
+    try {
+        result = validate_age(age)
+        print(result)
+    } catch ValueError as e {
+        print("Invalid: " + e.message())
+    }
+}
+print("")
+
+# -----------------------------------------------------------------------------
+# Section 7: Nested Exception Handling
+# -----------------------------------------------------------------------------
+print("--- 7. Nested Exception Handling ---")
+
+# Try/catch blocks can be nested for complex error handling
+fn outer_function() {
+    result = []
+    try {
+        result = result.append("outer try")
+        try {
+            result = result.append("inner try")
+            raise ValueError("inner error")
+        } catch ValueError as e {
+            result = result.append("inner catch")
+            # Re-raise as a different error type
+            raise TypeError("converted from: " + e.message())
+        }
+    } catch TypeError as e {
+        result = result.append("outer catch: " + e.message())
+    }
+    return result
+}
+
+nested_result = outer_function()
+print("Nested execution: " + nested_result.to_string())
+print("")
+
+# -----------------------------------------------------------------------------
+# Section 8: Practical Example - Safe Division
+# -----------------------------------------------------------------------------
+print("--- 8. Practical Example: Safe Division ---")
+
+fn safe_divide(a, b) {
+    try {
+        return {"success": true, "value": a / b, "error": none}
+    } catch as e {
+        return {"success": false, "value": none, "error": e.message()}
+    }
+}
+
+# Test safe division
+divisions = [
+    [10, 2],
+    [10, 0],
+    [100, 4]
+]
+
+for pair in divisions {
+    a = pair[0]
+    b = pair[1]
+    result = safe_divide(a, b)
+    if result["success"] {
+        print(a.to_string() + " / " + b.to_string() + " = " + result["value"].to_string())
+    } else {
+        print(a.to_string() + " / " + b.to_string() + " failed: " + result["error"])
+    }
+}
+print("")
+
+# -----------------------------------------------------------------------------
+# Section 9: Try-Only-Finally (No Catch)
+# -----------------------------------------------------------------------------
+print("--- 9. Try-Only-Finally ---")
+
+# You can use try/finally without catch for guaranteed cleanup
+resource_released = false
+
+fn use_resource() {
+    try {
+        print("  Using resource...")
+        # Resource is in use
+    } finally {
+        print("  Releasing resource...")
+        resource_released = true
+    }
+}
+
+use_resource()
+print("Resource released: " + resource_released.to_string())
+print("")
+
+# -----------------------------------------------------------------------------
+# Summary
+# -----------------------------------------------------------------------------
+print("=== Summary ===")
+print("Key takeaways:")
+print("1. Use try/catch to handle errors gracefully")
+print("2. Catch specific error types for targeted handling")
+print("3. Use finally for cleanup code that must always run")
+print("4. Raise custom errors with raise ErrorType(message)")
+print("5. Error objects provide type(), message(), and stack_trace()")

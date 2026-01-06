@@ -57,6 +57,11 @@ pub struct Executor {
     /// When a method is called, push its receiver. Blocks called from within
     /// that method will have access to this `self` for implicit method resolution.
     pub(crate) block_self_stack: Vec<BlockSelfEntry>,
+    /// Stack of original graph Values for method calls.
+    /// When a graph method is called, the original Value (with its Rc<RefCell>) is pushed.
+    /// This allows call_graph_method_impl to bind `self` to the same Rc<RefCell>,
+    /// ensuring mutations are visible across closures.
+    pub(crate) graph_method_value_stack: Vec<Value>,
 }
 
 /// Entry in the block_self_stack tracking the `self` value for block context
@@ -86,6 +91,7 @@ impl Executor {
             super_context_stack: Vec::new(),
             writeback_stack: Vec::new(),
             block_self_stack: Vec::new(),
+            graph_method_value_stack: Vec::new(),
         }
     }
 
@@ -108,6 +114,7 @@ impl Executor {
             super_context_stack: Vec::new(),
             writeback_stack: Vec::new(),
             block_self_stack: Vec::new(),
+            graph_method_value_stack: Vec::new(),
         }
     }
 
@@ -225,7 +232,8 @@ impl Executor {
                     Err(_) => {
                         // Phase 2 Implicit Self: Check if `self` is a graph with this property
                         if let Ok(self_value) = self.env.get("self") {
-                            if let ValueKind::Graph(ref graph) = self_value.kind {
+                            if let ValueKind::Graph(ref graph_rc) = self_value.kind {
+                                let graph = graph_rc.borrow();
                                 // Check for property in __properties__/ branch
                                 let property_node_id = Graph::property_node_id(name);
                                 if graph.has_node(&property_node_id) {
@@ -317,7 +325,7 @@ impl Executor {
 
                 // 2. The class must be a graph (CLG)
                 let graph = match &class_value.kind {
-                    ValueKind::Graph(g) => g.clone(),
+                    ValueKind::Graph(g) => g.borrow().clone(),
                     _ => {
                         return Err(GraphoidError::type_error(
                             "graph (CLG)",
@@ -328,7 +336,7 @@ impl Executor {
 
                 // 3. If no overrides, just return the clone (accessing a graph already clones it)
                 if overrides.is_empty() {
-                    return Ok(class_value);
+                    return Ok(Value::graph(graph));
                 }
 
                 // 4. Apply property overrides
@@ -380,15 +388,13 @@ impl Executor {
                 let val = self.truncate_if_integer_mode(val);
 
                 // Phase 18: Set type_name on graphs when assigned to a variable
-                let val = if let ValueKind::Graph(mut graph) = val.kind {
+                if let ValueKind::Graph(ref graph_rc) = val.kind {
+                    let mut graph = graph_rc.borrow_mut();
                     // Only set type_name if it's not already set (e.g., for clones that keep their type)
                     if graph.type_name.is_none() {
                         graph.type_name = Some(name.clone());
                     }
-                    Value::graph(graph)
-                } else {
-                    val
-                };
+                }
 
                 self.env.define(name.clone(), val);
 
@@ -406,15 +412,13 @@ impl Executor {
                 match target {
                     AssignmentTarget::Variable(name) => {
                         // Phase 18: Set type_name on graphs when assigned to a variable
-                        let val = if let ValueKind::Graph(mut graph) = val.kind {
+                        if let ValueKind::Graph(ref graph_rc) = val.kind {
+                            let mut graph = graph_rc.borrow_mut();
                             // Only set type_name if it's not already set (e.g., for clones that keep their type)
                             if graph.type_name.is_none() {
                                 graph.type_name = Some(name.clone());
                             }
-                            Value::graph(graph)
-                        } else {
-                            val
-                        };
+                        }
 
                         // Try to update existing variable, or create new one if it doesn't exist
                         if self.env.exists(name) {
@@ -425,12 +429,12 @@ impl Executor {
                             // Properties are stored in __properties__/ branch
                             let property_node_id = Graph::property_node_id(&name);
                             let assigned_to_self = if let Ok(self_value) = self.env.get("self") {
-                                if let ValueKind::Graph(mut graph) = self_value.kind {
+                                if let ValueKind::Graph(ref graph_rc) = self_value.kind {
+                                    let mut graph = graph_rc.borrow_mut();
                                     if graph.has_node(&property_node_id) {
                                         // Update the graph property in __properties__/ branch
+                                        // Changes are visible through the shared Rc
                                         graph.add_node(property_node_id, val.clone())?;
-                                        // Write the modified graph back to self
-                                        self.env.set("self", Value::graph(graph))?;
                                         true
                                     } else {
                                         false
@@ -456,21 +460,15 @@ impl Executor {
 
                         // Handle different collection types
                         match obj.kind {
-                            ValueKind::Graph(mut graph) => {
+                            ValueKind::Graph(ref graph_rc) => {
                                 // For graphs, index must be a string (node ID)
                                 let node_id = match &idx.kind {
                                     ValueKind::String(s) => s.clone(),
                                     _ => return Err(GraphoidError::type_error("string", idx.type_name())),
                                 };
 
-                                // Add or update the node
-                                graph.add_node(node_id, val)?;
-
-                                // Update the graph in the environment
-                                // We need to get the variable name from the object expression
-                                if let Expr::Variable { name, .. } = object.as_ref() {
-                                    self.env.set(name, Value::graph(graph))?;
-                                }
+                                // Add or update the node - changes visible through shared Rc
+                                graph_rc.borrow_mut().add_node(node_id, val)?;
                                 Ok(None)
                             }
                             ValueKind::Map(mut hash) => {
@@ -530,11 +528,13 @@ impl Executor {
                         let obj = self.eval_expr(object)?;
 
                         match obj.kind {
-                            ValueKind::Graph(mut graph) => {
+                            ValueKind::Graph(ref graph_rc) => {
                                 // Phase 19: Check if there's a setter for this property
-                                if let Some(setter_func) = graph.get_setter(property).cloned() {
+                                let setter_func = graph_rc.borrow().get_setter(property).cloned();
+                                if let Some(setter_func) = setter_func {
                                     // Call the setter with the value being assigned
                                     // The setter receives `self` (the graph) and the value as an argument
+                                    let graph = graph_rc.borrow().clone();
                                     self.call_graph_method(&graph, &setter_func, &[val], object)?;
 
                                     // The graph is already updated in the environment by call_graph_method
@@ -543,17 +543,13 @@ impl Executor {
                                     // No setter - update property or data node directly
                                     // First, check if this is a CLG property in __properties__/ branch
                                     let property_node_id = Graph::property_node_id(&property);
+                                    let mut graph = graph_rc.borrow_mut();
                                     if graph.has_node(&property_node_id) {
-                                        // Update CLG property
+                                        // Update CLG property - changes visible through shared Rc
                                         graph.add_node(property_node_id, val)?;
                                     } else {
                                         // Add/update as regular user data node
                                         graph.add_node(property.clone(), val)?;
-                                    }
-
-                                    // Update the graph in the environment
-                                    if let Expr::Variable { name, .. } = object.as_ref() {
-                                        self.env.set(name, Value::graph(graph))?;
                                     }
                                     Ok(None)
                                 }
@@ -622,20 +618,19 @@ impl Executor {
 
                     // Receiver must be a graph
                     match &receiver_value.kind {
-                        ValueKind::Graph(graph) => {
-                            // Clone the graph, attach the method/setter/static, and update the binding
-                            let mut graph_clone = graph.clone();
+                        ValueKind::Graph(ref graph_rc) => {
+                            // Attach the method/setter/static to the graph - changes visible through shared Rc
+                            let mut graph = graph_rc.borrow_mut();
                             if *is_static {
                                 // Phase 20: Attach as a static method
-                                graph_clone.attach_static_method(name.clone(), func.clone());
+                                graph.attach_static_method(name.clone(), func.clone());
                             } else if *is_setter {
                                 // Phase 19: Attach as a setter
-                                graph_clone.attach_setter(name.clone(), func.clone());
+                                graph.attach_setter(name.clone(), func.clone());
                             } else {
                                 // Regular method
-                                graph_clone.attach_method(name.clone(), func.clone());
+                                graph.attach_method(name.clone(), func.clone());
                             }
-                            self.env.define(receiver_name.clone(), Value::graph(graph_clone));
                         }
                         _ => {
                             return Err(GraphoidError::runtime(format!(
@@ -1143,9 +1138,9 @@ impl Executor {
         // If there's a parent, evaluate it and create child graph via inheritance
         if let Some(parent_box) = parent_expr {
             let parent_value = self.eval_expr(parent_box)?;
-            if let ValueKind::Graph(parent_graph) = parent_value.kind {
+            if let ValueKind::Graph(ref parent_graph_rc) = parent_value.kind {
                 // Create child that inherits from parent
-                let child = Graph::from_parent(parent_graph);
+                let child = Graph::from_parent(parent_graph_rc.borrow().clone());
                 return Ok(Value::graph(child));
             } else {
                 return Err(GraphoidError::runtime(format!(
@@ -1206,8 +1201,8 @@ impl Executor {
         // Create the graph, possibly inheriting from parent
         let mut graph = if let Some(parent_box) = parent_expr {
             let parent_value = self.eval_expr(parent_box)?;
-            if let ValueKind::Graph(parent_graph) = parent_value.kind {
-                Graph::from_parent(parent_graph)
+            if let ValueKind::Graph(ref parent_graph_rc) = parent_value.kind {
+                Graph::from_parent(parent_graph_rc.borrow().clone())
             } else {
                 return Err(GraphoidError::runtime(format!(
                     "Cannot inherit from non-graph type '{}'. Expected graph.",
@@ -1446,7 +1441,7 @@ impl Executor {
             ValueKind::String(ref s) => !s.is_empty(),
             ValueKind::List(ref l) => l.len() > 0,
             ValueKind::Map(ref h) => h.len() > 0,
-            ValueKind::Graph(ref g) => g.node_count() > 0,
+            ValueKind::Graph(ref g) => g.borrow().node_count() > 0,
             _ => true, // Everything else is truthy
         };
 
@@ -1686,7 +1681,7 @@ impl Executor {
                 // Return character as a string
                 Ok(Value::string(chars[actual_index as usize].to_string()))
             }
-            ValueKind::Graph(ref graph) => {
+            ValueKind::Graph(ref graph_rc) => {
                 // Index must be a string for graphs (node ID)
                 let node_id = match &index_value.kind {
                     ValueKind::String(s) => s,
@@ -1704,6 +1699,7 @@ impl Executor {
                 }
 
                 // Look up the node
+                let graph = graph_rc.borrow();
                 match graph.get_node(&node_id) {
                     Some(value) => Ok(value.clone()),
                     None => Err(GraphoidError::runtime(format!(
@@ -1729,12 +1725,13 @@ impl Executor {
         let object_value = self.eval_expr(object)?;
 
         match &object_value.kind {
-            ValueKind::Graph(ref graph) => {
+            ValueKind::Graph(ref graph_rc) => {
                 // Don't allow access to internal nodes via property syntax
                 if property.starts_with("__") {
                     return Ok(Value::none());
                 }
 
+                let graph = graph_rc.borrow();
                 // First, check for CLG property in __properties__/ branch
                 let property_node_id = Graph::property_node_id(&property);
                 if let Some(value) = graph.get_node(&property_node_id) {
@@ -1779,7 +1776,7 @@ impl Executor {
 
         // Extract the graph from self
         let self_graph = match &self_value.kind {
-            ValueKind::Graph(g) => g.clone(),
+            ValueKind::Graph(ref g) => g.borrow().clone(),
             _ => {
                 return Err(GraphoidError::runtime(
                     "'super' can only be used within a graph method".to_string(),
@@ -2302,7 +2299,23 @@ impl Executor {
             ValueKind::Time(timestamp) => self.eval_time_method(*timestamp, method, args),
             ValueKind::List(list) => self.eval_list_method(&list, method, args),
             ValueKind::Map(hash) => self.eval_map_method(&hash, method, args),
-            ValueKind::Graph(graph) => self.eval_graph_method(graph.clone(), method, args, object_expr),
+            ValueKind::Graph(ref graph_rc) => {
+                // Clone the graph for the method call
+                let graph = graph_rc.borrow().clone();
+
+                // Push the original Value onto the stack so call_graph_method_impl can use
+                // the same Rc<RefCell> when binding `self`. This ensures mutations inside
+                // methods are visible through all shared references (e.g., in closures).
+                self.graph_method_value_stack.push(value.clone());
+
+                // Call the method - this may mutate `graph` via self binding
+                let result = self.eval_graph_method(graph, method, args, object_expr);
+
+                // Pop the Value from the stack
+                self.graph_method_value_stack.pop();
+
+                result
+            }
             ValueKind::String(ref s) => self.eval_string_method(s, method, args, object_expr),
             ValueKind::Error(ref err) => self.eval_error_method(err, method, args),
             ValueKind::PatternNode(pn) => self.eval_pattern_node_method(pn, method, args),
@@ -3705,10 +3718,12 @@ impl Executor {
             // Phase 2 Implicit Self: Check if `self` is a graph with this method
             // This allows calling methods without explicit `self.` prefix
             if let Ok(self_value) = self.env.get("self") {
-                if let ValueKind::Graph(ref graph) = self_value.kind {
+                if let ValueKind::Graph(ref graph_rc) = self_value.kind {
+                    let graph = graph_rc.borrow();
                     if graph.has_method(name) {
                         // Clone the graph for method call
                         let graph_clone = graph.clone();
+                        drop(graph); // Release borrow before method call
                         // Create a dummy Variable expression for self to use in call_graph_method
                         let self_expr = Expr::Variable {
                             name: "self".to_string(),
@@ -4239,8 +4254,14 @@ impl Executor {
 
         // Push self onto block_self_stack for implicit self in blocks
         // This allows closures called from within this method to access `self`
+        // Use the original Value from the stack to maintain Rc<RefCell> sharing
+        let block_self_value = if let Some(original_value) = self.graph_method_value_stack.last() {
+            original_value.clone()
+        } else {
+            Value::graph(graph.clone())
+        };
         self.block_self_stack.push(BlockSelfEntry {
-            value: Value::graph(graph.clone()),
+            value: block_self_value,
         });
 
         // Push function call onto the graph
@@ -4264,8 +4285,17 @@ impl Executor {
         // Save current environment and switch to call environment
         let saved_env = std::mem::replace(&mut self.env, call_env);
 
-        // Bind `self` to the graph
-        self.env.define("self".to_string(), Value::graph(graph.clone()));
+        // Bind `self` to the graph.
+        // Use the original Value from graph_method_value_stack if available - this ensures
+        // that `self` shares the same Rc<RefCell> as the variable the method was called on,
+        // so mutations inside the method are visible through closures that captured that variable.
+        let self_value = if let Some(original_value) = self.graph_method_value_stack.last() {
+            original_value.clone()
+        } else {
+            // Fallback: create a new Value (this shouldn't happen in normal method calls)
+            Value::graph(graph.clone())
+        };
+        self.env.define("self".to_string(), self_value);
 
         // IMPORTANT: For instance methods, bind the class name from the CURRENT environment.
         // This enables patterns like `instance = ClassName {}` inside methods, where methods
@@ -4315,8 +4345,9 @@ impl Executor {
         self.env = saved_env;
 
         // Check method constraints before persisting changes
-        if let Some(Value { kind: ValueKind::Graph(ref modified_graph), .. }) = modified_self {
+        if let Some(Value { kind: ValueKind::Graph(ref modified_graph_rc), .. }) = modified_self {
             // Get the after state (use constrainable_node_ids for accurate constraint checking)
+            let modified_graph = modified_graph_rc.borrow();
             let after_node_ids: std::collections::HashSet<String> = modified_graph.constrainable_node_ids().into_iter().collect();
             let after_edge_count = modified_graph.data_edge_list().len();
 
@@ -4422,19 +4453,22 @@ impl Executor {
         }
 
         // Persist mutations to `self` back to the original graph variable
-        if let Some(modified_graph) = modified_self {
+        // With Rc<RefCell<Graph>>, changes are automatically visible through the shared reference
+        // However, we still need to handle some edge cases for compatibility
+        if let Some(modified_graph_value) = modified_self {
             // Only update if object_expr is a simple variable reference
             if let Expr::Variable { name, .. } = object_expr {
                 // Try to set in environment first
-                if self.env.set(name, modified_graph.clone()).is_err() {
+                if self.env.set(name, modified_graph_value.clone()).is_err() {
                     // Variable not in environment - check if it's accessed via implicit self
                     // If so, update the property on the outer `self` graph
                     if let Ok(outer_self) = self.env.get("self") {
-                        if let ValueKind::Graph(mut outer_graph) = outer_self.kind.clone() {
+                        if let ValueKind::Graph(ref outer_graph_rc) = outer_self.kind {
+                            let mut outer_graph = outer_graph_rc.borrow_mut();
                             if outer_graph.has_node(name) {
                                 // Update the property on the outer self (add_node preserves edges)
-                                outer_graph.add_node(name.to_string(), modified_graph)?;
-                                self.env.set("self", Value::graph(outer_graph))?;
+                                // Changes visible through the shared Rc
+                                outer_graph.add_node(name.to_string(), modified_graph_value)?;
                             }
                             // If it's not a property on outer self either, ignore
                             // (could be a read-only method call on a computed expression)
@@ -5062,48 +5096,49 @@ impl Executor {
         catch_clauses: &[crate::ast::CatchClause],
     ) -> Result<Option<Value>> {
         // Extract error type from GraphoidError
-        // First check if the error message contains a user-raised error type (e.g., "ValueError: message")
+        // User-raised errors are wrapped like: "Runtime error: ValueError: message"
+        // We need to extract the inner error type (ValueError) not the wrapper (Runtime error)
         let error_message = error.to_string();
         let error_type_name: String;
         let actual_message: String;
 
-        if let Some(colon_pos) = error_message.find(':') {
-            let potential_type = &error_message[..colon_pos];
-            // Check if it's a known error type
+        // First, strip the GraphoidError wrapper prefix if present
+        // These prefixes come from thiserror's #[error(...)] formatting
+        let prefixes = [
+            "Runtime error: ",
+            "Type error: ",
+            "Syntax error: ",
+            "IO error: ",
+            "Rule violation: ",
+            "Module not found: ",
+            "Circular dependency: ",
+            "Configuration error: ",
+        ];
+
+        let mut inner_message = error_message.as_str();
+        for prefix in &prefixes {
+            if let Some(stripped) = inner_message.strip_prefix(prefix) {
+                inner_message = stripped;
+                break;
+            }
+        }
+
+        // Now check if the inner message contains a user error type (e.g., "ValueError: message")
+        if let Some(colon_pos) = inner_message.find(':') {
+            let potential_type = &inner_message[..colon_pos];
+            // Check if it's a known user error type
             if matches!(potential_type, "ValueError" | "TypeError" | "IOError" | "NetworkError" | "ParseError" | "RuntimeError") {
                 error_type_name = potential_type.to_string();
-                actual_message = error_message[(colon_pos + 1)..].trim().to_string();
+                actual_message = inner_message[(colon_pos + 1)..].trim().to_string();
             } else {
-                // Not a recognized error type prefix, use GraphoidError type
-                error_type_name = match error {
-                    GraphoidError::SyntaxError { .. } => "SyntaxError".to_string(),
-                    GraphoidError::TypeError { .. } => "TypeError".to_string(),
-                    GraphoidError::RuntimeError { .. } => "RuntimeError".to_string(),
-                    GraphoidError::RuleViolation { .. } => "RuleViolation".to_string(),
-                    GraphoidError::ModuleNotFound { .. } => "ModuleNotFound".to_string(),
-                    GraphoidError::IOError { .. } => "IOError".to_string(),
-                    GraphoidError::CircularDependency { .. } => "CircularDependency".to_string(),
-                    GraphoidError::IoError(_) => "IoError".to_string(),
-                    GraphoidError::ConfigError { .. } => "ConfigError".to_string(),
-                    GraphoidError::LoopControl { .. } => "LoopControl".to_string(),
-                };
-                actual_message = error_message.clone();
+                // Not a recognized user error type, use the GraphoidError variant type
+                error_type_name = error.error_type();
+                actual_message = inner_message.to_string();
             }
         } else {
-            // No colon, use GraphoidError type
-            error_type_name = match error {
-                GraphoidError::SyntaxError { .. } => "SyntaxError".to_string(),
-                GraphoidError::TypeError { .. } => "TypeError".to_string(),
-                GraphoidError::RuntimeError { .. } => "RuntimeError".to_string(),
-                GraphoidError::RuleViolation { .. } => "RuleViolation".to_string(),
-                GraphoidError::ModuleNotFound { .. } => "ModuleNotFound".to_string(),
-                GraphoidError::IOError { .. } => "IOError".to_string(),
-                GraphoidError::CircularDependency { .. } => "CircularDependency".to_string(),
-                GraphoidError::IoError(_) => "IoError".to_string(),
-                GraphoidError::ConfigError { .. } => "ConfigError".to_string(),
-                    GraphoidError::LoopControl { .. } => "LoopControl".to_string(),
-            };
-            actual_message = error_message.clone();
+            // No colon in inner message, use GraphoidError variant type
+            error_type_name = error.error_type();
+            actual_message = inner_message.to_string();
         }
 
         // Search for a matching catch clause

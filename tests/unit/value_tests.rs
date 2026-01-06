@@ -271,7 +271,7 @@ fn test_frozen_graph_propagates() {
     assert!(val.is_frozen());
 
     if let ValueKind::Graph(g) = &val.kind {
-        assert!(g.is_frozen());
+        assert!(g.borrow().is_frozen());
     }
 }
 

@@ -243,7 +243,7 @@ fn test_tree_has_tree_ruleset_applied() {
 
     // Verify: tree{} applies :tree ruleset
     if let ValueKind::Graph(graph) = &t.kind {
-        assert!(graph.has_ruleset("tree"), "tree{{}} should apply :tree ruleset");
+        assert!(graph.borrow().has_ruleset("tree"), "tree{{}} should apply :tree ruleset");
     } else {
         panic!("tree{{}} should create a Graph value");
     }
