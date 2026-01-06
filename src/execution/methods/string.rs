@@ -203,7 +203,183 @@ impl Executor {
                         args.len()
                     )));
                 }
-                Ok(Value::number(s.len() as f64))
+                Ok(Value::number(s.chars().count() as f64))
+            }
+            // List-like methods: strings behave as graphs of characters
+            "first" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'first' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                match s.chars().next() {
+                    Some(c) => Ok(Value::string(c.to_string())),
+                    None => Ok(Value::none()),
+                }
+            }
+            "last" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'last' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                match s.chars().last() {
+                    Some(c) => Ok(Value::string(c.to_string())),
+                    None => Ok(Value::none()),
+                }
+            }
+            "is_empty" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'is_empty' takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                Ok(Value::boolean(s.is_empty()))
+            }
+            "slice" => {
+                // Alias for substring - strings behave like lists
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'slice' expects 2 arguments (start, end), but got {}",
+                        args.len()
+                    )));
+                }
+                let start = match &args[0].kind {
+                    ValueKind::Number(n) => *n as usize,
+                    _other => {
+                        return Err(GraphoidError::type_error("number", args[0].type_name()));
+                    }
+                };
+                let end = match &args[1].kind {
+                    ValueKind::Number(n) => *n as usize,
+                    _other => {
+                        return Err(GraphoidError::type_error("number", args[1].type_name()));
+                    }
+                };
+
+                let chars: Vec<char> = s.chars().collect();
+                let start = start.min(chars.len());
+                let end = end.min(chars.len());
+
+                if start > end {
+                    return Ok(Value::string(String::new()));
+                }
+
+                Ok(Value::string(chars[start..end].iter().collect()))
+            }
+            // Functional methods: strings behave as graphs of characters
+            "map" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'map' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                match &args[0].kind {
+                    ValueKind::Function(func) => {
+                        // Apply the function to each character
+                        let mut results = Vec::new();
+                        for c in s.chars() {
+                            let char_value = Value::string(c.to_string());
+                            let result = self.call_function(func, &[char_value])?;
+                            results.push(result);
+                        }
+                        Ok(Value::list(List::from_vec(results)))
+                    }
+                    _other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "String method 'map' expects function, got {}",
+                            args[0].type_name()
+                        )));
+                    }
+                }
+            }
+            "filter" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'filter' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                match &args[0].kind {
+                    ValueKind::Function(func) => {
+                        // Filter characters where predicate returns true
+                        let mut result = String::new();
+                        for c in s.chars() {
+                            let char_value = Value::string(c.to_string());
+                            let keep = self.call_function(func, &[char_value])?;
+                            if keep.is_truthy() {
+                                result.push(c);
+                            }
+                        }
+                        Ok(Value::string(result))
+                    }
+                    _other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "String method 'filter' expects function, got {}",
+                            args[0].type_name()
+                        )));
+                    }
+                }
+            }
+            "reject" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'reject' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                match &args[0].kind {
+                    ValueKind::Function(func) => {
+                        // Keep characters where predicate returns false
+                        let mut result = String::new();
+                        for c in s.chars() {
+                            let char_value = Value::string(c.to_string());
+                            let reject = self.call_function(func, &[char_value])?;
+                            if !reject.is_truthy() {
+                                result.push(c);
+                            }
+                        }
+                        Ok(Value::string(result))
+                    }
+                    _other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "String method 'reject' expects function, got {}",
+                            args[0].type_name()
+                        )));
+                    }
+                }
+            }
+            "each" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "String method 'each' expects 1 argument, but got {}",
+                        args.len()
+                    )));
+                }
+
+                match &args[0].kind {
+                    ValueKind::Function(func) => {
+                        // Call function for each character (for side effects)
+                        for c in s.chars() {
+                            let char_value = Value::string(c.to_string());
+                            self.call_function(func, &[char_value])?;
+                        }
+                        Ok(Value::none())
+                    }
+                    _other => {
+                        return Err(GraphoidError::runtime(format!(
+                            "String method 'each' expects function, got {}",
+                            args[0].type_name()
+                        )));
+                    }
+                }
             }
             "upper" => {
                 if !args.is_empty() {

@@ -62,6 +62,11 @@ pub struct Executor {
     /// This allows call_graph_method_impl to bind `self` to the same Rc<RefCell>,
     /// ensuring mutations are visible across closures.
     pub(crate) graph_method_value_stack: Vec<Value>,
+    /// Counter for suppressing implicit self property assignment in lambdas.
+    /// When > 0, assignment to unbound variables will NOT fall back to self properties.
+    /// This prevents lambdas passed INTO graph methods from accidentally modifying
+    /// graph properties, while still allowing method calls via implicit self.
+    pub(crate) suppress_self_property_assignment: usize,
 }
 
 /// Entry in the block_self_stack tracking the `self` value for block context
@@ -92,6 +97,7 @@ impl Executor {
             writeback_stack: Vec::new(),
             block_self_stack: Vec::new(),
             graph_method_value_stack: Vec::new(),
+            suppress_self_property_assignment: 0,
         }
     }
 
@@ -115,6 +121,7 @@ impl Executor {
             writeback_stack: Vec::new(),
             block_self_stack: Vec::new(),
             graph_method_value_stack: Vec::new(),
+            suppress_self_property_assignment: 0,
         }
     }
 
@@ -427,15 +434,24 @@ impl Executor {
                             // Phase 2 Implicit Self: Check if `self` is a graph with this property
                             // If so, assign to self.property instead of creating a local variable
                             // Properties are stored in __properties__/ branch
+                            //
+                            // IMPORTANT: This is suppressed when inside a lambda that was defined
+                            // outside a graph context. This prevents accidental modification of
+                            // graph properties by lambdas passed into graph methods.
+                            // Method calls still work via implicit self (DSL patterns).
                             let property_node_id = Graph::property_node_id(&name);
-                            let assigned_to_self = if let Ok(self_value) = self.env.get("self") {
-                                if let ValueKind::Graph(ref graph_rc) = self_value.kind {
-                                    let mut graph = graph_rc.borrow_mut();
-                                    if graph.has_node(&property_node_id) {
-                                        // Update the graph property in __properties__/ branch
-                                        // Changes are visible through the shared Rc
-                                        graph.add_node(property_node_id, val.clone())?;
-                                        true
+                            let assigned_to_self = if self.suppress_self_property_assignment == 0 {
+                                if let Ok(self_value) = self.env.get("self") {
+                                    if let ValueKind::Graph(ref graph_rc) = self_value.kind {
+                                        let mut graph = graph_rc.borrow_mut();
+                                        if graph.has_node(&property_node_id) {
+                                            // Update the graph property in __properties__/ branch
+                                            // Changes are visible through the shared Rc
+                                            graph.add_node(property_node_id, val.clone())?;
+                                            true
+                                        } else {
+                                            false
+                                        }
                                     } else {
                                         false
                                     }
@@ -757,11 +773,16 @@ impl Executor {
                 let iterable_value = self.eval_expr(iterable)?;
 
                 // Get the list of values to iterate over
+                // Strings are iterable as graphs of characters
                 let values = match &iterable_value.kind {
                     ValueKind::List(ref items) => items.to_vec(),
+                    ValueKind::String(ref s) => {
+                        // Convert string to list of single-character strings
+                        s.chars().map(|c| Value::string(c.to_string())).collect()
+                    }
                     _other => {
                         return Err(GraphoidError::type_error(
-                            "list",
+                            "list or string",
                             iterable_value.type_name(),
                         ));
                     }
@@ -4011,12 +4032,30 @@ impl Executor {
         //
         // Priority: Use the parent environment's `self` if it exists (in case the method
         // modified self before calling the block), otherwise fall back to block_self_stack.
-        if func.name.is_none() {
+        //
+        // IMPORTANT: Track whether this lambda was defined outside a graph context.
+        // If so, suppress implicit self PROPERTY assignment (but still allow method calls).
+        // This prevents accidental modification of graph properties by passed-in lambdas.
+        let suppress_property_assignment = if func.name.is_none() {
+            // Check if lambda was defined inside a graph method (captured env has 'self')
+            let captured_has_self = func.env.borrow().get("self").is_ok();
+
+            // Inject self for DSL-style method calls
             let block_self = saved_env.get("self").ok()
                 .or_else(|| self.block_self_stack.last().map(|e| e.value.clone()));
+            let has_block_self = block_self.is_some();
             if let Some(self_value) = block_self {
                 self.env.define("self".to_string(), self_value);
             }
+
+            // Suppress property assignment if lambda was defined outside graph context
+            !captured_has_self && has_block_self
+        } else {
+            false
+        };
+
+        if suppress_property_assignment {
+            self.suppress_self_property_assignment += 1;
         }
 
         // Execute function body - either pattern matching or traditional
@@ -4135,6 +4174,11 @@ impl Executor {
                 // This ensures the enclosing method's `self` is updated
                 let _ = saved_env.set("self", modified_self);
             }
+        }
+
+        // Decrement suppress counter if we incremented it
+        if suppress_property_assignment {
+            self.suppress_self_property_assignment -= 1;
         }
 
         // Restore original environment
@@ -4296,6 +4340,12 @@ impl Executor {
             self.function_graph.borrow_mut().push_call(func_id.clone(), arg_values.to_vec());
         }
 
+        // Save and reset the suppress_self_property_assignment counter.
+        // Graph method bodies should ALWAYS be able to use implicit self property assignment,
+        // even when called from inside a lambda that has suppression enabled.
+        let saved_suppress = self.suppress_self_property_assignment;
+        self.suppress_self_property_assignment = 0;
+
         // Save current environment first
         let saved_env_clone = self.env.clone();
 
@@ -4385,7 +4435,8 @@ impl Executor {
                         RuleSpec::ReadOnly => {
                             // Any change violates read_only
                             if before_node_ids != after_node_ids || before_edge_count != after_edge_count {
-                                // Pop call stack before returning error
+                                // Restore state before returning error
+                                self.suppress_self_property_assignment = saved_suppress;
                                 self.call_stack.pop();
                                 if func.node_id.is_some() {
                                     self.function_graph.borrow_mut().pop_call(Value::none());
@@ -4400,6 +4451,7 @@ impl Executor {
                             // Check if any nodes were removed
                             let removed: Vec<_> = before_node_ids.difference(&after_node_ids).collect();
                             if !removed.is_empty() {
+                                self.suppress_self_property_assignment = saved_suppress;
                                 self.call_stack.pop();
                                 if func.node_id.is_some() {
                                     self.function_graph.borrow_mut().pop_call(Value::none());
@@ -4413,6 +4465,7 @@ impl Executor {
                         RuleSpec::NoEdgeRemovals => {
                             // Check if edges were removed
                             if after_edge_count < before_edge_count {
+                                self.suppress_self_property_assignment = saved_suppress;
                                 self.call_stack.pop();
                                 if func.node_id.is_some() {
                                     self.function_graph.borrow_mut().pop_call(Value::none());
@@ -4451,6 +4504,7 @@ impl Executor {
                                     };
 
                                     if !is_allowed {
+                                        self.suppress_self_property_assignment = saved_suppress;
                                         self.call_stack.pop();
                                         if func.node_id.is_some() {
                                             self.function_graph.borrow_mut().pop_call(Value::none());
@@ -4462,6 +4516,7 @@ impl Executor {
                                     }
                                 }
                                 Err(e) => {
+                                    self.suppress_self_property_assignment = saved_suppress;
                                     self.call_stack.pop();
                                     if func.node_id.is_some() {
                                         self.function_graph.borrow_mut().pop_call(Value::none());
@@ -4504,6 +4559,9 @@ impl Executor {
                 }
             }
         }
+
+        // Restore suppress_self_property_assignment counter
+        self.suppress_self_property_assignment = saved_suppress;
 
         // Pop method from call stack
         self.call_stack.pop();
