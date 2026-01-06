@@ -1835,6 +1835,33 @@ impl Executor {
         result
     }
 
+    /// Helper to set a variable value, checking graph properties if env.set fails.
+    /// This allows mutating methods to work on graph properties like `items.append!(x)`
+    /// where `items` is a property of the current `self` graph.
+    fn set_variable_or_graph_property(&mut self, var_name: &str, value: Value) -> Result<()> {
+        // Try to set in environment first
+        if self.env.set(var_name, value.clone()).is_ok() {
+            return Ok(());
+        }
+
+        // Variable not in environment - check if it's a property on `self` graph
+        if let Ok(self_value) = self.env.get("self") {
+            if let ValueKind::Graph(ref graph_rc) = self_value.kind {
+                let mut graph = graph_rc.borrow_mut();
+                // Check for property in __properties__/ branch
+                let property_node_id = Graph::property_node_id(var_name);
+                if graph.has_node(&property_node_id) {
+                    // Update the property on self
+                    graph.add_node(property_node_id, value)?;
+                    return Ok(());
+                }
+            }
+        }
+
+        // If we get here, the variable doesn't exist anywhere
+        Err(GraphoidError::undefined_variable(var_name))
+    }
+
     /// Helper to evaluate arguments (positional only for now).
     /// Named arguments in method calls are not yet supported.
     pub(crate) fn eval_arguments(&mut self, args: &[crate::ast::Argument]) -> Result<Vec<Value>> {
@@ -1967,14 +1994,14 @@ impl Executor {
                 if let ValueKind::List(list) = &object_value.kind {
                     let mut list_to_mutate = list.clone();
                     let popped_value = list_to_mutate.pop()?; // Get popped value and mutate
-                    self.env.set(&var_name, Value::list(list_to_mutate))?;
+                    self.set_variable_or_graph_property(&var_name, Value::list(list_to_mutate))?;
                     return Ok(popped_value); // Return the popped value
                 }
             }
 
             // For other mutating methods, apply method and update variable
             let result = self.apply_method_to_value(object_value, base_method, &arg_values, object)?;
-            self.env.set(&var_name, result)?;
+            self.set_variable_or_graph_property(&var_name, result)?;
 
             // Mutating methods return none
             Ok(Value::none())

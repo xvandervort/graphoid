@@ -1,0 +1,205 @@
+# collections_spec.gr - gspec tests for samples/01-basics/collections.gr
+#
+# Run with: cargo run --quiet tests/gspec/collections_spec.gr
+
+import "gspec"
+
+runner = gspec.TestRunner.clone()
+
+# Shared state graph for before_each tests
+graph Setup { numbers: [], person: {} }
+setup = Setup.clone()
+
+runner.describe("Collections", () => {
+
+    runner.describe("Lists", () => {
+
+        runner.describe("basic accessors", () => {
+            runner.before_each(() => {
+                setup.numbers = [1, 2, 3, 4, 5]
+            })
+
+            runner.it("first() returns the first element", () => {
+                return expect(setup.numbers.first()).to_equal(1)
+            })
+
+            runner.it("last() returns the last element", () => {
+                return expect(setup.numbers.last()).to_equal(5)
+            })
+
+            runner.it("len() returns the length", () => {
+                return expect(setup.numbers.len()).to_equal(5)
+            })
+
+            runner.it("works with empty list", () => {
+                empty = []
+                return expect(empty.len()).to_equal(0)
+            })
+        })
+
+        runner.describe("functional operations", () => {
+            runner.before_each(() => {
+                setup.numbers = [1, 2, 3, 4, 5]
+            })
+
+            runner.it("map() transforms each element", () => {
+                doubled = setup.numbers.map(x => x * 2)
+                return expect(doubled).to_equal([2, 4, 6, 8, 10])
+            })
+
+            runner.it("filter() keeps matching elements", () => {
+                evens = setup.numbers.filter(x => x % 2 == 0)
+                return expect(evens).to_equal([2, 4])
+            })
+
+            runner.it("reject() removes matching elements", () => {
+                odds = setup.numbers.reject(x => x % 2 == 0)
+                return expect(odds).to_equal([1, 3, 5])
+            })
+
+            runner.it("map() does not modify original", () => {
+                doubled = setup.numbers.map(x => x * 2)
+                return expect(setup.numbers).to_equal([1, 2, 3, 4, 5])
+            })
+        })
+
+        runner.describe("immutable operations", () => {
+            runner.before_each(() => {
+                setup.numbers = [1, 2, 3, 4, 5]
+            })
+
+            runner.it("insert() adds element at index", () => {
+                with_99 = setup.numbers.insert(2, 99)
+                return expect(with_99).to_equal([1, 2, 99, 3, 4, 5])
+            })
+
+            runner.it("insert() does not modify original", () => {
+                with_99 = setup.numbers.insert(2, 99)
+                return expect(setup.numbers).to_equal([1, 2, 3, 4, 5])
+            })
+
+            runner.it("remove() removes an element", () => {
+                without_3 = setup.numbers.remove(3)
+                return expect(without_3).to_equal([1, 2, 4, 5])
+            })
+
+            runner.it("remove() does not modify original", () => {
+                without_3 = setup.numbers.remove(3)
+                return expect(setup.numbers).to_equal([1, 2, 3, 4, 5])
+            })
+        })
+
+        runner.describe("transformation operations", () => {
+            runner.it("reverse() reverses the list", () => {
+                items = [1, 2, 3, 4, 5]
+                reversed = items.reverse()
+                return expect(reversed).to_equal([5, 4, 3, 2, 1])
+            })
+
+            runner.it("uniq() removes duplicates", () => {
+                items = [1, 2, 2, 3, 3, 3, 4]
+                unique = items.uniq()
+                return expect(unique).to_equal([1, 2, 3, 4])
+            })
+
+            runner.it("compact() removes none values", () => {
+                items = [1, none, 2, none, 3]
+                clean = items.compact()
+                return expect(clean).to_equal([1, 2, 3])
+            })
+        })
+    })
+
+    runner.describe("Maps", () => {
+
+        runner.describe("basic operations", () => {
+            runner.before_each(() => {
+                setup.person = {"name": "Alice", "age": 30, "city": "Portland"}
+            })
+
+            runner.it("supports key access with []", () => {
+                return expect(setup.person["name"]).to_equal("Alice")
+            })
+
+            runner.it("keys() returns all keys", () => {
+                keys = setup.person.keys()
+                return expect(keys).to_have_length(3)
+            })
+
+            runner.it("keys() contains expected keys", () => {
+                keys = setup.person.keys()
+                return expect(keys).to_contain("name")
+            })
+
+            runner.it("values() returns all values", () => {
+                vals = setup.person.values()
+                return expect(vals).to_have_length(3)
+            })
+
+            runner.it("values() contains expected values", () => {
+                vals = setup.person.values()
+                return expect(vals).to_contain("Alice")
+            })
+
+            runner.it("has_key() returns true for existing key", () => {
+                return expect(setup.person.has_key("age")).to_equal(true)
+            })
+
+            runner.it("has_key() returns false for missing key", () => {
+                return expect(setup.person.has_key("email")).to_equal(false)
+            })
+
+            runner.it("size() returns the number of entries", () => {
+                return expect(setup.person.size()).to_equal(3)
+            })
+
+            runner.it("is_empty() returns false for non-empty map", () => {
+                return expect(setup.person.is_empty()).to_equal(false)
+            })
+
+            runner.it("is_empty() returns true for empty map", () => {
+                empty = {}
+                return expect(empty.is_empty()).to_equal(true)
+            })
+        })
+
+        runner.describe("immutable operations", () => {
+            runner.before_each(() => {
+                setup.person = {"name": "Alice", "age": 30, "city": "Portland"}
+            })
+
+            runner.it("remove() returns new map without key", () => {
+                smaller = setup.person.remove("city")
+                return expect(smaller.has_key("city")).to_equal(false)
+            })
+
+            runner.it("remove() does not modify original", () => {
+                smaller = setup.person.remove("city")
+                return expect(setup.person.has_key("city")).to_equal(true)
+            })
+        })
+
+        runner.describe("negation examples", () => {
+            runner.it("empty list is not truthy", () => {
+                return expect([]).to_not().to_be_truthy()
+            })
+
+            runner.it("non-empty list does not have length 0", () => {
+                return expect([1, 2, 3]).to_not().to_have_length(0)
+            })
+
+            runner.it("map does not contain missing key", () => {
+                person = {"name": "Alice"}
+                return expect(person.has_key("email")).to_not().to_equal(true)
+            })
+        })
+    })
+})
+
+runner.print_summary()
+
+# Exit with error code if tests failed
+summary = runner.summary()
+if summary["failed"] > 0 {
+    raise RuntimeError(summary["failed"].to_string() + " tests failed")
+}

@@ -30,6 +30,12 @@ graph Expectation {
         return self
     }
 
+    # Alias for negate() - more readable: expect(x).to_not().equal(y)
+    # Note: 'not' is a reserved keyword, so we use 'to_not' instead
+    fn to_not() {
+        return negate()
+    }
+
     # Helper to build result map, applying negation
     fn _result(passed, fail_msg, negated_fail_msg) {
         final_passed = passed
@@ -234,20 +240,28 @@ graph TestRunner {
     passed: 0
     failed: 0
     indent: 0
+    hooks: []
 
     # Helper to build indentation string
     fn _indent_str() {
         return string.generate("  ", indent)
     }
 
+    # Register a before_each hook for the current describe block
+    fn before_each(hook) {
+        hooks.append!(hook)
+    }
+
     # Describe a test suite
     fn describe(name, block) {
         print(_indent_str() + name)
 
-        # Update indent, run block, restore indent
+        # Save current hooks, update indent, run block, restore both
+        saved_hooks = hooks.slice(0, hooks.length())
         indent = indent + 1
         block()
         indent = indent - 1
+        hooks = saved_hooks
     }
 
     # Context is an alias for describe (for nested grouping)
@@ -256,15 +270,32 @@ graph TestRunner {
     }
 
     # Define a single test case
+    # If block returns an expectation result (map with "pass" key), auto-assert it
     fn it(description, block) {
         prefix = _indent_str()
+
+        # Run before_each hooks
+        for hook in hooks {
+            hook()
+        }
 
         # Run the test and catch any exceptions
         test_passed = true
         error_msg = ""
 
         try {
-            block()
+            result = block()
+            # Check if block returned an expectation result
+            if result != none {
+                if result.type() == "map" {
+                    if result.has_key("pass") {
+                        if not result["pass"] {
+                            test_passed = false
+                            error_msg = result["message"]
+                        }
+                    }
+                }
+            }
         } catch as e {
             test_passed = false
             error_msg = e.message()

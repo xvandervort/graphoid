@@ -512,6 +512,175 @@ t.assert_true(true, "print_summary() executes without error")
 print("")
 
 # =============================================================================
+# Section 17: Auto-assertion it() blocks (Priority 1)
+# =============================================================================
+print("--- 17. Auto-assertion it() Blocks ---")
+
+# Test that it() auto-asserts when block returns expectation result
+runner7 = gspec.TestRunner.clone()
+
+# Test 1: Block returns passing expectation - should pass automatically
+runner7.describe("AutoAssert", () => {
+    runner7.it("auto-passes when expectation passes", () => {
+        return expect(5).to_equal(5)
+    })
+})
+summary7 = runner7.summary()
+t.assert_true(summary7["passed"] == 1, "Auto-assert: passing expectation counts as pass")
+t.assert_true(summary7["failed"] == 0, "Auto-assert: passing expectation has no failures")
+
+# Test 2: Block returns failing expectation - should fail automatically
+runner8 = gspec.TestRunner.clone()
+runner8.describe("AutoAssertFail", () => {
+    runner8.it("auto-fails when expectation fails", () => {
+        return expect(5).to_equal(10)
+    })
+})
+summary8 = runner8.summary()
+t.assert_true(summary8["passed"] == 0, "Auto-assert: failing expectation counts as fail")
+t.assert_true(summary8["failed"] == 1, "Auto-assert: failing expectation has 1 failure")
+
+# Test 3: Block returns nothing (no return) - should still work
+runner9 = gspec.TestRunner.clone()
+runner9.describe("NoReturn", () => {
+    runner9.it("passes when block has no return", () => {
+        x = 5 + 5
+    })
+})
+summary9 = runner9.summary()
+t.assert_true(summary9["passed"] == 1, "Auto-assert: no return still passes")
+
+# Test 4: Block throws exception - should fail (existing behavior)
+runner10 = gspec.TestRunner.clone()
+runner10.describe("ThrowTest", () => {
+    runner10.it("fails when block throws", () => {
+        raise ValueError("oops")
+    })
+})
+summary10 = runner10.summary()
+t.assert_true(summary10["failed"] == 1, "Auto-assert: exception still fails")
+
+print("")
+
+# =============================================================================
+# Section 18: to_not() alias for negate() (Priority 2)
+# =============================================================================
+print("--- 18. to_not() Alias ---")
+
+# Test that to_not() works the same as negate()
+# Note: 'not' is a reserved keyword, so we use 'to_not' instead
+result = expect(5).to_not().to_equal(10)
+t.assert_true(result["pass"], "to_not().to_equal: 5 not equal 10")
+
+result = expect(5).to_not().to_equal(5)
+t.assert_false(result["pass"], "to_not().to_equal: 5 equals 5 (negated fails)")
+
+result = expect(false).to_not().to_be_truthy()
+t.assert_true(result["pass"], "to_not().to_be_truthy: false is not truthy")
+
+result = expect([1, 2, 3]).to_not().to_contain(5)
+t.assert_true(result["pass"], "to_not().to_contain: list does not contain 5")
+
+result = expect([1, 2, 3]).to_not().to_be_empty()
+t.assert_true(result["pass"], "to_not().to_be_empty: non-empty list is not empty")
+
+result = expect("hello").to_not().to_be_a("num")
+t.assert_true(result["pass"], "to_not().to_be_a: string is not a num")
+
+print("")
+
+# =============================================================================
+# Section 19: before_each() Support (Priority 3)
+# =============================================================================
+print("--- 19. before_each() Support ---")
+
+# Test that before_each runs before each it() block
+# Use a graph to track state across closures (graphs share state properly)
+graph Counter { value: 0 }
+counter = Counter.clone()
+
+runner11 = gspec.TestRunner.clone()
+
+runner11.describe("BeforeEachTest", () => {
+    runner11.before_each(() => {
+        counter.value = counter.value + 1
+    })
+
+    runner11.it("first test", () => {
+        # before_each should have run once
+    })
+
+    runner11.it("second test", () => {
+        # before_each should have run twice now
+    })
+
+    runner11.it("third test", () => {
+        # before_each should have run three times now
+    })
+})
+
+t.assert_true(counter.value == 3, "before_each: ran 3 times for 3 tests")
+
+# Test that before_each can set up shared state
+graph Shared { numbers: [] }
+shared = Shared.clone()
+
+runner12 = gspec.TestRunner.clone()
+
+runner12.describe("SharedSetup", () => {
+    runner12.before_each(() => {
+        shared.numbers = [1, 2, 3, 4, 5]
+    })
+
+    runner12.it("uses shared setup", () => {
+        return expect(shared.numbers.len()).to_equal(5)
+    })
+
+    runner12.it("modifies shared state", () => {
+        # Use immutable operation + assignment instead of mutating method
+        shared.numbers = shared.numbers.insert(shared.numbers.length(), 6)
+        return expect(shared.numbers.len()).to_equal(6)
+    })
+
+    runner12.it("setup resets for next test", () => {
+        return expect(shared.numbers.len()).to_equal(5)
+    })
+})
+
+summary12 = runner12.summary()
+t.assert_true(summary12["passed"] == 3, "before_each: all 3 tests with shared setup passed")
+
+# Test nested describe blocks with before_each
+graph OuterRuns { count: 0 }
+graph InnerRuns { count: 0 }
+outer_runs = OuterRuns.clone()
+inner_runs = InnerRuns.clone()
+
+runner13 = gspec.TestRunner.clone()
+
+runner13.describe("Outer", () => {
+    runner13.before_each(() => {
+        outer_runs.count = outer_runs.count + 1
+    })
+
+    runner13.it("outer test", () => {})
+
+    runner13.describe("Inner", () => {
+        runner13.before_each(() => {
+            inner_runs.count = inner_runs.count + 1
+        })
+
+        runner13.it("inner test 1", () => {})
+        runner13.it("inner test 2", () => {})
+    })
+})
+
+t.assert_true(outer_runs.count == 3, "before_each: outer runs for all 3 tests")
+t.assert_true(inner_runs.count == 2, "before_each: inner runs for 2 inner tests only")
+
+print("")
+
+# =============================================================================
 # Summary
 # =============================================================================
 t.summary()
