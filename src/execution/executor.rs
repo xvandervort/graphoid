@@ -1943,19 +1943,31 @@ impl Executor {
                 )));
             }
 
-            // Look up the member in the module's namespace FIRST (module-qualified calls
-            // should always resolve to the module's definition, not global_functions)
+            // Look up the member in the module's namespace
             let member = module.namespace.get(method)?;
 
-            // If it's a function, call it with args
-            if let ValueKind::Function(func) = &member.kind {
-                // Evaluate argument expressions if not already done
+            // If it's a function, check for overloads and call with correct arity
+            if let ValueKind::Function(_) = &member.kind {
+                // Evaluate argument expressions
                 let arg_values = if args.is_empty() {
                     Vec::new()
                 } else {
                     self.eval_arguments(args)?
                 };
-                return self.call_function(&func, &arg_values);
+                let arity = arg_values.len();
+
+                // Check global_functions for overloaded versions with matching arity
+                // Module functions are copied there during import (see load_module)
+                if let Some(overloads) = self.global_functions.get(method) {
+                    if let Some(func) = overloads.iter().find(|f| f.parameters.len() == arity).cloned() {
+                        return self.call_function(&func, &arg_values);
+                    }
+                }
+
+                // No matching overload found in global_functions, use the one from namespace
+                if let ValueKind::Function(func) = &member.kind {
+                    return self.call_function(func, &arg_values);
+                }
             } else if let ValueKind::NativeFunction(native_func) = &member.kind {
                 // Native function - call it with evaluated args
                 let arg_values = self.eval_arguments(args)?;

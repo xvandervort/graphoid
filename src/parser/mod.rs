@@ -314,9 +314,24 @@ impl Parser {
             });
         };
 
-        // Regular function syntax only
-        let name = first_ident;
-        let receiver: Option<String> = None;
+        // Check for method syntax: fn receiver.method_name()
+        let (name, receiver) = if self.match_token(&TokenType::Dot) {
+            // fn receiver.method_name() syntax
+            let method_name = if let TokenType::Identifier(id) = &self.peek().token_type {
+                let n = id.clone();
+                self.advance();
+                n
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected method name after '.'".to_string(),
+                    position: self.peek().position(),
+                });
+            };
+            (method_name, Some(first_ident))
+        } else {
+            // Regular function: fn function_name()
+            (first_ident, None)
+        };
 
         // ⚠️  NO GENERICS POLICY ENFORCEMENT
         // See: dev_docs/NO_GENERICS_POLICY.md
