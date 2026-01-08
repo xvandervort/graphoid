@@ -12,23 +12,23 @@ runner.describe("Functions and Control Flow", () => {
 
         runner.it("defines and calls a simple function", () => {
             fn add(a, b) { return a + b }
-            return expect(add(5, 3)).to_equal(8)
+            assert(expect(add(5, 3)).to_equal(8))
         })
 
         runner.it("supports single-expression functions", () => {
             fn square(x) { return x * x }
-            return expect(square(7)).to_equal(49)
+            assert(expect(square(7)).to_equal(49))
         })
 
         runner.it("supports functions with no parameters", () => {
             fn get_pi() { return 3.14159 }
-            return expect(get_pi()).to_be_greater_than(3)
+            assert(expect(get_pi()).to_be_greater_than(3))
         })
 
         runner.it("supports nested function calls", () => {
             fn double(x) { return x * 2 }
             fn add_one(x) { return x + 1 }
-            return expect(double(add_one(5))).to_equal(12)
+            assert(expect(double(add_one(5))).to_equal(12))
         })
 
         runner.it("supports recursive functions", () => {
@@ -36,7 +36,7 @@ runner.describe("Functions and Control Flow", () => {
                 if n <= 1 { return 1 }
                 return n * factorial(n - 1)
             }
-            return expect(factorial(5)).to_equal(120)
+            assert(expect(factorial(5)).to_equal(120))
         })
     })
 
@@ -44,41 +44,41 @@ runner.describe("Functions and Control Flow", () => {
 
         runner.it("creates single-parameter lambda with arrow syntax", () => {
             sq = x => x * x
-            return expect(sq(7)).to_equal(49)
+            assert(expect(sq(7)).to_equal(49))
         })
 
         runner.it("creates multi-parameter lambda", () => {
             multiply = (a, b) => a * b
-            return expect(multiply(4, 5)).to_equal(20)
+            assert(expect(multiply(4, 5)).to_equal(20))
         })
 
         runner.it("uses lambda with map()", () => {
             numbers = [1, 2, 3, 4, 5]
             squares = numbers.map(x => x * x)
-            return expect(squares).to_equal([1, 4, 9, 16, 25])
+            assert(expect(squares).to_equal([1, 4, 9, 16, 25]))
         })
 
         runner.it("uses lambda with filter()", () => {
             numbers = [1, 2, 3, 4, 5]
             evens = numbers.filter(x => x % 2 == 0)
-            return expect(evens).to_equal([2, 4])
+            assert(expect(evens).to_equal([2, 4]))
         })
 
         runner.it("chains lambda operations", () => {
             numbers = [1, 2, 3, 4, 5]
             result = numbers.filter(x => x > 2).map(x => x * 10)
-            return expect(result).to_equal([30, 40, 50])
+            assert(expect(result).to_equal([30, 40, 50]))
         })
 
         runner.it("uses lambda with reject()", () => {
             numbers = [1, 2, 3, 4, 5]
             odds = numbers.reject(x => x % 2 == 0)
-            return expect(odds).to_equal([1, 3, 5])
+            assert(expect(odds).to_equal([1, 3, 5]))
         })
 
         runner.it("stores lambda in variable and reuses", () => {
             is_positive = x => x > 0
-            return expect([-2, -1, 0, 1, 2].filter(is_positive)).to_equal([1, 2])
+            assert(expect([-2, -1, 0, 1, 2].filter(is_positive)).to_equal([1, 2]))
         })
     })
 
@@ -89,26 +89,26 @@ runner.describe("Functions and Control Flow", () => {
                 age = 25
                 result = "unknown"
                 if age >= 18 { result = "adult" } else { result = "minor" }
-                return expect(result).to_equal("adult")
+                assert(expect(result).to_equal("adult"))
             })
 
             runner.it("executes else branch when condition is false", () => {
                 age = 15
                 result = "unknown"
                 if age >= 18 { result = "adult" } else { result = "minor" }
-                return expect(result).to_equal("minor")
+                assert(expect(result).to_equal("minor"))
             })
 
             runner.it("supports inline conditional expressions", () => {
                 age = 25
                 status = if age >= 21 { "can drink" } else { "cannot drink" }
-                return expect(status).to_equal("can drink")
+                assert(expect(status).to_equal("can drink"))
             })
 
             runner.it("returns value from inline conditional", () => {
                 x = 10
                 result = if x > 5 { "big" } else { "small" }
-                return expect(result).to_equal("big")
+                assert(expect(result).to_equal("big"))
             })
         })
 
@@ -117,40 +117,40 @@ runner.describe("Functions and Control Flow", () => {
                 score = 85
                 did_pass = false
                 unless score < 60 { did_pass = true }
-                return expect(did_pass).to_equal(true)
+                assert(expect(did_pass).to_equal(true))
             })
 
             runner.it("skips block when condition is true", () => {
                 score = 50
                 did_pass = true
                 unless score < 60 { did_pass = false }
-                return expect(did_pass).to_equal(true)
+                assert(expect(did_pass).to_equal(true))
             })
         })
 
         runner.describe("boolean expressions", () => {
             runner.it("supports and operator", () => {
-                return expect(true and true).to_equal(true)
+                assert(expect(true and true).to_equal(true))
             })
 
             runner.it("supports or operator", () => {
-                return expect(false or true).to_equal(true)
+                assert(expect(false or true).to_equal(true))
             })
 
             runner.it("supports not operator", () => {
-                return expect(not false).to_equal(true)
+                assert(expect(not false).to_equal(true))
             })
 
             runner.it("supports comparison operators", () => {
-                return expect(5 > 3).to_equal(true)
+                assert(expect(5 > 3).to_equal(true))
             })
 
             runner.it("supports equality check", () => {
-                return expect(5 == 5).to_equal(true)
+                assert(expect(5 == 5).to_equal(true))
             })
 
             runner.it("supports inequality check", () => {
-                return expect(5 != 3).to_equal(true)
+                assert(expect(5 != 3).to_equal(true))
             })
         })
     })
@@ -163,7 +163,7 @@ runner.describe("Functions and Control Flow", () => {
                 for i in [1, 2, 3, 4, 5] {
                     sum = sum + i
                 }
-                return expect(sum).to_equal(15)
+                assert(expect(sum).to_equal(15))
             })
 
             runner.it("iterates over empty list without error", () => {
@@ -171,7 +171,7 @@ runner.describe("Functions and Control Flow", () => {
                 for i in [] {
                     sum = sum + 1
                 }
-                return expect(sum).to_equal(0)
+                assert(expect(sum).to_equal(0))
             })
 
             runner.it("can access loop variable in body", () => {
@@ -179,7 +179,7 @@ runner.describe("Functions and Control Flow", () => {
                 for n in [1, 2, 3] {
                     squares = squares.insert(squares.length(), n * n)
                 }
-                return expect(squares).to_equal([1, 4, 9])
+                assert(expect(squares).to_equal([1, 4, 9]))
             })
         })
 
@@ -191,7 +191,7 @@ runner.describe("Functions and Control Flow", () => {
                     result = result + count
                     count = count - 1
                 }
-                return expect(result).to_equal(15)
+                assert(expect(result).to_equal(15))
             })
 
             runner.it("skips body when condition is initially false", () => {
@@ -201,7 +201,7 @@ runner.describe("Functions and Control Flow", () => {
                     executed = true
                     count = count - 1
                 }
-                return expect(executed).to_equal(false)
+                assert(expect(executed).to_equal(false))
             })
 
             runner.it("supports countdown pattern", () => {
@@ -211,7 +211,7 @@ runner.describe("Functions and Control Flow", () => {
                     nums = nums.insert(nums.length(), count)
                     count = count - 1
                 }
-                return expect(nums).to_equal([3, 2, 1])
+                assert(expect(nums).to_equal([3, 2, 1]))
             })
         })
     })
@@ -225,7 +225,7 @@ runner.describe("Functions and Control Flow", () => {
                 for c in "hello" {
                     chars = chars.insert(chars.length(), c)
                 }
-                return expect(chars).to_equal(["h", "e", "l", "l", "o"])
+                assert(expect(chars).to_equal(["h", "e", "l", "l", "o"]))
             })
 
             runner.it("iterates over empty string without error", () => {
@@ -233,55 +233,55 @@ runner.describe("Functions and Control Flow", () => {
                 for c in "" {
                     count = count + 1
                 }
-                return expect(count).to_equal(0)
+                assert(expect(count).to_equal(0))
             })
         })
 
         runner.describe("list-like accessors", () => {
             runner.it("first() returns first character", () => {
-                return expect("hello".first()).to_equal("h")
+                assert(expect("hello".first()).to_equal("h"))
             })
 
             runner.it("last() returns last character", () => {
-                return expect("hello".last()).to_equal("o")
+                assert(expect("hello".last()).to_equal("o"))
             })
 
             runner.it("first() on empty string returns none", () => {
-                return expect("".first()).to_be_none()
+                assert(expect("".first()).to_be_none())
             })
 
             runner.it("is_empty() returns true for empty string", () => {
-                return expect("".is_empty()).to_equal(true)
+                assert(expect("".is_empty()).to_equal(true))
             })
 
             runner.it("is_empty() returns false for non-empty string", () => {
-                return expect("hello".is_empty()).to_equal(false)
+                assert(expect("hello".is_empty()).to_equal(false))
             })
 
             runner.it("slice() works like substring()", () => {
-                return expect("hello".slice(1, 4)).to_equal("ell")
+                assert(expect("hello".slice(1, 4)).to_equal("ell"))
             })
         })
 
         runner.describe("functional methods", () => {
             runner.it("map() transforms each character", () => {
                 result = "abc".map(c => c.upper())
-                return expect(result).to_equal(["A", "B", "C"])
+                assert(expect(result).to_equal(["A", "B", "C"]))
             })
 
             runner.it("filter() keeps matching characters", () => {
                 vowels = "hello".filter(c => c == "e" or c == "o")
-                return expect(vowels).to_equal("eo")
+                assert(expect(vowels).to_equal("eo"))
             })
 
             runner.it("reject() removes matching characters", () => {
                 consonants = "hello".reject(c => c == "e" or c == "o")
-                return expect(consonants).to_equal("hll")
+                assert(expect(consonants).to_equal("hll"))
             })
 
             runner.it("filter() returns string, not list", () => {
                 result = "abc".filter(c => c != "b")
-                return expect(result.type()).to_equal("string")
+                assert(expect(result.type()).to_equal("string"))
             })
         })
     })
@@ -291,7 +291,7 @@ runner.describe("Functions and Control Flow", () => {
         runner.it("handles function returning none implicitly", () => {
             fn do_nothing() { x = 5 }
             result = do_nothing()
-            return expect(result).to_be_none()
+            assert(expect(result).to_be_none())
         })
 
         runner.it("handles function with early return", () => {
@@ -299,7 +299,7 @@ runner.describe("Functions and Control Flow", () => {
                 if n <= 0 { return "not positive" }
                 return "positive"
             }
-            return expect(check_positive(-5)).to_equal("not positive")
+            assert(expect(check_positive(-5)).to_equal("not positive"))
         })
 
         runner.it("handles function shadowing outer variable", () => {
@@ -308,13 +308,13 @@ runner.describe("Functions and Control Flow", () => {
                 x = 20
                 return x
             }
-            return expect(get_x()).to_equal(20)
+            assert(expect(get_x()).to_equal(20))
         })
 
         runner.it("handles lambda capturing outer variable", () => {
             multiplier = 3
             triple = x => x * multiplier
-            return expect(triple(5)).to_equal(15)
+            assert(expect(triple(5)).to_equal(15))
         })
     })
 })

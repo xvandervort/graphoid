@@ -1,7 +1,7 @@
-# gspec_tests.gr - TDD tests for the gspec testing framework
+# gspec_spec.gr - TDD tests for the gspec testing framework
 #
 # These tests verify the gspec framework itself works correctly.
-# Run with: cargo run --quiet tests/integration/gspec_tests.gr
+# Run with: cargo run --quiet tests/gspec/gspec_spec.gr
 
 import "gspec"
 
@@ -677,6 +677,144 @@ runner13.describe("Outer", () => {
 
 t.assert_true(outer_runs.count == 3, "before_each: outer runs for all 3 tests")
 t.assert_true(inner_runs.count == 2, "before_each: inner runs for 2 inner tests only")
+
+print("")
+
+# =============================================================================
+# Section 20: assert() Function (Multi-assertion support)
+# =============================================================================
+print("--- 20. assert() Function ---")
+
+# Test that assert passes silently for passing expectations
+no_error = true
+try {
+    assert(expect(5).to_equal(5))
+    assert(expect("hello").to_have_length(5))
+    assert(expect([1, 2, 3]).to_contain(2))
+} catch as e {
+    no_error = false
+}
+t.assert_true(no_error, "assert: passes silently for passing expectations")
+
+# Test that assert raises on failing expectations
+caught_error = false
+try {
+    assert(expect(5).to_equal(10))
+} catch as e {
+    caught_error = true
+    t.assert_true(e.message().contains("Assertion failed"), "assert: error message contains 'Assertion failed'")
+}
+t.assert_true(caught_error, "assert: raises error on failing expectation")
+
+# Test assert in an it() block with multiple assertions
+runner_assert = gspec.TestRunner.clone()
+runner_assert.describe("AssertTest", () => {
+    runner_assert.it("multiple assertions pass", () => {
+        assert(expect(1 + 1).to_equal(2))
+        assert(expect("abc".length()).to_equal(3))
+        assert(expect([1, 2]).to_contain(1))
+    })
+})
+summary_assert = runner_assert.summary()
+t.assert_true(summary_assert["passed"] == 1, "assert: it() with multiple assertions passes")
+
+print("")
+
+# =============================================================================
+# Section 21: after_each() Support
+# =============================================================================
+print("--- 21. after_each() Support ---")
+
+# Test that after_each runs after each test
+graph AfterCounter { value: 0 }
+after_counter = AfterCounter.clone()
+
+runner_after = gspec.TestRunner.clone()
+runner_after.describe("AfterEachTest", () => {
+    runner_after.after_each(() => {
+        after_counter.value = after_counter.value + 1
+    })
+
+    runner_after.it("first test", () => {})
+    runner_after.it("second test", () => {})
+    runner_after.it("third test", () => {})
+})
+
+t.assert_true(after_counter.value == 3, "after_each: ran 3 times for 3 tests")
+
+# Test that after_each runs even when test fails
+graph AfterFailCounter { value: 0 }
+after_fail_counter = AfterFailCounter.clone()
+
+runner_after_fail = gspec.TestRunner.clone()
+runner_after_fail.describe("AfterEachFailTest", () => {
+    runner_after_fail.after_each(() => {
+        after_fail_counter.value = after_fail_counter.value + 1
+    })
+
+    runner_after_fail.it("passes", () => {})
+    runner_after_fail.it("fails", () => {
+        raise ValueError("intentional")
+    })
+    runner_after_fail.it("also passes", () => {})
+})
+
+t.assert_true(after_fail_counter.value == 3, "after_each: runs even when test fails")
+
+# Test combined before_each and after_each
+graph BeforeAfterOrder { log: [] }
+order = BeforeAfterOrder.clone()
+
+runner_both = gspec.TestRunner.clone()
+runner_both.describe("BeforeAfterOrder", () => {
+    runner_both.before_each(() => {
+        order.log = order.log.insert(order.log.length(), "before")
+    })
+    runner_both.after_each(() => {
+        order.log = order.log.insert(order.log.length(), "after")
+    })
+
+    runner_both.it("test", () => {
+        order.log = order.log.insert(order.log.length(), "test")
+    })
+})
+
+t.assert_true(order.log.length() == 3, "before/after: correct number of entries")
+t.assert_true(order.log[0] == "before", "before/after: before runs first")
+t.assert_true(order.log[1] == "test", "before/after: test runs second")
+t.assert_true(order.log[2] == "after", "before/after: after runs last")
+
+print("")
+
+# =============================================================================
+# Section 22: xit() and pending() Support
+# =============================================================================
+print("--- 22. xit() and pending() Support ---")
+
+# Test xit (skipped test)
+runner_skip = gspec.TestRunner.clone()
+runner_skip.describe("SkipTest", () => {
+    runner_skip.it("runs", () => {})
+    runner_skip.xit("skipped", () => {
+        raise ValueError("should not run")
+    })
+    runner_skip.it("also runs", () => {})
+})
+summary_skip = runner_skip.summary()
+t.assert_true(summary_skip["passed"] == 2, "xit: 2 tests passed")
+t.assert_true(summary_skip["skipped"] == 1, "xit: 1 test skipped")
+t.assert_true(summary_skip["total"] == 3, "xit: 3 total tests")
+
+# Test pending (placeholder test)
+runner_pending = gspec.TestRunner.clone()
+runner_pending.describe("PendingTest", () => {
+    runner_pending.it("implemented", () => {})
+    runner_pending.pending("not yet implemented")
+    runner_pending.pending("another placeholder")
+})
+summary_pending = runner_pending.summary()
+t.assert_true(summary_pending["passed"] == 1, "pending: 1 test passed")
+t.assert_true(summary_pending["skipped"] == 2, "pending: 2 tests pending")
 
 print("")
 

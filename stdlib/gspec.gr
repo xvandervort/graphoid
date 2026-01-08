@@ -239,8 +239,10 @@ graph Expectation {
 graph TestRunner {
     passed: 0
     failed: 0
+    skipped: 0
     indent: 0
-    hooks: []
+    before_hooks: []
+    after_hooks: []
 
     # Helper to build indentation string
     fn _indent_str() {
@@ -249,7 +251,12 @@ graph TestRunner {
 
     # Register a before_each hook for the current describe block
     fn before_each(hook) {
-        hooks.append!(hook)
+        before_hooks.append!(hook)
+    }
+
+    # Register an after_each hook for the current describe block
+    fn after_each(hook) {
+        after_hooks.append!(hook)
     }
 
     # Describe a test suite
@@ -257,11 +264,13 @@ graph TestRunner {
         print(_indent_str() + name)
 
         # Save current hooks, update indent, run block, restore both
-        saved_hooks = hooks.slice(0, hooks.length())
+        saved_before = before_hooks.slice(0, before_hooks.length())
+        saved_after = after_hooks.slice(0, after_hooks.length())
         indent = indent + 1
         block()
         indent = indent - 1
-        hooks = saved_hooks
+        before_hooks = saved_before
+        after_hooks = saved_after
     }
 
     # Context is an alias for describe (for nested grouping)
@@ -275,7 +284,7 @@ graph TestRunner {
         prefix = _indent_str()
 
         # Run before_each hooks
-        for hook in hooks {
+        for hook in before_hooks {
             hook()
         }
 
@@ -301,6 +310,19 @@ graph TestRunner {
             error_msg = e.message()
         }
 
+        # Run after_each hooks (even if test failed)
+        for hook in after_hooks {
+            try {
+                hook()
+            } catch as e {
+                # Log but don't override test failure
+                if test_passed {
+                    test_passed = false
+                    error_msg = "after_each hook failed: " + e.message()
+                }
+            }
+        }
+
         if test_passed {
             passed = passed + 1
             print(prefix + "  PASS: " + description)
@@ -313,24 +335,48 @@ graph TestRunner {
         }
     }
 
+    # Skip a test (xit = "excluded it")
+    fn xit(description, block) {
+        prefix = _indent_str()
+        skipped = skipped + 1
+        print(prefix + "  SKIP: " + description)
+    }
+
+    # Mark a test as pending (placeholder - no block needed)
+    fn pending(description) {
+        prefix = _indent_str()
+        skipped = skipped + 1
+        print(prefix + "  PENDING: " + description)
+    }
+
     # Get test summary as a map
     fn summary() {
-        total = passed + failed
+        total = passed + failed + skipped
         return {
             "passed": passed,
             "failed": failed,
+            "skipped": skipped,
             "total": total
         }
     }
 
     # Print test summary
     fn print_summary() {
-        total = passed + failed
+        total = passed + failed + skipped
         print("")
         print("=== Test Summary ===")
-        print(passed.to_string() + " passed, " + failed.to_string() + " failed, " + total.to_string() + " total")
+        summary_line = passed.to_string() + " passed, " + failed.to_string() + " failed"
+        if skipped > 0 {
+            summary_line = summary_line + ", " + skipped.to_string() + " skipped"
+        }
+        summary_line = summary_line + ", " + total.to_string() + " total"
+        print(summary_line)
         if failed == 0 {
-            print("ALL TESTS PASSED!")
+            if skipped > 0 {
+                print("ALL TESTS PASSED! (some skipped)")
+            } else {
+                print("ALL TESTS PASSED!")
+            }
         } else {
             print("SOME TESTS FAILED")
         }
@@ -344,4 +390,23 @@ graph TestRunner {
 # Create an Expectation for the given value
 fn expect(actual) {
     return Expectation.new(actual)
+}
+
+# Assert an expectation result - raises AssertionError if it fails
+# This allows multiple assertions per test without needing to return:
+#
+#   runner.it("checks multiple things", () => {
+#       assert(expect(x).to_equal(1))
+#       assert(expect(y).to_equal(2))
+#       assert(expect(z).to_be_truthy())
+#   })
+#
+fn assert(result) {
+    if result.type() == "map" {
+        if result.has_key("pass") {
+            if not result["pass"] {
+                raise ValueError("Assertion failed: " + result["message"])
+            }
+        }
+    }
 }
