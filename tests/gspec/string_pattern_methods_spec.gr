@@ -1,102 +1,98 @@
-# string_pattern_methods.spec.gr - Tests for string pattern matching methods
+# string_pattern_methods_spec.gr - Tests for string pattern matching methods
 #
 # Tests for: contains(), extract(), count(), find()
-# Run with: gr spec tests/integration/string_pattern_methods.spec.gr
-
-import "gspec"
-
-runner = gspec.TestRunner.clone()
+# Run with: gr spec tests/gspec/string_pattern_methods_spec.gr
 
 # =============================================================================
 # contains() method with modes
 # =============================================================================
 
-runner.describe("String.contains()", () => {
+describe("String.contains()", () => {
 
-    runner.describe("with :any mode", () => {
+    describe("with :any mode", () => {
 
-        runner.it("returns true when string contains digits", () => {
+        it("returns true when string contains digits", () => {
             assert(expect("Hello123".contains(:any, :digits)).to_equal(true))
         })
 
-        runner.it("returns false when string has no digits", () => {
+        it("returns false when string has no digits", () => {
             assert(expect("Hello".contains(:any, :digits)).to_equal(false))
         })
 
-        runner.it("returns true when string contains symbols", () => {
+        it("returns true when string contains symbols", () => {
             assert(expect("Hello!".contains(:any, :symbols)).to_equal(true))
         })
 
-        runner.it("returns true when string contains letters", () => {
+        it("returns true when string contains letters", () => {
             assert(expect("abc".contains(:any, :letters)).to_equal(true))
         })
 
-        runner.it("returns true when string contains whitespace", () => {
+        it("returns true when string contains whitespace", () => {
             assert(expect("Hello World".contains(:any, :whitespace)).to_equal(true))
         })
 
-        runner.it("returns true when any of multiple patterns match", () => {
+        it("returns true when any of multiple patterns match", () => {
             assert(expect("Hello".contains(:any, :digits, :letters)).to_equal(true))
         })
     })
 
-    runner.describe("with :all mode", () => {
+    describe("with :all mode", () => {
 
-        runner.it("returns true when string contains all patterns", () => {
+        it("returns true when string contains all patterns", () => {
             assert(expect("Hello123".contains(:all, :letters, :digits)).to_equal(true))
         })
 
-        runner.it("returns false when string is missing a pattern", () => {
+        it("returns false when string is missing a pattern", () => {
             assert(expect("Hello".contains(:all, :letters, :digits)).to_equal(false))
         })
 
-        runner.it("returns true when all three patterns present", () => {
+        it("returns true when all three patterns present", () => {
             assert(expect("Hello 123".contains(:all, :letters, :digits, :spaces)).to_equal(true))
         })
     })
 
-    runner.describe("with :only mode", () => {
+    describe("with :only mode", () => {
 
-        runner.it("returns true when string contains only letters", () => {
+        it("returns true when string contains only letters", () => {
             assert(expect("Hello".contains(:only, :letters)).to_equal(true))
         })
 
-        runner.it("returns false when string has extra character types", () => {
+        it("returns false when string has extra character types", () => {
             assert(expect("Hello123".contains(:only, :letters)).to_equal(false))
         })
 
-        runner.it("returns true when string contains only letters and spaces", () => {
+        it("returns true when string contains only letters and spaces", () => {
             assert(expect("Hello World".contains(:only, :letters, :spaces)).to_equal(true))
         })
 
-        runner.it("returns false when string has punctuation not allowed", () => {
+        it("returns false when string has punctuation not allowed", () => {
             assert(expect("Hello!".contains(:only, :letters)).to_equal(false))
         })
     })
 
-    runner.describe("pattern symbols", () => {
+    describe("pattern symbols", () => {
 
-        runner.it("detects uppercase letters", () => {
+        it("detects uppercase letters", () => {
             assert(expect("ABC".contains(:any, :uppercase)).to_equal(true))
         })
 
-        runner.it("detects lowercase letters", () => {
+        it("detects lowercase letters", () => {
             assert(expect("abc".contains(:any, :lowercase)).to_equal(true))
         })
 
-        runner.it("detects digits with :digits", () => {
+        it("detects digits with :digits", () => {
             assert(expect("123".contains(:any, :digits)).to_equal(true))
         })
 
-        runner.it("detects digits with :numbers alias", () => {
+        it("detects digits with :numbers alias", () => {
             assert(expect("123".contains(:any, :numbers)).to_equal(true))
         })
 
-        runner.it("detects punctuation", () => {
+        it("detects punctuation", () => {
             assert(expect("Hello!".contains(:any, :punctuation)).to_equal(true))
         })
 
-        runner.it("detects alphanumeric characters", () => {
+        it("detects alphanumeric characters", () => {
             assert(expect("abc123".contains(:only, :alphanumeric)).to_equal(true))
         })
     })
@@ -106,33 +102,33 @@ runner.describe("String.contains()", () => {
 # extract() method
 # =============================================================================
 
-runner.describe("String.extract()", () => {
+describe("String.extract()", () => {
 
-    runner.it("extracts number sequences from mixed text", () => {
+    it("extracts number sequences from mixed text", () => {
         numbers = "Hello 123 World 456".extract(:numbers)
         assert(expect(numbers).to_equal(["123", "456"]))
     })
 
-    runner.it("extracts words from text", () => {
+    it("extracts words from text", () => {
         words = "Hello World".extract(:words)
         assert(expect(words).to_equal(["Hello", "World"]))
     })
 
-    runner.it("extracts email addresses", () => {
+    it("extracts email addresses", () => {
         emails = "Contact: test@example.com for info".extract(:emails)
         assert(expect(emails).to_equal(["test@example.com"]))
     })
 
-    runner.it("extracts letter sequences", () => {
+    it("extracts letter sequences", () => {
         letters = "one, two, three".extract(:letters)
         assert(expect(letters).to_equal(["one", "two", "three"]))
     })
 
-    runner.it("returns empty list when no matches", () => {
+    it("returns empty list when no matches", () => {
         assert(expect("Hello".extract(:numbers)).to_equal([]))
     })
 
-    runner.it("extracts multiple emails", () => {
+    it("extracts multiple emails", () => {
         text = "a@b.com and c@d.org"
         emails = text.extract(:emails)
         assert(expect(emails.length()).to_equal(2))
@@ -143,35 +139,35 @@ runner.describe("String.extract()", () => {
 # count() method
 # =============================================================================
 
-runner.describe("String.count()", () => {
+describe("String.count()", () => {
 
-    runner.describe("counting individual characters", () => {
+    describe("counting individual characters", () => {
 
-        runner.it("counts digit characters", () => {
+        it("counts digit characters", () => {
             assert(expect("Hello 123".count(:digits)).to_equal(3))
         })
 
-        runner.it("counts space characters", () => {
+        it("counts space characters", () => {
             assert(expect("Hello World 123".count(:spaces)).to_equal(2))
         })
 
-        runner.it("returns 0 when no matches", () => {
+        it("returns 0 when no matches", () => {
             assert(expect("Hello".count(:digits)).to_equal(0))
         })
     })
 
-    runner.describe("counting sequences", () => {
+    describe("counting sequences", () => {
 
-        runner.it("counts word sequences", () => {
+        it("counts word sequences", () => {
             assert(expect("Hello World Test".count(:words)).to_equal(3))
         })
 
-        runner.it("counts individual digit characters (not sequences)", () => {
+        it("counts individual digit characters (not sequences)", () => {
             # :numbers/:digits counts individual digit chars, not sequences
             assert(expect("123 456 789".count(:numbers)).to_equal(9))
         })
 
-        runner.it("counts email addresses", () => {
+        it("counts email addresses", () => {
             assert(expect("a@b.com and c@d.org".count(:emails)).to_equal(2))
         })
     })
@@ -181,41 +177,41 @@ runner.describe("String.count()", () => {
 # find() method
 # =============================================================================
 
-runner.describe("String.find()", () => {
+describe("String.find()", () => {
 
-    runner.describe("finding all positions", () => {
+    describe("finding all positions", () => {
 
-        runner.it("returns all positions of digit occurrences", () => {
+        it("returns all positions of digit occurrences", () => {
             positions = "Hello123World456".find(:digits)
             assert(expect(positions).to_have_length(6))
         })
 
-        runner.it("returns empty list when pattern not found", () => {
+        it("returns empty list when pattern not found", () => {
             assert(expect("Hello".find(:digits)).to_equal([]))
         })
     })
 
-    runner.describe("with limit parameter", () => {
+    describe("with limit parameter", () => {
 
-        runner.it("limits number of positions returned", () => {
+        it("limits number of positions returned", () => {
             positions = "Hello123World456".find(:digits, 2)
             assert(expect(positions).to_have_length(2))
         })
 
-        runner.it("returns all if limit exceeds matches", () => {
+        it("returns all if limit exceeds matches", () => {
             positions = "Hello1".find(:digits, 10)
             assert(expect(positions).to_have_length(1))
         })
     })
 
-    runner.describe("with :first option", () => {
+    describe("with :first option", () => {
 
-        runner.it("returns first position as number", () => {
+        it("returns first position as number", () => {
             pos = "Hello123".find(:digits, :first)
             assert(expect(pos).to_equal(5))
         })
 
-        runner.it("returns -1 when not found", () => {
+        it("returns -1 when not found", () => {
             assert(expect("Hello".find(:digits, :first)).to_equal(-1))
         })
     })
@@ -225,9 +221,9 @@ runner.describe("String.find()", () => {
 # Multi-assertion tests (demonstrating assert() capability)
 # =============================================================================
 
-runner.describe("Multi-assertion tests", () => {
+describe("Multi-assertion tests", () => {
 
-    runner.it("validates multiple properties of extract result", () => {
+    it("validates multiple properties of extract result", () => {
         result = "Hello 123 World 456".extract(:numbers)
         assert(expect(result).to_be_a("list"))
         assert(expect(result).to_have_length(2))
@@ -235,7 +231,7 @@ runner.describe("Multi-assertion tests", () => {
         assert(expect(result).to_contain("456"))
     })
 
-    runner.it("validates multiple string properties", () => {
+    it("validates multiple string properties", () => {
         text = "ABC123"
         assert(expect(text.contains(:any, :uppercase)).to_equal(true))
         assert(expect(text.contains(:any, :digits)).to_equal(true))
@@ -248,35 +244,29 @@ runner.describe("Multi-assertion tests", () => {
 # Edge cases and combined usage
 # =============================================================================
 
-runner.describe("Edge cases", () => {
+describe("Edge cases", () => {
 
-    runner.it("handles empty string for contains", () => {
+    it("handles empty string for contains", () => {
         assert(expect("".contains(:any, :letters)).to_equal(false))
     })
 
-    runner.it("handles empty string for extract", () => {
+    it("handles empty string for extract", () => {
         assert(expect("".extract(:words)).to_equal([]))
     })
 
-    runner.it("handles empty string for count", () => {
+    it("handles empty string for count", () => {
         assert(expect("".count(:digits)).to_equal(0))
     })
 
-    runner.it("handles empty string for find", () => {
+    it("handles empty string for find", () => {
         assert(expect("".find(:digits)).to_equal([]))
     })
 
-    runner.it("handles whitespace-only string", () => {
+    it("handles whitespace-only string", () => {
         assert(expect("   ".contains(:only, :spaces)).to_equal(true))
     })
 
-    runner.it("handles special characters", () => {
+    it("handles special characters", () => {
         assert(expect("!@#$%".contains(:only, :symbols)).to_equal(true))
     })
 })
-
-# =============================================================================
-# Run and summarize
-# =============================================================================
-
-runner.print_summary()
