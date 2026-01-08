@@ -3,7 +3,7 @@
 # In Graphoid, EVERYTHING is a graph. Strings are no exception - they behave
 # as graphs of characters, responding to the same methods as lists.
 #
-# Run with: cargo run --quiet tests/gspec/string_as_graph_spec.gr
+# Run with: gr spec tests/gspec/string_as_graph_spec.gr
 
 import "gspec"
 

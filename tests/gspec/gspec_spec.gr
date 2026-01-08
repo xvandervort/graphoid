@@ -1,7 +1,7 @@
 # gspec_spec.gr - TDD tests for the gspec testing framework
 #
 # These tests verify the gspec framework itself works correctly.
-# Run with: cargo run --quiet tests/gspec/gspec_spec.gr
+# Run with: gr spec tests/gspec/gspec_spec.gr
 
 import "gspec"
 

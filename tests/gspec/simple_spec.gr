@@ -1,0 +1,62 @@
+# simple_spec.gr - Clean gspec syntax (no imports, no runner management)
+#
+# Run with: gr spec tests/gspec/simple_spec.gr
+
+describe("Basic Math", () => {
+    it("adds numbers", () => {
+        expect(2 + 3).to_equal(5)
+    })
+
+    it("subtracts numbers", () => {
+        expect(10 - 4).to_equal(6)
+    })
+
+    it("multiplies numbers", () => {
+        expect(3 * 4).to_equal(12)
+    })
+
+    context("with negative numbers", () => {
+        it("handles negative addition", () => {
+            expect(-5 + 3).to_equal(-2)
+        })
+
+        it("handles negative multiplication", () => {
+            expect(-2 * -3).to_equal(6)
+        })
+    })
+})
+
+describe("Lists", () => {
+    before_each(() => {
+        # This runs before each test
+    })
+
+    it("has correct length", () => {
+        assert(expect([1, 2, 3]).to_have_length(3))
+    })
+
+    it("contains elements", () => {
+        assert(expect([1, 2, 3]).to_contain(2))
+    })
+
+    it("can be empty", () => {
+        assert(expect([]).to_be_empty())
+    })
+
+    xit("is skipped", () => {
+        # This test is skipped
+        expect(true).to_equal(false)
+    })
+
+    pending("not yet implemented")
+})
+
+describe("Strings", () => {
+    it("has length", () => {
+        expect("hello".length()).to_equal(5)
+    })
+
+    it("supports concatenation", () => {
+        expect("hello" + " world").to_equal("hello world")
+    })
+})

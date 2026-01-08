@@ -1,7 +1,7 @@
 # string_pattern_methods.spec.gr - Tests for string pattern matching methods
 #
 # Tests for: contains(), extract(), count(), find()
-# Run with: cargo run --quiet tests/integration/string_pattern_methods.spec.gr
+# Run with: gr spec tests/integration/string_pattern_methods.spec.gr
 
 import "gspec"
 

@@ -1,6 +1,6 @@
 # functions_spec.gr - gspec tests for samples/01-basics/functions.gr
 #
-# Run with: cargo run --quiet tests/gspec/functions_spec.gr
+# Run with: gr spec tests/gspec/functions_spec.gr
 
 import "gspec"
 
