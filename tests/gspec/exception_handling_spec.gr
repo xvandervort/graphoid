@@ -1,0 +1,200 @@
+# exception_handling_spec.gr - gspec tests for samples/02-intermediate/exception_handling.gr
+#
+# Run with: gr spec tests/gspec/exception_handling_spec.gr
+
+describe("Exception Handling", () => {
+
+    describe("basic try/catch", () => {
+        it("catches division by zero", () => {
+            caught = false
+            try {
+                x = 10 / 0
+            } catch as e {
+                caught = true
+            }
+            assert(expect(caught).to_equal(true))
+        })
+
+        it("does not enter catch when no error", () => {
+            caught = false
+            try {
+                x = 10 / 2
+            } catch as e {
+                caught = true
+            }
+            assert(expect(caught).to_equal(false))
+        })
+    })
+
+    describe("specific error types", () => {
+        it("catches ValueError specifically", () => {
+            error_type = ""
+            try {
+                raise ValueError("bad value")
+            } catch ValueError as e {
+                error_type = e.type()
+            }
+            assert(expect(error_type).to_equal("ValueError"))
+        })
+
+        it("catches TypeError specifically", () => {
+            error_type = ""
+            try {
+                raise TypeError("wrong type")
+            } catch TypeError as e {
+                error_type = e.type()
+            }
+            assert(expect(error_type).to_equal("TypeError"))
+        })
+
+        it("catches IOError specifically", () => {
+            error_type = ""
+            try {
+                raise IOError("file not found")
+            } catch IOError as e {
+                error_type = e.type()
+            }
+            assert(expect(error_type).to_equal("IOError"))
+        })
+    })
+
+    describe("multiple catch clauses", () => {
+        it("matches the correct catch clause", () => {
+            fn process(error_kind) {
+                try {
+                    if error_kind == "type" { raise TypeError("type error") }
+                    if error_kind == "value" { raise ValueError("value error") }
+                    return "no error"
+                } catch TypeError as e {
+                    return "caught type"
+                } catch ValueError as e {
+                    return "caught value"
+                }
+            }
+
+            assert(expect(process("type")).to_equal("caught type"))
+            assert(expect(process("value")).to_equal("caught value"))
+            assert(expect(process("none")).to_equal("no error"))
+        })
+    })
+
+    describe("finally block", () => {
+        it("runs finally when no error occurs", () => {
+            finally_ran = false
+            try {
+                x = 5
+            } finally {
+                finally_ran = true
+            }
+            assert(expect(finally_ran).to_equal(true))
+        })
+
+        it("runs finally when error occurs", () => {
+            finally_ran = false
+            try {
+                raise ValueError("oops")
+            } catch as e {
+                # caught
+            } finally {
+                finally_ran = true
+            }
+            assert(expect(finally_ran).to_equal(true))
+        })
+    })
+
+    describe("error object methods", () => {
+        it("provides error type", () => {
+            error_type = ""
+            try {
+                raise ValueError("test message")
+            } catch as e {
+                error_type = e.type()
+            }
+            assert(expect(error_type).to_equal("ValueError"))
+        })
+
+        it("provides error message", () => {
+            error_msg = ""
+            try {
+                raise ValueError("test message")
+            } catch as e {
+                error_msg = e.message()
+            }
+            assert(expect(error_msg).to_equal("test message"))
+        })
+
+        it("provides stack trace", () => {
+            trace = ""
+            try {
+                raise ValueError("test")
+            } catch as e {
+                trace = e.stack_trace()
+            }
+            assert(expect(trace.length()).to_be_greater_than(0))
+        })
+    })
+
+    describe("raising custom errors", () => {
+        it("raises error with custom message", () => {
+            fn validate_age(age) {
+                if age < 0 {
+                    raise ValueError("Age cannot be negative")
+                }
+                return "valid"
+            }
+
+            result = ""
+            try {
+                validate_age(-5)
+            } catch ValueError as e {
+                result = e.message()
+            }
+            assert(expect(result).to_equal("Age cannot be negative"))
+        })
+    })
+
+    describe("nested exception handling", () => {
+        it("handles nested try/catch blocks", () => {
+            outer_caught = ""
+            try {
+                try {
+                    raise ValueError("inner")
+                } catch ValueError as e {
+                    raise TypeError("converted")
+                }
+            } catch TypeError as e {
+                outer_caught = e.message()
+            }
+            assert(expect(outer_caught).to_equal("converted"))
+        })
+    })
+
+    describe("safe operations pattern", () => {
+        it("returns success result on no error", () => {
+            fn safe_divide(a, b) {
+                try {
+                    return {"success": true, "value": a / b}
+                } catch as e {
+                    return {"success": false, "error": e.message()}
+                }
+            }
+
+            result = safe_divide(10, 2)
+            assert(expect(result["success"]).to_equal(true))
+            assert(expect(result["value"]).to_equal(5))
+        })
+
+        it("returns error result on failure", () => {
+            fn safe_divide(a, b) {
+                try {
+                    return {"success": true, "value": a / b}
+                } catch as e {
+                    return {"success": false, "error": e.message()}
+                }
+            }
+
+            result = safe_divide(10, 0)
+            assert(expect(result["success"]).to_equal(false))
+        })
+    })
+})

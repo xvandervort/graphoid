@@ -1,0 +1,138 @@
+# graphs_spec.gr - gspec tests for samples/01-basics/graphs.gr
+#
+# Run with: gr spec tests/gspec/graphs_spec.gr
+
+describe("Graphs", () => {
+
+    describe("graph creation", () => {
+        it("creates an empty directed graph", () => {
+            g = graph { type: :directed }
+            assert(expect(g.type()).to_equal("graph"))
+        })
+
+        it("creates an empty undirected graph", () => {
+            g = graph { type: :undirected }
+            assert(expect(g.type()).to_equal("graph"))
+        })
+
+        it("starts with no nodes", () => {
+            g = graph { type: :directed }
+            assert(expect(g.nodes()).to_equal([]))
+        })
+
+        it("starts with no edges", () => {
+            g = graph { type: :directed }
+            assert(expect(g.edges()).to_equal([]))
+        })
+    })
+
+    describe("adding nodes", () => {
+        it("adds a node with a value", () => {
+            g = graph { type: :directed }
+            g.add_node("Server1", 100)
+            assert(expect(g.nodes()).to_contain("Server1"))
+        })
+
+        it("adds multiple nodes", () => {
+            g = graph { type: :directed }
+            g.add_node("A", 1)
+            g.add_node("B", 2)
+            g.add_node("C", 3)
+            assert(expect(g.nodes().length()).to_equal(3))
+        })
+
+        it("retrieves node value with get_node", () => {
+            g = graph { type: :directed }
+            g.add_node("Server1", 100)
+            assert(expect(g.get_node("Server1")).to_equal(100))
+        })
+
+        it("returns none for non-existent node", () => {
+            g = graph { type: :directed }
+            assert(expect(g.get_node("NotThere")).to_be_none())
+        })
+    })
+
+    describe("adding edges", () => {
+        it("adds an edge between nodes", () => {
+            g = graph { type: :directed }
+            g.add_node("A", 1)
+            g.add_node("B", 2)
+            g.add_edge("A", "B", "connects")
+            assert(expect(g.edges().length()).to_equal(1))
+        })
+
+        it("edge contains source, target, and label", () => {
+            g = graph { type: :directed }
+            g.add_node("A", 1)
+            g.add_node("B", 2)
+            g.add_edge("A", "B", "connects")
+            edge = g.edges().first()
+            assert(expect(edge[0]).to_equal("A"))
+            assert(expect(edge[1]).to_equal("B"))
+            assert(expect(edge[2]).to_equal("connects"))
+        })
+
+        it("adds multiple edges", () => {
+            g = graph { type: :directed }
+            g.add_node("A", 1)
+            g.add_node("B", 2)
+            g.add_node("C", 3)
+            g.add_edge("A", "B", "e1")
+            g.add_edge("B", "C", "e2")
+            g.add_edge("A", "C", "e3")
+            assert(expect(g.edges().length()).to_equal(3))
+        })
+    })
+
+    describe("node_count and edge_count", () => {
+        it("counts nodes correctly", () => {
+            g = graph { type: :directed }
+            g.add_node("A", 1)
+            g.add_node("B", 2)
+            g.add_node("C", 3)
+            assert(expect(g.node_count()).to_equal(3))
+        })
+
+        it("counts edges correctly", () => {
+            g = graph { type: :directed }
+            g.add_node("A", 1)
+            g.add_node("B", 2)
+            g.add_edge("A", "B", "link")
+            assert(expect(g.edge_count()).to_equal(1))
+        })
+    })
+
+    describe("graph with string values", () => {
+        it("stores string values in nodes", () => {
+            g = graph { type: :directed }
+            g.add_node("config", "production")
+            assert(expect(g.get_node("config")).to_equal("production"))
+        })
+
+        it("stores map values in nodes", () => {
+            g = graph { type: :directed }
+            g.add_node("server", {"host": "localhost", "port": 8080})
+            config = g.get_node("server")
+            assert(expect(config["host"]).to_equal("localhost"))
+            assert(expect(config["port"]).to_equal(8080))
+        })
+    })
+
+    describe("network example from sample", () => {
+        it("builds the sample network", () => {
+            network = graph { type: :directed }
+            network.add_node("Server1", 100)
+            network.add_node("Server2", 200)
+            network.add_node("Server3", 150)
+            network.add_node("Client", 50)
+            network.add_edge("Server1", "Server2", "connects")
+            network.add_edge("Server2", "Server3", "connects")
+            network.add_edge("Client", "Server1", "requests")
+
+            assert(expect(network.node_count()).to_equal(4))
+            assert(expect(network.edge_count()).to_equal(3))
+            assert(expect(network.get_node("Server1")).to_equal(100))
+        })
+    })
+})

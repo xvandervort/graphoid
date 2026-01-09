@@ -248,14 +248,46 @@ pub struct Graph {
     // This follows Graphoid's "everything is a graph" principle
 }
 
-// Manual PartialEq implementation that ignores optimization state
+// Manual PartialEq implementation that compares DATA LAYER only
+// By default, graph equality is about the data layer (structure and values),
+// not metadata like rules, rulesets, methods, or optimization state.
+// This follows Graphoid's principle that comparisons concern the data layer by default.
+//
+// Internal nodes excluded from comparison:
+// - __methods__/* (method branch)
+// - __properties__/* (CLG properties)
+// - __parent__, __self__ (inheritance)
+// - __computed__/* (computed properties)
+// - Any other node starting with __
 impl PartialEq for Graph {
     fn eq(&self, other: &Self) -> bool {
-        self.graph_type == other.graph_type
-            && self.nodes == other.nodes
-            && self.rulesets == other.rulesets
-            && self.rules == other.rules
-        // Deliberately ignore: property_access_counts, property_indices, auto_index_threshold
+        // Graph types must match
+        if self.graph_type != other.graph_type {
+            return false;
+        }
+
+        // Helper to check if a node ID is a data layer node (not internal)
+        fn is_data_node(id: &str) -> bool {
+            !id.starts_with("__")
+        }
+
+        // Get data-layer nodes from both graphs
+        let self_data: std::collections::HashMap<&String, &GraphNode> = self
+            .nodes
+            .iter()
+            .filter(|(id, _)| is_data_node(id))
+            .collect();
+
+        let other_data: std::collections::HashMap<&String, &GraphNode> = other
+            .nodes
+            .iter()
+            .filter(|(id, _)| is_data_node(id))
+            .collect();
+
+        // Compare only data layer nodes
+        self_data == other_data
+        // Deliberately ignore: rules, rulesets, config, internal nodes
+        // Deliberately ignore optimization state: property_access_counts, property_indices, auto_index_threshold
     }
 }
 

@@ -42,13 +42,6 @@ describe("Lists", () => {
     it("can be empty", () => {
         assert(expect([]).to_be_empty())
     })
-
-    xit("is skipped", () => {
-        # This test is skipped
-        expect(true).to_equal(false)
-    })
-
-    pending("not yet implemented")
 })
 
 describe("Strings", () => {

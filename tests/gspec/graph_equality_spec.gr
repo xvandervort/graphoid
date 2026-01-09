@@ -1,0 +1,78 @@
+# graph_equality_spec.gr - Tests that graph equality compares DATA only, not metadata
+#
+# Run with: gr spec tests/gspec/graph_equality_spec.gr
+
+describe("Graph Equality", () => {
+
+    describe("lists with behaviors", () => {
+        it("compares equal when values match despite different rules", () => {
+            a = [1, 2, 3]
+            b = [1, 2, 3].add_rule(:none_to_zero)
+            assert(expect(a == b).to_equal(true))
+        })
+
+        it("compares equal after transformation produces same values", () => {
+            result = [1, none, 3].add_rule(:none_to_zero)
+            expected = [1, 0, 3]
+            assert(expect(result == expected).to_equal(true))
+        })
+
+        it("compares not equal when values differ", () => {
+            a = [1, 2, 3]
+            b = [1, 2, 4]
+            assert(expect(a == b).to_equal(false))
+        })
+
+        it("compares equal with multiple rules attached", () => {
+            a = [1, 2, 3]
+            b = [1, 2, 3].add_rule(:none_to_zero).add_rule(:positive)
+            assert(expect(a == b).to_equal(true))
+        })
+    })
+
+    describe("graphs with rules", () => {
+        it("compares equal when nodes match despite different rulesets", () => {
+            g1 = graph { type: :directed }
+            g1.add_node("a", 1)
+            g1.add_node("b", 2)
+
+            g2 = graph { type: :directed }
+            g2.add_node("a", 1)
+            g2.add_node("b", 2)
+
+            assert(expect(g1 == g2).to_equal(true))
+        })
+
+        it("compares not equal when nodes differ", () => {
+            g1 = graph { type: :directed }
+            g1.add_node("a", 1)
+
+            g2 = graph { type: :directed }
+            g2.add_node("a", 2)
+
+            assert(expect(g1 == g2).to_equal(false))
+        })
+
+        it("compares not equal when graph types differ", () => {
+            g1 = graph { type: :directed }
+            g1.add_node("a", 1)
+
+            g2 = graph { type: :undirected }
+            g2.add_node("a", 1)
+
+            assert(expect(g1 == g2).to_equal(false))
+        })
+    })
+
+    describe("empty collections", () => {
+        it("empty lists compare equal", () => {
+            assert(expect([] == []).to_equal(true))
+        })
+
+        it("empty list with rule equals empty list without", () => {
+            a = []
+            b = [].add_rule(:none_to_zero)
+            assert(expect(a == b).to_equal(true))
+        })
+    })
+})

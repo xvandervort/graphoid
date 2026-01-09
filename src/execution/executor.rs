@@ -67,6 +67,11 @@ pub struct Executor {
     /// This prevents lambdas passed INTO graph methods from accidentally modifying
     /// graph properties, while still allowing method calls via implicit self.
     pub(crate) suppress_self_property_assignment: usize,
+    /// Counter tracking function call depth.
+    /// When > 0, we're inside a function/lambda call. Functions defined at this depth
+    /// should NOT be added to global_functions (they're block-scoped).
+    /// This provides proper test isolation in gspec and prevents function name leakage.
+    pub(crate) function_call_depth: usize,
 }
 
 /// Entry in the block_self_stack tracking the `self` value for block context
@@ -98,6 +103,7 @@ impl Executor {
             block_self_stack: Vec::new(),
             graph_method_value_stack: Vec::new(),
             suppress_self_property_assignment: 0,
+            function_call_depth: 0,
         }
     }
 
@@ -122,6 +128,7 @@ impl Executor {
             block_self_stack: Vec::new(),
             graph_method_value_stack: Vec::new(),
             suppress_self_property_assignment: 0,
+            function_call_depth: 0,
         }
     }
 
@@ -656,17 +663,54 @@ impl Executor {
                         }
                     }
                 } else {
-                    // Regular function - store in environment and global functions table
+                    // Regular function - store in environment and possibly global functions table
 
-                    // Store in global functions table (for recursion support and overloading)
-                    // Multiple functions with same name but different arities are supported
-                    self.global_functions
-                        .entry(name.clone())
-                        .or_insert_with(Vec::new)
-                        .push(func.clone());
+                    // Only add to global_functions at top level (function_call_depth == 0)
+                    // Functions defined inside other functions/lambdas are block-scoped
+                    // This provides proper test isolation in gspec
+                    if self.function_call_depth == 0 {
+                        // Store in global functions table (for recursion support and overloading)
+                        // Multiple functions with same name but different arities are supported
+                        self.global_functions
+                            .entry(name.clone())
+                            .or_insert_with(Vec::new)
+                            .push(func.clone());
+                    }
 
-                    // Store function in environment (last definition wins for direct calls)
-                    self.env.define(name.clone(), Value::function(func.clone()));
+                    // Store function in environment with support for local overloading
+                    // If a function with the same name exists, store them together as a list
+                    // This enables function overloading within scopes (e.g., inside test blocks)
+                    if let Ok(existing) = self.env.get(name) {
+                        match &existing.kind {
+                            ValueKind::Function(existing_func) => {
+                                // Convert single function to list of overloads
+                                let overloads = vec![
+                                    Value::function(existing_func.clone()),
+                                    Value::function(func.clone()),
+                                ];
+                                self.env.define(name.clone(), Value::list(List::from_vec(overloads)));
+                            }
+                            ValueKind::List(existing_list) => {
+                                // Already a list - check if it's function overloads
+                                let mut overloads = existing_list.to_vec();
+                                // Only add if existing entries are functions
+                                if overloads.iter().all(|v| matches!(v.kind, ValueKind::Function(_))) {
+                                    overloads.push(Value::function(func.clone()));
+                                    self.env.define(name.clone(), Value::list(List::from_vec(overloads)));
+                                } else {
+                                    // Not function overloads, just replace
+                                    self.env.define(name.clone(), Value::function(func.clone()));
+                                }
+                            }
+                            _ => {
+                                // Not a function, just replace
+                                self.env.define(name.clone(), Value::function(func.clone()));
+                            }
+                        }
+                    } else {
+                        // No existing value, store as single function
+                        self.env.define(name.clone(), Value::function(func.clone()));
+                    }
 
                     // NOW update the function's captured environment to include itself for recursion
                     // Since we use Rc<RefCell>, this updates all copies of the function
@@ -1946,7 +1990,7 @@ impl Executor {
             // Look up the member in the module's namespace
             let member = module.namespace.get(method)?;
 
-            // If it's a function, check for overloads and call with correct arity
+            // If it's a function or list of function overloads, call with correct arity
             if let ValueKind::Function(_) = &member.kind {
                 // Evaluate argument expressions
                 let arg_values = if args.is_empty() {
@@ -1967,6 +2011,34 @@ impl Executor {
                 // No matching overload found in global_functions, use the one from namespace
                 if let ValueKind::Function(func) = &member.kind {
                     return self.call_function(func, &arg_values);
+                }
+            } else if let ValueKind::List(ref list) = &member.kind {
+                // Check if this is a list of function overloads (for scoped overloading support)
+                let items = list.to_vec();
+                let all_functions = items.iter().all(|v| matches!(v.kind, ValueKind::Function(_)));
+                if all_functions && !items.is_empty() {
+                    // Evaluate argument expressions
+                    let arg_values = if args.is_empty() {
+                        Vec::new()
+                    } else {
+                        self.eval_arguments(args)?
+                    };
+                    let arity = arg_values.len();
+
+                    // Find function with matching arity
+                    for item in &items {
+                        if let ValueKind::Function(func) = &item.kind {
+                            if func.parameters.len() == arity {
+                                return self.call_function(func, &arg_values);
+                            }
+                        }
+                    }
+
+                    // No matching arity found
+                    return Err(GraphoidError::runtime(format!(
+                        "No overload of '{}' matches arity {}",
+                        method, arity
+                    )));
                 }
             } else if let ValueKind::NativeFunction(native_func) = &member.kind {
                 // Native function - call it with evaluated args
@@ -3760,7 +3832,34 @@ impl Executor {
             // Count arguments to determine arity
             let arity = args.len();
 
-            // Check if there are overloaded functions with this name
+            // First check environment for local function overloads (stored as list)
+            // This handles functions defined inside lambdas/blocks
+            if let Ok(env_val) = self.env.get(name) {
+                if let ValueKind::List(ref list) = env_val.kind {
+                    let items = list.to_vec();
+                    // Check if this is a list of function overloads
+                    let all_functions = items.iter().all(|v| matches!(v.kind, ValueKind::Function(_)));
+                    if all_functions && !items.is_empty() {
+                        // Find function with matching arity
+                        for item in &items {
+                            if let ValueKind::Function(func) = &item.kind {
+                                if func.parameters.len() == arity {
+                                    // Process arguments and call the matched overload
+                                    let arg_values = self.process_arguments(func, args)?;
+
+                                    // Collect writeback info for mutable arguments
+                                    let writebacks = self.collect_writebacks(func, args);
+                                    self.writeback_stack.push(writebacks);
+
+                                    return self.call_function(func, &arg_values);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Then check global functions table for overloaded functions
             if let Some(overloads) = self.global_functions.get(name) {
                 // Find function with matching arity
                 if let Some(func) = overloads.iter().find(|f| f.parameters.len() == arity).cloned() {
@@ -4070,6 +4169,10 @@ impl Executor {
             self.suppress_self_property_assignment += 1;
         }
 
+        // Track function call depth for proper function scoping
+        // Functions defined inside function calls should not pollute global namespace
+        self.function_call_depth += 1;
+
         // Execute function body - either pattern matching or traditional
         let mut return_value = Value::none();
         let execution_result: Result<()> = (|| {
@@ -4192,6 +4295,9 @@ impl Executor {
         if suppress_property_assignment {
             self.suppress_self_property_assignment -= 1;
         }
+
+        // Decrement function call depth
+        self.function_call_depth -= 1;
 
         // Restore original environment
         self.env = saved_env;

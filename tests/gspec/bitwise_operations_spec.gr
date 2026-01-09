@@ -1,0 +1,146 @@
+# bitwise_operations_spec.gr - gspec tests for samples/02-intermediate/bitwise_operations.gr
+#
+# Run with: gr spec tests/gspec/bitwise_operations_spec.gr
+
+describe("Bitwise Operations", () => {
+
+    describe("bitwise AND (&)", () => {
+        it("returns 1 only where both bits are 1", () => {
+            assert(expect(12 & 10).to_equal(8))  # 1100 & 1010 = 1000
+        })
+
+        it("extracts bits with a mask", () => {
+            flags = 0b11010110
+            mask = 0b00001111
+            assert(expect(flags & mask).to_equal(6))  # lower nibble
+        })
+    })
+
+    describe("bitwise OR (|)", () => {
+        it("returns 1 where either bit is 1", () => {
+            assert(expect(12 | 10).to_equal(14))  # 1100 | 1010 = 1110
+        })
+
+        it("sets bits using OR", () => {
+            settings = 0b00000000
+            flag1 = 0b00000001
+            flag2 = 0b00000010
+            assert(expect(settings | flag1 | flag2).to_equal(3))
+        })
+    })
+
+    describe("bitwise XOR (^)", () => {
+        it("returns 1 where bits differ", () => {
+            assert(expect(12 ^ 10).to_equal(6))  # 1100 ^ 1010 = 0110
+        })
+
+        it("XOR with self equals 0", () => {
+            assert(expect(42 ^ 42).to_equal(0))
+        })
+
+        it("XOR with 0 equals self", () => {
+            assert(expect(42 ^ 0).to_equal(42))
+        })
+    })
+
+    describe("bitwise NOT (~)", () => {
+        it("inverts all bits", () => {
+            assert(expect(~5).to_equal(-6))  # two's complement
+        })
+
+        it("NOT of -1 equals 0", () => {
+            assert(expect(~(-1)).to_equal(0))
+        })
+    })
+
+    describe("left shift (<<)", () => {
+        it("shifts bits left", () => {
+            assert(expect(3 << 2).to_equal(12))  # 0011 << 2 = 1100
+        })
+
+        it("multiplies by powers of 2", () => {
+            assert(expect(7 << 2).to_equal(28))  # 7 * 4
+            assert(expect(7 << 3).to_equal(56))  # 7 * 8
+        })
+
+        it("creates bit positions", () => {
+            assert(expect(1 << 0).to_equal(1))
+            assert(expect(1 << 3).to_equal(8))
+            assert(expect(1 << 7).to_equal(128))
+        })
+    })
+
+    describe("right shift (>>)", () => {
+        it("shifts bits right", () => {
+            assert(expect(12 >> 2).to_equal(3))  # 1100 >> 2 = 0011
+        })
+
+        it("divides by powers of 2", () => {
+            assert(expect(20 >> 2).to_equal(5))   # 20 / 4
+            assert(expect(64 >> 3).to_equal(8))   # 64 / 8
+        })
+
+        it("preserves sign for negative numbers (signed shift)", () => {
+            assert(expect(-16 >> 2).to_equal(-4))
+        })
+    })
+
+    describe("power operator (**)", () => {
+        it("computes exponentiation", () => {
+            assert(expect(2 ** 3).to_equal(8))
+            assert(expect(2 ** 10).to_equal(1024))
+        })
+
+        it("is right-associative", () => {
+            # 2 ** 3 ** 2 = 2 ** (3 ** 2) = 2 ** 9 = 512
+            assert(expect(2 ** 3 ** 2).to_equal(512))
+        })
+
+        it("handles negative exponents", () => {
+            assert(expect(2 ** (-1)).to_equal(0.5))
+        })
+
+        it("handles fractional exponents (square root)", () => {
+            assert(expect(9 ** 0.5).to_equal(3))
+        })
+    })
+
+    describe("binary literals", () => {
+        it("parses binary with 0b prefix", () => {
+            assert(expect(0b1010).to_equal(10))
+            assert(expect(0b1111).to_equal(15))
+        })
+
+        it("supports underscores for readability", () => {
+            assert(expect(0b1111_0000).to_equal(240))
+        })
+    })
+
+    describe("hexadecimal literals", () => {
+        it("parses hex with 0x prefix", () => {
+            assert(expect(0xFF).to_equal(255))
+            assert(expect(0x10).to_equal(16))
+        })
+
+        it("supports underscores for readability", () => {
+            assert(expect(0xDE_AD).to_equal(57005))
+        })
+    })
+
+    describe("practical examples", () => {
+        it("checks if a bit is set", () => {
+            permissions = 0b00101101
+            read_bit = 1 << 0
+            has_read = (permissions & read_bit) != 0
+            assert(expect(has_read).to_equal(true))
+        })
+
+        it("sets and clears bits", () => {
+            status = 0b00000000
+            status = status | (1 << 2)  # set bit 2
+            assert(expect(status).to_equal(4))
+            status = status & ~(1 << 2)  # clear bit 2
+            assert(expect(status).to_equal(0))
+        })
+    })
+})
