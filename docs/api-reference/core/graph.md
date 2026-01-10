@@ -1034,6 +1034,186 @@ numbers.add_rule(validate_positive_values)
 
 ---
 
+## Equality and Comparison
+
+Graphoid graphs have a layered architecture. By default, equality (`==`) compares only the **data layer** - the user-visible nodes and edges. Metadata like rules, rulesets, and attached methods are ignored.
+
+For more precise comparisons, use the `equals()` method with options.
+
+### == (Equality Operator)
+
+Compares two graphs by their data layer only.
+
+**Behavior**:
+- Graph types must match (directed vs undirected)
+- Compares all data nodes (nodes not starting with `__`)
+- Compares node values and edges
+- Ignores: rules, rulesets, methods, properties, internal nodes
+
+**Examples**:
+```graphoid
+g1 = graph { type: :directed }
+g1.add_node("a", 1)
+g1.add_node("b", 2)
+
+g2 = graph { type: :directed }
+g2.add_node("a", 1)
+g2.add_node("b", 2)
+
+print(g1 == g2)  # true - same data
+
+# Rules don't affect equality
+g2.add_rule(:no_duplicates)
+print(g1 == g2)  # true - still equal, rules ignored
+
+# Different data means not equal
+g3 = graph { type: :directed }
+g3.add_node("a", 999)
+print(g1 == g3)  # false - different values
+```
+
+**See also**: `equals()`
+
+---
+
+### equals(other, options)
+
+Compares graphs with control over which layers to compare.
+
+**Syntax**: `graph.equals(other, options)`
+
+**Parameters**:
+- `other` (graph): The graph to compare against
+- `options` (hash, optional): Comparison options
+  - `include:` - Compare data PLUS specified layers
+  - `only:` - Compare ONLY specified layers (excluding data unless `:data` specified)
+
+**Comparison Layers**:
+
+| Layer | Description |
+|-------|-------------|
+| `:data` | User data nodes (default for `==`) |
+| `:rules` | Ad-hoc rules attached via `add_rule()` |
+| `:rulesets` | Ruleset names (`:tree`, `:dag`, `:bst`, etc.) |
+| `:methods` | Attached methods |
+| `:properties` | CLG properties (`__properties__/*`) |
+| `:all` | All layers |
+
+**Returns**: (bool) `true` if equal according to specified layers
+
+**Examples**:
+
+```graphoid
+# Default behavior - same as ==
+g1 = graph { type: :directed }
+g1.add_node("a", 1)
+g1.add_rule(:no_duplicates)
+
+g2 = graph { type: :directed }
+g2.add_node("a", 1)
+g2.add_rule(:positive)
+
+print(g1.equals(g2))  # true - data only (default)
+```
+
+**Using `include:` (data + additional layers)**:
+
+```graphoid
+# Include rules in comparison
+g1 = graph { type: :directed }
+g1.add_node("a", 1)
+g1.add_rule(:no_duplicates)
+
+g2 = graph { type: :directed }
+g2.add_node("a", 1)
+g2.add_rule(:no_duplicates)
+
+g3 = graph { type: :directed }
+g3.add_node("a", 1)
+g3.add_rule(:positive)
+
+print(g1.equals(g2, {include: :rules}))  # true - same data AND rules
+print(g1.equals(g3, {include: :rules}))  # false - same data, different rules
+
+# Include rulesets
+dag1 = graph { type: :directed, ruleset: :dag }
+dag1.add_node("x", 100)
+
+dag2 = graph { type: :directed, ruleset: :dag }
+dag2.add_node("x", 100)
+
+tree1 = graph { type: :directed, ruleset: :tree }
+tree1.add_node("x", 100)
+
+print(dag1.equals(dag2, {include: :rulesets}))  # true
+print(dag1.equals(tree1, {include: :rulesets})) # false - different ruleset
+
+# Include multiple layers
+print(g1.equals(g2, {include: [:rules, :rulesets]}))  # data + rules + rulesets
+```
+
+**Using `only:` (specific layers, excluding data)**:
+
+```graphoid
+# Compare only rules, ignore data differences
+g1 = graph { type: :directed }
+g1.add_node("a", 1)
+g1.add_rule(:no_duplicates)
+
+g2 = graph { type: :directed }
+g2.add_node("b", 999)  # Different data!
+g2.add_rule(:no_duplicates)
+
+print(g1.equals(g2, {only: :rules}))  # true - same rules (data ignored)
+
+# Compare only rulesets
+dag1 = graph { type: :directed, ruleset: :dag }
+dag1.add_node("x", 100)
+dag1.add_rule(:no_duplicates)
+
+dag2 = graph { type: :directed, ruleset: :dag }
+dag2.add_node("y", 200)  # Different data
+dag2.add_rule(:positive)  # Different rule
+
+print(dag1.equals(dag2, {only: :rulesets}))  # true - same ruleset
+
+# Compare only data (explicit)
+print(g1.equals(g2, {only: :data}))  # false - different data
+```
+
+**Using `:all` (everything must match)**:
+
+```graphoid
+g1 = graph { type: :directed, ruleset: :dag }
+g1.add_node("a", 1)
+g1.add_rule(:no_duplicates)
+
+g2 = graph { type: :directed, ruleset: :dag }
+g2.add_node("a", 1)
+g2.add_rule(:no_duplicates)
+
+g3 = graph { type: :directed, ruleset: :dag }
+g3.add_node("a", 1)
+g3.add_rule(:positive)  # Different rule
+
+print(g1.equals(g2, {include: :all}))  # true - everything matches
+print(g1.equals(g3, {include: :all}))  # false - rule differs
+```
+
+**Use Cases**:
+
+| Scenario | Approach |
+|----------|----------|
+| Check if two graphs have same structure | `g1 == g2` or `g1.equals(g2)` |
+| Verify graphs have same validation rules | `g1.equals(g2, {include: :rules})` |
+| Check if graphs are same "type" (ruleset) | `g1.equals(g2, {only: :rulesets})` |
+| Compare graphs for cloning/backup verification | `g1.equals(g2, {include: :all})` |
+| Check if two templates have same rules | `g1.equals(g2, {only: :rules})` |
+
+**See also**: `==`, `add_rule()`, `with_ruleset()`
+
+---
+
 ## Graph Pattern Matching
 
 ### match_pattern(pattern)

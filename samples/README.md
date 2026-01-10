@@ -20,7 +20,7 @@ Then work through the basics in order:
 ```
 samples/
 ├── 01-basics/          (4 files)  - Start here!
-├── 02-intermediate/    (11 files) - Core features
+├── 02-intermediate/    (13 files) - Core features
 ├── 03-advanced/        (5 files)  - Graph pattern matching
 ├── 04-modules/         (6 files)  - Code organization
 └── 05-stdlib/          (4 files)  - Standard library
@@ -255,6 +255,37 @@ Topics:
 
 ```bash
 gr samples/02-intermediate/bitwise_unsigned.gr
+```
+
+### `graph_equality.gr` ⭐⭐⭐
+**Graph equality and layer comparison**
+
+Topics:
+- Basic equality (`==`) compares data only
+- `equals()` method with options
+- `include:` mode - compare data plus specified layers
+- `only:` mode - compare only specified layers
+- Comparison layers: `:data`, `:rules`, `:rulesets`, `:methods`, `:all`
+- List equality with behaviors
+
+```bash
+gr samples/02-intermediate/graph_equality.gr
+```
+
+**Key Concept:** Graphoid graphs have layered architecture. `==` compares data only; use `equals()` with options for precise layer control.
+
+### `exception_handling.gr` ⭐⭐⭐
+**Try/catch/finally and error handling**
+
+Topics:
+- Basic try/catch blocks
+- Multiple catch clauses by error type
+- Finally blocks
+- Error object methods (`.type()`, `.message()`, `.stack_trace()`)
+- Raising custom errors
+
+```bash
+gr samples/02-intermediate/exception_handling.gr
 ```
 
 ---
@@ -588,9 +619,9 @@ Check if the example uses newer features. The language is in alpha, so some exam
 
 ## Example Statistics
 
-- **Total Examples:** 30 files
+- **Total Examples:** 32 files
 - **Basics:** 4 files (~20 minutes)
-- **Intermediate:** 11 files (~2-3 hours)
+- **Intermediate:** 13 files (~2-3 hours)
 - **Advanced:** 5 files (~1-2 hours)
 - **Modules:** 6 files (~1 hour)
 - **Stdlib:** 4 files (~1 hour)

@@ -201,3 +201,305 @@ fn test_graph_with_properties_only_compares_data() {
 
     assert_eq!(g1, g2, "Graphs should be equal when data nodes match, ignoring __properties__/");
 }
+
+// ============================================================================
+// EQUALS METHOD WITH LAYER OPTIONS TESTS
+// ============================================================================
+
+use graphoid::values::ComparisonLayer;
+use std::collections::HashSet;
+
+// --- include: tests (data + additional layers) ---
+
+#[test]
+fn test_equals_include_rules_same_rules() {
+    let mut g1 = Graph::new(GraphType::Directed);
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g1.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
+
+    let mut g2 = Graph::new(GraphType::Directed);
+    g2.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g2.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Rules].into_iter().collect();
+    assert!(g1.equals_with_layers(&g2, Some(&layers), false),
+        "Graphs with same data and same rules should be equal with include: :rules");
+}
+
+#[test]
+fn test_equals_include_rules_different_rules() {
+    let mut g1 = Graph::new(GraphType::Directed);
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g1.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
+
+    let mut g2 = Graph::new(GraphType::Directed);
+    g2.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g2.add_rule(RuleInstance::new(RuleSpec::Positive)).unwrap();
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Rules].into_iter().collect();
+    assert!(!g1.equals_with_layers(&g2, Some(&layers), false),
+        "Graphs with same data but different rules should NOT be equal with include: :rules");
+}
+
+#[test]
+fn test_equals_include_rules_one_has_rules() {
+    let mut g1 = Graph::new(GraphType::Directed);
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+
+    let mut g2 = Graph::new(GraphType::Directed);
+    g2.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g2.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Rules].into_iter().collect();
+    assert!(!g1.equals_with_layers(&g2, Some(&layers), false),
+        "Graphs where only one has rules should NOT be equal with include: :rules");
+}
+
+#[test]
+fn test_equals_include_rulesets_same() {
+    let mut g1 = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+
+    let mut g2 = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
+    g2.add_node("a".to_string(), Value::number(1.0)).unwrap();
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Rulesets].into_iter().collect();
+    assert!(g1.equals_with_layers(&g2, Some(&layers), false),
+        "Graphs with same rulesets should be equal with include: :rulesets");
+}
+
+#[test]
+fn test_equals_include_rulesets_different() {
+    let mut g1 = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+
+    let mut g2 = Graph::new(GraphType::Directed).with_ruleset("tree".to_string());
+    g2.add_node("a".to_string(), Value::number(1.0)).unwrap();
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Rulesets].into_iter().collect();
+    assert!(!g1.equals_with_layers(&g2, Some(&layers), false),
+        "Graphs with different rulesets should NOT be equal with include: :rulesets");
+}
+
+#[test]
+fn test_equals_include_methods_same() {
+    use graphoid::values::Function;
+    use graphoid::execution::Environment;
+    use std::rc::Rc;
+    use std::cell::RefCell;
+
+    let mut g1 = Graph::new(GraphType::Directed);
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    let func1 = Function {
+        name: Some("test".to_string()),
+        params: vec![],
+        parameters: vec![],
+        body: vec![],
+        pattern_clauses: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
+        is_setter: false,
+        is_static: false,
+        guard: None,
+    };
+    g1.attach_method("test".to_string(), func1);
+
+    let mut g2 = Graph::new(GraphType::Directed);
+    g2.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    let func2 = Function {
+        name: Some("test".to_string()),
+        params: vec![],
+        parameters: vec![],
+        body: vec![],
+        pattern_clauses: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
+        is_setter: false,
+        is_static: false,
+        guard: None,
+    };
+    g2.attach_method("test".to_string(), func2);
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Methods].into_iter().collect();
+    assert!(g1.equals_with_layers(&g2, Some(&layers), false),
+        "Graphs with same method names should be equal with include: :methods");
+}
+
+#[test]
+fn test_equals_include_methods_different() {
+    use graphoid::values::Function;
+    use graphoid::execution::Environment;
+    use std::rc::Rc;
+    use std::cell::RefCell;
+
+    let mut g1 = Graph::new(GraphType::Directed);
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    let func1 = Function {
+        name: Some("foo".to_string()),
+        params: vec![],
+        parameters: vec![],
+        body: vec![],
+        pattern_clauses: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
+        is_setter: false,
+        is_static: false,
+        guard: None,
+    };
+    g1.attach_method("foo".to_string(), func1);
+
+    let mut g2 = Graph::new(GraphType::Directed);
+    g2.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    let func2 = Function {
+        name: Some("bar".to_string()),
+        params: vec![],
+        parameters: vec![],
+        body: vec![],
+        pattern_clauses: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
+        is_setter: false,
+        is_static: false,
+        guard: None,
+    };
+    g2.attach_method("bar".to_string(), func2);
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Methods].into_iter().collect();
+    assert!(!g1.equals_with_layers(&g2, Some(&layers), false),
+        "Graphs with different method names should NOT be equal with include: :methods");
+}
+
+#[test]
+fn test_equals_include_multiple_layers() {
+    let mut g1 = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g1.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
+
+    let mut g2 = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
+    g2.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g2.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Rules, ComparisonLayer::Rulesets].into_iter().collect();
+    assert!(g1.equals_with_layers(&g2, Some(&layers), false),
+        "Graphs should be equal when all specified layers match");
+}
+
+#[test]
+fn test_equals_include_all() {
+    let mut g1 = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g1.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
+
+    let mut g2 = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
+    g2.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g2.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::All].into_iter().collect();
+    assert!(g1.equals_with_layers(&g2, Some(&layers), false),
+        "Graphs should be equal with include: :all when everything matches");
+}
+
+// --- only: tests (specific layer only, excluding data) ---
+
+#[test]
+fn test_equals_only_rules_same() {
+    let mut g1 = Graph::new(GraphType::Directed);
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g1.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
+
+    let mut g2 = Graph::new(GraphType::Directed);
+    g2.add_node("b".to_string(), Value::number(999.0)).unwrap(); // Different data!
+    g2.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Rules].into_iter().collect();
+    assert!(g1.equals_with_layers(&g2, Some(&layers), true),
+        "Graphs with same rules should be equal with only: :rules (ignoring data)");
+}
+
+#[test]
+fn test_equals_only_rules_different() {
+    let mut g1 = Graph::new(GraphType::Directed);
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g1.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
+
+    let mut g2 = Graph::new(GraphType::Directed);
+    g2.add_node("a".to_string(), Value::number(1.0)).unwrap(); // Same data
+    g2.add_rule(RuleInstance::new(RuleSpec::Positive)).unwrap(); // Different rule
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Rules].into_iter().collect();
+    assert!(!g1.equals_with_layers(&g2, Some(&layers), true),
+        "Graphs with different rules should NOT be equal with only: :rules");
+}
+
+#[test]
+fn test_equals_only_rulesets() {
+    let mut g1 = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
+    g1.add_node("x".to_string(), Value::number(100.0)).unwrap();
+
+    let mut g2 = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
+    g2.add_node("y".to_string(), Value::number(200.0)).unwrap(); // Different data
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Rulesets].into_iter().collect();
+    assert!(g1.equals_with_layers(&g2, Some(&layers), true),
+        "Graphs with same rulesets should be equal with only: :rulesets (ignoring data)");
+}
+
+#[test]
+fn test_equals_only_methods() {
+    use graphoid::values::Function;
+    use graphoid::execution::Environment;
+    use std::rc::Rc;
+    use std::cell::RefCell;
+
+    let mut g1 = Graph::new(GraphType::Directed);
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    let func1 = Function {
+        name: Some("calculate".to_string()),
+        params: vec![],
+        parameters: vec![],
+        body: vec![],
+        pattern_clauses: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
+        is_setter: false,
+        is_static: false,
+        guard: None,
+    };
+    g1.attach_method("calculate".to_string(), func1);
+
+    let mut g2 = Graph::new(GraphType::Directed);
+    g2.add_node("z".to_string(), Value::string("different".to_string())).unwrap(); // Different data
+    let func2 = Function {
+        name: Some("calculate".to_string()),
+        params: vec![],
+        parameters: vec![],
+        body: vec![],
+        pattern_clauses: None,
+        env: Rc::new(RefCell::new(Environment::new())),
+        node_id: None,
+        is_setter: false,
+        is_static: false,
+        guard: None,
+    };
+    g2.attach_method("calculate".to_string(), func2);
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Methods].into_iter().collect();
+    assert!(g1.equals_with_layers(&g2, Some(&layers), true),
+        "Graphs with same methods should be equal with only: :methods (ignoring data)");
+}
+
+#[test]
+fn test_equals_only_data() {
+    // only: :data should compare just data, ignoring everything else
+    let mut g1 = Graph::new(GraphType::Directed).with_ruleset("dag".to_string());
+    g1.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g1.add_rule(RuleInstance::new(RuleSpec::NoDuplicates)).unwrap();
+
+    let mut g2 = Graph::new(GraphType::Directed).with_ruleset("tree".to_string()); // Different ruleset
+    g2.add_node("a".to_string(), Value::number(1.0)).unwrap();
+    g2.add_rule(RuleInstance::new(RuleSpec::Positive)).unwrap(); // Different rule
+
+    let layers: HashSet<ComparisonLayer> = [ComparisonLayer::Data].into_iter().collect();
+    assert!(g1.equals_with_layers(&g2, Some(&layers), true),
+        "Graphs with same data should be equal with only: :data (ignoring rules/rulesets)");
+}

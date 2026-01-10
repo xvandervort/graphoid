@@ -4,7 +4,7 @@
 //! Each node stores direct pointers to its neighbors, avoiding index scans.
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use super::{Value, ValueKind, PatternNode, PatternEdge, PatternPath, Function, List};
+use super::{Value, ValueKind, PatternNode, PatternEdge, PatternPath, Function, List, ComparisonLayer};
 use crate::graph::rules::{Rule, RuleContext, GraphOperation, RuleSpec, RuleInstance, RuleSeverity};
 use crate::graph::rulesets::get_ruleset_rules;
 use crate::error::GraphoidError;
@@ -261,33 +261,9 @@ pub struct Graph {
 // - Any other node starting with __
 impl PartialEq for Graph {
     fn eq(&self, other: &Self) -> bool {
-        // Graph types must match
-        if self.graph_type != other.graph_type {
-            return false;
-        }
-
-        // Helper to check if a node ID is a data layer node (not internal)
-        fn is_data_node(id: &str) -> bool {
-            !id.starts_with("__")
-        }
-
-        // Get data-layer nodes from both graphs
-        let self_data: std::collections::HashMap<&String, &GraphNode> = self
-            .nodes
-            .iter()
-            .filter(|(id, _)| is_data_node(id))
-            .collect();
-
-        let other_data: std::collections::HashMap<&String, &GraphNode> = other
-            .nodes
-            .iter()
-            .filter(|(id, _)| is_data_node(id))
-            .collect();
-
-        // Compare only data layer nodes
-        self_data == other_data
-        // Deliberately ignore: rules, rulesets, config, internal nodes
-        // Deliberately ignore optimization state: property_access_counts, property_indices, auto_index_threshold
+        // Delegate to equals_with_layers with default parameters (data only)
+        // This ensures ONE implementation for all comparison logic
+        self.equals_with_layers(other, None, false)
     }
 }
 
@@ -310,6 +286,143 @@ impl Graph {
             auto_index_threshold: 10, // Create index after 10 lookups
             // Methods are stored as nodes with node_type "__method__"
         }
+    }
+
+    /// Compare graphs with specified layer options
+    ///
+    /// # Arguments
+    /// * `other` - The graph to compare against
+    /// * `layers` - Optional set of layers to include in comparison (None = data only)
+    /// * `only_mode` - If true, compare ONLY the specified layers (excluding data unless :data specified)
+    ///                 If false, compare data PLUS the specified layers (include mode)
+    ///
+    /// # Layers
+    /// - `Data` - User data nodes (default for ==)
+    /// - `Rules` - Ad-hoc rules attached via add_rule()
+    /// - `Rulesets` - Ruleset names (tree, dag, bst, etc.)
+    /// - `Methods` - Attached methods
+    /// - `Properties` - CLG properties
+    /// - `All` - Everything
+    ///
+    /// # Examples (Graphoid syntax)
+    /// ```graphoid
+    /// a.equals(b, include: :rules)      # Data + rules
+    /// a.equals(b, include: [:rules, :methods])  # Data + rules + methods
+    /// a.equals(b, only: :rules)         # Rules only (ignore data)
+    /// a.equals(b, only: :data)          # Data only (same as ==)
+    /// ```
+    pub fn equals_with_layers(&self, other: &Graph, layers: Option<&HashSet<ComparisonLayer>>, only_mode: bool) -> bool {
+        // If no layers specified, default behavior: data layer only
+        let layers = match layers {
+            Some(l) => l.clone(),
+            None => {
+                let mut default = HashSet::new();
+                default.insert(ComparisonLayer::Data);
+                default
+            }
+        };
+
+        // Check if :all is specified
+        let compare_all = layers.contains(&ComparisonLayer::All);
+
+        // Determine which layers to compare
+        let compare_data = compare_all || layers.contains(&ComparisonLayer::Data) || !only_mode;
+        let compare_rules = compare_all || layers.contains(&ComparisonLayer::Rules);
+        let compare_rulesets = compare_all || layers.contains(&ComparisonLayer::Rulesets);
+        let compare_methods = compare_all || layers.contains(&ComparisonLayer::Methods);
+        let compare_properties = compare_all || layers.contains(&ComparisonLayer::Properties);
+
+        // In only_mode, don't include data unless explicitly requested
+        let compare_data = if only_mode {
+            compare_all || layers.contains(&ComparisonLayer::Data)
+        } else {
+            compare_data
+        };
+
+        // Graph types must always match (structural requirement)
+        if self.graph_type != other.graph_type {
+            return false;
+        }
+
+        // Compare data layer if needed
+        if compare_data {
+            fn is_data_node(id: &str) -> bool {
+                !id.starts_with("__")
+            }
+
+            let self_data: HashMap<&String, &GraphNode> = self
+                .nodes
+                .iter()
+                .filter(|(id, _)| is_data_node(id))
+                .collect();
+
+            let other_data: HashMap<&String, &GraphNode> = other
+                .nodes
+                .iter()
+                .filter(|(id, _)| is_data_node(id))
+                .collect();
+
+            if self_data != other_data {
+                return false;
+            }
+        }
+
+        // Compare rules layer if needed
+        if compare_rules {
+            // Compare rule names (ignoring order)
+            // We use names because RuleSpec contains f64 which can't be hashed
+            let self_rules: HashSet<String> = self.rules.iter().map(|r| r.spec.name().to_string()).collect();
+            let other_rules: HashSet<String> = other.rules.iter().map(|r| r.spec.name().to_string()).collect();
+            if self_rules != other_rules {
+                return false;
+            }
+        }
+
+        // Compare rulesets layer if needed
+        if compare_rulesets {
+            // Compare ruleset names (ignoring order)
+            let self_rulesets: HashSet<&String> = self.rulesets.iter().collect();
+            let other_rulesets: HashSet<&String> = other.rulesets.iter().collect();
+            if self_rulesets != other_rulesets {
+                return false;
+            }
+        }
+
+        // Compare methods layer if needed
+        if compare_methods {
+            // Compare method names (ignoring implementation details)
+            let self_methods: HashSet<String> = self.method_names().into_iter().collect();
+            let other_methods: HashSet<String> = other.method_names().into_iter().collect();
+            if self_methods != other_methods {
+                return false;
+            }
+        }
+
+        // Compare properties layer if needed
+        if compare_properties {
+            // Compare __properties__/* nodes
+            fn is_property_node(id: &str) -> bool {
+                id.starts_with("__properties__/")
+            }
+
+            let self_props: HashMap<&String, &GraphNode> = self
+                .nodes
+                .iter()
+                .filter(|(id, _)| is_property_node(id))
+                .collect();
+
+            let other_props: HashMap<&String, &GraphNode> = other
+                .nodes
+                .iter()
+                .filter(|(id, _)| is_property_node(id))
+                .collect();
+
+            if self_props != other_props {
+                return false;
+            }
+        }
+
+        true
     }
 
     /// Create a new graph that inherits from a parent

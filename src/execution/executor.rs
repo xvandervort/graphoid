@@ -1216,8 +1216,9 @@ impl Executor {
         }
 
         // No parent - create a new empty graph
-        // Parse configuration to determine graph type
+        // Parse configuration to determine graph type and ruleset
         let mut graph_type = GraphType::Directed; // Default
+        let mut ruleset: Option<String> = None;
 
         for (key, value_expr) in config {
             if key == "type" {
@@ -1234,10 +1235,24 @@ impl Executor {
                 } else {
                     return Err(GraphoidError::type_error("symbol", value.type_name()));
                 }
+            } else if key == "ruleset" {
+                let value = self.eval_expr(value_expr)?;
+                if let ValueKind::Symbol(s) = &value.kind {
+                    ruleset = Some(s.clone());
+                } else {
+                    return Err(GraphoidError::type_error("symbol", value.type_name()));
+                }
             }
         }
 
-        Ok(Value::graph(Graph::new(graph_type)))
+        let mut graph = Graph::new(graph_type);
+
+        // Apply ruleset if specified
+        if let Some(rs) = ruleset {
+            graph = graph.with_ruleset(rs);
+        }
+
+        Ok(Value::graph(graph))
     }
 
     /// Evaluates a named graph declaration: graph Name { configure {...}, properties, methods }

@@ -1,0 +1,193 @@
+# graph_equality.gr - Demonstrating graph equality comparison
+#
+# Graphoid graphs have a layered architecture:
+# - Data layer: user-visible nodes and edges
+# - Rules layer: validation rules (add_rule)
+# - Rulesets layer: named rule collections (:dag, :tree, etc.)
+# - Methods layer: attached functions
+# - Properties layer: CLG properties
+#
+# By default, == compares DATA ONLY. Use equals() with options
+# for more precise comparisons.
+
+print("=== Graph Equality in Graphoid ===\n")
+
+# -----------------------------------------------------------------------------
+# Basic Equality (== operator)
+# -----------------------------------------------------------------------------
+print("--- Basic Equality (==) ---")
+
+g1 = graph { type: :directed }
+g1.add_node("a", 1)
+g1.add_node("b", 2)
+g1.add_edge("a", "b", "link")
+
+g2 = graph { type: :directed }
+g2.add_node("a", 1)
+g2.add_node("b", 2)
+g2.add_edge("a", "b", "link")
+
+print("g1 == g2 (same data): " + (g1 == g2).to_string())  # true
+
+# Rules don't affect basic equality
+g2.add_rule(:no_duplicates)
+print("g1 == g2 (after adding rule to g2): " + (g1 == g2).to_string())  # still true
+
+# But different data does
+g3 = graph { type: :directed }
+g3.add_node("a", 999)  # Different value
+print("g1 == g3 (different values): " + (g1 == g3).to_string())  # false
+
+# Graph type matters
+g4 = graph { type: :undirected }
+g4.add_node("a", 1)
+g4.add_node("b", 2)
+print("g1 == g4 (directed vs undirected): " + (g1 == g4).to_string())  # false
+
+print("")
+
+# -----------------------------------------------------------------------------
+# equals() with include: option
+# -----------------------------------------------------------------------------
+print("--- equals() with include: option ---")
+print("(Compares data PLUS specified layers)\n")
+
+# Create graphs with same data but different rules
+config1 = graph { type: :directed }
+config1.add_node("server", "localhost")
+config1.add_rule(:no_duplicates)
+
+config2 = graph { type: :directed }
+config2.add_node("server", "localhost")
+config2.add_rule(:no_duplicates)
+
+config3 = graph { type: :directed }
+config3.add_node("server", "localhost")
+config3.add_rule(:positive)  # Different rule
+
+print("config1 == config2: " + (config1 == config2).to_string())  # true (data only)
+print("config1.equals(config2, {include: :rules}): " + config1.equals(config2, {include: :rules}).to_string())  # true
+print("config1.equals(config3, {include: :rules}): " + config1.equals(config3, {include: :rules}).to_string())  # false
+
+print("")
+
+# Comparing rulesets
+dag1 = graph { type: :directed, ruleset: :dag }
+dag1.add_node("task", "build")
+
+dag2 = graph { type: :directed, ruleset: :dag }
+dag2.add_node("task", "build")
+
+tree1 = graph { type: :directed, ruleset: :tree }
+tree1.add_node("task", "build")
+
+print("dag1 == dag2: " + (dag1 == dag2).to_string())  # true (data only)
+print("dag1 == tree1: " + (dag1 == tree1).to_string())  # true (data only - rulesets ignored!)
+print("dag1.equals(dag2, {include: :rulesets}): " + dag1.equals(dag2, {include: :rulesets}).to_string())  # true
+print("dag1.equals(tree1, {include: :rulesets}): " + dag1.equals(tree1, {include: :rulesets}).to_string())  # false
+
+print("")
+
+# Multiple layers
+print("dag1.equals(dag2, {include: [:rules, :rulesets]}): " + dag1.equals(dag2, {include: [:rules, :rulesets]}).to_string())
+
+print("")
+
+# -----------------------------------------------------------------------------
+# equals() with only: option
+# -----------------------------------------------------------------------------
+print("--- equals() with only: option ---")
+print("(Compares ONLY specified layers, ignoring data)\n")
+
+# Same rules, different data
+template1 = graph { type: :directed }
+template1.add_node("x", 100)
+template1.add_rule(:no_duplicates)
+template1.add_rule(:positive)
+
+template2 = graph { type: :directed }
+template2.add_node("y", 999)  # Different data!
+template2.add_rule(:no_duplicates)
+template2.add_rule(:positive)
+
+print("template1 == template2: " + (template1 == template2).to_string())  # false (different data)
+print("template1.equals(template2, {only: :rules}): " + template1.equals(template2, {only: :rules}).to_string())  # true (same rules)
+
+print("")
+
+# Check if two graphs are the same "type" (by ruleset)
+workflow1 = graph { type: :directed, ruleset: :dag }
+workflow1.add_node("step1", "compile")
+workflow1.add_node("step2", "test")
+
+workflow2 = graph { type: :directed, ruleset: :dag }
+workflow2.add_node("task_a", "deploy")
+workflow2.add_node("task_b", "monitor")
+
+print("workflow1.equals(workflow2, {only: :rulesets}): " + workflow1.equals(workflow2, {only: :rulesets}).to_string())  # true
+
+print("")
+
+# -----------------------------------------------------------------------------
+# equals() with :all option
+# -----------------------------------------------------------------------------
+print("--- equals() with :all option ---")
+print("(Everything must match)\n")
+
+full1 = graph { type: :directed, ruleset: :dag }
+full1.add_node("a", 1)
+full1.add_rule(:no_duplicates)
+
+full2 = graph { type: :directed, ruleset: :dag }
+full2.add_node("a", 1)
+full2.add_rule(:no_duplicates)
+
+full3 = graph { type: :directed, ruleset: :dag }
+full3.add_node("a", 1)
+full3.add_rule(:positive)  # Different rule
+
+print("full1.equals(full2, {include: :all}): " + full1.equals(full2, {include: :all}).to_string())  # true
+print("full1.equals(full3, {include: :all}): " + full1.equals(full3, {include: :all}).to_string())  # false
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Lists with behaviors
+# -----------------------------------------------------------------------------
+print("--- Lists with Behaviors ---")
+print("(Lists are graphs too - same equality rules apply)\n")
+
+list1 = [1, 2, 3]
+list2 = [1, 2, 3]
+list3 = [1, 2, 3].add_rule(:none_to_zero)
+
+print("list1 == list2: " + (list1 == list2).to_string())  # true
+print("list1 == list3 (list3 has rule): " + (list1 == list3).to_string())  # true - rules ignored
+
+# Transformation affects data
+list4 = [1, none, 3].add_rule(:none_to_zero)  # Transforms to [1, 0, 3]
+list5 = [1, 0, 3]
+print("[1,none,3] with none_to_zero == [1,0,3]: " + (list4 == list5).to_string())  # true
+
+print("")
+
+# -----------------------------------------------------------------------------
+# Practical Use Cases
+# -----------------------------------------------------------------------------
+print("--- Practical Use Cases ---\n")
+
+# Use case 1: Checking if backup matches original (data only)
+original = graph { type: :directed }
+original.add_node("data", "important")
+backup = graph { type: :directed }
+backup.add_node("data", "important")
+print("Backup matches original (data): " + (original == backup).to_string())
+
+# Use case 2: Verifying two configs have same validation rules
+print("Configs have same validation: " + config1.equals(config2, {include: :rules}).to_string())
+
+# Use case 3: Checking if graph is a DAG type
+is_dag = workflow1.equals(graph { type: :directed, ruleset: :dag }, {only: :rulesets})
+print("workflow1 is a DAG: " + is_dag.to_string())
+
+print("\n=== Done ===")

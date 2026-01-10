@@ -13,10 +13,32 @@ use num_bigint::BigInt;
 pub mod graph;
 pub mod list;
 pub mod hash;
+
+/// Layers that can be compared when using graph.equals() with include:/only: options
+///
+/// By default, graph comparison (==) only compares the Data layer.
+/// Use equals(other, include: [...]) to include additional layers.
+/// Use equals(other, only: [...]) to compare only specific layers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ComparisonLayer {
+    /// User data nodes (default for ==)
+    Data,
+    /// Ad-hoc rules attached via add_rule()
+    Rules,
+    /// Ruleset names (tree, dag, bst, etc.)
+    Rulesets,
+    /// Attached methods (__methods__/*)
+    Methods,
+    /// CLG properties (__properties__/*)
+    Properties,
+    /// All layers (everything)
+    All,
+}
 // pub mod tree; // DELETED in Step 5 - trees are now graphs with rules
 
 pub use graph::{Graph, GraphType, GraphNode, ExecutionPlan};
 pub use list::List;
+// ComparisonLayer is defined in this module, so it's already public
 pub use hash::Hash;
 // Tree type removed - use graph{}.with_ruleset(:tree) instead
 
