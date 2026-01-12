@@ -2,10 +2,10 @@
 #
 # Run with: gr spec tests/gspec/exception_handling_spec.gr
 
-describe("Exception Handling", () => {
+describe "Exception Handling" {
 
-    describe("basic try/catch", () => {
-        it("catches division by zero", () => {
+    describe "basic try/catch" {
+        it "catches division by zero" {
             caught = false
             try {
                 x = 10 / 0
@@ -13,9 +13,9 @@ describe("Exception Handling", () => {
                 caught = true
             }
             assert(expect(caught).to_equal(true))
-        })
+        }
 
-        it("does not enter catch when no error", () => {
+        it "does not enter catch when no error" {
             caught = false
             try {
                 x = 10 / 2
@@ -23,11 +23,11 @@ describe("Exception Handling", () => {
                 caught = true
             }
             assert(expect(caught).to_equal(false))
-        })
-    })
+        }
+    }
 
-    describe("specific error types", () => {
-        it("catches ValueError specifically", () => {
+    describe "specific error types" {
+        it "catches ValueError specifically" {
             error_type = ""
             try {
                 raise ValueError("bad value")
@@ -35,9 +35,9 @@ describe("Exception Handling", () => {
                 error_type = e.type()
             }
             assert(expect(error_type).to_equal("ValueError"))
-        })
+        }
 
-        it("catches TypeError specifically", () => {
+        it "catches TypeError specifically" {
             error_type = ""
             try {
                 raise TypeError("wrong type")
@@ -45,9 +45,9 @@ describe("Exception Handling", () => {
                 error_type = e.type()
             }
             assert(expect(error_type).to_equal("TypeError"))
-        })
+        }
 
-        it("catches IOError specifically", () => {
+        it "catches IOError specifically" {
             error_type = ""
             try {
                 raise IOError("file not found")
@@ -55,11 +55,11 @@ describe("Exception Handling", () => {
                 error_type = e.type()
             }
             assert(expect(error_type).to_equal("IOError"))
-        })
-    })
+        }
+    }
 
-    describe("multiple catch clauses", () => {
-        it("matches the correct catch clause", () => {
+    describe "multiple catch clauses" {
+        it "matches the correct catch clause" {
             fn process(error_kind) {
                 try {
                     if error_kind == "type" { raise TypeError("type error") }
@@ -75,11 +75,11 @@ describe("Exception Handling", () => {
             assert(expect(process("type")).to_equal("caught type"))
             assert(expect(process("value")).to_equal("caught value"))
             assert(expect(process("none")).to_equal("no error"))
-        })
-    })
+        }
+    }
 
-    describe("finally block", () => {
-        it("runs finally when no error occurs", () => {
+    describe "finally block" {
+        it "runs finally when no error occurs" {
             finally_ran = false
             try {
                 x = 5
@@ -87,9 +87,9 @@ describe("Exception Handling", () => {
                 finally_ran = true
             }
             assert(expect(finally_ran).to_equal(true))
-        })
+        }
 
-        it("runs finally when error occurs", () => {
+        it "runs finally when error occurs" {
             finally_ran = false
             try {
                 raise ValueError("oops")
@@ -99,11 +99,11 @@ describe("Exception Handling", () => {
                 finally_ran = true
             }
             assert(expect(finally_ran).to_equal(true))
-        })
-    })
+        }
+    }
 
-    describe("error object methods", () => {
-        it("provides error type", () => {
+    describe "error object methods" {
+        it "provides error type" {
             error_type = ""
             try {
                 raise ValueError("test message")
@@ -111,9 +111,9 @@ describe("Exception Handling", () => {
                 error_type = e.type()
             }
             assert(expect(error_type).to_equal("ValueError"))
-        })
+        }
 
-        it("provides error message", () => {
+        it "provides error message" {
             error_msg = ""
             try {
                 raise ValueError("test message")
@@ -121,9 +121,9 @@ describe("Exception Handling", () => {
                 error_msg = e.message()
             }
             assert(expect(error_msg).to_equal("test message"))
-        })
+        }
 
-        it("provides stack trace", () => {
+        it "provides stack trace" {
             trace = ""
             try {
                 raise ValueError("test")
@@ -131,11 +131,11 @@ describe("Exception Handling", () => {
                 trace = e.stack_trace()
             }
             assert(expect(trace.length()).to_be_greater_than(0))
-        })
-    })
+        }
+    }
 
-    describe("raising custom errors", () => {
-        it("raises error with custom message", () => {
+    describe "raising custom errors" {
+        it "raises error with custom message" {
             fn validate_age(age) {
                 if age < 0 {
                     raise ValueError("Age cannot be negative")
@@ -150,11 +150,11 @@ describe("Exception Handling", () => {
                 result = e.message()
             }
             assert(expect(result).to_equal("Age cannot be negative"))
-        })
-    })
+        }
+    }
 
-    describe("nested exception handling", () => {
-        it("handles nested try/catch blocks", () => {
+    describe "nested exception handling" {
+        it "handles nested try/catch blocks" {
             outer_caught = ""
             try {
                 try {
@@ -166,11 +166,11 @@ describe("Exception Handling", () => {
                 outer_caught = e.message()
             }
             assert(expect(outer_caught).to_equal("converted"))
-        })
-    })
+        }
+    }
 
-    describe("safe operations pattern", () => {
-        it("returns success result on no error", () => {
+    describe "safe operations pattern" {
+        it "returns success result on no error" {
             fn safe_divide(a, b) {
                 try {
                     return {"success": true, "value": a / b}
@@ -182,9 +182,9 @@ describe("Exception Handling", () => {
             result = safe_divide(10, 2)
             assert(expect(result["success"]).to_equal(true))
             assert(expect(result["value"]).to_equal(5))
-        })
+        }
 
-        it("returns error result on failure", () => {
+        it "returns error result on failure" {
             fn safe_divide(a, b) {
                 try {
                     return {"success": true, "value": a / b}
@@ -195,6 +195,6 @@ describe("Exception Handling", () => {
 
             result = safe_divide(10, 0)
             assert(expect(result["success"]).to_equal(false))
-        })
-    })
-})
+        }
+    }
+}

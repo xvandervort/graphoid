@@ -2,36 +2,36 @@
 #
 # Run with: gr spec tests/gspec/graph_equality_spec.gr
 
-describe("Graph Equality", () => {
+describe "Graph Equality" {
 
-    describe("lists with behaviors", () => {
-        it("compares equal when values match despite different rules", () => {
+    describe "lists with behaviors" {
+        it "compares equal when values match despite different rules" {
             a = [1, 2, 3]
             b = [1, 2, 3].add_rule(:none_to_zero)
             assert(expect(a == b).to_equal(true))
-        })
+        }
 
-        it("compares equal after transformation produces same values", () => {
+        it "compares equal after transformation produces same values" {
             result = [1, none, 3].add_rule(:none_to_zero)
             expected = [1, 0, 3]
             assert(expect(result == expected).to_equal(true))
-        })
+        }
 
-        it("compares not equal when values differ", () => {
+        it "compares not equal when values differ" {
             a = [1, 2, 3]
             b = [1, 2, 4]
             assert(expect(a == b).to_equal(false))
-        })
+        }
 
-        it("compares equal with multiple rules attached", () => {
+        it "compares equal with multiple rules attached" {
             a = [1, 2, 3]
             b = [1, 2, 3].add_rule(:none_to_zero).add_rule(:positive)
             assert(expect(a == b).to_equal(true))
-        })
-    })
+        }
+    }
 
-    describe("graphs with rules", () => {
-        it("compares equal when nodes match despite different rulesets", () => {
+    describe "graphs with rules" {
+        it "compares equal when nodes match despite different rulesets" {
             g1 = graph { type: :directed }
             g1.add_node("a", 1)
             g1.add_node("b", 2)
@@ -41,9 +41,9 @@ describe("Graph Equality", () => {
             g2.add_node("b", 2)
 
             assert(expect(g1 == g2).to_equal(true))
-        })
+        }
 
-        it("compares not equal when nodes differ", () => {
+        it "compares not equal when nodes differ" {
             g1 = graph { type: :directed }
             g1.add_node("a", 1)
 
@@ -51,9 +51,9 @@ describe("Graph Equality", () => {
             g2.add_node("a", 2)
 
             assert(expect(g1 == g2).to_equal(false))
-        })
+        }
 
-        it("compares not equal when graph types differ", () => {
+        it "compares not equal when graph types differ" {
             g1 = graph { type: :directed }
             g1.add_node("a", 1)
 
@@ -61,23 +61,23 @@ describe("Graph Equality", () => {
             g2.add_node("a", 1)
 
             assert(expect(g1 == g2).to_equal(false))
-        })
-    })
+        }
+    }
 
-    describe("empty collections", () => {
-        it("empty lists compare equal", () => {
+    describe "empty collections" {
+        it "empty lists compare equal" {
             assert(expect([] == []).to_equal(true))
-        })
+        }
 
-        it("empty list with rule equals empty list without", () => {
+        it "empty list with rule equals empty list without" {
             a = []
             b = [].add_rule(:none_to_zero)
             assert(expect(a == b).to_equal(true))
-        })
-    })
+        }
+    }
 
-    describe("equals method with include: option", () => {
-        it("returns true when data and rules match", () => {
+    describe "equals method with include: option" {
+        it "returns true when data and rules match" {
             g1 = graph { type: :directed }
             g1.add_node("a", 1)
             g1.add_rule(:no_duplicates)
@@ -87,9 +87,9 @@ describe("Graph Equality", () => {
             g2.add_rule(:no_duplicates)
 
             assert(expect(g1.equals(g2, {include: :rules})).to_equal(true))
-        })
+        }
 
-        it("returns false when data matches but rules differ", () => {
+        it "returns false when data matches but rules differ" {
             g1 = graph { type: :directed }
             g1.add_node("a", 1)
             g1.add_rule(:no_duplicates)
@@ -99,9 +99,9 @@ describe("Graph Equality", () => {
             g2.add_rule(:positive)
 
             assert(expect(g1.equals(g2, {include: :rules})).to_equal(false))
-        })
+        }
 
-        it("returns true when data and rulesets match", () => {
+        it "returns true when data and rulesets match" {
             g1 = graph { type: :directed, ruleset: :dag }
             g1.add_node("a", 1)
 
@@ -109,9 +109,9 @@ describe("Graph Equality", () => {
             g2.add_node("a", 1)
 
             assert(expect(g1.equals(g2, {include: :rulesets})).to_equal(true))
-        })
+        }
 
-        it("returns false when data matches but rulesets differ", () => {
+        it "returns false when data matches but rulesets differ" {
             g1 = graph { type: :directed, ruleset: :dag }
             g1.add_node("a", 1)
 
@@ -119,9 +119,9 @@ describe("Graph Equality", () => {
             g2.add_node("a", 1)
 
             assert(expect(g1.equals(g2, {include: :rulesets})).to_equal(false))
-        })
+        }
 
-        it("supports multiple layers with list syntax", () => {
+        it "supports multiple layers with list syntax" {
             g1 = graph { type: :directed, ruleset: :dag }
             g1.add_node("a", 1)
             g1.add_rule(:no_duplicates)
@@ -131,11 +131,11 @@ describe("Graph Equality", () => {
             g2.add_rule(:no_duplicates)
 
             assert(expect(g1.equals(g2, {include: [:rules, :rulesets]})).to_equal(true))
-        })
-    })
+        }
+    }
 
-    describe("equals method with only: option", () => {
-        it("compares only rules, ignoring data differences", () => {
+    describe "equals method with only: option" {
+        it "compares only rules, ignoring data differences" {
             g1 = graph { type: :directed }
             g1.add_node("a", 1)
             g1.add_rule(:no_duplicates)
@@ -145,9 +145,9 @@ describe("Graph Equality", () => {
             g2.add_rule(:no_duplicates)
 
             assert(expect(g1.equals(g2, {only: :rules})).to_equal(true))
-        })
+        }
 
-        it("returns false when compared layer differs", () => {
+        it "returns false when compared layer differs" {
             g1 = graph { type: :directed }
             g1.add_node("a", 1)
             g1.add_rule(:no_duplicates)
@@ -157,9 +157,9 @@ describe("Graph Equality", () => {
             g2.add_rule(:positive)
 
             assert(expect(g1.equals(g2, {only: :rules})).to_equal(false))
-        })
+        }
 
-        it("compares only rulesets, ignoring data and rules", () => {
+        it "compares only rulesets, ignoring data and rules" {
             g1 = graph { type: :directed, ruleset: :dag }
             g1.add_node("x", 100)
             g1.add_rule(:no_duplicates)
@@ -169,9 +169,9 @@ describe("Graph Equality", () => {
             g2.add_rule(:positive)  # Different rule
 
             assert(expect(g1.equals(g2, {only: :rulesets})).to_equal(true))
-        })
+        }
 
-        it("compares only data when specified", () => {
+        it "compares only data when specified" {
             g1 = graph { type: :directed, ruleset: :dag }
             g1.add_node("a", 1)
             g1.add_rule(:no_duplicates)
@@ -181,11 +181,11 @@ describe("Graph Equality", () => {
             g2.add_rule(:positive)  # Different rule
 
             assert(expect(g1.equals(g2, {only: :data})).to_equal(true))
-        })
-    })
+        }
+    }
 
-    describe("equals method with :all option", () => {
-        it("returns true when all layers match", () => {
+    describe "equals method with :all option" {
+        it "returns true when all layers match" {
             g1 = graph { type: :directed, ruleset: :dag }
             g1.add_node("a", 1)
             g1.add_rule(:no_duplicates)
@@ -195,9 +195,9 @@ describe("Graph Equality", () => {
             g2.add_rule(:no_duplicates)
 
             assert(expect(g1.equals(g2, {include: :all})).to_equal(true))
-        })
+        }
 
-        it("returns false when any layer differs", () => {
+        it "returns false when any layer differs" {
             g1 = graph { type: :directed, ruleset: :dag }
             g1.add_node("a", 1)
             g1.add_rule(:no_duplicates)
@@ -207,11 +207,11 @@ describe("Graph Equality", () => {
             g2.add_rule(:positive)  # Different rule
 
             assert(expect(g1.equals(g2, {include: :all})).to_equal(false))
-        })
-    })
+        }
+    }
 
-    describe("equals method default behavior", () => {
-        it("compares data only by default (same as ==)", () => {
+    describe "equals method default behavior" {
+        it "compares data only by default (same as ==)" {
             g1 = graph { type: :directed }
             g1.add_node("a", 1)
             g1.add_rule(:no_duplicates)
@@ -222,6 +222,6 @@ describe("Graph Equality", () => {
 
             # Without options, equals() should behave like == (data only)
             assert(expect(g1.equals(g2)).to_equal(true))
-        })
-    })
-})
+        }
+    }
+}

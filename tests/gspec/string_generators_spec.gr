@@ -2,84 +2,84 @@
 #
 # Run with: gr spec tests/gspec/string_generators_spec.gr
 
-describe("String Generators", () => {
+describe "String Generators" {
 
-    describe("repetition mode", () => {
-        it("generates repeated spaces", () => {
+    describe "repetition mode" {
+        it "generates repeated spaces" {
             result = string.generate(" ", 5)
             assert(expect(result).to_equal("     "))
             assert(expect(result.length()).to_equal(5))
-        })
+        }
 
-        it("generates repeated characters", () => {
+        it "generates repeated characters" {
             result = string.generate("-", 10)
             assert(expect(result).to_equal("----------"))
-        })
+        }
 
-        it("generates repeated multi-char strings", () => {
+        it "generates repeated multi-char strings" {
             result = string.generate("ab", 3)
             assert(expect(result).to_equal("ababab"))
-        })
+        }
 
-        it("generates empty string with count 0", () => {
+        it "generates empty string with count 0" {
             result = string.generate("x", 0)
             assert(expect(result).to_equal(""))
-        })
-    })
+        }
+    }
 
-    describe("sequence mode", () => {
-        it("generates lowercase alphabet", () => {
+    describe "sequence mode" {
+        it "generates lowercase alphabet" {
             result = string.generate("a", "z")
             assert(expect(result).to_equal("abcdefghijklmnopqrstuvwxyz"))
             assert(expect(result.length()).to_equal(26))
-        })
+        }
 
-        it("generates uppercase alphabet", () => {
+        it "generates uppercase alphabet" {
             result = string.generate("A", "Z")
             assert(expect(result).to_equal("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
-        })
+        }
 
-        it("generates digits", () => {
+        it "generates digits" {
             result = string.generate("0", "9")
             assert(expect(result).to_equal("0123456789"))
-        })
+        }
 
-        it("generates partial range", () => {
+        it "generates partial range" {
             result = string.generate("a", "f")
             assert(expect(result).to_equal("abcdef"))
-        })
+        }
 
-        it("generates reverse range", () => {
+        it "generates reverse range" {
             result = string.generate("z", "a")
             assert(expect(result).to_equal("zyxwvutsrqponmlkjihgfedcba"))
-        })
+        }
 
-        it("generates single character for same start/end", () => {
+        it "generates single character for same start/end" {
             result = string.generate("m", "m")
             assert(expect(result).to_equal("m"))
-        })
-    })
+        }
+    }
 
-    describe("practical uses", () => {
-        it("creates padding for formatting", () => {
+    describe "practical uses" {
+        it "creates padding for formatting" {
             text = "Hi"
             padding = string.generate(" ", 5 - text.length())
             padded = text + padding
             assert(expect(padded.length()).to_equal(5))
-        })
+        }
 
-        it("creates separator lines", () => {
+        it "creates separator lines" {
             width = 20
             sep = string.generate("-", width)
             assert(expect(sep.length()).to_equal(20))
-        })
+        }
 
-        it("creates character set for validation", () => {
+        it "creates character set for validation" {
             lower = string.generate("a", "z")
             upper = string.generate("A", "Z")
             digits = string.generate("0", "9")
             charset = lower + upper + digits
             assert(expect(charset.length()).to_equal(62))
-        })
-    })
-})
+        }
+    }
+}

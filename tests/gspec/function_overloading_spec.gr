@@ -2,24 +2,24 @@
 #
 # Run with: gr spec tests/gspec/function_overloading_spec.gr
 
-describe("Function Overloading", () => {
+describe "Function Overloading" {
 
-    describe("by arity", () => {
-        it("calls 1-parameter version with 1 arg", () => {
+    describe "by arity" {
+        it "calls 1-parameter version with 1 arg" {
             fn greet(name) { return "Hello, " + name }
             fn greet(name, greeting) { return greeting + ", " + name }
 
             assert(expect(greet("Alice")).to_equal("Hello, Alice"))
-        })
+        }
 
-        it("calls 2-parameter version with 2 args", () => {
+        it "calls 2-parameter version with 2 args" {
             fn greet(name) { return "Hello, " + name }
             fn greet(name, greeting) { return greeting + ", " + name }
 
             assert(expect(greet("Bob", "Hi")).to_equal("Hi, Bob"))
-        })
+        }
 
-        it("supports 3 overloads", () => {
+        it "supports 3 overloads" {
             fn greet(name) { return "Hello, " + name }
             fn greet(name, greeting) { return greeting + ", " + name }
             fn greet(name, greeting, punct) { return greeting + ", " + name + punct }
@@ -27,37 +27,37 @@ describe("Function Overloading", () => {
             assert(expect(greet("A")).to_equal("Hello, A"))
             assert(expect(greet("B", "Hi")).to_equal("Hi, B"))
             assert(expect(greet("C", "Hey", "!!!")).to_equal("Hey, C!!!"))
-        })
-    })
+        }
+    }
 
-    describe("with different logic", () => {
-        it("add with 1 param increments by 1", () => {
+    describe "with different logic" {
+        it "add with 1 param increments by 1" {
             fn add(x) { return x + 1 }
             fn add(x, y) { return x + y }
             fn add(x, y, z) { return x + y + z }
 
             assert(expect(add(5)).to_equal(6))
-        })
+        }
 
-        it("add with 2 params sums them", () => {
+        it "add with 2 params sums them" {
             fn add(x) { return x + 1 }
             fn add(x, y) { return x + y }
             fn add(x, y, z) { return x + y + z }
 
             assert(expect(add(5, 10)).to_equal(15))
-        })
+        }
 
-        it("add with 3 params sums all", () => {
+        it "add with 3 params sums all" {
             fn add(x) { return x + 1 }
             fn add(x, y) { return x + y }
             fn add(x, y, z) { return x + y + z }
 
             assert(expect(add(5, 10, 15)).to_equal(30))
-        })
-    })
+        }
+    }
 
-    describe("module function overloading", () => {
-        it("works with imported module functions", () => {
+    describe "module function overloading" {
+        it "works with imported module functions" {
             import "approx"
 
             # 3-parameter version (absolute tolerance)
@@ -68,6 +68,6 @@ describe("Function Overloading", () => {
             # Tight tolerance should fail
             result2 = approx.equal(3.14159, 3.14, 0.001)
             assert(expect(result2).to_equal(false))
-        })
-    })
-})
+        }
+    }
+}

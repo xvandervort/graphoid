@@ -2,133 +2,133 @@
 #
 # Run with: gr spec tests/gspec/number_methods_spec.gr
 
-describe("Number Methods", () => {
+describe "Number Methods" {
 
-    describe("sqrt", () => {
-        it("returns square root of perfect square", () => {
+    describe "sqrt" {
+        it "returns square root of perfect square" {
             assert(expect((9.0).sqrt()).to_equal(3.0))
-        })
+        }
 
-        it("returns square root of non-perfect square", () => {
+        it "returns square root of non-perfect square" {
             result = (2.0).sqrt()
             assert(expect(result > 1.41).to_equal(true))
             assert(expect(result < 1.42).to_equal(true))
-        })
+        }
 
-        it("returns 0 for sqrt of 0", () => {
+        it "returns 0 for sqrt of 0" {
             assert(expect((0.0).sqrt()).to_equal(0.0))
-        })
-    })
+        }
+    }
 
-    describe("abs", () => {
-        it("returns positive number unchanged", () => {
+    describe "abs" {
+        it "returns positive number unchanged" {
             assert(expect((5.5).abs()).to_equal(5.5))
-        })
+        }
 
-        it("returns absolute value of negative", () => {
+        it "returns absolute value of negative" {
             assert(expect((-5.5).abs()).to_equal(5.5))
-        })
+        }
 
-        it("returns 0 for abs of 0", () => {
+        it "returns 0 for abs of 0" {
             assert(expect((0.0).abs()).to_equal(0.0))
-        })
-    })
+        }
+    }
 
-    describe("up (ceiling)", () => {
-        it("rounds up to integer", () => {
+    describe "up (ceiling)" {
+        it "rounds up to integer" {
             assert(expect((3.2).up()).to_equal(4.0))
-        })
+        }
 
-        it("rounds up to decimal places", () => {
+        it "rounds up to decimal places" {
             assert(expect((3.14159).up(2)).to_equal(3.15))
-        })
+        }
 
-        it("rounds up to nearest ten", () => {
+        it "rounds up to nearest ten" {
             assert(expect((23.0).up(:nearest_ten)).to_equal(30.0))
-        })
+        }
 
-        it("rounds up to nearest hundred", () => {
+        it "rounds up to nearest hundred" {
             assert(expect((250.0).up(:nearest_hundred)).to_equal(300.0))
-        })
+        }
 
-        it("handles negative numbers", () => {
+        it "handles negative numbers" {
             assert(expect((-3.2).up()).to_equal(-3.0))
-        })
-    })
+        }
+    }
 
-    describe("down (floor)", () => {
-        it("rounds down to integer", () => {
+    describe "down (floor)" {
+        it "rounds down to integer" {
             assert(expect((3.8).down()).to_equal(3.0))
-        })
+        }
 
-        it("rounds down to decimal places", () => {
+        it "rounds down to decimal places" {
             assert(expect((3.14159).down(2)).to_equal(3.14))
-        })
+        }
 
-        it("rounds down to nearest ten", () => {
+        it "rounds down to nearest ten" {
             assert(expect((27.0).down(:nearest_ten)).to_equal(20.0))
-        })
+        }
 
-        it("handles negative numbers", () => {
+        it "handles negative numbers" {
             assert(expect((-3.2).down()).to_equal(-4.0))
-        })
-    })
+        }
+    }
 
-    describe("round", () => {
-        it("rounds to integer", () => {
+    describe "round" {
+        it "rounds to integer" {
             assert(expect((3.5).round()).to_equal(4.0))
-        })
+        }
 
-        it("rounds to decimal places", () => {
+        it "rounds to decimal places" {
             assert(expect((3.14159).round(2)).to_equal(3.14))
-        })
+        }
 
-        it("rounds up to nearest ten", () => {
+        it "rounds up to nearest ten" {
             assert(expect((25.0).round(:nearest_ten)).to_equal(30.0))
-        })
+        }
 
-        it("rounds down to nearest ten", () => {
+        it "rounds down to nearest ten" {
             assert(expect((24.0).round(:nearest_ten)).to_equal(20.0))
-        })
+        }
 
-        it("handles negative numbers", () => {
+        it "handles negative numbers" {
             assert(expect((-3.5).round()).to_equal(-4.0))
-        })
-    })
+        }
+    }
 
-    describe("log", () => {
-        it("computes natural log", () => {
+    describe "log" {
+        it "computes natural log" {
             e = 2.718281828
             result = e.log()
             assert(expect(result > 0.99).to_equal(true))
             assert(expect(result < 1.01).to_equal(true))
-        })
+        }
 
-        it("computes log base 10", () => {
+        it "computes log base 10" {
             assert(expect((100.0).log(10)).to_equal(2.0))
-        })
+        }
 
-        it("computes log base 2", () => {
+        it "computes log base 2" {
             assert(expect((8.0).log(2)).to_equal(3.0))
-        })
-    })
+        }
+    }
 
-    describe("practical examples", () => {
-        it("calculates hypotenuse", () => {
+    describe "practical examples" {
+        it "calculates hypotenuse" {
             a = 3.0
             b = 4.0
             hypotenuse = ((a * a) + (b * b)).sqrt()
             assert(expect(hypotenuse).to_equal(5.0))
-        })
+        }
 
-        it("rounds price to nearest dollar", () => {
+        it "rounds price to nearest dollar" {
             price = 19.99
             assert(expect(price.round()).to_equal(20.0))
-        })
+        }
 
-        it("rounds to cents", () => {
+        it "rounds to cents" {
             price = 19.999
             assert(expect(price.round(2)).to_equal(20.0))
-        })
-    })
-})
+        }
+    }
+}

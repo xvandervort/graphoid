@@ -2,185 +2,185 @@
 #
 # Run with: gr spec tests/gspec/functions_spec.gr
 
-describe("Functions and Control Flow", () => {
+describe "Functions and Control Flow" {
 
-    describe("Functions", () => {
+    describe "Functions" {
 
-        it("defines and calls a simple function", () => {
+        it "defines and calls a simple function" {
             fn add(a, b) { return a + b }
             assert(expect(add(5, 3)).to_equal(8))
-        })
+        }
 
-        it("supports single-expression functions", () => {
+        it "supports single-expression functions" {
             fn square(x) { return x * x }
             assert(expect(square(7)).to_equal(49))
-        })
+        }
 
-        it("supports functions with no parameters", () => {
+        it "supports functions with no parameters" {
             fn get_pi() { return 3.14159 }
             assert(expect(get_pi()).to_be_greater_than(3))
-        })
+        }
 
-        it("supports nested function calls", () => {
+        it "supports nested function calls" {
             fn double(x) { return x * 2 }
             fn add_one(x) { return x + 1 }
             assert(expect(double(add_one(5))).to_equal(12))
-        })
+        }
 
-        it("supports recursive functions", () => {
+        it "supports recursive functions" {
             fn factorial(n) {
                 if n <= 1 { return 1 }
                 return n * factorial(n - 1)
             }
             assert(expect(factorial(5)).to_equal(120))
-        })
-    })
+        }
+    }
 
-    describe("Lambdas", () => {
+    describe "Lambdas" {
 
-        it("creates single-parameter lambda with arrow syntax", () => {
+        it "creates single-parameter lambda with arrow syntax" {
             sq = x => x * x
             assert(expect(sq(7)).to_equal(49))
-        })
+        }
 
-        it("creates multi-parameter lambda", () => {
+        it "creates multi-parameter lambda" {
             multiply = (a, b) => a * b
             assert(expect(multiply(4, 5)).to_equal(20))
-        })
+        }
 
-        it("uses lambda with map()", () => {
+        it "uses lambda with map()" {
             numbers = [1, 2, 3, 4, 5]
             squares = numbers.map(x => x * x)
             assert(expect(squares).to_equal([1, 4, 9, 16, 25]))
-        })
+        }
 
-        it("uses lambda with filter()", () => {
+        it "uses lambda with filter()" {
             numbers = [1, 2, 3, 4, 5]
             evens = numbers.filter(x => x % 2 == 0)
             assert(expect(evens).to_equal([2, 4]))
-        })
+        }
 
-        it("chains lambda operations", () => {
+        it "chains lambda operations" {
             numbers = [1, 2, 3, 4, 5]
             result = numbers.filter(x => x > 2).map(x => x * 10)
             assert(expect(result).to_equal([30, 40, 50]))
-        })
+        }
 
-        it("uses lambda with reject()", () => {
+        it "uses lambda with reject()" {
             numbers = [1, 2, 3, 4, 5]
             odds = numbers.reject(x => x % 2 == 0)
             assert(expect(odds).to_equal([1, 3, 5]))
-        })
+        }
 
-        it("stores lambda in variable and reuses", () => {
+        it "stores lambda in variable and reuses" {
             is_positive = x => x > 0
             assert(expect([-2, -1, 0, 1, 2].filter(is_positive)).to_equal([1, 2]))
-        })
-    })
+        }
+    }
 
-    describe("Conditionals", () => {
+    describe "Conditionals" {
 
-        describe("if-else", () => {
-            it("executes if branch when condition is true", () => {
+        describe "if-else" {
+            it "executes if branch when condition is true" {
                 age = 25
                 result = "unknown"
                 if age >= 18 { result = "adult" } else { result = "minor" }
                 assert(expect(result).to_equal("adult"))
-            })
+            }
 
-            it("executes else branch when condition is false", () => {
+            it "executes else branch when condition is false" {
                 age = 15
                 result = "unknown"
                 if age >= 18 { result = "adult" } else { result = "minor" }
                 assert(expect(result).to_equal("minor"))
-            })
+            }
 
-            it("supports inline conditional expressions", () => {
+            it "supports inline conditional expressions" {
                 age = 25
                 status = if age >= 21 { "can drink" } else { "cannot drink" }
                 assert(expect(status).to_equal("can drink"))
-            })
+            }
 
-            it("returns value from inline conditional", () => {
+            it "returns value from inline conditional" {
                 x = 10
                 result = if x > 5 { "big" } else { "small" }
                 assert(expect(result).to_equal("big"))
-            })
-        })
+            }
+        }
 
-        describe("unless", () => {
-            it("executes block when condition is false", () => {
+        describe "unless" {
+            it "executes block when condition is false" {
                 score = 85
                 did_pass = false
                 unless score < 60 { did_pass = true }
                 assert(expect(did_pass).to_equal(true))
-            })
+            }
 
-            it("skips block when condition is true", () => {
+            it "skips block when condition is true" {
                 score = 50
                 did_pass = true
                 unless score < 60 { did_pass = false }
                 assert(expect(did_pass).to_equal(true))
-            })
-        })
+            }
+        }
 
-        describe("boolean expressions", () => {
-            it("supports and operator", () => {
+        describe "boolean expressions" {
+            it "supports and operator" {
                 assert(expect(true and true).to_equal(true))
-            })
+            }
 
-            it("supports or operator", () => {
+            it "supports or operator" {
                 assert(expect(false or true).to_equal(true))
-            })
+            }
 
-            it("supports not operator", () => {
+            it "supports not operator" {
                 assert(expect(not false).to_equal(true))
-            })
+            }
 
-            it("supports comparison operators", () => {
+            it "supports comparison operators" {
                 assert(expect(5 > 3).to_equal(true))
-            })
+            }
 
-            it("supports equality check", () => {
+            it "supports equality check" {
                 assert(expect(5 == 5).to_equal(true))
-            })
+            }
 
-            it("supports inequality check", () => {
+            it "supports inequality check" {
                 assert(expect(5 != 3).to_equal(true))
-            })
-        })
-    })
+            }
+        }
+    }
 
-    describe("Loops", () => {
+    describe "Loops" {
 
-        describe("for loops", () => {
-            it("iterates over list elements", () => {
+        describe "for loops" {
+            it "iterates over list elements" {
                 sum = 0
                 for i in [1, 2, 3, 4, 5] {
                     sum = sum + i
                 }
                 assert(expect(sum).to_equal(15))
-            })
+            }
 
-            it("iterates over empty list without error", () => {
+            it "iterates over empty list without error" {
                 sum = 0
                 for i in [] {
                     sum = sum + 1
                 }
                 assert(expect(sum).to_equal(0))
-            })
+            }
 
-            it("can access loop variable in body", () => {
+            it "can access loop variable in body" {
                 squares = []
                 for n in [1, 2, 3] {
                     squares = squares.insert(squares.length(), n * n)
                 }
                 assert(expect(squares).to_equal([1, 4, 9]))
-            })
-        })
+            }
+        }
 
-        describe("while loops", () => {
-            it("executes while condition is true", () => {
+        describe "while loops" {
+            it "executes while condition is true" {
                 count = 5
                 result = 0
                 while count > 0 {
@@ -188,9 +188,9 @@ describe("Functions and Control Flow", () => {
                     count = count - 1
                 }
                 assert(expect(result).to_equal(15))
-            })
+            }
 
-            it("skips body when condition is initially false", () => {
+            it "skips body when condition is initially false" {
                 count = 0
                 executed = false
                 while count > 0 {
@@ -198,9 +198,9 @@ describe("Functions and Control Flow", () => {
                     count = count - 1
                 }
                 assert(expect(executed).to_equal(false))
-            })
+            }
 
-            it("supports countdown pattern", () => {
+            it "supports countdown pattern" {
                 nums = []
                 count = 3
                 while count > 0 {
@@ -208,109 +208,109 @@ describe("Functions and Control Flow", () => {
                     count = count - 1
                 }
                 assert(expect(nums).to_equal([3, 2, 1]))
-            })
-        })
-    })
+            }
+        }
+    }
 
-    describe("String as graph of characters", () => {
+    describe "String as graph of characters" {
         # Strings behave like graphs of characters - same methods as lists
 
-        describe("iteration", () => {
-            it("iterates over characters with for loop", () => {
+        describe "iteration" {
+            it "iterates over characters with for loop" {
                 chars = []
                 for c in "hello" {
                     chars = chars.insert(chars.length(), c)
                 }
                 assert(expect(chars).to_equal(["h", "e", "l", "l", "o"]))
-            })
+            }
 
-            it("iterates over empty string without error", () => {
+            it "iterates over empty string without error" {
                 count = 0
                 for c in "" {
                     count = count + 1
                 }
                 assert(expect(count).to_equal(0))
-            })
-        })
+            }
+        }
 
-        describe("list-like accessors", () => {
-            it("first() returns first character", () => {
+        describe "list-like accessors" {
+            it "first() returns first character" {
                 assert(expect("hello".first()).to_equal("h"))
-            })
+            }
 
-            it("last() returns last character", () => {
+            it "last() returns last character" {
                 assert(expect("hello".last()).to_equal("o"))
-            })
+            }
 
-            it("first() on empty string returns none", () => {
+            it "first() on empty string returns none" {
                 assert(expect("".first()).to_be_none())
-            })
+            }
 
-            it("is_empty() returns true for empty string", () => {
+            it "is_empty() returns true for empty string" {
                 assert(expect("".is_empty()).to_equal(true))
-            })
+            }
 
-            it("is_empty() returns false for non-empty string", () => {
+            it "is_empty() returns false for non-empty string" {
                 assert(expect("hello".is_empty()).to_equal(false))
-            })
+            }
 
-            it("slice() works like substring()", () => {
+            it "slice() works like substring()" {
                 assert(expect("hello".slice(1, 4)).to_equal("ell"))
-            })
-        })
+            }
+        }
 
-        describe("functional methods", () => {
-            it("map() transforms each character", () => {
+        describe "functional methods" {
+            it "map() transforms each character" {
                 result = "abc".map(c => c.upper())
                 assert(expect(result).to_equal(["A", "B", "C"]))
-            })
+            }
 
-            it("filter() keeps matching characters", () => {
+            it "filter() keeps matching characters" {
                 vowels = "hello".filter(c => c == "e" or c == "o")
                 assert(expect(vowels).to_equal("eo"))
-            })
+            }
 
-            it("reject() removes matching characters", () => {
+            it "reject() removes matching characters" {
                 consonants = "hello".reject(c => c == "e" or c == "o")
                 assert(expect(consonants).to_equal("hll"))
-            })
+            }
 
-            it("filter() returns string, not list", () => {
+            it "filter() returns string, not list" {
                 result = "abc".filter(c => c != "b")
                 assert(expect(result.type()).to_equal("string"))
-            })
-        })
-    })
+            }
+        }
+    }
 
-    describe("Function edge cases", () => {
+    describe "Function edge cases" {
 
-        it("handles function returning none implicitly", () => {
+        it "handles function returning none implicitly" {
             fn do_nothing() { x = 5 }
             result = do_nothing()
             assert(expect(result).to_be_none())
-        })
+        }
 
-        it("handles function with early return", () => {
+        it "handles function with early return" {
             fn check_positive(n) {
                 if n <= 0 { return "not positive" }
                 return "positive"
             }
             assert(expect(check_positive(-5)).to_equal("not positive"))
-        })
+        }
 
-        it("handles function shadowing outer variable", () => {
+        it "handles function shadowing outer variable" {
             x = 10
             fn get_x() {
                 x = 20
                 return x
             }
             assert(expect(get_x()).to_equal(20))
-        })
+        }
 
-        it("handles lambda capturing outer variable", () => {
+        it "handles lambda capturing outer variable" {
             multiplier = 3
             triple = x => x * multiplier
             assert(expect(triple(5)).to_equal(15))
-        })
-    })
-})
+        }
+    }
+}

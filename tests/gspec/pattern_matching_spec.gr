@@ -2,93 +2,93 @@
 #
 # Run with: gr spec tests/gspec/pattern_matching_spec.gr
 
-describe("Pattern Matching", () => {
+describe "Pattern Matching" {
 
-    describe("number matching", () => {
-        it("matches specific numbers", () => {
+    describe "number matching" {
+        it "matches specific numbers" {
             fn classify_num(x) {
                 return match x { 0 => "zero", 1 => "one", 2 => "two", _ => "other" }
             }
             assert(expect(classify_num(0)).to_equal("zero"))
             assert(expect(classify_num(1)).to_equal("one"))
             assert(expect(classify_num(2)).to_equal("two"))
-        })
+        }
 
-        it("uses wildcard for non-matched values", () => {
+        it "uses wildcard for non-matched values" {
             fn classify_num2(x) {
                 return match x { 0 => "zero", _ => "other" }
             }
             assert(expect(classify_num2(42)).to_equal("other"))
             assert(expect(classify_num2(100)).to_equal("other"))
-        })
-    })
+        }
+    }
 
-    describe("string matching", () => {
-        it("matches specific strings", () => {
+    describe "string matching" {
+        it "matches specific strings" {
             fn greet_str(name) {
                 return match name { "Alice" => "Hello, Alice!", "Bob" => "Hey Bob!", _ => "Hello, stranger!" }
             }
             assert(expect(greet_str("Alice")).to_equal("Hello, Alice!"))
             assert(expect(greet_str("Bob")).to_equal("Hey Bob!"))
-        })
+        }
 
-        it("uses wildcard for unmatched strings", () => {
+        it "uses wildcard for unmatched strings" {
             fn greet_str2(name) {
                 return match name { "Alice" => "Hello, Alice!", _ => "Hello, stranger!" }
             }
             assert(expect(greet_str2("Charlie")).to_equal("Hello, stranger!"))
-        })
-    })
+        }
+    }
 
-    describe("list pattern matching", () => {
-        it("matches empty list", () => {
+    describe "list pattern matching" {
+        it "matches empty list" {
             fn desc_empty(lst) {
                 return match lst { [] => "empty", _ => "not empty" }
             }
             assert(expect(desc_empty([])).to_equal("empty"))
-        })
+        }
 
-        it("matches single element list", () => {
+        it "matches single element list" {
             fn desc_single(lst) {
                 return match lst { [x] => "single", _ => "other" }
             }
             assert(expect(desc_single([1])).to_equal("single"))
             assert(expect(desc_single([42])).to_equal("single"))
-        })
+        }
 
-        it("matches two element list", () => {
+        it "matches two element list" {
             fn desc_two(lst) {
                 return match lst { [x, y] => "two", _ => "other" }
             }
             assert(expect(desc_two([1, 2])).to_equal("two"))
-        })
+        }
 
-        it("binds variables in patterns", () => {
+        it "binds variables in patterns" {
             fn first_of(lst) {
                 return match lst { [x] => x, [x, y] => x, _ => none }
             }
             assert(expect(first_of([42])).to_equal(42))
             assert(expect(first_of([10, 20])).to_equal(10))
-        })
-    })
+        }
+    }
 
-    describe("rest patterns", () => {
-        it("matches with rest pattern", () => {
+    describe "rest patterns" {
+        it "matches with rest pattern" {
             fn process_rest(lst) {
                 return match lst { [] => "empty", [first, ...rest] => "has first", [...all] => "all" }
             }
             assert(expect(process_rest([])).to_equal("empty"))
             assert(expect(process_rest([1])).to_equal("has first"))
             assert(expect(process_rest([1, 2, 3])).to_equal("has first"))
-        })
+        }
 
-        it("binds head with rest pattern", () => {
+        it "binds head with rest pattern" {
             fn get_head_rest(lst) {
                 return match lst { [head, ...tail] => head, _ => none }
             }
             assert(expect(get_head_rest([1, 2, 3, 4])).to_equal(1))
             assert(expect(get_head_rest([42])).to_equal(42))
             assert(expect(get_head_rest([])).to_be_none())
-        })
-    })
-})
+        }
+    }
+}

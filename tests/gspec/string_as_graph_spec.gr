@@ -5,236 +5,236 @@
 #
 # Run with: gr spec tests/gspec/string_as_graph_spec.gr
 
-describe("String as Graph of Characters", () => {
+describe "String as Graph of Characters" {
 
-    describe("Iteration", () => {
+    describe "Iteration" {
 
-        it("iterates over characters with for loop", () => {
+        it "iterates over characters with for loop" {
             chars = []
             for c in "hello" {
                 chars = chars.insert(chars.length(), c)
             }
             assert(expect(chars).to_equal(["h", "e", "l", "l", "o"]))
-        })
+        }
 
-        it("iterates over empty string without error", () => {
+        it "iterates over empty string without error" {
             count = 0
             for c in "" {
                 count = count + 1
             }
             assert(expect(count).to_equal(0))
-        })
+        }
 
-        it("iterates over unicode characters correctly", () => {
+        it "iterates over unicode characters correctly" {
             chars = []
             for c in "cafe" {
                 chars = chars.insert(chars.length(), c)
             }
             assert(expect(chars).to_equal(["c", "a", "f", "e"]))
-        })
+        }
 
-        it("each character is a single-character string", () => {
+        it "each character is a single-character string" {
             types = []
             for c in "abc" {
                 types = types.insert(types.length(), c.type())
             }
             assert(expect(types).to_equal(["string", "string", "string"]))
-        })
-    })
+        }
+    }
 
-    describe("List-like Accessors", () => {
+    describe "List-like Accessors" {
 
-        describe("first()", () => {
-            it("returns first character", () => {
+        describe "first()" {
+            it "returns first character" {
                 assert(expect("hello".first()).to_equal("h"))
-            })
+            }
 
-            it("returns none for empty string", () => {
+            it "returns none for empty string" {
                 assert(expect("".first()).to_be_none())
-            })
-        })
+            }
+        }
 
-        describe("last()", () => {
-            it("returns last character", () => {
+        describe "last()" {
+            it "returns last character" {
                 assert(expect("hello".last()).to_equal("o"))
-            })
+            }
 
-            it("returns none for empty string", () => {
+            it "returns none for empty string" {
                 assert(expect("".last()).to_be_none())
-            })
-        })
+            }
+        }
 
-        describe("is_empty()", () => {
-            it("returns true for empty string", () => {
+        describe "is_empty()" {
+            it "returns true for empty string" {
                 assert(expect("".is_empty()).to_equal(true))
-            })
+            }
 
-            it("returns false for non-empty string", () => {
+            it "returns false for non-empty string" {
                 assert(expect("hello".is_empty()).to_equal(false))
-            })
+            }
 
-            it("returns false for single character", () => {
+            it "returns false for single character" {
                 assert(expect("x".is_empty()).to_equal(false))
-            })
-        })
+            }
+        }
 
-        describe("length()", () => {
-            it("returns character count", () => {
+        describe "length()" {
+            it "returns character count" {
                 assert(expect("hello".length()).to_equal(5))
-            })
+            }
 
-            it("returns 0 for empty string", () => {
+            it "returns 0 for empty string" {
                 assert(expect("".length()).to_equal(0))
-            })
-        })
+            }
+        }
 
-        describe("slice()", () => {
-            it("extracts substring by indices", () => {
+        describe "slice()" {
+            it "extracts substring by indices" {
                 assert(expect("hello".slice(1, 4)).to_equal("ell"))
-            })
+            }
 
-            it("handles start at 0", () => {
+            it "handles start at 0" {
                 assert(expect("hello".slice(0, 2)).to_equal("he"))
-            })
+            }
 
-            it("handles end at length", () => {
+            it "handles end at length" {
                 assert(expect("hello".slice(3, 5)).to_equal("lo"))
-            })
+            }
 
-            it("returns empty for equal indices", () => {
+            it "returns empty for equal indices" {
                 assert(expect("hello".slice(2, 2)).to_equal(""))
-            })
+            }
 
-            it("returns empty for reversed indices", () => {
+            it "returns empty for reversed indices" {
                 assert(expect("hello".slice(4, 2)).to_equal(""))
-            })
+            }
 
-            it("clamps out-of-bounds indices", () => {
+            it "clamps out-of-bounds indices" {
                 assert(expect("hello".slice(0, 100)).to_equal("hello"))
-            })
-        })
-    })
+            }
+        }
+    }
 
-    describe("Functional Methods", () => {
+    describe "Functional Methods" {
 
-        describe("map()", () => {
-            it("transforms each character", () => {
+        describe "map()" {
+            it "transforms each character" {
                 result = "abc".map(c => c.upper())
                 assert(expect(result).to_equal(["A", "B", "C"]))
-            })
+            }
 
-            it("returns a list (not a string)", () => {
+            it "returns a list (not a string)" {
                 result = "abc".map(c => c)
                 assert(expect(result.type()).to_equal("list"))
-            })
+            }
 
-            it("can transform to non-string values", () => {
+            it "can transform to non-string values" {
                 result = "123".map(c => c.to_num())
                 assert(expect(result).to_equal([1, 2, 3]))
-            })
+            }
 
-            it("handles empty string", () => {
+            it "handles empty string" {
                 result = "".map(c => c.upper())
                 assert(expect(result).to_equal([]))
-            })
+            }
 
-            it("provides each character to the function", () => {
+            it "provides each character to the function" {
                 lengths = "ab cd".map(c => c.length())
                 assert(expect(lengths).to_equal([1, 1, 1, 1, 1]))
-            })
-        })
+            }
+        }
 
-        describe("filter()", () => {
-            it("keeps characters matching predicate", () => {
+        describe "filter()" {
+            it "keeps characters matching predicate" {
                 vowels = "hello".filter(c => c == "e" or c == "o")
                 assert(expect(vowels).to_equal("eo"))
-            })
+            }
 
-            it("returns a string (not a list)", () => {
+            it "returns a string (not a list)" {
                 result = "hello".filter(c => c == "l")
                 assert(expect(result.type()).to_equal("string"))
-            })
+            }
 
-            it("returns empty string when nothing matches", () => {
+            it "returns empty string when nothing matches" {
                 result = "hello".filter(c => c == "z")
                 assert(expect(result).to_equal(""))
-            })
+            }
 
-            it("returns same string when all match", () => {
+            it "returns same string when all match" {
                 result = "aaa".filter(c => c == "a")
                 assert(expect(result).to_equal("aaa"))
-            })
+            }
 
-            it("handles empty string", () => {
+            it "handles empty string" {
                 result = "".filter(c => true)
                 assert(expect(result).to_equal(""))
-            })
+            }
 
-            it("can filter by character properties", () => {
+            it "can filter by character properties" {
                 # Keep only lowercase letters (filter out space)
                 result = "a B c".filter(c => c != " ")
                 assert(expect(result).to_equal("aBc"))
-            })
-        })
+            }
+        }
 
-        describe("reject()", () => {
-            it("removes characters matching predicate", () => {
+        describe "reject()" {
+            it "removes characters matching predicate" {
                 consonants = "hello".reject(c => c == "e" or c == "o")
                 assert(expect(consonants).to_equal("hll"))
-            })
+            }
 
-            it("returns a string (not a list)", () => {
+            it "returns a string (not a list)" {
                 result = "hello".reject(c => c == "l")
                 assert(expect(result.type()).to_equal("string"))
-            })
+            }
 
-            it("returns same string when nothing matches", () => {
+            it "returns same string when nothing matches" {
                 result = "hello".reject(c => c == "z")
                 assert(expect(result).to_equal("hello"))
-            })
+            }
 
-            it("returns empty string when all match", () => {
+            it "returns empty string when all match" {
                 result = "aaa".reject(c => c == "a")
                 assert(expect(result).to_equal(""))
-            })
+            }
 
-            it("handles empty string", () => {
+            it "handles empty string" {
                 result = "".reject(c => true)
                 assert(expect(result).to_equal(""))
-            })
+            }
 
-            it("is the inverse of filter", () => {
+            it "is the inverse of filter" {
                 s = "hello"
                 filtered = s.filter(c => c == "l")
                 rejected = s.reject(c => c == "l")
                 assert(expect(filtered.length() + rejected.length()).to_equal(s.length()))
-            })
-        })
+            }
+        }
 
-        describe("each()", () => {
-            it("calls function for each character", () => {
+        describe "each()" {
+            it "calls function for each character" {
                 # Verify each() is called by using map() which we know works
                 # each() is equivalent to map() but returns none instead of results
                 mapped = "hello".map(c => c)
                 assert(expect(mapped.length()).to_equal(5))
-            })
+            }
 
-            it("returns none", () => {
+            it "returns none" {
                 result = "abc".each(c => c)
                 assert(expect(result).to_be_none())
-            })
+            }
 
-            it("handles empty string without error", () => {
+            it "handles empty string without error" {
                 # Verify no error is thrown for empty string
                 result = "".each(c => c)
                 assert(expect(result).to_be_none())
-            })
-        })
-    })
+            }
+        }
+    }
 
-    describe("Consistency with List Behavior", () => {
+    describe "Consistency with List Behavior" {
 
-        it("string and list have same iteration semantics", () => {
+        it "string and list have same iteration semantics" {
             # Collecting characters from string iteration
             str_chars = []
             for c in "abc" {
@@ -248,20 +248,20 @@ describe("String as Graph of Characters", () => {
             }
 
             assert(expect(str_chars).to_equal(list_items))
-        })
+        }
 
-        it("string.map produces same result as list.map on chars", () => {
+        it "string.map produces same result as list.map on chars" {
             str_result = "abc".map(c => c.upper())
             list_result = ["a", "b", "c"].map(c => c.upper())
             assert(expect(str_result).to_equal(list_result))
-        })
+        }
 
-        it("string first/last match list first/last for char lists", () => {
+        it "string first/last match list first/last for char lists" {
             s = "hello"
             chars = ["h", "e", "l", "l", "o"]
             first_match = s.first() == chars.first()
             last_match = s.last() == chars.last()
             assert(expect(first_match and last_match).to_equal(true))
-        })
-    })
-})
+        }
+    }
+}

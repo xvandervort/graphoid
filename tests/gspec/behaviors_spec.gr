@@ -6,114 +6,114 @@
 # even when values are the same (rule metadata affects equality).
 # We use to_string() comparison as a workaround.
 
-describe("Behaviors", () => {
+describe "Behaviors" {
 
-    describe("none_to_zero", () => {
-        it("replaces none values with 0", () => {
+    describe "none_to_zero" {
+        it "replaces none values with 0" {
             items = [1, none, 3, none, 5]
             result = items.add_rule(:none_to_zero)
             assert(expect(result.to_string()).to_equal("[1, 0, 3, 0, 5]"))
-        })
+        }
 
-        it("leaves non-none values unchanged", () => {
+        it "leaves non-none values unchanged" {
             items = [1, 2, 3]
             result = items.add_rule(:none_to_zero)
             assert(expect(result.to_string()).to_equal("[1, 2, 3]"))
-        })
+        }
 
-        it("handles all-none list", () => {
+        it "handles all-none list" {
             items = [none, none, none]
             result = items.add_rule(:none_to_zero)
             assert(expect(result.to_string()).to_equal("[0, 0, 0]"))
-        })
-    })
+        }
+    }
 
-    describe("positive", () => {
-        it("converts negative numbers to absolute values", () => {
+    describe "positive" {
+        it "converts negative numbers to absolute values" {
             items = [-5, 10, -3, 7, -1]
             result = items.add_rule(:positive)
             assert(expect(result.to_string()).to_equal("[5, 10, 3, 7, 1]"))
-        })
+        }
 
-        it("leaves positive numbers unchanged", () => {
+        it "leaves positive numbers unchanged" {
             items = [1, 2, 3]
             result = items.add_rule(:positive)
             assert(expect(result.to_string()).to_equal("[1, 2, 3]"))
-        })
+        }
 
-        it("handles zero", () => {
+        it "handles zero" {
             items = [0, -5, 5]
             result = items.add_rule(:positive)
             assert(expect(result.to_string()).to_equal("[0, 5, 5]"))
-        })
-    })
+        }
+    }
 
-    describe("round_to_int", () => {
-        it("rounds decimals to integers", () => {
+    describe "round_to_int" {
+        it "rounds decimals to integers" {
             items = [1.2, 3.7, 5.5, 2.1, 8.9]
             result = items.add_rule(:round_to_int)
             assert(expect(result.to_string()).to_equal("[1, 4, 6, 2, 9]"))
-        })
+        }
 
-        it("leaves integers unchanged", () => {
+        it "leaves integers unchanged" {
             items = [1, 2, 3]
             result = items.add_rule(:round_to_int)
             assert(expect(result.to_string()).to_equal("[1, 2, 3]"))
-        })
-    })
+        }
+    }
 
-    describe("validate_range", () => {
-        it("clamps values to min/max", () => {
+    describe "validate_range" {
+        it "clamps values to min/max" {
             items = [50, 110, 95, 130, 85, 70]
             result = items.add_rule(:validate_range, 60, 100)
             assert(expect(result.to_string()).to_equal("[60, 100, 95, 100, 85, 70]"))
-        })
+        }
 
-        it("leaves values within range unchanged", () => {
+        it "leaves values within range unchanged" {
             items = [70, 80, 90]
             result = items.add_rule(:validate_range, 60, 100)
             assert(expect(result.to_string()).to_equal("[70, 80, 90]"))
-        })
-    })
+        }
+    }
 
-    describe("uppercase", () => {
-        it("converts strings to uppercase", () => {
+    describe "uppercase" {
+        it "converts strings to uppercase" {
             items = ["hello", "WORLD", "GrApHoId"]
             result = items.add_rule(:uppercase)
             assert(expect(result.to_string()).to_equal("[\"HELLO\", \"WORLD\", \"GRAPHOID\"]"))
-        })
-    })
+        }
+    }
 
-    describe("lowercase", () => {
-        it("converts strings to lowercase", () => {
+    describe "lowercase" {
+        it "converts strings to lowercase" {
             items = ["HELLO", "World", "GrApHoId"]
             result = items.add_rule(:lowercase)
             assert(expect(result.to_string()).to_equal("[\"hello\", \"world\", \"graphoid\"]"))
-        })
-    })
+        }
+    }
 
-    describe("no_duplicates", () => {
-        it("removes duplicate values", () => {
+    describe "no_duplicates" {
+        it "removes duplicate values" {
             items = [1, 2, 3, 2, 4, 3, 5]
             result = items.add_rule(:no_duplicates)
             # Note: maintains first occurrence of each value
             assert(expect(result.length()).to_equal(5))
-        })
+        }
 
-        it("handles list with no duplicates", () => {
+        it "handles list with no duplicates" {
             items = [1, 2, 3, 4, 5]
             result = items.add_rule(:no_duplicates)
             assert(expect(result.length()).to_equal(5))
-        })
-    })
+        }
+    }
 
-    describe("chaining behaviors", () => {
-        it("applies multiple rules in sequence", () => {
+    describe "chaining behaviors" {
+        it "applies multiple rules in sequence" {
             items = [-5.7, none, 3.2, -1.9, none, 8.1]
             result = items.add_rule(:none_to_zero)
                          .add_rule(:positive)
                          .add_rule(:round_to_int)
             assert(expect(result.to_string()).to_equal("[6, 0, 3, 2, 0, 8]"))
-        })
-    })
-})
+        }
+    }
+}

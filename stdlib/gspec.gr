@@ -286,6 +286,8 @@ graph TestRunner {
     indent: 0
     before_hooks: []
     after_hooks: []
+    failed_tests: []
+    _context_stack: []
 
     # Helper to build indentation string
     fn _indent_str() {
@@ -302,16 +304,26 @@ graph TestRunner {
         after_hooks.append!(hook)
     }
 
+    # Build the full context path for failed test reporting
+    fn _full_context() {
+        if _context_stack.length() == 0 {
+            return ""
+        }
+        return _context_stack.join(" > ")
+    }
+
     # Describe a test suite
     fn describe(name, block) {
         print(_indent_str() + name)
 
-        # Save current hooks, update indent, run block, restore both
+        # Save current hooks, update indent, push context, run block, restore all
         saved_before = before_hooks.slice(0, before_hooks.length())
         saved_after = after_hooks.slice(0, after_hooks.length())
+        _context_stack.append!(name)
         indent = indent + 1
         block()
         indent = indent - 1
+        _context_stack.pop!()
         before_hooks = saved_before
         after_hooks = saved_after
     }
@@ -375,6 +387,13 @@ graph TestRunner {
             if error_msg.length() > 0 {
                 print(prefix + "    Error: " + error_msg)
             }
+            # Record the failed test with full context
+            ctx = _full_context()
+            full_name = description
+            if ctx.length() > 0 {
+                full_name = ctx + " > " + description
+            }
+            failed_tests.append!({"name": full_name, "error": error_msg})
         }
     }
 
@@ -399,7 +418,8 @@ graph TestRunner {
             "passed": passed,
             "failed": failed,
             "skipped": skipped,
-            "total": total
+            "total": total,
+            "failed_tests": failed_tests
         }
     }
 
@@ -422,6 +442,46 @@ graph TestRunner {
             }
         } else {
             print("SOME TESTS FAILED")
+        }
+    }
+
+    # Print final summary (called by spec runner after all files)
+    # Returns true if there were failures
+    fn final_summary() {
+        total = passed + failed + skipped
+        separator = string.generate("=", 60)
+
+        print("")
+        print(separator)
+        print("FINAL SUMMARY")
+        print(separator)
+
+        summary_line = passed.to_string() + " passed, " + failed.to_string() + " failed, " + skipped.to_string() + " skipped, " + total.to_string() + " total"
+        print(summary_line)
+
+        if failed_tests.length() > 0 {
+            print("")
+            print("Failed tests:")
+            for test in failed_tests {
+                print("  " + test["name"])
+                if test["error"].length() > 0 {
+                    print("    Error: " + test["error"])
+                }
+            }
+        }
+
+        if failed > 0 {
+            print("")
+            print("SOME TESTS FAILED")
+            return true
+        } else if skipped > 0 {
+            print("")
+            print("ALL TESTS PASSED (some skipped)")
+            return false
+        } else {
+            print("")
+            print("ALL TESTS PASSED")
+            return false
         }
     }
 }

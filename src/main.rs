@@ -79,53 +79,68 @@ fn run_spec_command(args: &[String]) {
 
     println!("Running {} spec file(s)...\n", spec_files.len());
 
-    let mut total_passed = 0;
-    let mut total_failed = 0;
-    let mut total_skipped = 0;
-    let mut failed_files: Vec<String> = Vec::new();
+    // Single executor for all spec files - Graphoid handles everything
+    let mut executor = Executor::new();
 
+    // Initialize the gspec framework once
+    if let Err(e) = inject_spec_dsl(&mut executor) {
+        eprintln!("Error initializing spec runner: {}", e);
+        std::process::exit(1);
+    }
+
+    // Run each spec file
     for spec_file in &spec_files {
-        match run_spec_file(spec_file) {
-            Ok((passed, failed, skipped)) => {
-                total_passed += passed;
-                total_failed += failed;
-                total_skipped += skipped;
-                if failed > 0 {
-                    failed_files.push(spec_file.display().to_string());
+        let abs_path = spec_file.canonicalize().unwrap_or_else(|_| spec_file.to_path_buf());
+        executor.set_current_file(Some(abs_path));
+
+        match fs::read_to_string(spec_file) {
+            Ok(source) => {
+                if let Err(e) = execute_source(&source, &mut executor) {
+                    eprintln!("\nError in {}: {}", spec_file.display(), e);
                 }
             }
             Err(e) => {
-                eprintln!("\nError in {}: {}", spec_file.display(), e);
-                total_failed += 1;
-                failed_files.push(spec_file.display().to_string());
+                eprintln!("\nError reading {}: {}", spec_file.display(), e);
             }
         }
     }
 
-    // Print final summary
-    println!("\n{}", "=".repeat(60));
-    println!("FINAL SUMMARY");
-    println!("{}", "=".repeat(60));
+    // Let Graphoid print the final summary and tell us if tests failed
+    let has_failures = finalize_spec_run(&mut executor);
 
-    let total = total_passed + total_failed + total_skipped;
-    println!("{} passed, {} failed, {} skipped, {} total",
-             total_passed, total_failed, total_skipped, total);
+    if has_failures {
+        std::process::exit(1);
+    }
+}
 
-    if !failed_files.is_empty() {
-        println!("\nFailed files:");
-        for f in &failed_files {
-            println!("  - {}", f);
+fn finalize_spec_run(executor: &mut Executor) -> bool {
+    // Call __spec_runner__.final_summary() which prints summary and returns true if failures
+    let code = "__spec_runner__.final_summary()";
+
+    let mut lexer = Lexer::new(code);
+    let tokens = match lexer.tokenize() {
+        Ok(t) => t,
+        Err(_) => return true,
+    };
+
+    let mut parser = Parser::new(tokens);
+    let program = match parser.parse() {
+        Ok(p) => p,
+        Err(_) => return true,
+    };
+
+    if let Some(stmt) = program.statements.first() {
+        if let graphoid::ast::Stmt::Expression { expr, .. } = stmt {
+            if let Ok(value) = executor.eval_expr(expr) {
+                // Returns true if there were failures
+                if let graphoid::values::ValueKind::Boolean(b) = value.kind {
+                    return b;
+                }
+            }
         }
     }
 
-    if total_failed > 0 {
-        println!("\nSOME TESTS FAILED");
-        std::process::exit(1);
-    } else if total_skipped > 0 {
-        println!("\nALL TESTS PASSED (some skipped)");
-    } else {
-        println!("\nALL TESTS PASSED");
-    }
+    true // Assume failure if we can't determine
 }
 
 fn discover_spec_files(path: &Path) -> Vec<PathBuf> {
@@ -162,28 +177,6 @@ fn discover_spec_files_recursive(dir: &Path, spec_files: &mut Vec<PathBuf>) {
             }
         }
     }
-}
-
-fn run_spec_file(path: &Path) -> Result<(i64, i64, i64), String> {
-    let source = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
-
-    let mut executor = Executor::new();
-
-    // Set current file for module resolution
-    let abs_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    executor.set_current_file(Some(abs_path));
-
-    // Inject gspec DSL functions into global scope
-    inject_spec_dsl(&mut executor)?;
-
-    // Execute the spec file
-    execute_source(&source, &mut executor)?;
-
-    // Get results from the runner
-    let summary = get_spec_summary(&mut executor)?;
-
-    Ok(summary)
 }
 
 fn inject_spec_dsl(executor: &mut Executor) -> Result<(), String> {
@@ -234,44 +227,6 @@ fn assert(result) {
 "#;
 
     execute_source(setup_code, executor)
-}
-
-fn get_spec_summary(executor: &mut Executor) -> Result<(i64, i64, i64), String> {
-    // Call __spec_runner__.summary() to get results
-    let summary_code = "__spec_runner__.summary()";
-
-    let mut lexer = Lexer::new(summary_code);
-    let tokens = lexer.tokenize().map_err(|e| format!("Lexer error: {}", e))?;
-
-    let mut parser = Parser::new(tokens);
-    let program = parser.parse().map_err(|e| format!("Parser error: {}", e))?;
-
-    if let Some(stmt) = program.statements.first() {
-        if let graphoid::ast::Stmt::Expression { expr, .. } = stmt {
-            let value = executor.eval_expr(expr)
-                .map_err(|e| format!("Runtime error: {}", e))?;
-
-            // Extract passed, failed, skipped from the map
-            if let Value { kind: graphoid::values::ValueKind::Map(map), .. } = value {
-                let passed = extract_num_from_hash(&map, "passed").unwrap_or(0);
-                let failed = extract_num_from_hash(&map, "failed").unwrap_or(0);
-                let skipped = extract_num_from_hash(&map, "skipped").unwrap_or(0);
-                return Ok((passed, failed, skipped));
-            }
-        }
-    }
-
-    Err("Failed to get spec summary".to_string())
-}
-
-fn extract_num_from_hash(hash: &graphoid::values::Hash, key: &str) -> Option<i64> {
-    hash.get(key).and_then(|v| {
-        if let graphoid::values::ValueKind::Number(n) = &v.kind {
-            Some(*n as i64)
-        } else {
-            None
-        }
-    })
 }
 
 // =============================================================================

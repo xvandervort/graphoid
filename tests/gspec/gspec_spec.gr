@@ -325,25 +325,25 @@ print("")
 print("--- 12. to_raise() Matcher ---")
 
 # Test that to_raise catches the expected error type
-result = expect(() => { raise ValueError("bad value") }).to_raise("ValueError")
+result = expect({ || raise ValueError("bad value") }).to_raise("ValueError")
 t.assert_true(result["pass"], "to_raise: catches ValueError")
 
-result = expect(() => { raise TypeError("wrong type") }).to_raise("TypeError")
+result = expect({ || raise TypeError("wrong type") }).to_raise("TypeError")
 t.assert_true(result["pass"], "to_raise: catches TypeError")
 
-result = expect(() => { raise IOError("file not found") }).to_raise("IOError")
+result = expect({ || raise IOError("file not found") }).to_raise("IOError")
 t.assert_true(result["pass"], "to_raise: catches IOError")
 
 # Test that wrong error type fails
-result = expect(() => { raise TypeError("wrong type") }).to_raise("ValueError")
+result = expect({ || raise TypeError("wrong type") }).to_raise("ValueError")
 t.assert_false(result["pass"], "to_raise: wrong type fails")
 
 # Test that no error fails
-result = expect(() => { x = 5 + 5 }).to_raise("ValueError")
+result = expect({ || x = 5 + 5 }).to_raise("ValueError")
 t.assert_false(result["pass"], "to_raise: no error fails")
 
 # Test RuntimeError from division by zero
-result = expect(() => { x = 1 / 0 }).to_raise("RuntimeError")
+result = expect({ || x = 1 / 0 }).to_raise("RuntimeError")
 t.assert_true(result["pass"], "to_raise: catches RuntimeError from division")
 
 print("")
@@ -353,10 +353,10 @@ print("")
 # =============================================================================
 print("--- 13. to_not_raise() Matcher ---")
 
-result = expect(() => { x = 5 + 5 }).to_not_raise()
+result = expect({ || x = 5 + 5 }).to_not_raise()
 t.assert_true(result["pass"], "to_not_raise: passes when no error")
 
-result = expect(() => { raise ValueError("oops") }).to_not_raise()
+result = expect({ || raise ValueError("oops") }).to_not_raise()
 t.assert_false(result["pass"], "to_not_raise: fails when error occurs")
 
 print("")
@@ -407,33 +407,33 @@ runner = gspec.TestRunner.clone()
 
 # Run a simple test suite - the TestRunner properly tracks pass/fail counts
 # due to the fixed closure scope handling (graphs now use Rc<RefCell> for sharing)
-runner.describe("Calculator", () => {
-    runner.it("adds numbers", () => {
+runner.describe "Calculator" {
+    runner.it "adds numbers" {
         result = expect(2 + 2).to_equal(4)
         if not result["pass"] {
             raise ValueError(result["message"])
         }
-    })
+    }
 
-    runner.it("subtracts numbers", () => {
+    runner.it "subtracts numbers" {
         result = expect(5 - 3).to_equal(2)
         if not result["pass"] {
             raise ValueError(result["message"])
         }
-    })
-})
+    }
+}
 
 # Test nested describe (context)
-runner.describe("String", () => {
-    runner.context("with uppercase", () => {
-        runner.it("has correct length", () => {
+runner.describe "String" {
+    runner.context "with uppercase" {
+        runner.it "has correct length" {
             result = expect("HELLO".length()).to_equal(5)
             if not result["pass"] {
                 raise ValueError(result["message"])
             }
-        })
-    })
-})
+        }
+    }
+}
 
 # Now verify the TestRunner properly tracked the pass/fail counts
 # (This was broken before the closure scope fix!)
@@ -444,14 +444,14 @@ t.assert_true(summary["total"] == 3, "TestRunner tracked 3 total tests")
 
 # Test a failing test to verify fail count tracking
 runner2 = gspec.TestRunner.clone()
-runner2.describe("FailTest", () => {
-    runner2.it("should fail", () => {
+runner2.describe "FailTest" {
+    runner2.it "should fail" {
         raise ValueError("intentional failure")
-    })
-    runner2.it("should pass", () => {
+    }
+    runner2.it "should pass" {
         # This passes
-    })
-})
+    }
+}
 summary2 = runner2.summary()
 t.assert_true(summary2["passed"] == 1, "TestRunner tracked 1 passed after failure")
 t.assert_true(summary2["failed"] == 1, "TestRunner tracked 1 failed test")
@@ -466,45 +466,45 @@ print("--- 16. TestRunner Edge Cases ---")
 
 # Test empty test suite
 runner3 = gspec.TestRunner.clone()
-runner3.describe("EmptySuite", () => {
+runner3.describe "EmptySuite" {
     # No it() blocks
-})
+}
 summary3 = runner3.summary()
 t.assert_true(summary3["total"] == 0, "Empty suite has 0 total tests")
 
 # Test deeply nested contexts
 runner4 = gspec.TestRunner.clone()
-runner4.describe("Level1", () => {
-    runner4.context("level2", () => {
-        runner4.context("level3", () => {
-            runner4.it("deep test", () => {
+runner4.describe "Level1" {
+    runner4.context "level2" {
+        runner4.context "level3" {
+            runner4.it "deep test" {
                 # Pass silently
-            })
-        })
-    })
-})
+            }
+        }
+    }
+}
 summary4 = runner4.summary()
 t.assert_true(summary4["passed"] == 1, "Deeply nested test tracked correctly")
 
 # Test multiple describe blocks
 runner5 = gspec.TestRunner.clone()
-runner5.describe("Suite1", () => {
-    runner5.it("test1", () => {})
-})
-runner5.describe("Suite2", () => {
-    runner5.it("test2", () => {})
-})
-runner5.describe("Suite3", () => {
-    runner5.it("test3", () => {})
-})
+runner5.describe "Suite1" {
+    runner5.it "test1" {}
+}
+runner5.describe "Suite2" {
+    runner5.it "test2" {}
+}
+runner5.describe "Suite3" {
+    runner5.it "test3" {}
+}
 summary5 = runner5.summary()
 t.assert_true(summary5["passed"] == 3, "Multiple describe blocks accumulate correctly")
 
 # Test that print_summary doesn't crash
 runner6 = gspec.TestRunner.clone()
-runner6.describe("PrintSummaryTest", () => {
-    runner6.it("passes", () => {})
-})
+runner6.describe "PrintSummaryTest" {
+    runner6.it "passes" {}
+}
 # This would crash if there's an issue
 runner6.print_summary()
 t.assert_true(true, "print_summary() executes without error")
@@ -520,43 +520,43 @@ print("--- 17. Auto-assertion it() Blocks ---")
 runner7 = gspec.TestRunner.clone()
 
 # Test 1: Block returns passing expectation - should pass automatically
-runner7.describe("AutoAssert", () => {
-    runner7.it("auto-passes when expectation passes", () => {
+runner7.describe "AutoAssert" {
+    runner7.it "auto-passes when expectation passes" {
         return expect(5).to_equal(5)
-    })
-})
+    }
+}
 summary7 = runner7.summary()
 t.assert_true(summary7["passed"] == 1, "Auto-assert: passing expectation counts as pass")
 t.assert_true(summary7["failed"] == 0, "Auto-assert: passing expectation has no failures")
 
 # Test 2: Block returns failing expectation - should fail automatically
 runner8 = gspec.TestRunner.clone()
-runner8.describe("AutoAssertFail", () => {
-    runner8.it("auto-fails when expectation fails", () => {
+runner8.describe "AutoAssertFail" {
+    runner8.it "auto-fails when expectation fails" {
         return expect(5).to_equal(10)
-    })
-})
+    }
+}
 summary8 = runner8.summary()
 t.assert_true(summary8["passed"] == 0, "Auto-assert: failing expectation counts as fail")
 t.assert_true(summary8["failed"] == 1, "Auto-assert: failing expectation has 1 failure")
 
 # Test 3: Block returns nothing (no return) - should still work
 runner9 = gspec.TestRunner.clone()
-runner9.describe("NoReturn", () => {
-    runner9.it("passes when block has no return", () => {
+runner9.describe "NoReturn" {
+    runner9.it "passes when block has no return" {
         x = 5 + 5
-    })
-})
+    }
+}
 summary9 = runner9.summary()
 t.assert_true(summary9["passed"] == 1, "Auto-assert: no return still passes")
 
 # Test 4: Block throws exception - should fail (existing behavior)
 runner10 = gspec.TestRunner.clone()
-runner10.describe("ThrowTest", () => {
-    runner10.it("fails when block throws", () => {
+runner10.describe "ThrowTest" {
+    runner10.it "fails when block throws" {
         raise ValueError("oops")
-    })
-})
+    }
+}
 summary10 = runner10.summary()
 t.assert_true(summary10["failed"] == 1, "Auto-assert: exception still fails")
 
@@ -601,23 +601,23 @@ counter = Counter.clone()
 
 runner11 = gspec.TestRunner.clone()
 
-runner11.describe("BeforeEachTest", () => {
-    runner11.before_each(() => {
+runner11.describe "BeforeEachTest" {
+    runner11.before_each {
         counter.value = counter.value + 1
-    })
+    }
 
-    runner11.it("first test", () => {
+    runner11.it "first test" {
         # before_each should have run once
-    })
+    }
 
-    runner11.it("second test", () => {
+    runner11.it "second test" {
         # before_each should have run twice now
-    })
+    }
 
-    runner11.it("third test", () => {
+    runner11.it "third test" {
         # before_each should have run three times now
-    })
-})
+    }
+}
 
 t.assert_true(counter.value == 3, "before_each: ran 3 times for 3 tests")
 
@@ -627,25 +627,25 @@ shared = Shared.clone()
 
 runner12 = gspec.TestRunner.clone()
 
-runner12.describe("SharedSetup", () => {
-    runner12.before_each(() => {
+runner12.describe "SharedSetup" {
+    runner12.before_each {
         shared.numbers = [1, 2, 3, 4, 5]
-    })
+    }
 
-    runner12.it("uses shared setup", () => {
+    runner12.it "uses shared setup" {
         return expect(shared.numbers.len()).to_equal(5)
-    })
+    }
 
-    runner12.it("modifies shared state", () => {
+    runner12.it "modifies shared state" {
         # Use immutable operation + assignment instead of mutating method
         shared.numbers = shared.numbers.insert(shared.numbers.length(), 6)
         return expect(shared.numbers.len()).to_equal(6)
-    })
+    }
 
-    runner12.it("setup resets for next test", () => {
+    runner12.it "setup resets for next test" {
         return expect(shared.numbers.len()).to_equal(5)
-    })
-})
+    }
+}
 
 summary12 = runner12.summary()
 t.assert_true(summary12["passed"] == 3, "before_each: all 3 tests with shared setup passed")
@@ -658,22 +658,22 @@ inner_runs = InnerRuns.clone()
 
 runner13 = gspec.TestRunner.clone()
 
-runner13.describe("Outer", () => {
-    runner13.before_each(() => {
+runner13.describe "Outer" {
+    runner13.before_each {
         outer_runs.count = outer_runs.count + 1
-    })
+    }
 
-    runner13.it("outer test", () => {})
+    runner13.it "outer test" {}
 
-    runner13.describe("Inner", () => {
-        runner13.before_each(() => {
+    runner13.describe "Inner" {
+        runner13.before_each {
             inner_runs.count = inner_runs.count + 1
-        })
+        }
 
-        runner13.it("inner test 1", () => {})
-        runner13.it("inner test 2", () => {})
-    })
-})
+        runner13.it "inner test 1" {}
+        runner13.it "inner test 2" {}
+    }
+}
 
 t.assert_true(outer_runs.count == 3, "before_each: outer runs for all 3 tests")
 t.assert_true(inner_runs.count == 2, "before_each: inner runs for 2 inner tests only")
@@ -708,13 +708,13 @@ t.assert_true(caught_error, "assert: raises error on failing expectation")
 
 # Test assert in an it() block with multiple assertions
 runner_assert = gspec.TestRunner.clone()
-runner_assert.describe("AssertTest", () => {
-    runner_assert.it("multiple assertions pass", () => {
+runner_assert.describe "AssertTest" {
+    runner_assert.it "multiple assertions pass" {
         assert(expect(1 + 1).to_equal(2))
         assert(expect("abc".length()).to_equal(3))
         assert(expect([1, 2]).to_contain(1))
-    })
-})
+    }
+}
 summary_assert = runner_assert.summary()
 t.assert_true(summary_assert["passed"] == 1, "assert: it() with multiple assertions passes")
 
@@ -730,15 +730,15 @@ graph AfterCounter { value: 0 }
 after_counter = AfterCounter.clone()
 
 runner_after = gspec.TestRunner.clone()
-runner_after.describe("AfterEachTest", () => {
-    runner_after.after_each(() => {
+runner_after.describe "AfterEachTest" {
+    runner_after.after_each {
         after_counter.value = after_counter.value + 1
-    })
+    }
 
-    runner_after.it("first test", () => {})
-    runner_after.it("second test", () => {})
-    runner_after.it("third test", () => {})
-})
+    runner_after.it "first test" {}
+    runner_after.it "second test" {}
+    runner_after.it "third test" {}
+}
 
 t.assert_true(after_counter.value == 3, "after_each: ran 3 times for 3 tests")
 
@@ -747,17 +747,17 @@ graph AfterFailCounter { value: 0 }
 after_fail_counter = AfterFailCounter.clone()
 
 runner_after_fail = gspec.TestRunner.clone()
-runner_after_fail.describe("AfterEachFailTest", () => {
-    runner_after_fail.after_each(() => {
+runner_after_fail.describe "AfterEachFailTest" {
+    runner_after_fail.after_each {
         after_fail_counter.value = after_fail_counter.value + 1
-    })
+    }
 
-    runner_after_fail.it("passes", () => {})
-    runner_after_fail.it("fails", () => {
+    runner_after_fail.it "passes" {}
+    runner_after_fail.it "fails" {
         raise ValueError("intentional")
-    })
-    runner_after_fail.it("also passes", () => {})
-})
+    }
+    runner_after_fail.it "also passes" {}
+}
 
 t.assert_true(after_fail_counter.value == 3, "after_each: runs even when test fails")
 
@@ -766,18 +766,18 @@ graph BeforeAfterOrder { log: [] }
 order = BeforeAfterOrder.clone()
 
 runner_both = gspec.TestRunner.clone()
-runner_both.describe("BeforeAfterOrder", () => {
-    runner_both.before_each(() => {
+runner_both.describe "BeforeAfterOrder" {
+    runner_both.before_each {
         order.log = order.log.insert(order.log.length(), "before")
-    })
-    runner_both.after_each(() => {
+    }
+    runner_both.after_each {
         order.log = order.log.insert(order.log.length(), "after")
-    })
+    }
 
-    runner_both.it("test", () => {
+    runner_both.it "test" {
         order.log = order.log.insert(order.log.length(), "test")
-    })
-})
+    }
+}
 
 t.assert_true(order.log.length() == 3, "before/after: correct number of entries")
 t.assert_true(order.log[0] == "before", "before/after: before runs first")
@@ -793,13 +793,13 @@ print("--- 22. xit() and pending() Support ---")
 
 # Test xit (skipped test)
 runner_skip = gspec.TestRunner.clone()
-runner_skip.describe("SkipTest", () => {
-    runner_skip.it("runs", () => {})
-    runner_skip.xit("skipped", () => {
+runner_skip.describe "SkipTest" {
+    runner_skip.it "runs" {}
+    runner_skip.xit "skipped" {
         raise ValueError("should not run")
-    })
-    runner_skip.it("also runs", () => {})
-})
+    }
+    runner_skip.it "also runs" {}
+}
 summary_skip = runner_skip.summary()
 t.assert_true(summary_skip["passed"] == 2, "xit: 2 tests passed")
 t.assert_true(summary_skip["skipped"] == 1, "xit: 1 test skipped")
@@ -807,11 +807,11 @@ t.assert_true(summary_skip["total"] == 3, "xit: 3 total tests")
 
 # Test pending (placeholder test)
 runner_pending = gspec.TestRunner.clone()
-runner_pending.describe("PendingTest", () => {
-    runner_pending.it("implemented", () => {})
+runner_pending.describe "PendingTest" {
+    runner_pending.it "implemented" {}
     runner_pending.pending("not yet implemented")
     runner_pending.pending("another placeholder")
-})
+}
 summary_pending = runner_pending.summary()
 t.assert_true(summary_pending["passed"] == 1, "pending: 1 test passed")
 t.assert_true(summary_pending["skipped"] == 2, "pending: 2 tests pending")

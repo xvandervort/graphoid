@@ -1,0 +1,245 @@
+# time_spec.gr - Tests for the time stdlib module
+#
+# Tests time creation, conversion, and component extraction.
+# Run with: gr spec tests/gspec/time_spec.gr
+
+describe "Time Module" {
+
+    describe "time.now()" {
+
+        it "returns a time value" {
+            expect(time.now().type()).to_equal("time")
+        }
+
+        it "returns current timestamp (after Unix epoch)" {
+            now = time.now()
+            # Should be after Jan 1, 2020 (timestamp 1577836800)
+            expect(now.to_num()).to_be_greater_than(1577836800)
+        }
+    }
+
+    describe "time.today()" {
+
+        it "returns a time value" {
+            expect(time.today().type()).to_equal("time")
+        }
+
+        it "returns midnight (hour/minute/second = 0)" {
+            today = time.today()
+            components = today.time_numbers()
+            assert(expect(components["hour"]).to_equal(0))
+            assert(expect(components["minute"]).to_equal(0))
+            assert(expect(components["second"]).to_equal(0))
+        }
+    }
+
+    describe "time.from_numbers()" {
+
+        it "creates time from components" {
+            t = time.from_numbers(2025, 1, 15, 14, 30, 45)
+            expect(t.type()).to_equal("time")
+        }
+
+        it "preserves year component" {
+            t = time.from_numbers(2025, 1, 15, 14, 30, 45)
+            components = t.time_numbers()
+            expect(components["year"]).to_equal(2025)
+        }
+
+        it "preserves month component" {
+            t = time.from_numbers(2025, 6, 15, 14, 30, 45)
+            components = t.time_numbers()
+            expect(components["month"]).to_equal(6)
+        }
+
+        it "preserves day component" {
+            t = time.from_numbers(2025, 1, 20, 14, 30, 45)
+            components = t.time_numbers()
+            expect(components["day"]).to_equal(20)
+        }
+
+        it "preserves hour component" {
+            t = time.from_numbers(2025, 1, 15, 18, 30, 45)
+            components = t.time_numbers()
+            expect(components["hour"]).to_equal(18)
+        }
+
+        it "preserves minute component" {
+            t = time.from_numbers(2025, 1, 15, 14, 45, 30)
+            components = t.time_numbers()
+            expect(components["minute"]).to_equal(45)
+        }
+
+        it "preserves second component" {
+            t = time.from_numbers(2025, 1, 15, 14, 30, 59)
+            components = t.time_numbers()
+            expect(components["second"]).to_equal(59)
+        }
+    }
+
+    describe "time.from_string()" {
+
+        it "parses ISO 8601 format" {
+            t = time.from_string("2025-01-20T10:00:00Z")
+            expect(t.type()).to_equal("time")
+        }
+
+        it "correctly parses date components" {
+            t = time.from_string("2025-06-15T09:30:45Z")
+            components = t.time_numbers()
+            assert(expect(components["year"]).to_equal(2025))
+            assert(expect(components["month"]).to_equal(6))
+            assert(expect(components["day"]).to_equal(15))
+        }
+
+        it "correctly parses time components" {
+            t = time.from_string("2025-01-15T14:30:45Z")
+            components = t.time_numbers()
+            assert(expect(components["hour"]).to_equal(14))
+            assert(expect(components["minute"]).to_equal(30))
+            assert(expect(components["second"]).to_equal(45))
+        }
+
+        it "handles timezone offset" {
+            t = time.from_string("2025-01-15T15:30:00+05:30")
+            expect(t.type()).to_equal("time")
+        }
+    }
+
+    describe "time.from_timestamp()" {
+
+        it "creates time from Unix timestamp" {
+            t = time.from_timestamp(1704067200)
+            expect(t.type()).to_equal("time")
+        }
+
+        it "handles Unix epoch (0)" {
+            epoch = time.from_timestamp(0)
+            components = epoch.time_numbers()
+            assert(expect(components["year"]).to_equal(1970))
+            assert(expect(components["month"]).to_equal(1))
+            assert(expect(components["day"]).to_equal(1))
+        }
+
+        it "handles fractional timestamps" {
+            t = time.from_timestamp(1704067200.5)
+            expect(t.type()).to_equal("time")
+        }
+    }
+
+    describe "time conversion methods" {
+
+        it "type() returns 'time'" {
+            t = time.from_numbers(2025, 1, 15, 0, 0, 0)
+            expect(t.type()).to_equal("time")
+        }
+
+        it "to_num() returns Unix timestamp" {
+            t = time.from_timestamp(1704067200)
+            expect(t.to_num()).to_be_close_to(1704067200, 1)
+        }
+
+        it "to_string() returns ISO 8601 format" {
+            t = time.from_numbers(2025, 1, 15, 14, 30, 45)
+            s = t.to_string()
+            assert(expect(s).to_contain("2025"))
+            assert(expect(s).to_contain("-"))
+            assert(expect(s).to_contain("T"))
+        }
+
+        it "to_bool() returns true for valid time" {
+            t = time.from_numbers(2025, 1, 15, 0, 0, 0)
+            expect(t.to_bool()).to_equal(true)
+        }
+    }
+
+    describe "time_numbers() components" {
+
+        it "returns a map" {
+            t = time.from_numbers(2025, 1, 15, 14, 30, 45)
+            expect(t.time_numbers().type()).to_equal("map")
+        }
+
+        it "includes weekday" {
+            t = time.from_numbers(2025, 1, 15, 0, 0, 0)
+            components = t.time_numbers()
+            # Weekday should be 0-6 (Sunday-Saturday) or 1-7 (Monday-Sunday)
+            assert(expect(components["weekday"]).to_be_at_least(0))
+            assert(expect(components["weekday"]).to_be_at_most(7))
+        }
+
+        it "includes day_of_year" {
+            t = time.from_numbers(2025, 1, 15, 0, 0, 0)
+            components = t.time_numbers()
+            # Jan 15 = day 15 of year
+            expect(components["day_of_year"]).to_equal(15)
+        }
+
+        it "calculates day_of_year correctly for Feb" {
+            # Feb 1 = day 32 of year (31 days in Jan + 1)
+            t = time.from_numbers(2025, 2, 1, 0, 0, 0)
+            components = t.time_numbers()
+            expect(components["day_of_year"]).to_equal(32)
+        }
+    }
+
+    describe "round-trip conversions" {
+
+        it "timestamp round-trip preserves value" {
+            original_ts = 1704067200
+            t = time.from_timestamp(original_ts)
+            recovered_ts = t.to_num()
+            expect(recovered_ts).to_be_close_to(original_ts, 1)
+        }
+
+        it "string round-trip preserves date" {
+            original = "2025-01-15T14:30:45Z"
+            t = time.from_string(original)
+            components = t.time_numbers()
+            # Verify the parsed components match
+            assert(expect(components["year"]).to_equal(2025))
+            assert(expect(components["month"]).to_equal(1))
+            assert(expect(components["day"]).to_equal(15))
+            assert(expect(components["hour"]).to_equal(14))
+            assert(expect(components["minute"]).to_equal(30))
+            assert(expect(components["second"]).to_equal(45))
+        }
+
+        it "from_numbers round-trip" {
+            t1 = time.from_numbers(2025, 6, 20, 10, 15, 30)
+            ts = t1.to_num()
+            t2 = time.from_timestamp(ts)
+            c1 = t1.time_numbers()
+            c2 = t2.time_numbers()
+            assert(expect(c1["year"]).to_equal(c2["year"]))
+            assert(expect(c1["month"]).to_equal(c2["month"]))
+            assert(expect(c1["day"]).to_equal(c2["day"]))
+        }
+    }
+
+    describe "edge cases" {
+
+        it "handles New Year's Eve" {
+            t = time.from_numbers(2025, 12, 31, 23, 59, 59)
+            components = t.time_numbers()
+            assert(expect(components["month"]).to_equal(12))
+            assert(expect(components["day"]).to_equal(31))
+        }
+
+        it "handles leap year Feb 29" {
+            # 2024 is a leap year
+            t = time.from_numbers(2024, 2, 29, 12, 0, 0)
+            components = t.time_numbers()
+            assert(expect(components["month"]).to_equal(2))
+            assert(expect(components["day"]).to_equal(29))
+        }
+
+        it "handles midnight" {
+            t = time.from_numbers(2025, 1, 15, 0, 0, 0)
+            components = t.time_numbers()
+            assert(expect(components["hour"]).to_equal(0))
+            assert(expect(components["minute"]).to_equal(0))
+            assert(expect(components["second"]).to_equal(0))
+        }
+    }
+}

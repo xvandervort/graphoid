@@ -3,89 +3,85 @@
 # Tests the configure { :unsigned } directive for logical right shift.
 # Run with: gr spec tests/gspec/bitwise_unsigned_spec.gr
 
-import "gspec"
+describe "Bitwise Unsigned Mode" {
 
-runner = gspec.TestRunner.clone()
+    describe "signed right shift (default)" {
 
-runner.describe("Bitwise Unsigned Mode", () => {
-
-    runner.describe("signed right shift (default)", () => {
-
-        runner.it("preserves sign bit for negative numbers", () => {
+        it "preserves sign bit for negative numbers" {
             # -16 >> 2 should be -4 in signed mode (arithmetic shift)
-            return expect(-16 >> 2).to_equal(-4)
-        })
+            expect(-16 >> 2).to_equal(-4)
+        }
 
-        runner.it("preserves sign bit for -8 >> 1", () => {
-            return expect(-8 >> 1).to_equal(-4)
-        })
+        it "preserves sign bit for -8 >> 1" {
+            expect(-8 >> 1).to_equal(-4)
+        }
 
-        runner.it("preserves sign bit for -32 >> 3", () => {
-            return expect(-32 >> 3).to_equal(-4)
-        })
+        it "preserves sign bit for -32 >> 3" {
+            expect(-32 >> 3).to_equal(-4)
+        }
 
-        runner.it("works normally for positive numbers", () => {
-            return expect(64 >> 2).to_equal(16)
-        })
+        it "works normally for positive numbers" {
+            expect(64 >> 2).to_equal(16)
+        }
 
-        runner.it("shifts positive numbers correctly", () => {
+        it "shifts positive numbers correctly" {
             assert(expect(16 >> 1).to_equal(8))
             assert(expect(32 >> 2).to_equal(8))
             assert(expect(128 >> 4).to_equal(8))
-        })
-    })
+        }
+    }
 
-    runner.describe("unsigned right shift", () => {
+    describe "unsigned right shift" {
 
-        runner.it("treats negative numbers as unsigned", () => {
+        it "treats negative numbers as unsigned" {
             configure { :unsigned } {
                 result = -16 >> 2
                 # In unsigned mode, -16 is treated as a large positive number
                 # The result should be a large positive number, not -4
-                return expect(result).to_be_greater_than(0)
+                expect(result).to_be_greater_than(0)
             }
-        })
+        }
 
-        runner.it("produces different result than signed for negative numbers", () => {
+        it "produces different result than signed for negative numbers" {
             signed_result = -16 >> 2
             unsigned_result = none
             configure { :unsigned } {
                 unsigned_result = -16 >> 2
             }
-            return expect(unsigned_result).to_not().to_equal(signed_result)
-        })
+            expect(unsigned_result).to_not().to_equal(signed_result)
+        }
 
-        runner.it("returns same result as signed for positive numbers", () => {
+        it "returns same result as signed for positive numbers" {
             signed_result = 64 >> 2
             unsigned_result = none
             configure { :unsigned } {
                 unsigned_result = 64 >> 2
             }
-            return expect(unsigned_result).to_equal(signed_result)
-        })
+            expect(unsigned_result).to_equal(signed_result)
+        }
 
-        runner.it("works with binary literals", () => {
+        it "works with binary literals" {
             configure { :unsigned } {
                 value = 0b10110000
                 shifted = value >> 2
                 # 176 >> 2 = 44
-                return expect(shifted).to_equal(44)
+                expect(shifted).to_equal(44)
             }
-        })
+        }
 
-        runner.it("works with hex literals", () => {
+        it "works with hex literals" {
             configure { :unsigned } {
                 value = 0xFF
                 shifted = value >> 4
                 # 255 >> 4 = 15
-                return expect(shifted).to_equal(15)
+                expect(shifted).to_equal(15)
             }
-        })
-    })
+        }
+    }
 
-    runner.describe("scoped configuration", () => {
+    describe "scoped configuration" {
 
-        runner.it("mode reverts after block", () => {
+        it "mode reverts after block" {
             # Before block - signed mode
             before = -8 >> 1
 
@@ -101,47 +97,45 @@ runner.describe("Bitwise Unsigned Mode", () => {
             assert(expect(before).to_equal(-4))
             assert(expect(after).to_equal(-4))
             assert(expect(inside).to_be_greater_than(0))
-        })
+        }
 
-        runner.it("does not affect other bitwise operations", () => {
+        it "does not affect other bitwise operations" {
             configure { :unsigned } {
                 # AND, OR, XOR, NOT should work the same
                 assert(expect(15 & 7).to_equal(7))
                 assert(expect(8 | 4).to_equal(12))
                 assert(expect(15 ^ 9).to_equal(6))
             }
-        })
+        }
 
-        runner.it("left shift is unaffected by unsigned mode", () => {
+        it "left shift is unaffected by unsigned mode" {
             signed_left = 4 << 2
             unsigned_left = none
             configure { :unsigned } {
                 unsigned_left = 4 << 2
             }
-            return expect(unsigned_left).to_equal(signed_left)
-        })
-    })
+            expect(unsigned_left).to_equal(signed_left)
+        }
+    }
 
-    runner.describe("practical use cases", () => {
+    describe "practical use cases" {
 
-        runner.it("extracts bits correctly in unsigned mode", () => {
+        it "extracts bits correctly in unsigned mode" {
             configure { :unsigned } {
                 # Extract lower nibble
                 value = 0xAB
                 lower = value & 0x0F
-                return expect(lower).to_equal(0x0B)
+                expect(lower).to_equal(0x0B)
             }
-        })
+        }
 
-        runner.it("can combine with masking operations", () => {
+        it "can combine with masking operations" {
             configure { :unsigned } {
                 value = 0xFF00AB12
                 # Extract second byte from right
                 byte2 = (value >> 8) & 0xFF
-                return expect(byte2).to_equal(0xAB)
+                expect(byte2).to_equal(0xAB)
             }
-        })
-    })
-})
-
-runner.print_summary()
+        }
+    }
+}
