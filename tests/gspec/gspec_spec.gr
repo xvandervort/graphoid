@@ -819,6 +819,67 @@ t.assert_true(summary_pending["skipped"] == 2, "pending: 2 tests pending")
 print("")
 
 # =============================================================================
+# Section 23: to_be_close_to() Matcher (Approximate Matching)
+# =============================================================================
+print("--- 23. to_be_close_to() Matcher ---")
+
+# Test basic approximate matching
+result = expect(3.14159).to_be_close_to(3.14, 0.01)
+t.assert_true(result["pass"], "to_be_close_to: 3.14159 is within 0.01 of 3.14")
+
+result = expect(3.14159).to_be_close_to(3.14, 0.001)
+t.assert_false(result["pass"], "to_be_close_to: 3.14159 is not within 0.001 of 3.14")
+
+# Test with exact match
+result = expect(5.0).to_be_close_to(5.0, 0.0001)
+t.assert_true(result["pass"], "to_be_close_to: exact match passes")
+
+# Test with negative numbers
+result = expect(-3.5).to_be_close_to(-3.4, 0.2)
+t.assert_true(result["pass"], "to_be_close_to: negative numbers within tolerance")
+
+result = expect(-3.5).to_be_close_to(-3.4, 0.05)
+t.assert_false(result["pass"], "to_be_close_to: negative numbers outside tolerance")
+
+# Test with zero
+result = expect(0.0001).to_be_close_to(0, 0.001)
+t.assert_true(result["pass"], "to_be_close_to: close to zero")
+
+# Test negation
+result = expect(3.14159).negate().to_be_close_to(3.0, 0.01)
+t.assert_true(result["pass"], "to_be_close_to negated: 3.14159 is NOT within 0.01 of 3.0")
+
+result = expect(3.14159).negate().to_be_close_to(3.14, 0.01)
+t.assert_false(result["pass"], "to_be_close_to negated: 3.14159 IS within 0.01 of 3.14")
+
+print("")
+
+# =============================================================================
+# Section 24: to_be_within().of() Chained Matcher
+# =============================================================================
+print("--- 24. to_be_within().of() Chained Matcher ---")
+
+# Test chained syntax
+result = expect(3.14159).to_be_within(0.01).of(3.14)
+t.assert_true(result["pass"], "to_be_within().of(): 3.14159 is within 0.01 of 3.14")
+
+result = expect(3.14159).to_be_within(0.001).of(3.14)
+t.assert_false(result["pass"], "to_be_within().of(): 3.14159 is not within 0.001 of 3.14")
+
+# Test with integers
+result = expect(100).to_be_within(5).of(98)
+t.assert_true(result["pass"], "to_be_within().of(): 100 is within 5 of 98")
+
+result = expect(100).to_be_within(1).of(98)
+t.assert_false(result["pass"], "to_be_within().of(): 100 is not within 1 of 98")
+
+# Test with negative tolerance handling
+result = expect(10.5).to_be_within(0.5).of(10)
+t.assert_true(result["pass"], "to_be_within().of(): 10.5 is within 0.5 of 10")
+
+print("")
+
+# =============================================================================
 # Summary
 # =============================================================================
 t.summary()

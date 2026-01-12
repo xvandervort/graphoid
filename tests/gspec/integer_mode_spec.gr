@@ -1,0 +1,167 @@
+# integer_mode_spec.gr - Tests for integer mode truncation
+#
+# Tests the configure { integer: :integer } directive for truncation-on-assignment.
+# Run with: gr spec tests/gspec/integer_mode_spec.gr
+
+import "gspec"
+
+runner = gspec.TestRunner.clone()
+
+runner.describe("Integer Mode", () => {
+
+    runner.describe("standard mode (default)", () => {
+
+        runner.it("preserves floating point values", () => {
+            a = 5.7
+            return expect(a).to_equal(5.7)
+        })
+
+        runner.it("preserves decimal precision in operations", () => {
+            a = 5.7
+            b = 3.2
+            c = a + b
+            return expect(c).to_equal(8.9)
+        })
+
+        runner.it("preserves negative decimals", () => {
+            return expect(-5.7).to_equal(-5.7)
+        })
+    })
+
+    runner.describe("integer mode truncation", () => {
+
+        runner.it("truncates positive decimals on assignment", () => {
+            configure { integer: :integer } {
+                x = 5.7
+                return expect(x).to_equal(5)
+            }
+        })
+
+        runner.it("truncates negative decimals toward zero", () => {
+            configure { integer: :integer } {
+                x = -5.7
+                # Truncation toward zero: -5.7 becomes -5
+                return expect(x).to_equal(-5)
+            }
+        })
+
+        runner.it("truncates operation results on assignment", () => {
+            configure { integer: :integer } {
+                x = 5.7  # Truncated to 5
+                y = 3.2  # Truncated to 3
+                z = x + y  # 5 + 3 = 8
+                return expect(z).to_equal(8)
+            }
+        })
+
+        runner.it("preserves whole numbers", () => {
+            configure { integer: :integer } {
+                a = 10.0
+                b = 20.0
+                assert(expect(a).to_equal(10))
+                assert(expect(b).to_equal(20))
+            }
+        })
+
+        runner.it("handles various decimal values", () => {
+            configure { integer: :integer } {
+                assert(expect(1.1).to_equal(1))
+                assert(expect(1.9).to_equal(1))
+                assert(expect(0.5).to_equal(0))
+                assert(expect(99.99).to_equal(99))
+            }
+        })
+    })
+
+    runner.describe("non-numeric values", () => {
+
+        runner.it("passes strings through unchanged", () => {
+            configure { integer: :integer } {
+                s = "hello"
+                return expect(s).to_equal("hello")
+            }
+        })
+
+        runner.it("passes booleans through unchanged", () => {
+            configure { integer: :integer } {
+                b = true
+                return expect(b).to_equal(true)
+            }
+        })
+
+        runner.it("passes none through unchanged", () => {
+            configure { integer: :integer } {
+                n = none
+                return expect(n).to_be_none()
+            }
+        })
+
+        runner.it("passes lists through unchanged", () => {
+            configure { integer: :integer } {
+                lst = [1.5, 2.5, 3.5]
+                # List itself is passed through, but assignments inside...
+                return expect(lst).to_have_length(3)
+            }
+        })
+    })
+
+    runner.describe("scoped configuration", () => {
+
+        runner.it("mode reverts after block", () => {
+            # Before block - standard mode
+            before = 5.7
+
+            # Inside block - integer mode
+            inside = none
+            configure { integer: :integer } {
+                inside = 5.7
+            }
+
+            # After block - standard mode again
+            after = 9.9
+
+            assert(expect(before).to_equal(5.7))
+            assert(expect(inside).to_equal(5))
+            assert(expect(after).to_equal(9.9))
+        })
+
+        runner.it("does not affect variables declared outside block", () => {
+            outside = 5.7
+            configure { integer: :integer } {
+                inside = 3.2
+            }
+            # outside should still be 5.7
+            return expect(outside).to_equal(5.7)
+        })
+    })
+
+    runner.describe("arithmetic operations", () => {
+
+        runner.it("truncates after division", () => {
+            configure { integer: :integer } {
+                result = 10 / 3  # 3.333... truncated to 3
+                return expect(result).to_equal(3)
+            }
+        })
+
+        runner.it("truncates after multiplication", () => {
+            configure { integer: :integer } {
+                a = 2.5  # truncated to 2
+                b = 3.5  # truncated to 3
+                c = a * b  # 2 * 3 = 6
+                return expect(c).to_equal(6)
+            }
+        })
+
+        runner.it("truncates after subtraction", () => {
+            configure { integer: :integer } {
+                a = 10.9  # truncated to 10
+                b = 3.1   # truncated to 3
+                c = a - b # 10 - 3 = 7
+                return expect(c).to_equal(7)
+            }
+        })
+    })
+})
+
+runner.print_summary()

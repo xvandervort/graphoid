@@ -15,12 +15,14 @@ module gspec_module alias gspec
 graph Expectation {
     _actual: none
     _negated: false
+    _tolerance: none
 
     # Create a new Expectation wrapping the given value
     fn new(actual) {
         e = self.clone()
         e._actual = actual
         e._negated = false
+        e._tolerance = none
         return e
     }
 
@@ -167,6 +169,47 @@ graph Expectation {
             _actual <= expected,
             "Expected " + _actual.to_string() + " to be at most " + expected.to_string(),
             "Expected " + _actual.to_string() + " not to be at most " + expected.to_string()
+        )
+    }
+
+    # --- Approximate Matching ---
+
+    # Check if actual is within tolerance of expected (absolute difference)
+    # Example: expect(3.14159).to_be_close_to(3.14, 0.01)
+    fn to_be_close_to(expected, tolerance) {
+        diff = _actual - expected
+        if diff < 0 {
+            diff = -diff
+        }
+        return _result(
+            diff <= tolerance,
+            "Expected " + _actual.to_string() + " to be within " + tolerance.to_string() + " of " + expected.to_string() + " (difference: " + diff.to_string() + ")",
+            "Expected " + _actual.to_string() + " not to be close to " + expected.to_string()
+        )
+    }
+
+    # Alias for to_be_close_to - more RSpec-like naming
+    fn to_be_within(tolerance) {
+        # Returns self to allow chaining: expect(x).to_be_within(0.01).of(y)
+        # We store tolerance in the expectation for use by .of()
+        _tolerance = tolerance
+        return self
+    }
+
+    # Complete the to_be_within(x).of(y) chain
+    fn of(expected) {
+        diff = _actual - expected
+        if diff < 0 {
+            diff = -diff
+        }
+        tol = _tolerance
+        if tol == none {
+            tol = 0.0001  # default tolerance
+        }
+        return _result(
+            diff <= tol,
+            "Expected " + _actual.to_string() + " to be within " + tol.to_string() + " of " + expected.to_string() + " (difference: " + diff.to_string() + ")",
+            "Expected " + _actual.to_string() + " not to be within " + tol.to_string() + " of " + expected.to_string()
         )
     }
 

@@ -1,0 +1,168 @@
+# constants_spec.gr - Tests for the constants stdlib module
+#
+# Tests mathematical and physical constants.
+# Run with: gr spec tests/gspec/constants_spec.gr
+
+import "gspec"
+import "constants"
+
+runner = gspec.TestRunner.clone()
+
+runner.describe("Constants Module", () => {
+
+    runner.describe("mathematical constants", () => {
+
+        runner.it("provides pi", () => {
+            assert(expect(const.pi).to_be_close_to(3.14159265358979, 0.00001))
+        })
+
+        runner.it("provides e (Euler's number)", () => {
+            assert(expect(const.e).to_be_close_to(2.71828182845904, 0.00001))
+        })
+
+        runner.it("provides tau (2*pi)", () => {
+            assert(expect(const.tau).to_be_close_to(6.28318530717958, 0.00001))
+            # Also verify tau = 2 * pi
+            assert(expect(const.tau).to_be_close_to(2 * const.pi, 0.00000001))
+        })
+
+        runner.it("provides phi (golden ratio)", () => {
+            assert(expect(const.phi).to_be_close_to(1.61803398874989, 0.00001))
+            # Golden ratio property: phi^2 = phi + 1
+            phi_squared = const.phi * const.phi
+            phi_plus_one = const.phi + 1
+            assert(expect(phi_squared).to_be_close_to(phi_plus_one, 0.00001))
+        })
+
+        runner.it("provides sqrt2", () => {
+            assert(expect(const.sqrt2).to_be_close_to(1.41421356237309, 0.00001))
+            # Verify: sqrt2 * sqrt2 = 2
+            assert(expect(const.sqrt2 * const.sqrt2).to_be_close_to(2.0, 0.00001))
+        })
+
+        runner.it("provides sqrt3", () => {
+            assert(expect(const.sqrt3).to_be_close_to(1.73205080756887, 0.00001))
+            # Verify: sqrt3 * sqrt3 = 3
+            assert(expect(const.sqrt3 * const.sqrt3).to_be_close_to(3.0, 0.00001))
+        })
+    })
+
+    runner.describe("logarithmic constants", () => {
+
+        runner.it("provides ln2", () => {
+            assert(expect(const.ln2).to_be_close_to(0.693147180559945, 0.00001))
+        })
+
+        runner.it("provides ln10", () => {
+            assert(expect(const.ln10).to_be_close_to(2.30258509299404, 0.00001))
+        })
+
+        runner.it("provides log2e", () => {
+            assert(expect(const.log2e).to_be_close_to(1.44269504088896, 0.00001))
+            # log2e * ln2 should equal 1
+            assert(expect(const.log2e * const.ln2).to_be_close_to(1.0, 0.00001))
+        })
+
+        runner.it("provides log10e", () => {
+            assert(expect(const.log10e).to_be_close_to(0.434294481903251, 0.00001))
+            # log10e * ln10 should equal 1
+            assert(expect(const.log10e * const.ln10).to_be_close_to(1.0, 0.00001))
+        })
+    })
+
+    runner.describe("angle conversion constants", () => {
+
+        runner.it("provides deg_to_rad", () => {
+            # 1 degree = pi/180 radians
+            expected = const.pi / 180
+            assert(expect(const.deg_to_rad).to_be_close_to(expected, 0.0000001))
+        })
+
+        runner.it("provides rad_to_deg", () => {
+            # 1 radian = 180/pi degrees
+            expected = 180 / const.pi
+            assert(expect(const.rad_to_deg).to_be_close_to(expected, 0.0001))
+        })
+
+        runner.it("converts 90 degrees to pi/2 radians", () => {
+            radians = 90 * const.deg_to_rad
+            assert(expect(radians).to_be_close_to(const.pi / 2, 0.00001))
+        })
+
+        runner.it("converts pi radians to 180 degrees", () => {
+            degrees = const.pi * const.rad_to_deg
+            assert(expect(degrees).to_be_close_to(180.0, 0.00001))
+        })
+
+        runner.it("deg_to_rad and rad_to_deg are reciprocals", () => {
+            product = const.deg_to_rad * const.rad_to_deg
+            assert(expect(product).to_be_close_to(1.0, 0.00001))
+        })
+    })
+
+    runner.describe("physical constants", () => {
+
+        runner.it("provides c (speed of light)", () => {
+            # c = 299792458 m/s
+            return expect(const.c).to_equal(299792458)
+        })
+
+        runner.it("provides G (gravitational constant)", () => {
+            # G = 6.67430e-11 N*m^2/kg^2
+            # Just verify it's a very small positive number
+            assert(expect(const.G).to_be_greater_than(0))
+            assert(expect(const.G).to_be_less_than(0.0000001))
+        })
+
+        runner.it("provides h (Planck constant)", () => {
+            # h = 6.62607015e-34 J*s
+            # Just verify it's a very small positive number
+            assert(expect(const.h).to_be_greater_than(0))
+            assert(expect(const.h).to_be_less_than(0.0000001))
+        })
+    })
+
+    runner.describe("practical calculations", () => {
+
+        runner.it("calculates circle circumference correctly", () => {
+            radius = 5.0
+            circumference = 2 * const.pi * radius
+            assert(expect(circumference).to_be_close_to(31.4159265358979, 0.0001))
+        })
+
+        runner.it("calculates circle area correctly", () => {
+            radius = 5.0
+            area = const.pi * radius * radius
+            assert(expect(area).to_be_close_to(78.5398163397448, 0.0001))
+        })
+
+        runner.it("converts angles round-trip correctly", () => {
+            original_degrees = 45.0
+            radians = original_degrees * const.deg_to_rad
+            back_to_degrees = radians * const.rad_to_deg
+            assert(expect(back_to_degrees).to_be_close_to(original_degrees, 0.00001))
+        })
+    })
+
+    runner.describe("constant types", () => {
+
+        runner.it("all constants are numbers", () => {
+            assert(expect(const.pi).to_be_a("num"))
+            assert(expect(const.e).to_be_a("num"))
+            assert(expect(const.tau).to_be_a("num"))
+            assert(expect(const.phi).to_be_a("num"))
+            assert(expect(const.c).to_be_a("num"))
+        })
+
+        runner.it("all constants are positive", () => {
+            assert(expect(const.pi).to_be_greater_than(0))
+            assert(expect(const.e).to_be_greater_than(0))
+            assert(expect(const.tau).to_be_greater_than(0))
+            assert(expect(const.phi).to_be_greater_than(0))
+            assert(expect(const.sqrt2).to_be_greater_than(0))
+            assert(expect(const.sqrt3).to_be_greater_than(0))
+        })
+    })
+})
+
+runner.print_summary()
