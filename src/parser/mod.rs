@@ -694,17 +694,8 @@ impl Parser {
     fn load_statement(&mut self) -> Result<Stmt> {
         let position = self.previous_position();
 
-        // Expect string literal
-        let path = if let TokenType::String(s) = &self.peek().token_type {
-            let p = s.clone();
-            self.advance();
-            p
-        } else {
-            return Err(GraphoidError::SyntaxError {
-                message: "Expected string literal after 'load'".to_string(),
-                position: self.peek().position(),
-            });
-        };
+        // Parse path expression (can be string literal or variable)
+        let path = self.expression()?;
 
         Ok(Stmt::Load { path, position })
     }

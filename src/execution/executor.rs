@@ -886,7 +886,14 @@ impl Executor {
             Stmt::Load { path, .. } => {
                 // Load statement - inline file contents into current scope
                 // Unlike import, this merges variables into the current namespace
-                self.execute_load(path)?;
+                let path_value = self.eval_expr(path)?;
+                let path_str = match &path_value.kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::runtime(
+                        "load path must be a string".to_string()
+                    )),
+                };
+                self.execute_load(&path_str)?;
                 Ok(None)
             }
             Stmt::Configure { settings, body, .. } => {
@@ -5130,8 +5137,27 @@ impl Executor {
         let mut module_executor = Executor::with_env(module_env);
         module_executor.set_current_file(Some(resolved_path.clone()));
 
+        // Pass "magic" variables (starting with __) to the module environment
+        // This allows parent scope to communicate with modules (e.g., __SPEC_PATH__)
+        for (name, value) in self.env.get_all_bindings() {
+            if name.starts_with("__") {
+                module_executor.env.define(name, value);
+            }
+        }
+
         // Execute module source
         module_executor.execute_source(&source)?;
+
+        // Propagate "magic" variables back to parent (e.g., __SPEC_RESULT__)
+        // Skip internal module variables like __module_name__ and __module_alias__
+        for (name, value) in module_executor.env.get_all_bindings() {
+            if name.starts_with("__")
+                && name != "__module_name__"
+                && name != "__module_alias__"
+            {
+                self.env.define(name, value);
+            }
+        }
 
         // Extract module name and alias (from module declarations or filename)
         let module_name = if let Some(v) = module_executor.get_variable("__module_name__") {
@@ -5223,26 +5249,61 @@ impl Executor {
     /// Executes a load statement - merges file contents into current namespace
     fn execute_load(&mut self, file_path: &str) -> Result<()> {
         use std::fs;
+        use std::path::Path;
 
-        // Resolve the file path
-        let resolved_path = if let Some(ref current) = self.current_file {
-            self.module_manager.resolve_module_path(file_path, Some(current))?
+        // Resolve the file path:
+        // 1. If it's an absolute path or exists as given, use it directly
+        // 2. If relative and we have a current file, resolve relative to current file's directory
+        // 3. Fall back to module resolution for module-style imports
+        let resolved_path = if Path::new(file_path).is_absolute() {
+            PathBuf::from(file_path)
+        } else if Path::new(file_path).exists() {
+            // Relative path that exists from current working directory
+            PathBuf::from(file_path)
+        } else if let Some(ref current) = self.current_file {
+            // Try relative to current file's directory
+            let relative = current.parent().map(|p| p.join(file_path));
+            if let Some(ref path) = relative {
+                if path.exists() {
+                    path.clone()
+                } else {
+                    // Fall back to module resolution
+                    self.module_manager.resolve_module_path(file_path, Some(current))?
+                }
+            } else {
+                self.module_manager.resolve_module_path(file_path, Some(current))?
+            }
         } else {
             self.module_manager.resolve_module_path(file_path, None)?
         };
 
+        // Verify file exists
+        if !resolved_path.exists() {
+            return Err(GraphoidError::runtime(format!(
+                "File not found: '{}'",
+                file_path
+            )));
+        }
+
         // Read file source
         let source = fs::read_to_string(&resolved_path)?;
 
-        // Create temporary executor with fresh environment to execute the file
+        // Create temporary executor, starting with copy of current environment
+        // This allows loaded files to access functions/variables from the caller
         let temp_env = Environment::new();
         let mut temp_executor = Executor::with_env(temp_env);
         temp_executor.set_current_file(Some(resolved_path.clone()));
 
-        // Execute file source in temporary environment
+        // Copy all bindings from current environment (including parent scopes) to temp_executor
+        // This gives the loaded file access to DSL functions like describe, it, expect, etc.
+        for (name, value) in self.env.get_all_bindings_recursive() {
+            temp_executor.env.define(name, value);
+        }
+
+        // Execute file source
         temp_executor.execute_source(&source)?;
 
-        // Merge all variables from temporary environment into current environment
+        // Merge new/modified variables back from temporary environment
         let all_vars = temp_executor.env.get_all_bindings();
         for (name, value) in all_vars {
             // Skip internal module metadata variables

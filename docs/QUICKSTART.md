@@ -453,6 +453,19 @@ load "./utilities.gr"
 result = square(5)  # No module prefix needed
 ```
 
+The `load` statement accepts expressions, not just string literals:
+
+```graphoid
+# Load from a variable
+config_path = "config/" + environment + ".gr"
+load config_path
+
+# Dynamic loading in a loop
+for file in spec_files {
+    load file
+}
+```
+
 **Import vs Load:**
 - **`import`**: Creates isolated namespace, access via alias
 - **`load`**: Merges directly into current namespace

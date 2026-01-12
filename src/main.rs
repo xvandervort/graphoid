@@ -59,174 +59,44 @@ fn print_usage() {
 }
 
 // =============================================================================
-// Spec Runner
+// Spec Runner - delegates to pure Graphoid implementation
 // =============================================================================
 
 fn run_spec_command(args: &[String]) {
-    let path = if args.is_empty() {
-        PathBuf::from(".")
-    } else {
-        PathBuf::from(&args[0])
-    };
+    let path = if args.is_empty() { "." } else { &args[0] };
 
-    let spec_files = discover_spec_files(&path);
-
-    if spec_files.is_empty() {
-        eprintln!("No spec files found in {:?}", path);
-        eprintln!("Spec files must end with _spec.gr");
-        std::process::exit(1);
-    }
-
-    println!("Running {} spec file(s)...\n", spec_files.len());
-
-    // Single executor for all spec files - Graphoid handles everything
     let mut executor = Executor::new();
 
-    // Initialize the gspec framework once
-    if let Err(e) = inject_spec_dsl(&mut executor) {
-        eprintln!("Error initializing spec runner: {}", e);
+    // Set the path for the Graphoid spec runner
+    let setup = format!("__SPEC_PATH__ = \"{}\"", path.replace('\\', "\\\\").replace('"', "\\\""));
+    if let Err(e) = execute_source(&setup, &mut executor) {
+        eprintln!("Error: {}", e);
         std::process::exit(1);
     }
 
-    // Run each spec file
-    for spec_file in &spec_files {
-        let abs_path = spec_file.canonicalize().unwrap_or_else(|_| spec_file.to_path_buf());
-        executor.set_current_file(Some(abs_path));
-
-        match fs::read_to_string(spec_file) {
-            Ok(source) => {
-                if let Err(e) = execute_source(&source, &mut executor) {
-                    eprintln!("\nError in {}: {}", spec_file.display(), e);
-                }
-            }
-            Err(e) => {
-                eprintln!("\nError reading {}: {}", spec_file.display(), e);
-            }
-        }
-    }
-
-    // Let Graphoid print the final summary and tell us if tests failed
-    let has_failures = finalize_spec_run(&mut executor);
-
-    if has_failures {
+    // Run the pure Graphoid spec runner
+    if let Err(e) = execute_source("import \"spec_runner\"", &mut executor) {
+        eprintln!("Error: {}", e);
         std::process::exit(1);
     }
-}
 
-fn finalize_spec_run(executor: &mut Executor) -> bool {
-    // Call __spec_runner__.final_summary() which prints summary and returns true if failures
-    let code = "__spec_runner__.final_summary()";
-
-    let mut lexer = Lexer::new(code);
-    let tokens = match lexer.tokenize() {
-        Ok(t) => t,
-        Err(_) => return true,
-    };
-
-    let mut parser = Parser::new(tokens);
-    let program = match parser.parse() {
-        Ok(p) => p,
-        Err(_) => return true,
-    };
-
-    if let Some(stmt) = program.statements.first() {
-        if let graphoid::ast::Stmt::Expression { expr, .. } = stmt {
-            if let Ok(value) = executor.eval_expr(expr) {
-                // Returns true if there were failures
-                if let graphoid::values::ValueKind::Boolean(b) = value.kind {
-                    return b;
+    // Check the result
+    let result_code = "__SPEC_RESULT__";
+    let mut lexer = Lexer::new(result_code);
+    if let Ok(tokens) = lexer.tokenize() {
+        let mut parser = Parser::new(tokens);
+        if let Ok(program) = parser.parse() {
+            if let Some(stmt) = program.statements.first() {
+                if let graphoid::ast::Stmt::Expression { expr, .. } = stmt {
+                    if let Ok(value) = executor.eval_expr(expr) {
+                        if let graphoid::values::ValueKind::Boolean(true) = value.kind {
+                            std::process::exit(1);
+                        }
+                    }
                 }
             }
         }
     }
-
-    true // Assume failure if we can't determine
-}
-
-fn discover_spec_files(path: &Path) -> Vec<PathBuf> {
-    let mut spec_files = Vec::new();
-
-    if path.is_file() {
-        // Single file specified
-        if path.to_string_lossy().ends_with("_spec.gr") {
-            spec_files.push(path.to_path_buf());
-        }
-    } else if path.is_dir() {
-        // Directory - find all *_spec.gr files recursively
-        discover_spec_files_recursive(path, &mut spec_files);
-    }
-
-    spec_files.sort();
-    spec_files
-}
-
-fn discover_spec_files_recursive(dir: &Path, spec_files: &mut Vec<PathBuf>) {
-    if let Ok(entries) = fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                // Skip hidden directories and common non-source dirs
-                let name = path.file_name().unwrap_or_default().to_string_lossy();
-                if !name.starts_with('.') && name != "target" && name != "node_modules" {
-                    discover_spec_files_recursive(&path, spec_files);
-                }
-            } else if path.is_file() {
-                if path.to_string_lossy().ends_with("_spec.gr") {
-                    spec_files.push(path);
-                }
-            }
-        }
-    }
-}
-
-fn inject_spec_dsl(executor: &mut Executor) -> Result<(), String> {
-    // Create the test runner and DSL by executing gspec setup code
-    let setup_code = r#"
-import "gspec"
-
-# Create the global test runner
-__spec_runner__ = gspec.TestRunner.clone()
-
-# DSL functions that delegate to the runner
-fn describe(name, block) {
-    __spec_runner__.describe(name, block)
-}
-
-fn context(name, block) {
-    __spec_runner__.context(name, block)
-}
-
-fn it(description, block) {
-    __spec_runner__.it(description, block)
-}
-
-fn xit(description, block) {
-    __spec_runner__.xit(description, block)
-}
-
-fn pending(description) {
-    __spec_runner__.pending(description)
-}
-
-fn before_each(hook) {
-    __spec_runner__.before_each(hook)
-}
-
-fn after_each(hook) {
-    __spec_runner__.after_each(hook)
-}
-
-# expect and assert are already exported from gspec module
-fn expect(value) {
-    return gspec.expect(value)
-}
-
-fn assert(result) {
-    return gspec.assert(result)
-}
-"#;
-
-    execute_source(setup_code, executor)
 }
 
 // =============================================================================
