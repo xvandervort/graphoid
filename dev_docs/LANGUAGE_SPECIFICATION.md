@@ -1641,6 +1641,48 @@ priv secret_value = 99  # Private variable
 public_value = 100      # Public variable (default)
 ```
 
+### Private Blocks
+
+Use `priv { }` blocks to group multiple private items together:
+
+```Graphoid
+# math_helpers.gr
+module math_helpers
+
+fn public_sqrt(x) {
+    return normalize(x).sqrt()
+}
+
+fn public_pow(base, exp) {
+    return internal_pow(normalize(base), exp)
+}
+
+# Group private implementation details
+priv {
+    fn normalize(x) {
+        if x < 0 { return 0 }
+        return x
+    }
+
+    fn internal_pow(base, exp) {
+        result = 1
+        for i in range(exp) {
+            result = result * base
+        }
+        return result
+    }
+
+    EPSILON = 0.0001  # Private constant
+}
+
+# Additional private block (multiple blocks allowed)
+priv {
+    fn validate_input(x) {
+        return x != none and x >= 0
+    }
+}
+```
+
 **Usage from another file:**
 
 ```Graphoid
@@ -1660,6 +1702,8 @@ secret = helpers.secret_value      # ❌ Error: 'secret_value' is private
 3. **Within same module** - All symbols (public and private) are accessible
 4. **From imports** - Only public symbols are accessible via `module.symbol` syntax
 5. **Synonym** - Both `priv` and `private` keywords work
+6. **Multiple priv blocks** - Allowed in a single module
+7. **Nested priv blocks** - Generate a warning (semantically meaningless)
 
 **Why Public by Default:**
 - **KISS Principle** - Reduces boilerplate (no `export` on every function)

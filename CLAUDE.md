@@ -191,11 +191,18 @@ This is not aspirational - it is the architectural mandate. Every design decisio
 │   └── user-guide/              # Tutorial chapters
 ├── dev_docs/                    # 📋 Development documentation
 │   ├── LANGUAGE_SPECIFICATION.md           # Canonical language spec
-│   ├── RUST_IMPLEMENTATION_ROADMAP.md      # 14-phase implementation plan
 │   ├── ARCHITECTURE_DESIGN.md              # Internal architecture decisions
+│   ├── roadmap/                            # 📍 Implementation roadmap (modular)
+│   │   ├── ROADMAP_INDEX.md                # Overview and phase summary
+│   │   ├── PHASE_15_CONCURRENCY.md         # Async/await, channels
+│   │   ├── PHASE_16_FFI.md                 # Foreign Function Interface
+│   │   ├── PHASE_17_DATABASE.md            # Database connectivity
+│   │   ├── PHASE_18_DISTRIBUTED_PRIMITIVES.md  # Remote refs, partitioning
+│   │   ├── PHASE_19_DISTRIBUTED_EXECUTION.md   # Distributed computing
+│   │   ├── PHASE_20_METAPROGRAMMING.md     # Macros, code generation
+│   │   └── PHASE_21-23_*.md                # Tooling (debugger, pkg mgr)
 │   ├── PRODUCTION_TOOLING_SPECIFICATION.md # Testing, debugging, packaging
-│   ├── PRODUCTION_TOOLING_SUMMARY.md       # Tooling executive summary
-│   └── TESTING_FRAMEWORK_COMPARISON.md     # RSpec-style vs traditional
+│   └── archive/                            # Archived documentation
 └── docs/                        # 📖 USER DOCUMENTATION (future)
 ```
 
@@ -227,10 +234,10 @@ The `dev_docs/` directory contains **comprehensive development documentation** i
    - Alternative patterns (duck typing, graph rules)
    - **Read this FIRST** before implementing any type-related features
 
-3. **`RUST_IMPLEMENTATION_ROADMAP.md`** - The implementation plan
-   - 14 phases from setup to production tooling
-   - Copy-paste-ready code for each phase
-   - Success criteria and timelines
+3. **`roadmap/ROADMAP_INDEX.md`** - The implementation plan
+   - Phases 0-14 complete (core language)
+   - Phases 15-23 remaining (concurrency, FFI, distributed, etc.)
+   - Individual phase files with detailed specs
    - **Use this** to know what to implement next
 
 4. **`ARCHITECTURE_DESIGN.md`** - Design decisions
@@ -259,27 +266,22 @@ The `dev_docs/` directory contains **comprehensive development documentation** i
 
 ## Current Development: Rust Implementation
 
-### Where We Are Now (December 2025)
+### Where We Are Now (January 2026)
 
-**Phases 0-11: ✅ COMPLETE**
-- Lexer, Parser, AST
-- Value System & Basic Execution
-- Functions & Lambdas
-- Collections & Methods
-- Graph Types & Rules
-- Module System
-- Pattern Matching
-- Pure Graphoid Stdlib (11 modules)
-
-**Phase 12: 🔄 IN PROGRESS** (~15% complete)
-- Native stdlib modules (Rust acceleration)
-- Constants, Random modules complete
-- TLS 1.3, HTTP working in pure Graphoid
+**Phases 0-14: ✅ COMPLETE**
+- Core language fully functional
+- Pattern matching, behaviors, graph querying
+- Module system with auto-discovery
+- Native stdlib modules (os, fs, net, random, constants)
+- Bitwise operators and integer types
+- Exception handling (try/catch/raise)
+- gspec testing framework (RSpec-style)
+- Pure Graphoid spec runner
 
 **Key Capabilities:**
 - ✅ **HTTPS Working** - `http.get("https://...")` in pure Graphoid
 - ✅ **TLS 1.3** - X25519, AES-GCM, HKDF implemented
-- ✅ **Module System** - Auto-discovery, no env vars needed
+- ✅ **Testing Framework** - 621+ gspec tests, 1,218+ Rust tests
 - ✅ **30 Sample Programs** - All working, well-organized
 
 **Current Test Status**: ✅ 2,228+ tests passing
@@ -541,35 +543,32 @@ Graphoid includes **professional-grade tooling** from day one:
 
 ## Implementation Roadmap
 
-See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 18-phase plan:
+See `dev_docs/roadmap/ROADMAP_INDEX.md` for the modular roadmap. Each phase has its own detailed file.
 
-| Phase | Focus | Duration | Status |
+### Completed Phases (0-14) ✅
+
+| Phase | Focus | Status |
+|-------|-------|--------|
+| 0-6 | Core Language (Lexer, Parser, Values, Collections, Graphs) | ✅ Complete |
+| 7-10 | Advanced Features (Pattern Matching, Behaviors, Modules) | ✅ Complete |
+| 11-13 | Stdlib (Pure Graphoid + Native + Bitwise) | ✅ Complete |
+| 14 | gspec Testing Framework | ✅ Complete (621+ tests) |
+
+### Remaining Phases (15-23)
+
+| Phase | Focus | Priority | Status |
 |-------|-------|----------|--------|
-| 0 | Project Setup | 1-2 days | ✅ COMPLETE |
-| 1 | Lexer | 3-5 days | ✅ COMPLETE (54 tests) |
-| 2 | Parser & AST | 5-7 days | ✅ COMPLETE (31 tests) |
-| 3 | Value System & Basic Execution | 5-7 days | ✅ COMPLETE |
-| 4 | Functions & Lambdas | 4-6 days | ✅ COMPLETE |
-| 5 | Collections & Methods | 7-10 days | ✅ COMPLETE |
-| 6 | Graph Types & Rules | 10-14 days | ✅ COMPLETE |
-| 6.5 | Foundational Gaps & Verification | 5-7 days | ✅ COMPLETE (132+ tests) |
-| 7 | Function Pattern Matching & Behaviors | 5-7 days | ✅ COMPLETE (186+ tests) |
-| 8 | Module System (Basic) | 4-6 days | ✅ COMPLETE (31 tests) |
-| 9 | Graph Pattern Matching | 7-10 days | ✅ COMPLETE (69 tests) |
-| 10 | Advanced Module Features | 3-5 days | ✅ COMPLETE (40 tests) |
-| 11 | Pure Graphoid Stdlib | 10-14 days | ✅ COMPLETE (11 modules, 24 tests) |
-| 12 | Native Stdlib Modules | 14-21 days | 🔄 ~15% COMPLETE (Constants, Random) |
-| 13 | Bitwise Operators & Integer Types | 5-7 days | 🔲 Pending |
-| 14 | Stdlib Translation to Pure Graphoid | 7-10 days | 🔲 Pending |
-| 15 | Testing Framework | 7-10 days | 🔲 Pending |
-| 16 | Debugger | 10-14 days | 🔲 Pending |
-| 17 | Package Manager | 14-21 days | 🔲 Pending |
+| 15 | Concurrency & Async | **Critical** | 🔲 Ready |
+| 16 | FFI (Foreign Function Interface) | **Critical** | 🔲 Ready |
+| 17 | Package Manager | **High** | 🔲 Ready |
+| 18 | Database Connectivity | **High** | 🔲 Blocked on 16, 17 |
+| 19 | Distributed Graph Primitives | **High** | 🔲 Blocked on 15 |
+| 20 | Distributed Execution | **High** | 🔲 Blocked on 19 |
+| 21 | Runtime Reflection | Low | 🔲 Ready |
+| 22 | Debugger | Low | 🔲 Ready |
+| 23 | Stdlib Translation | Low | 🔲 Ready |
 
-**Milestones**:
-- **MVP** (Phases 0-5): 6-8 weeks - Basic language works ✅
-- **Feature Complete** (Phases 0-14): 20-25 weeks - All language features + 90% self-hosting
-- **Production Tools** (Phases 0-17): 24-32 weeks - Testing, debugging, packaging
-- **Production Ready**: 32-40 weeks - Optimized, documented, polished
+**Critical Path**: Phases 15-20 enable distributed graph computation (the core differentiator)
 
 ---
 
@@ -592,11 +591,13 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 18-phase plan:
    - Alternative patterns: duck typing, graph rules, runtime checks
    - **READ THIS BEFORE implementing type-related features**
 
-3. **`dev_docs/RUST_IMPLEMENTATION_ROADMAP.md`** (1840 lines)
-   - 14-phase implementation plan
-   - Copy-paste-ready code for each phase
-   - Success criteria and timelines
-   - Testing strategy
+3. **`dev_docs/roadmap/`** (Modular roadmap)
+   - `ROADMAP_INDEX.md` - Overview and phase summary
+   - Individual phase files (PHASE_15_*.md through PHASE_23_*.md)
+   - Phases 15-16: Concurrency, FFI (Critical)
+   - Phases 17-18: Package Manager, Database (High)
+   - Phases 19-20: Distributed Computing (High)
+   - Phases 21-23: Reflection, Debugger, Stdlib Translation (Low)
 
 4. **`dev_docs/ARCHITECTURE_DESIGN.md`** (detailed architecture)
    - Two-tier value system (Simple vs Graph-backed)
@@ -623,14 +624,16 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 18-phase plan:
 
 ### Quick Reference
 
-- Phases 0-11: ✅ Complete (core language functional)
-- Phase 12: 🔄 Native stdlib modules (~15%)
+- Phases 0-14: ✅ Complete (core language + testing framework)
+- Phase 15+: 🔲 Concurrency, FFI, Distributed (see `dev_docs/roadmap/`)
 - **TLS 1.3: ✅ Working** (pure Graphoid!)
 - **HTTPS: ✅ Working** via `http.get()`
-- Total tests: **2,228+ passing**
+- **gspec: ✅ Working** (621+ tests)
+- Total Rust tests: **1,218+ passing**
+- Total gspec tests: **621+ passing**
 - Samples: **30/30 working**
-- Command: `~/.cargo/bin/cargo test --lib`
-- Build: `~/.cargo/bin/cargo build`
+- Command: `gr spec tests/gspec/` or `cargo test`
+- Build: `cargo build` or `make install`
 
 ---
 
@@ -866,49 +869,42 @@ Yes! The Rust implementation is functional. Try:
 
 1. Read `dev_docs/LANGUAGE_SPECIFICATION.md` to understand the language
 2. Read `dev_docs/ARCHITECTURE_DESIGN.md` to understand the design
-3. Start with Phase 1 (Lexer) in `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md`
-4. Write tests first (TDD)
-5. Keep `cargo build` warning-free
+3. Check `dev_docs/roadmap/ROADMAP_INDEX.md` for current status
+4. Pick a phase from `dev_docs/roadmap/PHASE_*.md`
+5. Write tests first (TDD)
+6. Keep `cargo build` warning-free
 
 ### For Next Session
 
 **START HERE**: Read `START_HERE_NEXT_SESSION.md` for detailed guide
 
-**Major Milestone Achieved: Pure Graphoid HTTPS Working! (December 2025)**
+**Current Status (January 2026)**:
+- ✅ **Phases 0-14 Complete** - Core language fully functional
+- ✅ **gspec Testing Framework** - 621+ tests, pure Graphoid spec runner
+- ✅ **HTTPS/TLS Working** - Pure Graphoid implementation
 
-**Last Session**: December 1-2, 2025
+**🚀 Recommended Next Steps (Critical Path to Distributed Graphs):**
 
-**Recent Accomplishments**:
-- ✅ **TLS 1.3 Complete** - X25519, AES-GCM, HKDF working in pure Graphoid
-- ✅ **HTTPS Working** - `http.get("https://...")` fetches real websites
-- ✅ **6 Major Bugs Fixed** - Module resolution, HMAC, stdlib path, etc.
-- ✅ **Project Restructured** - No more `rust/` subdirectory
+1. **Phase 15: Concurrency & Async**
+   - async/await syntax, channels, actors
+   - Prerequisite for distribution
+   - See: `dev_docs/roadmap/PHASE_15_CONCURRENCY.md`
 
-**Next Goal**: Build Bitcoin Price Tracker application
-- Fetch BTC prices via HTTPS
-- Store in JSON
-- Perform statistical analysis
-- All in 100% Graphoid
+2. **Phase 16: FFI (Foreign Function Interface)**
+   - Call C/Rust libraries from Graphoid
+   - See: `dev_docs/roadmap/PHASE_16_FFI.md`
 
-**🚀 Recommended Next Steps:**
+3. **Phase 17: Package Manager**
+   - Ecosystem enablement, third-party drivers
+   - See: `dev_docs/roadmap/PHASE_17_PACKAGE_MANAGER.md`
 
-1. **⭐ RECOMMENDED: Bitcoin Price Tracker** (The original goal!)
-   - Fetch BTC prices from a public API via HTTPS
-   - Store historical data in JSON files
-   - Calculate statistics (mean, std dev, trends)
-   - Ask: "Let's build the Bitcoin price tracker"
+4. **Phase 18: Database Connectivity**
+   - PostgreSQL, SQLite, Redis + third-party
+   - See: `dev_docs/roadmap/PHASE_18_DATABASE.md`
 
-2. **Add HTTP POST Support** (~1 day)
-   - Extend http.gr with `http.post(url, body, headers)`
-   - Needed for APIs that require POST
-
-3. **Complete API Reference Documentation** (~2-3 days)
-   - Finish remaining stdlib module documentation
-   - Document tls.gr and http.gr
-
-4. **Improve TLS Error Handling** (~1 day)
-   - Better error messages for connection failures
-   - Timeout handling
+5. **Phases 19-20: Distributed Graphs**
+   - Remote references, partitioning, distributed execution
+   - See: `dev_docs/roadmap/PHASE_19_*.md` and `PHASE_20_*.md`
 
 ---
 
