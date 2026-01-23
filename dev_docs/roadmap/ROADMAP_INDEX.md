@@ -1,8 +1,8 @@
 # Graphoid Implementation Roadmap
 
-**Version**: 7.0
-**Last Updated**: January 20, 2026
-**Status**: Phases 0-14 Complete, Phase 15 (Namespace Graph) Next
+**Version**: 9.0
+**Last Updated**: January 23, 2026
+**Status**: Phases 0-14 Complete, Phase 18.5 (Platform Support) and Phase 15 (Namespace Graph) Next
 
 ---
 
@@ -52,6 +52,18 @@ These phases fix this fundamental architectural gap.
 | [18](PHASE_18_COMPLETE_GRAPH_MODEL.md) | Complete Graph Model | **BLOCKER** | 10-14 days | Phase 15, 16 |
 
 **Total Graph Foundation**: 38-55 days
+
+### Platform Support (CRITICAL - Unblocks Platform Development)
+
+These features are required by the Graphoid Platform and should be implemented as soon as possible.
+
+| Phase | Name | Priority | Duration | Dependencies |
+|-------|------|----------|----------|--------------|
+| [18.5](PHASE_18_5_PLATFORM_SUPPORT.md) | Platform Support | **CRITICAL** | 5-7 days | None |
+
+**Features**: Timers, signal handling, module reload, file watching, stack traces, runtime introspection.
+
+**Note**: Phase 18.5 has no dependencies on the graph-centric foundation (Phases 15-18). It can be implemented immediately to unblock platform development while graph work proceeds in parallel.
 
 **See**: [GRAPH_CENTRIC_ARCHITECTURE_RATIONALE.md](GRAPH_CENTRIC_ARCHITECTURE_RATIONALE.md) for detailed justification.
 
@@ -120,6 +132,19 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 │                               Phase 19 (Concurrency)                                │
 │                                      │                                              │
 └──────────────────────────────────────┼──────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                    PLATFORM SUPPORT (PARALLEL - NO DEPENDENCIES)                     │
+│                                                                                     │
+│   Phase 18.5 (Platform Support) ───► Graphoid Platform                              │
+│   - Timers                           - Runtime                                      │
+│   - Signals                          - Loader                                       │
+│   - Module reload                    - Logger                                       │
+│   - File watching                    - Reload                                       │
+│   - Introspection                    - Monitor                                      │
+│                                                                                     │
+│   (Can start immediately, enables Platform development)                             │
+└─────────────────────────────────────────────────────────────────────────────────────┘
                                        │
          ┌─────────────────────────────┼─────────────────────────────────────┐
          │              ECOSYSTEM TRACK│                                      │
@@ -168,14 +193,20 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 
 ## Recommended Implementation Order
 
-### Immediate (BLOCKER)
+### Immediate (Two Parallel Tracks)
 
-**Must complete before ANY other work:**
+**Track A: Graph-Centric Foundation (BLOCKER for concurrency)**
 
 1. **Phase 15: Namespace Graph** - Variables as graph nodes, scopes as subgraphs
 2. **Phase 16: Execution Graph** - AST as graph, functions as subgraphs
 3. **Phase 17: Modules Graph** - Modules as subgraphs, imports as edges (can parallel with 18)
 4. **Phase 18: Complete Graph Model** - Classes, types, patterns, exceptions (can parallel with 17)
+
+**Track B: Platform Support (CRITICAL - unblocks Platform development)**
+
+1. **Phase 18.5: Platform Support** - Timers, signals, module reload, file watching, introspection
+
+*Track B has no dependencies and can start immediately. This enables platform development to proceed while graph-centric work continues.*
 
 ### Near-Term (Concurrency + Ecosystem)
 
@@ -236,6 +267,17 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 ---
 
 ## Timeline Estimates
+
+### Platform Support (Phase 18.5)
+**Estimated**: 1 week
+**Can Start**: Immediately (no dependencies)
+
+| Milestone | Features | Duration |
+|-----------|----------|----------|
+| Timers & Signals | `timer.after`, `timer.every`, `signal.on` | 2-3 days |
+| Module Management | `modules.reload`, `modules.unload` | 1-2 days |
+| File Watching | `fs.watch` | 1 day |
+| Introspection | `error.stack()`, `__MODULE__`, `runtime.memory()` | 1-2 days |
 
 ### Foundation: Graph-Centric (Phases 15-18)
 **Estimated**: 5-8 weeks
@@ -320,6 +362,9 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 - [PHASE_17_MODULES_GRAPH.md](PHASE_17_MODULES_GRAPH.md) - Modules as subgraphs
 - [PHASE_18_COMPLETE_GRAPH_MODEL.md](PHASE_18_COMPLETE_GRAPH_MODEL.md) - Classes, types, patterns, etc.
 
+### Platform Support (CRITICAL - Can Start Immediately)
+- [PHASE_18_5_PLATFORM_SUPPORT.md](PHASE_18_5_PLATFORM_SUPPORT.md) - Timers, signals, module reload, file watching, introspection
+
 ### Concurrency (Built on Graph Foundation)
 - [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) - Actors as nodes, channels as edges
 
@@ -343,7 +388,7 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 - [PHASE_32_SELF_HOSTING.md](PHASE_32_SELF_HOSTING.md) - Graphoid compiler in Graphoid
 
 ### Separate Projects (Not Numbered)
-- [GRAPHOID_PLATFORM.md](GRAPHOID_PLATFORM.md) - Application framework (Rails/Django for Graphoid) - after core language stabilizes
+- [Graphoid Platform](platform/GRAPHOID_PLATFORM.md) - Application framework (Rails/Django for Graphoid) - after core language stabilizes
 
 ---
 
@@ -351,6 +396,7 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 9.0 | 2026-01-23 | Added Phase 18.5: Platform Support (timers, signals, module reload, file watching, introspection). This phase has no dependencies and unblocks Graphoid Platform development. |
 | 8.0 | 2026-01-22 | Phase 29 rewritten as Compilation Strategy (dual-path, interpreter-first for dev, compiled for production). Moved Graphoid Platform out of numbered sequence (now GRAPHOID_PLATFORM.md). Renumbered: 31-33 → 30-32. |
 | 7.0 | 2026-01-20 | Phase 23 rewritten as Distribution Primitives (serialization, remote refs, routing hooks). Added Phase 30: Graphoid Platform (separate project for Pregel, Actors, MapReduce, CRDTs). Renumbered compilation phases: 30-32 → 31-33. |
 | 6.0 | 2026-01-16 | Renumbered phases: 14A-D → 15-18, old 15-28 → 19-32. Concurrency redesigned for graph-centric primitives. |

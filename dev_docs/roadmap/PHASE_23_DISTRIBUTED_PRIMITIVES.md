@@ -539,4 +539,4 @@ await ref.send(:hello)  # Routes via simple_hash
 - [PHASE_15_CONCURRENCY.md](PHASE_15_CONCURRENCY.md) - Async foundation
 - [PHASE_18_COMPLETE_GRAPH_MODEL.md](PHASE_18_COMPLETE_GRAPH_MODEL.md) - Universe graph structure
 - [PHASE_20_FFI.md](PHASE_20_FFI.md) - Bridge Node pattern
-- [GRAPHOID_PLATFORM.md](GRAPHOID_PLATFORM.md) - Platform built on these primitives (separate project)
+- [GRAPHOID_PLATFORM.md](platform/GRAPHOID_PLATFORM.md) - Platform built on these primitives (separate project)
