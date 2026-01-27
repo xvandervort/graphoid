@@ -314,9 +314,24 @@ impl Parser {
             });
         };
 
-        // Regular function syntax only
-        let name = first_ident;
-        let receiver: Option<String> = None;
+        // Check for method syntax: fn receiver.method_name()
+        let (name, receiver) = if self.match_token(&TokenType::Dot) {
+            // fn receiver.method_name() syntax
+            let method_name = if let TokenType::Identifier(id) = &self.peek().token_type {
+                let n = id.clone();
+                self.advance();
+                n
+            } else {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected method name after '.'".to_string(),
+                    position: self.peek().position(),
+                });
+            };
+            (method_name, Some(first_ident))
+        } else {
+            // Regular function: fn function_name()
+            (first_ident, None)
+        };
 
         // ⚠️  NO GENERICS POLICY ENFORCEMENT
         // See: dev_docs/NO_GENERICS_POLICY.md
@@ -679,17 +694,8 @@ impl Parser {
     fn load_statement(&mut self) -> Result<Stmt> {
         let position = self.previous_position();
 
-        // Expect string literal
-        let path = if let TokenType::String(s) = &self.peek().token_type {
-            let p = s.clone();
-            self.advance();
-            p
-        } else {
-            return Err(GraphoidError::SyntaxError {
-                message: "Expected string literal after 'load'".to_string(),
-                position: self.peek().position(),
-            });
-        };
+        // Parse path expression (can be string literal or variable)
+        let path = self.expression()?;
 
         Ok(Stmt::Load { path, position })
     }
@@ -1485,6 +1491,12 @@ impl Parser {
     fn assignment_or_expression(&mut self) -> Result<Stmt> {
         let position = self.peek().position();
 
+        // Try command-style call first: identifier args { block }
+        // This allows syntax like: describe "test" { body }
+        if let Some(stmt) = self.try_command_style_call()? {
+            return Ok(stmt);
+        }
+
         // Try to parse as assignment
         // Look ahead to see if there's an '=' after an identifier or index expression
         if let TokenType::Identifier(_) = &self.peek().token_type {
@@ -1529,6 +1541,217 @@ impl Parser {
         // Parse as expression statement
         let expr = self.expression()?;
         Ok(Stmt::Expression { expr, position })
+    }
+
+    /// Try to parse a command-style function call: identifier args { block }
+    /// Returns Some(stmt) if this is a command-style call, None otherwise.
+    ///
+    /// Command-style calls are statements like:
+    ///   describe "test" { ... }
+    ///   it "should work" { ... }
+    ///   context "when empty" { ... }
+    ///
+    /// The syntax is: identifier [args...] { block }
+    /// - identifier: function name
+    /// - args: zero or more arguments (strings, numbers, symbols, etc.)
+    /// - { block }: a trailing block that becomes a lambda argument
+    fn try_command_style_call(&mut self) -> Result<Option<Stmt>> {
+        // Must start with an identifier
+        let func_name = match &self.peek().token_type {
+            TokenType::Identifier(name) => name.clone(),
+            _ => return Ok(None),
+        };
+
+        let position = self.peek().position();
+        let checkpoint = self.current;
+        self.advance(); // consume function name
+
+        // Check what comes next - must be an argument-like token or {
+        // NOT: =, (, ., operators
+        if !self.is_command_arg_start() {
+            self.current = checkpoint;
+            return Ok(None);
+        }
+
+        // Parse arguments until we hit { or newline
+        let mut args = Vec::new();
+
+        while self.is_command_arg_start() && !self.check(&TokenType::LeftBrace) {
+            // Parse one argument
+            let arg = self.command_arg()?;
+            args.push(Argument::Positional { expr: arg, mutable: false });
+
+            // Optional comma between args (but not required)
+            self.match_token(&TokenType::Comma);
+        }
+
+        // Must have a trailing block for this to be a command-style call
+        if !self.check(&TokenType::LeftBrace) {
+            self.current = checkpoint;
+            return Ok(None);
+        }
+
+        // Parse the trailing block as a lambda
+        let block_lambda = self.parse_command_block()?;
+        args.push(Argument::Positional { expr: block_lambda, mutable: false });
+
+        // Build the call expression
+        let callee = Box::new(Expr::Variable {
+            name: func_name,
+            position: position.clone(),
+        });
+
+        let call_expr = Expr::Call {
+            callee,
+            args,
+            position: position.clone(),
+        };
+
+        Ok(Some(Stmt::Expression { expr: call_expr, position }))
+    }
+
+    /// Check if the current token can start a command argument
+    /// NOTE: We intentionally exclude LeftBracket and Identifier to avoid
+    /// ambiguity with index access (foo[x]) and regular expressions (foo bar)
+    fn is_command_arg_start(&self) -> bool {
+        matches!(
+            &self.peek().token_type,
+            TokenType::String(_)
+            | TokenType::Number(_)
+            | TokenType::True
+            | TokenType::False
+            | TokenType::None
+            | TokenType::Symbol(_)
+            | TokenType::LeftBrace    // trailing block
+        )
+    }
+
+    /// Parse a single command argument (limited subset of expressions)
+    /// Only parses simple literals - no identifiers or complex expressions
+    /// to avoid ambiguity with regular expressions
+    fn command_arg(&mut self) -> Result<Expr> {
+        let position = self.peek().position();
+
+        match &self.peek().token_type.clone() {
+            TokenType::String(s) => {
+                let value = s.clone();
+                self.advance();
+                Ok(Expr::Literal {
+                    value: LiteralValue::String(value),
+                    position,
+                })
+            }
+            TokenType::Number(n) => {
+                let value = *n;
+                self.advance();
+                Ok(Expr::Literal {
+                    value: LiteralValue::Number(value),
+                    position,
+                })
+            }
+            TokenType::True => {
+                self.advance();
+                Ok(Expr::Literal {
+                    value: LiteralValue::Boolean(true),
+                    position,
+                })
+            }
+            TokenType::False => {
+                self.advance();
+                Ok(Expr::Literal {
+                    value: LiteralValue::Boolean(false),
+                    position,
+                })
+            }
+            TokenType::None => {
+                self.advance();
+                Ok(Expr::Literal {
+                    value: LiteralValue::None,
+                    position,
+                })
+            }
+            TokenType::Symbol(s) => {
+                let name = s.clone();
+                self.advance();
+                Ok(Expr::Literal {
+                    value: LiteralValue::Symbol(name),
+                    position,
+                })
+            }
+            _ => Err(GraphoidError::SyntaxError {
+                message: "Expected command argument".to_string(),
+                position,
+            }),
+        }
+    }
+
+    /// Parse a command block: { body } (no parameter list required)
+    /// Returns a Lambda expression with empty parameters
+    fn parse_command_block(&mut self) -> Result<Expr> {
+        let position = self.peek().position();
+
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' to start block".to_string(),
+                position,
+            });
+        }
+
+        // Check for optional parameter list: |params| or ||
+        let params = if self.check(&TokenType::PipePipe) {
+            // Empty parameter list: ||
+            self.advance();
+            vec![]
+        } else if self.check(&TokenType::Pipe) {
+            // Parameter list: |a, b, c|
+            self.advance();
+            let mut params = Vec::new();
+            if !self.check(&TokenType::Pipe) {
+                loop {
+                    if let TokenType::Identifier(name) = &self.peek().token_type {
+                        params.push(name.clone());
+                        self.advance();
+                        if !self.match_token(&TokenType::Comma) {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+            if !self.match_token(&TokenType::Pipe) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '|' to close parameter list".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+            params
+        } else {
+            // No parameter list - empty params
+            vec![]
+        };
+
+        // Parse body statements
+        let statements = self.block()?;
+
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' to close block".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        // Create lambda with block body
+        let body = Box::new(Expr::Block {
+            statements,
+            position: position.clone(),
+        });
+
+        Ok(Expr::Lambda {
+            params,
+            body,
+            position,
+        })
     }
 
     fn block(&mut self) -> Result<Vec<Stmt>> {
@@ -1578,21 +1801,16 @@ impl Parser {
     }
 
     /// Check if the next token is the start of a trailing block
-    /// Trailing blocks start with { followed by | or || (empty params)
+    /// Trailing blocks start with { followed by | or || for parameters
+    /// This distinguishes trailing blocks from control structure bodies
     fn is_trailing_block(&self) -> bool {
-        if !self.check(&TokenType::LeftBrace) {
-            return false;
-        }
-
-        // Look ahead to see if there's a pipe (parameter list) or double pipe (empty params)
+        if !self.check(&TokenType::LeftBrace) { return false; }
         if self.current + 1 < self.tokens.len() {
             matches!(
                 self.tokens[self.current + 1].token_type,
                 TokenType::Pipe | TokenType::PipePipe
             )
-        } else {
-            false
-        }
+        } else { false }
     }
 
     /// Parse a trailing block: { |params| body } or { body }
@@ -2267,9 +2485,35 @@ impl Parser {
                     }
                 };
 
-                // Check if it's a method call (with parentheses)
-                if self.match_token(&TokenType::LeftParen) {
-                    // Regular method call (including explicit syntax for g.match())
+                // Check for command-style method call: obj.method "arg" { block }
+                // This must come before the LeftParen check
+                if self.is_command_arg_start() && !self.check(&TokenType::LeftBrace) {
+                    // Parse command arguments (strings, numbers, symbols - not the trailing block yet)
+                    let mut args = Vec::new();
+                    while self.is_command_arg_start() && !self.check(&TokenType::LeftBrace) {
+                        let arg = self.command_arg()?;
+                        args.push(Argument::Positional { expr: arg, mutable: false });
+                    }
+
+                    // Must have a trailing block for command-style method calls
+                    if !self.check(&TokenType::LeftBrace) {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected '{' block after command-style method arguments".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+
+                    let block_lambda = self.parse_command_block()?;
+                    args.push(Argument::Positional { expr: block_lambda, mutable: false });
+
+                    expr = Expr::MethodCall {
+                        object: Box::new(expr),
+                        method,
+                        args,
+                        position,
+                    };
+                } else if self.match_token(&TokenType::LeftParen) {
+                    // Regular method call with parentheses (including explicit syntax for g.match())
                     let mut args = self.arguments()?;
                     if !self.match_token(&TokenType::RightParen) {
                         return Err(GraphoidError::SyntaxError {
@@ -2296,6 +2540,16 @@ impl Parser {
                     // Otherwise, treat as property access: self.name
                     if self.is_trailing_block() {
                         let block_lambda = self.parse_trailing_block()?;
+                        let args = vec![Argument::Positional { expr: block_lambda, mutable: false }];
+                        expr = Expr::MethodCall {
+                            object: Box::new(expr),
+                            method,
+                            args,
+                            position,
+                        };
+                    } else if self.check(&TokenType::LeftBrace) {
+                        // Command-style block without other args: obj.method { block }
+                        let block_lambda = self.parse_command_block()?;
                         let args = vec![Argument::Positional { expr: block_lambda, mutable: false }];
                         expr = Expr::MethodCall {
                             object: Box::new(expr),
@@ -2467,6 +2721,21 @@ impl Parser {
 
             // Not a lambda, rewind and parse as expression
             self.current = paren_checkpoint;
+        }
+
+        // Case 3: Block lambda: { || ... } or { |x, y| ... }
+        // This allows block lambdas to be passed as function arguments
+        if self.check(&TokenType::LeftBrace) {
+            // Look ahead to see if this is a block lambda (has || or |)
+            if self.current + 1 < self.tokens.len() {
+                match &self.tokens[self.current + 1].token_type {
+                    TokenType::PipePipe | TokenType::Pipe => {
+                        // This is a block lambda!
+                        return self.parse_command_block();
+                    }
+                    _ => {}
+                }
+            }
         }
 
         // Not a lambda, parse as regular expression

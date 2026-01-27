@@ -44,6 +44,9 @@ impl NativeModule for FSModule {
         functions.insert("write".to_string(), fs_write as NativeFunction);
         functions.insert("close".to_string(), fs_close as NativeFunction);
         functions.insert("list_dir".to_string(), fs_list_dir as NativeFunction);
+        functions.insert("is_dir".to_string(), fs_is_dir as NativeFunction);
+        functions.insert("is_file".to_string(), fs_is_file as NativeFunction);
+        functions.insert("exists".to_string(), fs_exists as NativeFunction);
 
         functions
     }
@@ -252,4 +255,49 @@ fn fs_list_dir(args: &[Value]) -> Result<Value> {
         .collect();
 
     Ok(Value::list(crate::values::List::from_vec(values)))
+}
+
+/// Check if path is a directory
+/// fs.is_dir(path) -> bool
+fn fs_is_dir(args: &[Value]) -> Result<Value> {
+    if args.len() != 1 {
+        return Err(GraphoidError::RuntimeError {
+            message: "is_dir() requires exactly 1 argument: path".to_string(),
+        });
+    }
+
+    let path = get_string_arg(args, 0, "is_dir")?;
+    let is_dir = std::path::Path::new(&path).is_dir();
+
+    Ok(Value::boolean(is_dir))
+}
+
+/// Check if path is a file
+/// fs.is_file(path) -> bool
+fn fs_is_file(args: &[Value]) -> Result<Value> {
+    if args.len() != 1 {
+        return Err(GraphoidError::RuntimeError {
+            message: "is_file() requires exactly 1 argument: path".to_string(),
+        });
+    }
+
+    let path = get_string_arg(args, 0, "is_file")?;
+    let is_file = std::path::Path::new(&path).is_file();
+
+    Ok(Value::boolean(is_file))
+}
+
+/// Check if path exists
+/// fs.exists(path) -> bool
+fn fs_exists(args: &[Value]) -> Result<Value> {
+    if args.len() != 1 {
+        return Err(GraphoidError::RuntimeError {
+            message: "exists() requires exactly 1 argument: path".to_string(),
+        });
+    }
+
+    let path = get_string_arg(args, 0, "exists")?;
+    let exists = std::path::Path::new(&path).exists();
+
+    Ok(Value::boolean(exists))
 }

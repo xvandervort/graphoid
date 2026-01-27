@@ -1,0 +1,100 @@
+# spec_runner.gr - Pure Graphoid spec test runner
+#
+# Usage: Called by `gr spec [path]` command
+# Discovers and runs all *_spec.gr files, reports results
+
+import "gspec"
+import "fs"
+
+# Create the global test runner
+__spec_runner__ = gspec.TestRunner.clone()
+
+# DSL functions that delegate to the runner
+fn describe(name, block) {
+    __spec_runner__.describe(name, block)
+}
+
+fn context(name, block) {
+    __spec_runner__.context(name, block)
+}
+
+fn it(description, block) {
+    __spec_runner__.it(description, block)
+}
+
+fn xit(description, block) {
+    __spec_runner__.xit(description, block)
+}
+
+fn pending(description) {
+    __spec_runner__.pending(description)
+}
+
+fn before_each(hook) {
+    __spec_runner__.before_each(hook)
+}
+
+fn after_each(hook) {
+    __spec_runner__.after_each(hook)
+}
+
+fn expect(value) {
+    return gspec.expect(value)
+}
+
+fn assert(result) {
+    return gspec.assert(result)
+}
+
+# Discover spec files recursively
+fn discover_spec_files(path) {
+    files = []
+
+    if fs.is_file(path) {
+        if path.ends_with("_spec.gr") {
+            files.append!(path)
+        }
+    } else if fs.is_dir(path) {
+        for entry in fs.list_dir(path) {
+            # Skip hidden files and common non-source dirs
+            if not entry.starts_with(".") and entry != "target" and entry != "node_modules" {
+                full_path = path + "/" + entry
+                sub_files = discover_spec_files(full_path)
+                for f in sub_files {
+                    files.append!(f)
+                }
+            }
+        }
+    }
+
+    return files.sort()
+}
+
+# Run all spec files
+fn run_specs(path) {
+    # Normalize path: remove trailing slash
+    if path.ends_with("/") {
+        path = path.slice(0, path.length() - 1)
+    }
+    spec_files = discover_spec_files(path)
+
+    if spec_files.length() == 0 {
+        print("No spec files found in: " + path)
+        print("Spec files must end with _spec.gr")
+        return true  # failure
+    }
+
+    print("Running " + spec_files.length().to_string() + " spec file(s)...")
+    print("")
+
+    for spec_file in spec_files {
+        load(spec_file)
+    }
+
+    return __spec_runner__.final_summary()
+}
+
+# Main entry point - path is passed as __SPEC_PATH__ variable
+if __SPEC_PATH__ != none {
+    __SPEC_RESULT__ = run_specs(__SPEC_PATH__)
+}

@@ -1,0 +1,885 @@
+# gspec_spec.gr - TDD tests for the gspec testing framework
+#
+# These tests verify the gspec framework itself works correctly.
+# Run with: gr spec tests/gspec/gspec_spec.gr
+
+import "gspec"
+
+print("=== gspec Framework Tests ===")
+print("")
+
+# Track test results using a graph to avoid scope issues
+graph TestTracker {
+    run: 0
+    passed: 0
+
+    fn assert_true(condition, message) {
+        run = run + 1
+        if condition {
+            passed = passed + 1
+            print("  PASS: " + message)
+        } else {
+            print("  FAIL: " + message)
+        }
+    }
+
+    fn assert_false(condition, message) {
+        assert_true(not condition, message)
+    }
+
+    fn summary() {
+        print("=== Summary ===")
+        print(passed.to_string() + "/" + run.to_string() + " tests passed")
+        if passed == run {
+            print("ALL TESTS PASSED!")
+        } else {
+            print("SOME TESTS FAILED")
+        }
+    }
+}
+
+t = TestTracker.clone()
+
+# =============================================================================
+# Section 1: expect() function and Expectation creation
+# =============================================================================
+print("--- 1. expect() Function ---")
+
+# Test that expect() returns a graph (Expectation)
+e = expect(5)
+t.assert_true(e.type() == "graph", "expect() returns a graph")
+
+# Verify expect() works with different types
+e2 = expect("hello")
+t.assert_true(e2.type() == "graph", "expect() works with strings")
+
+e3 = expect([1, 2, 3])
+t.assert_true(e3.type() == "graph", "expect() works with lists")
+
+print("")
+
+# =============================================================================
+# Section 2: to_equal() matcher
+# =============================================================================
+print("--- 2. to_equal() Matcher ---")
+
+# Numbers
+result = expect(5).to_equal(5)
+t.assert_true(result["pass"], "to_equal: 5 equals 5")
+
+result = expect(5).to_equal(10)
+t.assert_false(result["pass"], "to_equal: 5 does not equal 10")
+
+# Strings
+result = expect("hello").to_equal("hello")
+t.assert_true(result["pass"], "to_equal: strings match")
+
+result = expect("hello").to_equal("world")
+t.assert_false(result["pass"], "to_equal: strings don't match")
+
+# Lists
+result = expect([1, 2, 3]).to_equal([1, 2, 3])
+t.assert_true(result["pass"], "to_equal: lists match")
+
+result = expect([1, 2, 3]).to_equal([1, 2, 4])
+t.assert_false(result["pass"], "to_equal: lists don't match")
+
+# Booleans
+result = expect(true).to_equal(true)
+t.assert_true(result["pass"], "to_equal: true equals true")
+
+result = expect(true).to_equal(false)
+t.assert_false(result["pass"], "to_equal: true does not equal false")
+
+# None
+result = expect(none).to_equal(none)
+t.assert_true(result["pass"], "to_equal: none equals none")
+
+# Error message on failure
+result = expect(5).to_equal(10)
+t.assert_true(result["message"].length() > 0, "to_equal: failure includes message")
+
+print("")
+
+# =============================================================================
+# Section 3: to_be() matcher (identity/same object)
+# =============================================================================
+print("--- 3. to_be() Matcher ---")
+
+result = expect(5).to_be(5)
+t.assert_true(result["pass"], "to_be: 5 is 5")
+
+result = expect(true).to_be(true)
+t.assert_true(result["pass"], "to_be: true is true")
+
+result = expect(none).to_be(none)
+t.assert_true(result["pass"], "to_be: none is none")
+
+print("")
+
+# =============================================================================
+# Section 4: to_be_truthy() matcher
+# =============================================================================
+print("--- 4. to_be_truthy() Matcher ---")
+
+result = expect(true).to_be_truthy()
+t.assert_true(result["pass"], "to_be_truthy: true is truthy")
+
+result = expect(1).to_be_truthy()
+t.assert_true(result["pass"], "to_be_truthy: 1 is truthy")
+
+result = expect("hello").to_be_truthy()
+t.assert_true(result["pass"], "to_be_truthy: non-empty string is truthy")
+
+result = expect([1, 2]).to_be_truthy()
+t.assert_true(result["pass"], "to_be_truthy: non-empty list is truthy")
+
+result = expect(false).to_be_truthy()
+t.assert_false(result["pass"], "to_be_truthy: false is not truthy")
+
+result = expect(none).to_be_truthy()
+t.assert_false(result["pass"], "to_be_truthy: none is not truthy")
+
+print("")
+
+# =============================================================================
+# Section 5: to_be_falsy() matcher
+# =============================================================================
+print("--- 5. to_be_falsy() Matcher ---")
+
+result = expect(false).to_be_falsy()
+t.assert_true(result["pass"], "to_be_falsy: false is falsy")
+
+result = expect(none).to_be_falsy()
+t.assert_true(result["pass"], "to_be_falsy: none is falsy")
+
+result = expect(0).to_be_falsy()
+t.assert_true(result["pass"], "to_be_falsy: 0 is falsy")
+
+result = expect("").to_be_falsy()
+t.assert_true(result["pass"], "to_be_falsy: empty string is falsy")
+
+result = expect([]).to_be_falsy()
+t.assert_true(result["pass"], "to_be_falsy: empty list is falsy")
+
+result = expect(true).to_be_falsy()
+t.assert_false(result["pass"], "to_be_falsy: true is not falsy")
+
+print("")
+
+# =============================================================================
+# Section 6: to_be_none() matcher
+# =============================================================================
+print("--- 6. to_be_none() Matcher ---")
+
+result = expect(none).to_be_none()
+t.assert_true(result["pass"], "to_be_none: none is none")
+
+result = expect(0).to_be_none()
+t.assert_false(result["pass"], "to_be_none: 0 is not none")
+
+result = expect(false).to_be_none()
+t.assert_false(result["pass"], "to_be_none: false is not none")
+
+result = expect("").to_be_none()
+t.assert_false(result["pass"], "to_be_none: empty string is not none")
+
+print("")
+
+# =============================================================================
+# Section 7: to_be_a() type matcher
+# =============================================================================
+print("--- 7. to_be_a() Matcher ---")
+
+result = expect(5).to_be_a("num")
+t.assert_true(result["pass"], "to_be_a: 5 is a num")
+
+result = expect("hello").to_be_a("string")
+t.assert_true(result["pass"], "to_be_a: 'hello' is a string")
+
+result = expect([1, 2, 3]).to_be_a("list")
+t.assert_true(result["pass"], "to_be_a: [1,2,3] is a list")
+
+result = expect(true).to_be_a("bool")
+t.assert_true(result["pass"], "to_be_a: true is a bool")
+
+result = expect({"a": 1}).to_be_a("map")
+t.assert_true(result["pass"], "to_be_a: {} is a map")
+
+result = expect(none).to_be_a("none")
+t.assert_true(result["pass"], "to_be_a: none is none type")
+
+result = expect(5).to_be_a("string")
+t.assert_false(result["pass"], "to_be_a: 5 is not a string")
+
+result = expect("hello").to_be_a("num")
+t.assert_false(result["pass"], "to_be_a: 'hello' is not a num")
+
+print("")
+
+# =============================================================================
+# Section 8: to_contain() matcher
+# =============================================================================
+print("--- 8. to_contain() Matcher ---")
+
+# Lists
+result = expect([1, 2, 3]).to_contain(2)
+t.assert_true(result["pass"], "to_contain: list contains element")
+
+result = expect([1, 2, 3]).to_contain(5)
+t.assert_false(result["pass"], "to_contain: list does not contain element")
+
+result = expect(["a", "b", "c"]).to_contain("b")
+t.assert_true(result["pass"], "to_contain: string list contains element")
+
+# Strings
+result = expect("hello world").to_contain("world")
+t.assert_true(result["pass"], "to_contain: string contains substring")
+
+result = expect("hello world").to_contain("xyz")
+t.assert_false(result["pass"], "to_contain: string does not contain substring")
+
+print("")
+
+# =============================================================================
+# Section 9: to_be_empty() matcher
+# =============================================================================
+print("--- 9. to_be_empty() Matcher ---")
+
+result = expect([]).to_be_empty()
+t.assert_true(result["pass"], "to_be_empty: empty list is empty")
+
+result = expect([1, 2]).to_be_empty()
+t.assert_false(result["pass"], "to_be_empty: non-empty list is not empty")
+
+result = expect("").to_be_empty()
+t.assert_true(result["pass"], "to_be_empty: empty string is empty")
+
+result = expect("hello").to_be_empty()
+t.assert_false(result["pass"], "to_be_empty: non-empty string is not empty")
+
+result = expect({}).to_be_empty()
+t.assert_true(result["pass"], "to_be_empty: empty map is empty")
+
+print("")
+
+# =============================================================================
+# Section 10: to_have_length() matcher
+# =============================================================================
+print("--- 10. to_have_length() Matcher ---")
+
+result = expect([1, 2, 3]).to_have_length(3)
+t.assert_true(result["pass"], "to_have_length: list has correct length")
+
+result = expect([1, 2, 3]).to_have_length(5)
+t.assert_false(result["pass"], "to_have_length: list has wrong length")
+
+result = expect("hello").to_have_length(5)
+t.assert_true(result["pass"], "to_have_length: string has correct length")
+
+result = expect("").to_have_length(0)
+t.assert_true(result["pass"], "to_have_length: empty string has length 0")
+
+print("")
+
+# =============================================================================
+# Section 11: Comparison matchers
+# =============================================================================
+print("--- 11. Comparison Matchers ---")
+
+result = expect(10).to_be_greater_than(5)
+t.assert_true(result["pass"], "to_be_greater_than: 10 > 5")
+
+result = expect(5).to_be_greater_than(10)
+t.assert_false(result["pass"], "to_be_greater_than: 5 not > 10")
+
+result = expect(5).to_be_greater_than(5)
+t.assert_false(result["pass"], "to_be_greater_than: 5 not > 5")
+
+result = expect(5).to_be_less_than(10)
+t.assert_true(result["pass"], "to_be_less_than: 5 < 10")
+
+result = expect(10).to_be_less_than(5)
+t.assert_false(result["pass"], "to_be_less_than: 10 not < 5")
+
+result = expect(5).to_be_less_than(5)
+t.assert_false(result["pass"], "to_be_less_than: 5 not < 5")
+
+result = expect(10).to_be_at_least(5)
+t.assert_true(result["pass"], "to_be_at_least: 10 >= 5")
+
+result = expect(5).to_be_at_least(5)
+t.assert_true(result["pass"], "to_be_at_least: 5 >= 5")
+
+result = expect(5).to_be_at_most(10)
+t.assert_true(result["pass"], "to_be_at_most: 5 <= 10")
+
+result = expect(5).to_be_at_most(5)
+t.assert_true(result["pass"], "to_be_at_most: 5 <= 5")
+
+print("")
+
+# =============================================================================
+# Section 12: to_raise() matcher
+# =============================================================================
+print("--- 12. to_raise() Matcher ---")
+
+# Test that to_raise catches the expected error type
+result = expect({ || raise ValueError("bad value") }).to_raise("ValueError")
+t.assert_true(result["pass"], "to_raise: catches ValueError")
+
+result = expect({ || raise TypeError("wrong type") }).to_raise("TypeError")
+t.assert_true(result["pass"], "to_raise: catches TypeError")
+
+result = expect({ || raise IOError("file not found") }).to_raise("IOError")
+t.assert_true(result["pass"], "to_raise: catches IOError")
+
+# Test that wrong error type fails
+result = expect({ || raise TypeError("wrong type") }).to_raise("ValueError")
+t.assert_false(result["pass"], "to_raise: wrong type fails")
+
+# Test that no error fails
+result = expect({ || x = 5 + 5 }).to_raise("ValueError")
+t.assert_false(result["pass"], "to_raise: no error fails")
+
+# Test RuntimeError from division by zero
+result = expect({ || x = 1 / 0 }).to_raise("RuntimeError")
+t.assert_true(result["pass"], "to_raise: catches RuntimeError from division")
+
+print("")
+
+# =============================================================================
+# Section 13: to_not_raise() matcher
+# =============================================================================
+print("--- 13. to_not_raise() Matcher ---")
+
+result = expect({ || x = 5 + 5 }).to_not_raise()
+t.assert_true(result["pass"], "to_not_raise: passes when no error")
+
+result = expect({ || raise ValueError("oops") }).to_not_raise()
+t.assert_false(result["pass"], "to_not_raise: fails when error occurs")
+
+print("")
+
+# =============================================================================
+# Section 14: Negation with negate()
+# =============================================================================
+print("--- 14. Negation ---")
+
+# Negated equality
+result = expect(5).negate().to_equal(10)
+t.assert_true(result["pass"], "negate: 5 not equal 10")
+
+result = expect(5).negate().to_equal(5)
+t.assert_false(result["pass"], "negate: 5 equals 5 (negated fails)")
+
+# Negated truthiness
+result = expect(false).negate().to_be_truthy()
+t.assert_true(result["pass"], "negate: false is not truthy")
+
+result = expect(true).negate().to_be_falsy()
+t.assert_true(result["pass"], "negate: true is not falsy")
+
+# Negated containment
+result = expect([1, 2, 3]).negate().to_contain(5)
+t.assert_true(result["pass"], "negate: list does not contain 5")
+
+result = expect([1, 2, 3]).negate().to_contain(2)
+t.assert_false(result["pass"], "negate: list contains 2 (negated fails)")
+
+# Negated type
+result = expect(5).negate().to_be_a("string")
+t.assert_true(result["pass"], "negate: 5 is not a string")
+
+# Negated comparison
+result = expect(5).negate().to_be_greater_than(10)
+t.assert_true(result["pass"], "negate: 5 is not greater than 10")
+
+print("")
+
+# =============================================================================
+# Section 15: TestRunner - describe() and it()
+# =============================================================================
+print("--- 15. TestRunner - describe/it ---")
+
+# Create a test runner (access via module prefix)
+runner = gspec.TestRunner.clone()
+
+# Run a simple test suite - the TestRunner properly tracks pass/fail counts
+# due to the fixed closure scope handling (graphs now use Rc<RefCell> for sharing)
+runner.describe "Calculator" {
+    runner.it "adds numbers" {
+        result = expect(2 + 2).to_equal(4)
+        if not result["pass"] {
+            raise ValueError(result["message"])
+        }
+    }
+
+    runner.it "subtracts numbers" {
+        result = expect(5 - 3).to_equal(2)
+        if not result["pass"] {
+            raise ValueError(result["message"])
+        }
+    }
+}
+
+# Test nested describe (context)
+runner.describe "String" {
+    runner.context "with uppercase" {
+        runner.it "has correct length" {
+            result = expect("HELLO".length()).to_equal(5)
+            if not result["pass"] {
+                raise ValueError(result["message"])
+            }
+        }
+    }
+}
+
+# Now verify the TestRunner properly tracked the pass/fail counts
+# (This was broken before the closure scope fix!)
+summary = runner.summary()
+t.assert_true(summary["passed"] == 3, "TestRunner tracked 3 passed tests")
+t.assert_true(summary["failed"] == 0, "TestRunner tracked 0 failed tests")
+t.assert_true(summary["total"] == 3, "TestRunner tracked 3 total tests")
+
+# Test a failing test to verify fail count tracking
+runner2 = gspec.TestRunner.clone()
+runner2.describe "FailTest" {
+    runner2.it "should fail" {
+        raise ValueError("intentional failure")
+    }
+    runner2.it "should pass" {
+        # This passes
+    }
+}
+summary2 = runner2.summary()
+t.assert_true(summary2["passed"] == 1, "TestRunner tracked 1 passed after failure")
+t.assert_true(summary2["failed"] == 1, "TestRunner tracked 1 failed test")
+t.assert_true(summary2["total"] == 2, "TestRunner tracked 2 total tests")
+
+print("")
+
+# =============================================================================
+# Section 16: TestRunner Edge Cases
+# =============================================================================
+print("--- 16. TestRunner Edge Cases ---")
+
+# Test empty test suite
+runner3 = gspec.TestRunner.clone()
+runner3.describe "EmptySuite" {
+    # No it() blocks
+}
+summary3 = runner3.summary()
+t.assert_true(summary3["total"] == 0, "Empty suite has 0 total tests")
+
+# Test deeply nested contexts
+runner4 = gspec.TestRunner.clone()
+runner4.describe "Level1" {
+    runner4.context "level2" {
+        runner4.context "level3" {
+            runner4.it "deep test" {
+                # Pass silently
+            }
+        }
+    }
+}
+summary4 = runner4.summary()
+t.assert_true(summary4["passed"] == 1, "Deeply nested test tracked correctly")
+
+# Test multiple describe blocks
+runner5 = gspec.TestRunner.clone()
+runner5.describe "Suite1" {
+    runner5.it "test1" {}
+}
+runner5.describe "Suite2" {
+    runner5.it "test2" {}
+}
+runner5.describe "Suite3" {
+    runner5.it "test3" {}
+}
+summary5 = runner5.summary()
+t.assert_true(summary5["passed"] == 3, "Multiple describe blocks accumulate correctly")
+
+# Test that print_summary doesn't crash
+runner6 = gspec.TestRunner.clone()
+runner6.describe "PrintSummaryTest" {
+    runner6.it "passes" {}
+}
+# This would crash if there's an issue
+runner6.print_summary()
+t.assert_true(true, "print_summary() executes without error")
+
+print("")
+
+# =============================================================================
+# Section 17: Auto-assertion it() blocks (Priority 1)
+# =============================================================================
+print("--- 17. Auto-assertion it() Blocks ---")
+
+# Test that it() auto-asserts when block returns expectation result
+runner7 = gspec.TestRunner.clone()
+
+# Test 1: Block returns passing expectation - should pass automatically
+runner7.describe "AutoAssert" {
+    runner7.it "auto-passes when expectation passes" {
+        return expect(5).to_equal(5)
+    }
+}
+summary7 = runner7.summary()
+t.assert_true(summary7["passed"] == 1, "Auto-assert: passing expectation counts as pass")
+t.assert_true(summary7["failed"] == 0, "Auto-assert: passing expectation has no failures")
+
+# Test 2: Block returns failing expectation - should fail automatically
+runner8 = gspec.TestRunner.clone()
+runner8.describe "AutoAssertFail" {
+    runner8.it "auto-fails when expectation fails" {
+        return expect(5).to_equal(10)
+    }
+}
+summary8 = runner8.summary()
+t.assert_true(summary8["passed"] == 0, "Auto-assert: failing expectation counts as fail")
+t.assert_true(summary8["failed"] == 1, "Auto-assert: failing expectation has 1 failure")
+
+# Test 3: Block returns nothing (no return) - should still work
+runner9 = gspec.TestRunner.clone()
+runner9.describe "NoReturn" {
+    runner9.it "passes when block has no return" {
+        x = 5 + 5
+    }
+}
+summary9 = runner9.summary()
+t.assert_true(summary9["passed"] == 1, "Auto-assert: no return still passes")
+
+# Test 4: Block throws exception - should fail (existing behavior)
+runner10 = gspec.TestRunner.clone()
+runner10.describe "ThrowTest" {
+    runner10.it "fails when block throws" {
+        raise ValueError("oops")
+    }
+}
+summary10 = runner10.summary()
+t.assert_true(summary10["failed"] == 1, "Auto-assert: exception still fails")
+
+print("")
+
+# =============================================================================
+# Section 18: to_not() alias for negate() (Priority 2)
+# =============================================================================
+print("--- 18. to_not() Alias ---")
+
+# Test that to_not() works the same as negate()
+# Note: 'not' is a reserved keyword, so we use 'to_not' instead
+result = expect(5).to_not().to_equal(10)
+t.assert_true(result["pass"], "to_not().to_equal: 5 not equal 10")
+
+result = expect(5).to_not().to_equal(5)
+t.assert_false(result["pass"], "to_not().to_equal: 5 equals 5 (negated fails)")
+
+result = expect(false).to_not().to_be_truthy()
+t.assert_true(result["pass"], "to_not().to_be_truthy: false is not truthy")
+
+result = expect([1, 2, 3]).to_not().to_contain(5)
+t.assert_true(result["pass"], "to_not().to_contain: list does not contain 5")
+
+result = expect([1, 2, 3]).to_not().to_be_empty()
+t.assert_true(result["pass"], "to_not().to_be_empty: non-empty list is not empty")
+
+result = expect("hello").to_not().to_be_a("num")
+t.assert_true(result["pass"], "to_not().to_be_a: string is not a num")
+
+print("")
+
+# =============================================================================
+# Section 19: before_each() Support (Priority 3)
+# =============================================================================
+print("--- 19. before_each() Support ---")
+
+# Test that before_each runs before each it() block
+# Use a graph to track state across closures (graphs share state properly)
+graph Counter { value: 0 }
+counter = Counter.clone()
+
+runner11 = gspec.TestRunner.clone()
+
+runner11.describe "BeforeEachTest" {
+    runner11.before_each {
+        counter.value = counter.value + 1
+    }
+
+    runner11.it "first test" {
+        # before_each should have run once
+    }
+
+    runner11.it "second test" {
+        # before_each should have run twice now
+    }
+
+    runner11.it "third test" {
+        # before_each should have run three times now
+    }
+}
+
+t.assert_true(counter.value == 3, "before_each: ran 3 times for 3 tests")
+
+# Test that before_each can set up shared state
+graph Shared { numbers: [] }
+shared = Shared.clone()
+
+runner12 = gspec.TestRunner.clone()
+
+runner12.describe "SharedSetup" {
+    runner12.before_each {
+        shared.numbers = [1, 2, 3, 4, 5]
+    }
+
+    runner12.it "uses shared setup" {
+        return expect(shared.numbers.len()).to_equal(5)
+    }
+
+    runner12.it "modifies shared state" {
+        # Use immutable operation + assignment instead of mutating method
+        shared.numbers = shared.numbers.insert(shared.numbers.length(), 6)
+        return expect(shared.numbers.len()).to_equal(6)
+    }
+
+    runner12.it "setup resets for next test" {
+        return expect(shared.numbers.len()).to_equal(5)
+    }
+}
+
+summary12 = runner12.summary()
+t.assert_true(summary12["passed"] == 3, "before_each: all 3 tests with shared setup passed")
+
+# Test nested describe blocks with before_each
+graph OuterRuns { count: 0 }
+graph InnerRuns { count: 0 }
+outer_runs = OuterRuns.clone()
+inner_runs = InnerRuns.clone()
+
+runner13 = gspec.TestRunner.clone()
+
+runner13.describe "Outer" {
+    runner13.before_each {
+        outer_runs.count = outer_runs.count + 1
+    }
+
+    runner13.it "outer test" {}
+
+    runner13.describe "Inner" {
+        runner13.before_each {
+            inner_runs.count = inner_runs.count + 1
+        }
+
+        runner13.it "inner test 1" {}
+        runner13.it "inner test 2" {}
+    }
+}
+
+t.assert_true(outer_runs.count == 3, "before_each: outer runs for all 3 tests")
+t.assert_true(inner_runs.count == 2, "before_each: inner runs for 2 inner tests only")
+
+print("")
+
+# =============================================================================
+# Section 20: assert() Function (Multi-assertion support)
+# =============================================================================
+print("--- 20. assert() Function ---")
+
+# Test that assert passes silently for passing expectations
+no_error = true
+try {
+    assert(expect(5).to_equal(5))
+    assert(expect("hello").to_have_length(5))
+    assert(expect([1, 2, 3]).to_contain(2))
+} catch as e {
+    no_error = false
+}
+t.assert_true(no_error, "assert: passes silently for passing expectations")
+
+# Test that assert raises on failing expectations
+caught_error = false
+try {
+    assert(expect(5).to_equal(10))
+} catch as e {
+    caught_error = true
+    t.assert_true(e.message().contains("Assertion failed"), "assert: error message contains 'Assertion failed'")
+}
+t.assert_true(caught_error, "assert: raises error on failing expectation")
+
+# Test assert in an it() block with multiple assertions
+runner_assert = gspec.TestRunner.clone()
+runner_assert.describe "AssertTest" {
+    runner_assert.it "multiple assertions pass" {
+        assert(expect(1 + 1).to_equal(2))
+        assert(expect("abc".length()).to_equal(3))
+        assert(expect([1, 2]).to_contain(1))
+    }
+}
+summary_assert = runner_assert.summary()
+t.assert_true(summary_assert["passed"] == 1, "assert: it() with multiple assertions passes")
+
+print("")
+
+# =============================================================================
+# Section 21: after_each() Support
+# =============================================================================
+print("--- 21. after_each() Support ---")
+
+# Test that after_each runs after each test
+graph AfterCounter { value: 0 }
+after_counter = AfterCounter.clone()
+
+runner_after = gspec.TestRunner.clone()
+runner_after.describe "AfterEachTest" {
+    runner_after.after_each {
+        after_counter.value = after_counter.value + 1
+    }
+
+    runner_after.it "first test" {}
+    runner_after.it "second test" {}
+    runner_after.it "third test" {}
+}
+
+t.assert_true(after_counter.value == 3, "after_each: ran 3 times for 3 tests")
+
+# Test that after_each runs even when test fails
+graph AfterFailCounter { value: 0 }
+after_fail_counter = AfterFailCounter.clone()
+
+runner_after_fail = gspec.TestRunner.clone()
+runner_after_fail.describe "AfterEachFailTest" {
+    runner_after_fail.after_each {
+        after_fail_counter.value = after_fail_counter.value + 1
+    }
+
+    runner_after_fail.it "passes" {}
+    runner_after_fail.it "fails" {
+        raise ValueError("intentional")
+    }
+    runner_after_fail.it "also passes" {}
+}
+
+t.assert_true(after_fail_counter.value == 3, "after_each: runs even when test fails")
+
+# Test combined before_each and after_each
+graph BeforeAfterOrder { log: [] }
+order = BeforeAfterOrder.clone()
+
+runner_both = gspec.TestRunner.clone()
+runner_both.describe "BeforeAfterOrder" {
+    runner_both.before_each {
+        order.log = order.log.insert(order.log.length(), "before")
+    }
+    runner_both.after_each {
+        order.log = order.log.insert(order.log.length(), "after")
+    }
+
+    runner_both.it "test" {
+        order.log = order.log.insert(order.log.length(), "test")
+    }
+}
+
+t.assert_true(order.log.length() == 3, "before/after: correct number of entries")
+t.assert_true(order.log[0] == "before", "before/after: before runs first")
+t.assert_true(order.log[1] == "test", "before/after: test runs second")
+t.assert_true(order.log[2] == "after", "before/after: after runs last")
+
+print("")
+
+# =============================================================================
+# Section 22: xit() and pending() Support
+# =============================================================================
+print("--- 22. xit() and pending() Support ---")
+
+# Test xit (skipped test)
+runner_skip = gspec.TestRunner.clone()
+runner_skip.describe "SkipTest" {
+    runner_skip.it "runs" {}
+    runner_skip.xit "skipped" {
+        raise ValueError("should not run")
+    }
+    runner_skip.it "also runs" {}
+}
+summary_skip = runner_skip.summary()
+t.assert_true(summary_skip["passed"] == 2, "xit: 2 tests passed")
+t.assert_true(summary_skip["skipped"] == 1, "xit: 1 test skipped")
+t.assert_true(summary_skip["total"] == 3, "xit: 3 total tests")
+
+# Test pending (placeholder test)
+runner_pending = gspec.TestRunner.clone()
+runner_pending.describe "PendingTest" {
+    runner_pending.it "implemented" {}
+    runner_pending.pending("not yet implemented")
+    runner_pending.pending("another placeholder")
+}
+summary_pending = runner_pending.summary()
+t.assert_true(summary_pending["passed"] == 1, "pending: 1 test passed")
+t.assert_true(summary_pending["skipped"] == 2, "pending: 2 tests pending")
+
+print("")
+
+# =============================================================================
+# Section 23: to_be_close_to() Matcher (Approximate Matching)
+# =============================================================================
+print("--- 23. to_be_close_to() Matcher ---")
+
+# Test basic approximate matching
+result = expect(3.14159).to_be_close_to(3.14, 0.01)
+t.assert_true(result["pass"], "to_be_close_to: 3.14159 is within 0.01 of 3.14")
+
+result = expect(3.14159).to_be_close_to(3.14, 0.001)
+t.assert_false(result["pass"], "to_be_close_to: 3.14159 is not within 0.001 of 3.14")
+
+# Test with exact match
+result = expect(5.0).to_be_close_to(5.0, 0.0001)
+t.assert_true(result["pass"], "to_be_close_to: exact match passes")
+
+# Test with negative numbers
+result = expect(-3.5).to_be_close_to(-3.4, 0.2)
+t.assert_true(result["pass"], "to_be_close_to: negative numbers within tolerance")
+
+result = expect(-3.5).to_be_close_to(-3.4, 0.05)
+t.assert_false(result["pass"], "to_be_close_to: negative numbers outside tolerance")
+
+# Test with zero
+result = expect(0.0001).to_be_close_to(0, 0.001)
+t.assert_true(result["pass"], "to_be_close_to: close to zero")
+
+# Test negation
+result = expect(3.14159).negate().to_be_close_to(3.0, 0.01)
+t.assert_true(result["pass"], "to_be_close_to negated: 3.14159 is NOT within 0.01 of 3.0")
+
+result = expect(3.14159).negate().to_be_close_to(3.14, 0.01)
+t.assert_false(result["pass"], "to_be_close_to negated: 3.14159 IS within 0.01 of 3.14")
+
+print("")
+
+# =============================================================================
+# Section 24: to_be_within().of() Chained Matcher
+# =============================================================================
+print("--- 24. to_be_within().of() Chained Matcher ---")
+
+# Test chained syntax
+result = expect(3.14159).to_be_within(0.01).of(3.14)
+t.assert_true(result["pass"], "to_be_within().of(): 3.14159 is within 0.01 of 3.14")
+
+result = expect(3.14159).to_be_within(0.001).of(3.14)
+t.assert_false(result["pass"], "to_be_within().of(): 3.14159 is not within 0.001 of 3.14")
+
+# Test with integers
+result = expect(100).to_be_within(5).of(98)
+t.assert_true(result["pass"], "to_be_within().of(): 100 is within 5 of 98")
+
+result = expect(100).to_be_within(1).of(98)
+t.assert_false(result["pass"], "to_be_within().of(): 100 is not within 1 of 98")
+
+# Test with negative tolerance handling
+result = expect(10.5).to_be_within(0.5).of(10)
+t.assert_true(result["pass"], "to_be_within().of(): 10.5 is within 0.5 of 10")
+
+print("")
+
+# =============================================================================
+# Summary
+# =============================================================================
+t.summary()

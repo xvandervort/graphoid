@@ -6,7 +6,7 @@ This directory contains 30 carefully curated educational examples demonstrating 
 
 **New to Graphoid?** Start here:
 ```bash
-graphoid samples/01-basics/hello_world.gr
+gr samples/01-basics/hello_world.gr
 ```
 
 Then work through the basics in order:
@@ -20,7 +20,7 @@ Then work through the basics in order:
 ```
 samples/
 ├── 01-basics/          (4 files)  - Start here!
-├── 02-intermediate/    (11 files) - Core features
+├── 02-intermediate/    (13 files) - Core features
 ├── 03-advanced/        (5 files)  - Graph pattern matching
 ├── 04-modules/         (6 files)  - Code organization
 └── 05-stdlib/          (4 files)  - Standard library
@@ -52,7 +52,7 @@ Topics:
 - String methods (`.upper()`, `.len()`, `.replace()`)
 
 ```bash
-graphoid samples/01-basics/hello_world.gr
+gr samples/01-basics/hello_world.gr
 ```
 
 Expected output:
@@ -75,7 +75,7 @@ Topics:
 - Pattern matching basics
 
 ```bash
-graphoid samples/01-basics/functions.gr
+gr samples/01-basics/functions.gr
 ```
 
 ### `collections.gr` ⭐⭐⭐
@@ -88,7 +88,7 @@ Topics:
 - Immutability by default
 
 ```bash
-graphoid samples/01-basics/collections.gr
+gr samples/01-basics/collections.gr
 ```
 
 ### `graphs.gr` ⭐⭐
@@ -101,7 +101,7 @@ Topics:
 - Understanding "everything is a graph"
 
 ```bash
-graphoid samples/01-basics/graphs.gr
+gr samples/01-basics/graphs.gr
 ```
 
 ---
@@ -121,7 +121,7 @@ Topics:
 - Self-managing data structures
 
 ```bash
-graphoid samples/02-intermediate/behaviors.gr
+gr samples/02-intermediate/behaviors.gr
 ```
 
 **Key Concept:** Rules transform values automatically, eliminating repetitive validation code.
@@ -136,7 +136,7 @@ Topics:
 - Binding variables in patterns
 
 ```bash
-graphoid samples/02-intermediate/pattern_matching.gr
+gr samples/02-intermediate/pattern_matching.gr
 ```
 
 ### `string_generators.gr` ⭐⭐⭐
@@ -148,7 +148,7 @@ Topics:
 - Practical uses: bar charts, tables, padding
 
 ```bash
-graphoid samples/02-intermediate/string_generators.gr
+gr samples/02-intermediate/string_generators.gr
 ```
 
 ### `string_mutating_methods.gr` ⭐⭐
@@ -161,7 +161,7 @@ Topics:
 - `.trim()` vs `.trim!()`
 
 ```bash
-graphoid samples/02-intermediate/string_mutating_methods.gr
+gr samples/02-intermediate/string_mutating_methods.gr
 ```
 
 **Key Principle:** If you don't see `!`, nothing mutates.
@@ -176,7 +176,7 @@ Topics:
 - `.find()` - find positions
 
 ```bash
-graphoid samples/02-intermediate/string_pattern_methods.gr
+gr samples/02-intermediate/string_pattern_methods.gr
 ```
 
 ### `number_methods.gr` ⭐⭐
@@ -189,7 +189,7 @@ Topics:
 - Practical examples
 
 ```bash
-graphoid samples/02-intermediate/number_methods.gr
+gr samples/02-intermediate/number_methods.gr
 ```
 
 ### `universal_casting.gr` ⭐⭐⭐
@@ -202,7 +202,7 @@ Topics:
 - Practical examples with conditionals
 
 ```bash
-graphoid samples/02-intermediate/universal_casting.gr
+gr samples/02-intermediate/universal_casting.gr
 ```
 
 ### `integer_mode.gr` ⭐⭐
@@ -215,7 +215,7 @@ Topics:
 - When to use integer mode
 
 ```bash
-graphoid samples/02-intermediate/integer_mode.gr
+gr samples/02-intermediate/integer_mode.gr
 ```
 
 ### `function_overloading.gr` ⭐⭐
@@ -227,7 +227,7 @@ Topics:
 - Module function overloading
 
 ```bash
-graphoid samples/02-intermediate/function_overloading.gr
+gr samples/02-intermediate/function_overloading.gr
 ```
 
 ### `bitwise_operations.gr` ⭐⭐⭐
@@ -241,7 +241,7 @@ Topics:
 - Binary literals (`0b1010`)
 
 ```bash
-graphoid samples/02-intermediate/bitwise_operations.gr
+gr samples/02-intermediate/bitwise_operations.gr
 ```
 
 ### `bitwise_unsigned.gr` ⭐⭐
@@ -254,7 +254,38 @@ Topics:
 - Use cases for unsigned shifts
 
 ```bash
-graphoid samples/02-intermediate/bitwise_unsigned.gr
+gr samples/02-intermediate/bitwise_unsigned.gr
+```
+
+### `graph_equality.gr` ⭐⭐⭐
+**Graph equality and layer comparison**
+
+Topics:
+- Basic equality (`==`) compares data only
+- `equals()` method with options
+- `include:` mode - compare data plus specified layers
+- `only:` mode - compare only specified layers
+- Comparison layers: `:data`, `:rules`, `:rulesets`, `:methods`, `:all`
+- List equality with behaviors
+
+```bash
+gr samples/02-intermediate/graph_equality.gr
+```
+
+**Key Concept:** Graphoid graphs have layered architecture. `==` compares data only; use `equals()` with options for precise layer control.
+
+### `exception_handling.gr` ⭐⭐⭐
+**Try/catch/finally and error handling**
+
+Topics:
+- Basic try/catch blocks
+- Multiple catch clauses by error type
+- Finally blocks
+- Error object methods (`.type()`, `.message()`, `.stack_trace()`)
+- Raising custom errors
+
+```bash
+gr samples/02-intermediate/exception_handling.gr
 ```
 
 ---
@@ -273,7 +304,7 @@ Topics:
 - Node property extraction
 
 ```bash
-graphoid samples/03-advanced/property_projection.gr
+gr samples/03-advanced/property_projection.gr
 ```
 
 **Prerequisites:** Understanding of graphs and pattern matching.
@@ -288,7 +319,7 @@ Topics:
 - Conflict resolution strategies
 
 ```bash
-graphoid samples/03-advanced/subgraph_operations.gr
+gr samples/03-advanced/subgraph_operations.gr
 ```
 
 ### `recommendation_system.gr` ⭐⭐
@@ -301,7 +332,7 @@ Topics:
 - Social network algorithms
 
 ```bash
-graphoid samples/03-advanced/recommendation_system.gr
+gr samples/03-advanced/recommendation_system.gr
 ```
 
 ### `social_network_patterns.gr` ⭐⭐
@@ -314,7 +345,7 @@ Topics:
 - Result projection
 
 ```bash
-graphoid samples/03-advanced/social_network_patterns.gr
+gr samples/03-advanced/social_network_patterns.gr
 ```
 
 ### `variable_length_paths.gr` ⭐⭐
@@ -327,7 +358,7 @@ Topics:
 - Reachability queries
 
 ```bash
-graphoid samples/03-advanced/variable_length_paths.gr
+gr samples/03-advanced/variable_length_paths.gr
 ```
 
 ---
@@ -346,7 +377,7 @@ Topics:
 - Demonstrates: `app → service → utils`
 
 ```bash
-graphoid samples/04-modules/app_main.gr
+gr samples/04-modules/app_main.gr
 ```
 
 **Key Example:** Shows how modules can import other modules, creating a dependency chain.
@@ -361,7 +392,7 @@ Topics:
 - API design
 
 ```bash
-graphoid samples/04-modules/priv_keyword.gr
+gr samples/04-modules/priv_keyword.gr
 ```
 
 **Best Practice:** Hide implementation details, expose clean APIs.
@@ -376,7 +407,7 @@ Topics:
 - Practical examples
 
 ```bash
-graphoid samples/04-modules/load_vs_import.gr
+gr samples/04-modules/load_vs_import.gr
 ```
 
 **Critical Distinction:**
@@ -407,7 +438,7 @@ Topics:
 - Physical constants: c (speed of light), G (gravitational), h (Planck)
 
 ```bash
-graphoid samples/05-stdlib/constants.gr
+gr samples/05-stdlib/constants.gr
 ```
 
 ### `random.gr` ⭐⭐⭐
@@ -426,7 +457,7 @@ Topics:
 - `random.uuid()` - generate UUIDs
 
 ```bash
-graphoid samples/05-stdlib/random.gr
+gr samples/05-stdlib/random.gr
 ```
 
 ### `approx_demo.gr` ⭐⭐⭐
@@ -440,7 +471,7 @@ Topics:
 - Floating-point safety
 
 ```bash
-graphoid samples/05-stdlib/approx_demo.gr
+gr samples/05-stdlib/approx_demo.gr
 ```
 
 **Use Case:** Comparing floating-point numbers safely.
@@ -455,7 +486,7 @@ Topics:
 - Practical examples
 
 ```bash
-graphoid samples/05-stdlib/time_type.gr
+gr samples/05-stdlib/time_type.gr
 ```
 
 ---
@@ -465,28 +496,28 @@ graphoid samples/05-stdlib/time_type.gr
 ### Basic Execution
 ```bash
 # From rust/ directory
-graphoid samples/01-basics/hello_world.gr
+gr samples/01-basics/hello_world.gr
 ```
 
 ### With Stdlib (if needed)
 ```bash
 # Set stdlib path
-graphoid samples/05-stdlib/random.gr
+gr samples/05-stdlib/random.gr
 ```
 
 ### Release Mode (faster)
 If running from source without installing:
 ```bash
-cargo run --release -- samples/02-intermediate/behaviors.gr
+gr samples/02-intermediate/behaviors.gr
 ```
-If installed, `graphoid` already runs at release speed.
+If installed, `gr` already runs at release speed.
 
 ### Run Multiple Examples
 ```bash
 # Test all basics
 for f in samples/01-basics/*.gr; do
     echo "Running $f..."
-    graphoid "$f"
+    gr "$f"
 done
 ```
 
@@ -554,7 +585,7 @@ print("Key takeaway: [main point]")
 
 2. Add file to directory
 3. Update this README with description
-4. Test that it runs: `graphoid samples/XX-category/your_example.gr`
+4. Test that it runs: `gr samples/XX-category/your_example.gr`
 5. Ensure it produces clear, educational output
 
 ---
@@ -577,7 +608,7 @@ import "./module_name"
 
 Some examples require the stdlib:
 ```bash
-graphoid samples/05-stdlib/random.gr
+gr samples/05-stdlib/random.gr
 ```
 
 ### Example Runs but Output is Unexpected
@@ -588,9 +619,9 @@ Check if the example uses newer features. The language is in alpha, so some exam
 
 ## Example Statistics
 
-- **Total Examples:** 30 files
+- **Total Examples:** 32 files
 - **Basics:** 4 files (~20 minutes)
-- **Intermediate:** 11 files (~2-3 hours)
+- **Intermediate:** 13 files (~2-3 hours)
 - **Advanced:** 5 files (~1-2 hours)
 - **Modules:** 6 files (~1 hour)
 - **Stdlib:** 4 files (~1 hour)

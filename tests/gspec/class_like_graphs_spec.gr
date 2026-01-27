@@ -1,0 +1,511 @@
+# class_like_graphs_spec.gr - gspec tests for samples/03-advanced/class_like_graphs.gr
+#                            and related CLG samples (inheritance, privacy, static, super, type_checking)
+#
+# Run with: gr spec tests/gspec/class_like_graphs_spec.gr
+
+describe "Class-Like Graphs" {
+
+    describe "basic graph declaration" {
+        it "creates a graph with data nodes" {
+            graph Point {
+                x: 10
+                y: 20
+            }
+            assert(expect(Point.x).to_equal(10))
+            assert(expect(Point.y).to_equal(20))
+        }
+
+        it "defines methods on graphs" {
+            graph Counter {
+                count: 0
+
+                fn increment() {
+                    count = count + 1
+                }
+
+                fn value() {
+                    return count
+                }
+            }
+            Counter.increment()
+            assert(expect(Counter.value()).to_equal(1))
+        }
+
+        it "supports method chaining with return self" {
+            graph StringConcatBuilder {
+                result: ""
+
+                fn add(s) {
+                    result = result + s
+                    return self
+                }
+
+                fn build() {
+                    return result
+                }
+            }
+            b = StringConcatBuilder.clone()
+            b = b.add("a").add("b").add("c")
+            assert(expect(b.build()).to_equal("abc"))
+        }
+    }
+
+    describe "clone and new pattern" {
+        it "clones a graph to create an instance" {
+            graph Template {
+                value: 0
+            }
+            instance = Template.clone()
+            instance.value = 42
+            assert(expect(instance.value).to_equal(42))
+            assert(expect(Template.value).to_equal(0))
+        }
+
+        it "implements factory with new() method" {
+            graph Counter {
+                count: 0
+
+                fn new(initial) {
+                    instance = self.clone()
+                    instance.count = initial
+                    return instance
+                }
+
+                fn value() {
+                    return count
+                }
+            }
+            c1 = Counter.new(100)
+            c2 = Counter.new(200)
+            assert(expect(c1.value()).to_equal(100))
+            assert(expect(c2.value()).to_equal(200))
+            assert(expect(Counter.value()).to_equal(0))
+        }
+
+        it "instances are independent" {
+            graph Box {
+                contents: 0
+
+                fn new(v) {
+                    b = self.clone()
+                    b.contents = v
+                    return b
+                }
+
+                fn put(v) {
+                    contents = v
+                }
+
+                fn value() {
+                    return contents
+                }
+            }
+            a = Box.new(1)
+            b = Box.new(2)
+            a.put(100)
+            assert(expect(a.value()).to_equal(100))
+            assert(expect(b.value()).to_equal(2))
+        }
+    }
+
+    describe "inheritance" {
+        it "inherits data nodes from parent" {
+            graph Parent {
+                name: "parent"
+                value: 10
+            }
+
+            graph Child from Parent {
+                extra: 20
+            }
+            assert(expect(Child.name).to_equal("parent"))
+            assert(expect(Child.value).to_equal(10))
+            assert(expect(Child.extra).to_equal(20))
+        }
+
+        it "overrides parent data nodes" {
+            graph Animal {
+                sound: "..."
+            }
+
+            graph Dog from Animal {
+                sound: "Woof!"
+            }
+            assert(expect(Animal.sound).to_equal("..."))
+            assert(expect(Dog.sound).to_equal("Woof!"))
+        }
+
+        it "inherits methods from parent" {
+            graph Base {
+                value: 5
+
+                fn get_value() {
+                    return value
+                }
+            }
+
+            graph Derived from Base {
+                value: 10
+            }
+            assert(expect(Derived.get_value()).to_equal(10))
+        }
+
+        it "overrides methods" {
+            graph Base {
+                fn describe() {
+                    return "base"
+                }
+            }
+
+            graph Derived from Base {
+                fn describe() {
+                    return "derived"
+                }
+            }
+            assert(expect(Base.describe()).to_equal("base"))
+            assert(expect(Derived.describe()).to_equal("derived"))
+        }
+
+        it "supports chained inheritance" {
+            graph A {
+                a_val: 1
+            }
+
+            graph B from A {
+                b_val: 2
+            }
+
+            graph C from B {
+                c_val: 3
+            }
+            assert(expect(C.a_val).to_equal(1))
+            assert(expect(C.b_val).to_equal(2))
+            assert(expect(C.c_val).to_equal(3))
+        }
+
+        it "child changes do not affect parent" {
+            graph Parent {
+                data: 100
+            }
+
+            graph Child from Parent {
+                data: 200
+            }
+            assert(expect(Parent.data).to_equal(100))
+            assert(expect(Child.data).to_equal(200))
+        }
+    }
+
+    describe "private methods" {
+        it "calls private method internally" {
+            graph Validator {
+                fn _internal_check(x) {
+                    return x > 0
+                }
+
+                fn validate(x) {
+                    return self._internal_check(x)
+                }
+            }
+            assert(expect(Validator.validate(5)).to_be_truthy())
+            assert(expect(Validator.validate(-1)).to_be_falsy())
+        }
+
+        it "private methods can call other private methods" {
+            graph Processor {
+                fn _step1(x) {
+                    return x * 2
+                }
+
+                fn _step2(x) {
+                    return self._step1(x) + 1
+                }
+
+                fn process(x) {
+                    return self._step2(x)
+                }
+            }
+            assert(expect(Processor.process(5)).to_equal(11))
+        }
+
+        it "inherited graphs can use parent private methods through public" {
+            graph Base {
+                multiplier: 10
+
+                fn _secret() {
+                    return multiplier
+                }
+
+                fn reveal() {
+                    return self._secret()
+                }
+            }
+
+            graph Child from Base {
+                multiplier: 20
+            }
+            assert(expect(Base.reveal()).to_equal(10))
+            assert(expect(Child.reveal()).to_equal(20))
+        }
+    }
+
+    describe "static methods" {
+        it "defines and calls static methods" {
+            graph Utils {
+                static fn add(a, b) {
+                    return a + b
+                }
+            }
+            assert(expect(Utils.add(3, 4)).to_equal(7))
+        }
+
+        it "static methods work as factories" {
+            graph Point {
+                x: 0
+                y: 0
+
+                static fn create(px, py) {
+                    p = Point.clone()
+                    p.x = px
+                    p.y = py
+                    return p
+                }
+            }
+            pt = Point.create(10, 20)
+            assert(expect(pt.x).to_equal(10))
+            assert(expect(pt.y).to_equal(20))
+        }
+
+        it "static methods can modify class-level data" {
+            graph Counter {
+                _count: 0
+
+                static fn create() {
+                    Counter._count = Counter._count + 1
+                    return Counter.clone()
+                }
+
+                static fn get_count() {
+                    return Counter._count
+                }
+            }
+            Counter.create()
+            Counter.create()
+            Counter.create()
+            assert(expect(Counter.get_count()).to_equal(3))
+        }
+
+        it "inherited graphs can override static methods" {
+            graph Shape {
+                static fn describe() {
+                    return "shape"
+                }
+            }
+
+            graph Circle from Shape {
+                static fn describe() {
+                    return "circle"
+                }
+            }
+            assert(expect(Shape.describe()).to_equal("shape"))
+            assert(expect(Circle.describe()).to_equal("circle"))
+        }
+    }
+
+    describe "super calls" {
+        it "calls parent method with super" {
+            graph Parent {
+                fn greet() {
+                    return "Hello"
+                }
+            }
+
+            graph Child from Parent {
+                fn greet() {
+                    return super.greet() + " World"
+                }
+            }
+            assert(expect(Child.greet()).to_equal("Hello World"))
+        }
+
+        it "super with arguments" {
+            graph Base {
+                fn compute(x, y) {
+                    return x + y
+                }
+            }
+
+            graph Extended from Base {
+                fn compute(x, y) {
+                    return super.compute(x, y) * 2
+                }
+            }
+            assert(expect(Extended.compute(3, 4)).to_equal(14))
+        }
+
+        it "super accesses child data nodes" {
+            graph Vehicle {
+                speed: 0
+
+                fn describe() {
+                    return "speed: " + speed.to_string()
+                }
+            }
+
+            graph Car from Vehicle {
+                speed: 60
+
+                fn describe() {
+                    return "Car " + super.describe()
+                }
+            }
+            assert(expect(Car.describe()).to_equal("Car speed: 60"))
+        }
+    }
+
+    describe "type checking" {
+        it "type_of returns graph name" {
+            graph Animal {}
+            assert(expect(Animal.type_of()).to_equal("Animal"))
+        }
+
+        it "clones preserve type_of" {
+            graph Dog {}
+            fido = Dog.clone()
+            assert(expect(fido.type_of()).to_equal("Dog"))
+        }
+
+        it "is_a with string returns true for exact match" {
+            graph Cat {}
+            whiskers = Cat.clone()
+            assert(expect(whiskers.is_a("Cat")).to_be_truthy())
+        }
+
+        it "is_a with string returns false for non-match" {
+            graph Cat {}
+            whiskers = Cat.clone()
+            assert(expect(whiskers.is_a("Dog")).to_be_falsy())
+        }
+
+        it "is_a checks inheritance chain" {
+            graph Animal {}
+
+            graph Dog from Animal {}
+
+            fido = Dog.clone()
+            assert(expect(fido.is_a("Dog")).to_be_truthy())
+            assert(expect(fido.is_a("Animal")).to_be_truthy())
+        }
+
+        it "is_a works with graph reference" {
+            graph Animal {}
+
+            graph Cat from Animal {}
+
+            whiskers = Cat.clone()
+            assert(expect(whiskers.is_a(Cat)).to_be_truthy())
+            assert(expect(whiskers.is_a(Animal)).to_be_truthy())
+        }
+
+        it "multi-level inheritance is_a" {
+            graph A {}
+
+            graph B from A {}
+
+            graph C from B {}
+
+            c = C.clone()
+            assert(expect(c.is_a("C")).to_be_truthy())
+            assert(expect(c.is_a("B")).to_be_truthy())
+            assert(expect(c.is_a("A")).to_be_truthy())
+        }
+    }
+
+    describe "practical examples" {
+        it "counter with increment and decrement" {
+            graph Counter {
+                count: 0
+
+                fn new(initial) {
+                    c = self.clone()
+                    c.count = initial
+                    return c
+                }
+
+                fn increment() {
+                    count = count + 1
+                    return self
+                }
+
+                fn decrement() {
+                    count = count - 1
+                    return self
+                }
+
+                fn value() {
+                    return count
+                }
+            }
+            c = Counter.new(10)
+            c.increment()
+            c.increment()
+            c.decrement()
+            assert(expect(c.value()).to_equal(11))
+        }
+
+        it "shape hierarchy with area calculation" {
+            graph Shape {
+                fn area() {
+                    return 0
+                }
+            }
+
+            graph Rectangle from Shape {
+                width: 0
+                height: 0
+
+                fn new(w, h) {
+                    r = self.clone()
+                    r.width = w
+                    r.height = h
+                    return r
+                }
+
+                fn area() {
+                    return width * height
+                }
+            }
+            rect = Rectangle.new(10, 5)
+            assert(expect(rect.area()).to_equal(50))
+        }
+
+        it "type-based dispatch" {
+            graph Animal {
+                name: "unknown"
+            }
+
+            graph Dog from Animal {
+                name: "dog"
+            }
+
+            graph Cat from Animal {
+                name: "cat"
+            }
+
+            fn get_sound(animal) {
+                if animal.is_a("Dog") {
+                    return "woof"
+                }
+                if animal.is_a("Cat") {
+                    return "meow"
+                }
+                return "..."
+            }
+
+            d = Dog.clone()
+            c = Cat.clone()
+            assert(expect(get_sound(d)).to_equal("woof"))
+            assert(expect(get_sound(c)).to_equal("meow"))
+        }
+    }
+}

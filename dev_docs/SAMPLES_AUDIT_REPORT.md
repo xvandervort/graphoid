@@ -456,10 +456,10 @@ Start with the basics:
 
 ```bash
 # From rust/ directory
-cargo run --release -- samples/01-basics/hello_world.gr
+gr samples/01-basics/hello_world.gr
 
-# With stdlib path
-GRAPHOID_STDLIB_PATH=../stdlib cargo run -- samples/02-intermediate/behaviors.gr
+# Or run another sample
+gr samples/02-intermediate/behaviors.gr
 ```
 
 ## File Descriptions

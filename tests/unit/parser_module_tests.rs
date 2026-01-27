@@ -1,6 +1,6 @@
 use graphoid::lexer::Lexer;
 use graphoid::parser::Parser;
-use graphoid::ast::Stmt;
+use graphoid::ast::{Stmt, Expr, LiteralValue};
 
 #[test]
 fn test_parse_load_statement() {
@@ -13,7 +13,13 @@ fn test_parse_load_statement() {
     assert_eq!(program.statements.len(), 1);
     match &program.statements[0] {
         Stmt::Load { path, .. } => {
-            assert_eq!(path, "config.gr");
+            // path is now an Expr, check it's a string literal
+            match path {
+                Expr::Literal { value, .. } => {
+                    assert_eq!(*value, LiteralValue::String("config.gr".to_string()));
+                }
+                _ => panic!("Expected string literal path, got {:?}", path),
+            }
         }
         _ => panic!("Expected Load statement, got {:?}", program.statements[0]),
     }
@@ -29,21 +35,37 @@ fn test_parse_load_with_relative_path() {
 
     match &program.statements[0] {
         Stmt::Load { path, .. } => {
-            assert_eq!(path, "./utils/helpers.gr");
+            match path {
+                Expr::Literal { value, .. } => {
+                    assert_eq!(*value, LiteralValue::String("./utils/helpers.gr".to_string()));
+                }
+                _ => panic!("Expected string literal path, got {:?}", path),
+            }
         }
         _ => panic!("Expected Load statement"),
     }
 }
 
 #[test]
-fn test_load_requires_string() {
-    let source = "load config";  // Missing quotes
+fn test_load_with_variable() {
+    // load now accepts expressions, including variables
+    let source = "load config";
     let mut lexer = Lexer::new(source);
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
-    let result = parser.parse();
+    let program = parser.parse().unwrap();
 
-    assert!(result.is_err());  // Should fail to parse
+    match &program.statements[0] {
+        Stmt::Load { path, .. } => {
+            match path {
+                Expr::Variable { name, .. } => {
+                    assert_eq!(name, "config");
+                }
+                _ => panic!("Expected variable, got {:?}", path),
+            }
+        }
+        _ => panic!("Expected Load statement"),
+    }
 }
 
 #[test]

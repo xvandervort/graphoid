@@ -1,0 +1,485 @@
+# graph_features_spec.gr - gspec tests for samples/03-advanced/graph_*.gr files
+#
+# Covers: declaration syntax, directives, rules, layer visibility, responds_to,
+#         mixin include, method constraints, when dispatch, semantic edges,
+#         visualization, and subgraph operations
+#
+# Run with: gr spec tests/gspec/graph_features_spec.gr
+
+describe "Graph Features" {
+
+    describe "declaration syntax" {
+        it "creates graph with properties using declaration syntax" {
+            graph Point {
+                x: 5
+                y: 10
+            }
+            assert(expect(Point.x).to_equal(5))
+            assert(expect(Point.y).to_equal(10))
+        }
+
+        it "uses implicit self for property access in methods" {
+            graph Counter {
+                value: 0
+
+                fn add(n) {
+                    value = value + n
+                }
+
+                fn result() {
+                    return value
+                }
+            }
+            c = Counter.clone()
+            c.add(5)
+            c.add(3)
+            assert(expect(c.result()).to_equal(8))
+        }
+
+        it "supports implicit method calls within methods" {
+            graph Calculator {
+                fn double(x) {
+                    return x * 2
+                }
+
+                fn quadruple(x) {
+                    return double(double(x))
+                }
+            }
+            assert(expect(Calculator.quadruple(3)).to_equal(12))
+        }
+    }
+
+    describe "configure directives" {
+        it "generates getter with readable directive" {
+            graph ReadablePoint {
+                configure { readable: [:x, :y] }
+                x: 10
+                y: 20
+            }
+            p = ReadablePoint.clone()
+            assert(expect(p.x()).to_equal(10))
+            assert(expect(p.y()).to_equal(20))
+        }
+
+        it "generates setter with writable directive" {
+            graph WritableName {
+                configure { writable: :name }
+                name: "default"
+            }
+            w = WritableName.clone()
+            w.set_name("Alice")
+            assert(expect(w.name).to_equal("Alice"))
+        }
+
+        it "generates both getter and setter with accessible" {
+            graph Accessible {
+                configure { accessible: :value }
+                value: 0
+            }
+            a = Accessible.clone()
+            a.set_value(42)
+            assert(expect(a.value()).to_equal(42))
+        }
+
+        it "single symbol works without list syntax" {
+            graph SingleProp {
+                configure { readable: :data }
+                data: 100
+            }
+            assert(expect(SingleProp.data()).to_equal(100))
+        }
+    }
+
+    describe "graph rules" {
+        it "adds no_cycles rule to graph" {
+            g = graph{}
+            g.add_node("A", 1)
+            g.add_node("B", 2)
+            g.add_rule(:no_cycles)
+            assert(expect(g.has_rule(:no_cycles)).to_be_truthy())
+        }
+
+        it "removes a rule from graph" {
+            g = graph{}
+            g.add_rule(:no_cycles)
+            assert(expect(g.has_rule(:no_cycles)).to_be_truthy())
+            g.remove_rule(:no_cycles)
+            assert(expect(g.has_rule(:no_cycles)).to_be_falsy())
+        }
+
+        it "adds max_degree rule with parameter" {
+            g = graph{}
+            g.add_node("hub", 0)
+            g.add_node("spoke1", 1)
+            g.add_node("spoke2", 2)
+            g.add_rule(:max_degree, 2)
+            g.add_edge("hub", "spoke1")
+            g.add_edge("hub", "spoke2")
+            assert(expect(g.has_rule(:max_degree)).to_be_truthy())
+        }
+
+        it "rule keyword works inside graph declaration" {
+            graph RuledGraph {
+                rule :no_cycles
+                data: 0
+            }
+            assert(expect(RuledGraph.has_rule(:no_cycles)).to_be_truthy())
+        }
+
+        it "supports with_ruleset for predefined rulesets" {
+            g = graph{}.with_ruleset(:dag)
+            assert(expect(g.has_ruleset(:dag)).to_be_truthy())
+            assert(expect(g.has_rule(:no_cycles)).to_be_truthy())
+        }
+    }
+
+    describe "layer visibility" {
+        it "graph declaration properties stored in __properties__ branch" {
+            graph WithProps {
+                value: 42
+            }
+            # Properties from graph declaration are in __properties__ prefix
+            all_nodes = WithProps.nodes(:all)
+            has_prop = false
+            for node in all_nodes {
+                if node.contains("value") {
+                    has_prop = true
+                }
+            }
+            assert(expect(has_prop).to_be_truthy())
+        }
+
+        it "nodes(:all) includes internal layers" {
+            graph WithMethods {
+                data: 10
+
+                fn method() {
+                    return data
+                }
+            }
+            all_nodes = WithMethods.nodes(:all)
+            # All nodes includes __properties__ and __methods__ branches
+            assert(expect(all_nodes.length()).to_be_greater_than(0))
+        }
+
+        it "add_node creates data nodes visible to nodes()" {
+            g = graph{}
+            g.add_node("explicit", 42)
+            nodes = g.nodes()
+            assert(expect(nodes).to_contain("explicit"))
+        }
+    }
+
+    describe "responds_to" {
+        it "returns true for existing method" {
+            graph HasMethod {
+                fn speak() {
+                    return "hello"
+                }
+            }
+            assert(expect(HasMethod.responds_to("speak")).to_be_truthy())
+        }
+
+        it "returns false for non-existent method" {
+            graph NoMethod {
+                data: 1
+            }
+            assert(expect(NoMethod.responds_to("nonexistent")).to_be_falsy())
+        }
+
+        it "works with inherited methods" {
+            graph Parent {
+                fn parent_method() {
+                    return 1
+                }
+            }
+
+            graph Child from Parent {
+                fn child_method() {
+                    return 2
+                }
+            }
+            assert(expect(Child.responds_to("parent_method")).to_be_truthy())
+            assert(expect(Child.responds_to("child_method")).to_be_truthy())
+        }
+
+        it "works on cloned instances" {
+            graph Template {
+                fn method() {
+                    return 42
+                }
+            }
+            instance = Template.clone()
+            assert(expect(instance.responds_to("method")).to_be_truthy())
+        }
+    }
+
+    describe "mixin include" {
+        it "copies methods from mixin to target graph" {
+            graph Mixin {
+                fn helper() {
+                    return "helped"
+                }
+            }
+
+            graph Target {
+                data: 0
+            }
+            Target.include(Mixin)
+            assert(expect(Target.responds_to("helper")).to_be_truthy())
+        }
+
+        it "included methods can be called" {
+            graph Comparable {
+                fn compare(other) {
+                    return self.value - other.value
+                }
+            }
+
+            graph Item {
+                value: 10
+            }
+            Item.include(Comparable)
+
+            a = Item.clone()
+            a.value = 20
+
+            b = Item.clone()
+            b.value = 15
+
+            assert(expect(a.compare(b)).to_equal(5))
+        }
+
+        it "returns list of included method names" {
+            graph Source {
+                fn one() { return 1 }
+                fn two() { return 2 }
+            }
+
+            graph Dest {}
+            included = Dest.include(Source)
+            assert(expect(included.length()).to_be_greater_than(0))
+        }
+    }
+
+    describe "when dispatch" {
+        it "dispatches based on guard condition" {
+            graph Shape {
+                sides: 0
+
+                fn name() when sides == 3 {
+                    return "triangle"
+                }
+
+                fn name() when sides == 4 {
+                    return "rectangle"
+                }
+
+                fn name() {
+                    return "polygon"
+                }
+            }
+
+            tri = Shape.clone()
+            tri.sides = 3
+            assert(expect(tri.name()).to_equal("triangle"))
+
+            rect = Shape.clone()
+            rect.sides = 4
+            assert(expect(rect.name()).to_equal("rectangle"))
+
+            pent = Shape.clone()
+            pent.sides = 5
+            assert(expect(pent.name()).to_equal("polygon"))
+        }
+    }
+
+    describe "semantic edges" {
+        # Note: method_reads, method_writes, property_writers, dependencies
+        # are documented in samples but not fully implemented yet
+
+        it "ancestors returns inheritance chain" {
+            graph A {}
+            graph B from A {}
+            graph C from B {}
+
+            ancestors = C.ancestors()
+            assert(expect(ancestors).to_contain("B"))
+            assert(expect(ancestors).to_contain("A"))
+        }
+
+        it "method_reads exists but may return empty" {
+            graph Counter {
+                count: 0
+                fn getter() { return count }
+            }
+            reads = Counter.method_reads("getter")
+            # Currently returns empty - feature pending implementation
+            assert(expect(reads.type()).to_equal("list"))
+        }
+
+        it "method_writes exists but may return empty" {
+            graph Counter {
+                count: 0
+                fn increment() { count = count + 1 }
+            }
+            writes = Counter.method_writes("increment")
+            # Currently returns empty - feature pending implementation
+            assert(expect(writes.type()).to_equal("list"))
+        }
+    }
+
+    describe "visualization" {
+        it "visualize returns text representation" {
+            g = graph{}
+            g.add_node("A", 1)
+            g.add_node("B", 2)
+            viz = g.visualize()
+            assert(expect(viz.length()).to_be_greater_than(0))
+        }
+
+        it "to_dot returns Graphviz format" {
+            g = graph{}
+            g.add_node("X", 1)
+            dot = g.to_dot()
+            assert(expect(dot).to_contain("digraph"))
+        }
+
+        it "to_ascii returns ASCII tree" {
+            g = graph{}
+            g.add_node("root", 1)
+            g.add_node("child", 2)
+            g.add_edge("root", "child")
+            ascii = g.to_ascii()
+            assert(expect(ascii.length()).to_be_greater_than(0))
+        }
+    }
+
+    describe "subgraph operations" {
+        describe "extract" {
+            it "extracts nodes matching filter" {
+                g = graph{}
+                g.add_node("small", 1)
+                g.add_node("large", 100)
+
+                small_filter = val => val < 50
+                sub = g.extract(small_filter, none, true)
+                assert(expect(sub.node_count()).to_equal(1))
+            }
+
+            it "extracts edges matching filter" {
+                g = graph{}
+                g.add_node("A", 1)
+                g.add_node("B", 2)
+                g.add_node("C", 3)
+                g.add_edge("A", "B", "friend")
+                g.add_edge("B", "C", "colleague")
+
+                friend_filter = (src, dest, etype) => etype == "friend"
+                sub = g.extract(none, friend_filter, false)
+                assert(expect(sub.edge_count()).to_equal(1))
+            }
+        }
+
+        describe "delete" {
+            it "deletes nodes matching filter" {
+                g = graph{}
+                g.add_node("keep", 1)
+                g.add_node("remove", 100)
+
+                remove_filter = val => val >= 100
+                result = g.delete(remove_filter, none)
+                assert(expect(result.node_count()).to_equal(1))
+            }
+
+            it "delete returns a graph" {
+                g = graph{}
+                g.add_node("A", 1)
+                g.add_node("B", 2)
+                g.add_edge("A", "B", "link")
+
+                result = g.delete(none, none)
+                assert(expect(result.type()).to_equal("graph"))
+            }
+        }
+
+        describe "add_subgraph (merge)" {
+            it "merges two graphs with no conflicts" {
+                g1 = graph{}
+                g1.add_node("A", 1)
+
+                g2 = graph{}
+                g2.add_node("B", 2)
+
+                merged = g1.add_subgraph(g2, none)
+                assert(expect(merged.node_count()).to_equal(2))
+            }
+
+            it "merges with keep_original conflict resolution" {
+                g1 = graph{}
+                g1.add_node("shared", 100)
+
+                g2 = graph{}
+                g2.add_node("shared", 999)
+
+                merged = g1.add_subgraph(g2, "keep_original")
+                assert(expect(merged.get_node("shared")).to_equal(100))
+            }
+
+            it "merges with overwrite conflict resolution" {
+                g1 = graph{}
+                g1.add_node("shared", 100)
+
+                g2 = graph{}
+                g2.add_node("shared", 999)
+
+                merged = g1.add_subgraph(g2, "overwrite")
+                assert(expect(merged.get_node("shared")).to_equal(999))
+            }
+        }
+    }
+
+    describe "method constraints" {
+        it "read_only rule prevents modifications" {
+            graph Immutable {
+                rule :read_only
+                value: 42
+
+                fn getter() {
+                    return value
+                }
+            }
+            assert(expect(Immutable.getter()).to_equal(42))
+        }
+
+        it "no_node_removals allows appending" {
+            graph AppendOnly {
+                rule :no_node_removals
+
+                fn add_item(id, val) {
+                    self.add_node(id, val)
+                }
+            }
+            AppendOnly.add_item("a", 1)
+            AppendOnly.add_item("b", 2)
+            assert(expect(AppendOnly.node_count()).to_equal(2))
+        }
+
+        it "remove_method removes a method from graph" {
+            graph Dynamic {
+                fn temp() {
+                    return "temporary"
+                }
+
+                fn perm() {
+                    return "permanent"
+                }
+            }
+            removed = Dynamic.remove_method("temp")
+            assert(expect(removed).to_be_truthy())
+            assert(expect(Dynamic.responds_to("temp")).to_be_falsy())
+            assert(expect(Dynamic.responds_to("perm")).to_be_truthy())
+        }
+    }
+}

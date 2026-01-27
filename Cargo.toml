@@ -68,7 +68,7 @@ default = []
 profiling = ["criterion"]
 
 [[bin]]
-name = "graphoid"
+name = "gr"
 path = "src/main.rs"
 
 [lib]
