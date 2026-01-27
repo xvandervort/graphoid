@@ -1,0 +1,195 @@
+# Integration tests for try/catch/finally exception handling
+# Tests Phase 14 exception handling feature
+
+print("=== Exception Handling Tests ===")
+print("")
+
+# Track test results
+passed = 0
+failed = 0
+
+fn assert_equal(actual, expected, test_name) {
+    if actual == expected {
+        print("  PASS: " + test_name)
+        return true
+    } else {
+        print("  FAIL: " + test_name)
+        print("    Expected: " + expected.to_string())
+        print("    Actual: " + actual.to_string())
+        return false
+    }
+}
+
+# --- Test 1: Basic try/catch ---
+print("Test 1: Basic try/catch")
+caught = false
+try {
+    x = 10 / 0
+} catch as e {
+    caught = true
+}
+if assert_equal(caught, true, "Division by zero caught") {
+    passed = passed + 1
+} else {
+    failed = failed + 1
+}
+
+# --- Test 2: Catch specific error type ---
+print("")
+print("Test 2: Catch specific error type")
+caught_type = ""
+try {
+    raise ValueError("test error")
+} catch ValueError as e {
+    caught_type = e.type()
+}
+if assert_equal(caught_type, "ValueError", "ValueError caught by type") {
+    passed = passed + 1
+} else {
+    failed = failed + 1
+}
+
+# --- Test 3: Multiple catch clauses ---
+print("")
+print("Test 3: Multiple catch clauses")
+which_caught = ""
+try {
+    raise TypeError("type problem")
+} catch ValueError as e {
+    which_caught = "ValueError"
+} catch TypeError as e {
+    which_caught = "TypeError"
+} catch as e {
+    which_caught = "other"
+}
+if assert_equal(which_caught, "TypeError", "Correct catch clause selected") {
+    passed = passed + 1
+} else {
+    failed = failed + 1
+}
+
+# --- Test 4: Catch-all clause ---
+print("")
+print("Test 4: Catch-all clause")
+caught_any = false
+try {
+    raise NetworkError("connection failed")
+} catch as e {
+    caught_any = true
+}
+if assert_equal(caught_any, true, "Catch-all catches NetworkError") {
+    passed = passed + 1
+} else {
+    failed = failed + 1
+}
+
+# --- Test 5: Finally block always runs (no error) ---
+print("")
+print("Test 5: Finally block (no error)")
+finally_ran = false
+try {
+    x = 5 + 5
+} finally {
+    finally_ran = true
+}
+if assert_equal(finally_ran, true, "Finally runs when no error") {
+    passed = passed + 1
+} else {
+    failed = failed + 1
+}
+
+# --- Test 6: Finally block runs after catch ---
+print("")
+print("Test 6: Finally block (after catch)")
+catch_ran = false
+finally_ran = false
+try {
+    raise ValueError("oops")
+} catch ValueError as e {
+    catch_ran = true
+} finally {
+    finally_ran = true
+}
+if assert_equal(catch_ran, true, "Catch ran") and assert_equal(finally_ran, true, "Finally also ran") {
+    passed = passed + 1
+} else {
+    failed = failed + 1
+}
+
+# --- Test 7: Error message extraction ---
+print("")
+print("Test 7: Error message extraction")
+error_msg = ""
+try {
+    raise ValueError("custom message here")
+} catch ValueError as e {
+    error_msg = e.message()
+}
+if assert_equal(error_msg, "custom message here", "Error message preserved") {
+    passed = passed + 1
+} else {
+    failed = failed + 1
+}
+
+# --- Test 8: Error type method ---
+print("")
+print("Test 8: Error type method")
+error_type = ""
+try {
+    raise IOError("file not found")
+} catch IOError as e {
+    error_type = e.type()
+}
+if assert_equal(error_type, "IOError", "Error type accessible") {
+    passed = passed + 1
+} else {
+    failed = failed + 1
+}
+
+# --- Test 9: Nested try/catch ---
+print("")
+print("Test 9: Nested try/catch")
+outer_caught = false
+inner_caught = false
+try {
+    try {
+        raise ValueError("inner")
+    } catch ValueError as e {
+        inner_caught = true
+        raise TypeError("from inner")
+    }
+} catch TypeError as e {
+    outer_caught = true
+}
+if assert_equal(inner_caught, true, "Inner catch ran") and assert_equal(outer_caught, true, "Outer catch ran") {
+    passed = passed + 1
+} else {
+    failed = failed + 1
+}
+
+# --- Test 10: RuntimeError from division ---
+print("")
+print("Test 10: RuntimeError catch")
+caught_runtime = false
+try {
+    x = 1 / 0
+} catch RuntimeError as e {
+    caught_runtime = true
+}
+if assert_equal(caught_runtime, true, "RuntimeError caught for division by zero") {
+    passed = passed + 1
+} else {
+    failed = failed + 1
+}
+
+# --- Summary ---
+print("")
+print("=== Summary ===")
+total = passed + failed
+print(passed.to_string() + "/" + total.to_string() + " tests passed")
+
+if failed == 0 {
+    print("ALL TESTS PASSED!")
+} else {
+    print("SOME TESTS FAILED")
+}

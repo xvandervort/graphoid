@@ -71,7 +71,7 @@ pub enum Stmt {
         position: SourcePosition,
     },
     Load {
-        path: String,
+        path: Expr,
         position: SourcePosition,
     },
     Configure {

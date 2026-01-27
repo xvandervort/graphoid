@@ -1,0 +1,143 @@
+# universal_casting_spec.gr - gspec tests for samples/02-intermediate/universal_casting.gr
+#
+# Run with: gr spec tests/gspec/universal_casting_spec.gr
+
+describe "Universal Casting" {
+
+    describe "boolean casting" {
+        it "converts true to 1" {
+            assert(expect(true.to_num()).to_equal(1))
+        }
+
+        it "converts false to 0" {
+            assert(expect(false.to_num()).to_equal(0))
+        }
+
+        it "converts true to string 'true'" {
+            assert(expect(true.to_string()).to_equal("true"))
+        }
+
+        it "converts false to string 'false'" {
+            assert(expect(false.to_string()).to_equal("false"))
+        }
+
+        it "to_bool is identity for booleans" {
+            assert(expect(true.to_bool()).to_equal(true))
+            assert(expect(false.to_bool()).to_equal(false))
+        }
+    }
+
+    describe "none casting" {
+        it "converts none to 0" {
+            assert(expect(none.to_num()).to_equal(0))
+        }
+
+        it "converts none to empty string" {
+            assert(expect(none.to_string()).to_equal(""))
+        }
+
+        it "converts none to false" {
+            assert(expect(none.to_bool()).to_equal(false))
+        }
+    }
+
+    describe "number casting" {
+        it "converts number to string" {
+            assert(expect((42.5).to_string()).to_equal("42.5"))
+        }
+
+        it "converts 0 to false" {
+            assert(expect((0.0).to_bool()).to_equal(false))
+        }
+
+        it "converts non-zero to true" {
+            assert(expect((42.0).to_bool()).to_equal(true))
+            assert(expect((-1.0).to_bool()).to_equal(true))
+        }
+
+        it "to_num is identity for numbers" {
+            assert(expect((42.5).to_num()).to_equal(42.5))
+        }
+    }
+
+    describe "string casting" {
+        it "converts numeric string to number" {
+            assert(expect("123.45".to_num()).to_equal(123.45))
+        }
+
+        it "converts empty string to false" {
+            assert(expect("".to_bool()).to_equal(false))
+        }
+
+        it "converts non-empty string to true" {
+            assert(expect("hello".to_bool()).to_equal(true))
+        }
+
+        it "to_string is identity for strings" {
+            assert(expect("hello".to_string()).to_equal("hello"))
+        }
+    }
+
+    describe "list casting" {
+        it "converts empty list to false" {
+            assert(expect([].to_bool()).to_equal(false))
+        }
+
+        it "converts non-empty list to true" {
+            assert(expect([1, 2, 3].to_bool()).to_equal(true))
+        }
+
+        it "converts list to its length" {
+            assert(expect([1, 2, 3, 4, 5].to_num()).to_equal(5))
+        }
+
+        it "converts empty list to string '[]'" {
+            assert(expect([].to_string()).to_equal("[]"))
+        }
+
+        it "converts list to string representation" {
+            assert(expect([1, 2, 3].to_string()).to_equal("[1, 2, 3]"))
+        }
+    }
+
+    describe "hash/map casting" {
+        it "converts empty map to false" {
+            assert(expect({}.to_bool()).to_equal(false))
+        }
+
+        it "converts non-empty map to true" {
+            h = {"a": 1}
+            assert(expect(h.to_bool()).to_equal(true))
+        }
+
+        it "converts map to number of keys" {
+            h = {"a": 1, "b": 2}
+            assert(expect(h.to_num()).to_equal(2))
+        }
+
+        it "converts empty map to string '{}'" {
+            assert(expect({}.to_string()).to_equal("{}"))
+        }
+    }
+
+    describe "practical uses" {
+        it "uses to_bool to check if collection is empty" {
+            items = [1, 2, 3]
+            assert(expect(items.to_bool()).to_equal(true))
+
+            empty = []
+            assert(expect(empty.to_bool()).to_equal(false))
+        }
+
+        it "uses to_num to get collection size" {
+            config = {"host": "localhost", "port": 8080}
+            assert(expect(config.to_num()).to_equal(2))
+        }
+
+        it "converts user input string to number" {
+            user_input = "42"
+            age = user_input.to_num()
+            assert(expect(age).to_equal(42))
+        }
+    }
+}

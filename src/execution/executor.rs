@@ -57,6 +57,21 @@ pub struct Executor {
     /// When a method is called, push its receiver. Blocks called from within
     /// that method will have access to this `self` for implicit method resolution.
     pub(crate) block_self_stack: Vec<BlockSelfEntry>,
+    /// Stack of original graph Values for method calls.
+    /// When a graph method is called, the original Value (with its Rc<RefCell>) is pushed.
+    /// This allows call_graph_method_impl to bind `self` to the same Rc<RefCell>,
+    /// ensuring mutations are visible across closures.
+    pub(crate) graph_method_value_stack: Vec<Value>,
+    /// Counter for suppressing implicit self property assignment in lambdas.
+    /// When > 0, assignment to unbound variables will NOT fall back to self properties.
+    /// This prevents lambdas passed INTO graph methods from accidentally modifying
+    /// graph properties, while still allowing method calls via implicit self.
+    pub(crate) suppress_self_property_assignment: usize,
+    /// Counter tracking function call depth.
+    /// When > 0, we're inside a function/lambda call. Functions defined at this depth
+    /// should NOT be added to global_functions (they're block-scoped).
+    /// This provides proper test isolation in gspec and prevents function name leakage.
+    pub(crate) function_call_depth: usize,
 }
 
 /// Entry in the block_self_stack tracking the `self` value for block context
@@ -86,6 +101,9 @@ impl Executor {
             super_context_stack: Vec::new(),
             writeback_stack: Vec::new(),
             block_self_stack: Vec::new(),
+            graph_method_value_stack: Vec::new(),
+            suppress_self_property_assignment: 0,
+            function_call_depth: 0,
         }
     }
 
@@ -108,6 +126,9 @@ impl Executor {
             super_context_stack: Vec::new(),
             writeback_stack: Vec::new(),
             block_self_stack: Vec::new(),
+            graph_method_value_stack: Vec::new(),
+            suppress_self_property_assignment: 0,
+            function_call_depth: 0,
         }
     }
 
@@ -225,7 +246,8 @@ impl Executor {
                     Err(_) => {
                         // Phase 2 Implicit Self: Check if `self` is a graph with this property
                         if let Ok(self_value) = self.env.get("self") {
-                            if let ValueKind::Graph(ref graph) = self_value.kind {
+                            if let ValueKind::Graph(ref graph_rc) = self_value.kind {
+                                let graph = graph_rc.borrow();
                                 // Check for property in __properties__/ branch
                                 let property_node_id = Graph::property_node_id(name);
                                 if graph.has_node(&property_node_id) {
@@ -317,7 +339,7 @@ impl Executor {
 
                 // 2. The class must be a graph (CLG)
                 let graph = match &class_value.kind {
-                    ValueKind::Graph(g) => g.clone(),
+                    ValueKind::Graph(g) => g.borrow().clone(),
                     _ => {
                         return Err(GraphoidError::type_error(
                             "graph (CLG)",
@@ -328,7 +350,7 @@ impl Executor {
 
                 // 3. If no overrides, just return the clone (accessing a graph already clones it)
                 if overrides.is_empty() {
-                    return Ok(class_value);
+                    return Ok(Value::graph(graph));
                 }
 
                 // 4. Apply property overrides
@@ -380,15 +402,13 @@ impl Executor {
                 let val = self.truncate_if_integer_mode(val);
 
                 // Phase 18: Set type_name on graphs when assigned to a variable
-                let val = if let ValueKind::Graph(mut graph) = val.kind {
+                if let ValueKind::Graph(ref graph_rc) = val.kind {
+                    let mut graph = graph_rc.borrow_mut();
                     // Only set type_name if it's not already set (e.g., for clones that keep their type)
                     if graph.type_name.is_none() {
                         graph.type_name = Some(name.clone());
                     }
-                    Value::graph(graph)
-                } else {
-                    val
-                };
+                }
 
                 self.env.define(name.clone(), val);
 
@@ -406,15 +426,13 @@ impl Executor {
                 match target {
                     AssignmentTarget::Variable(name) => {
                         // Phase 18: Set type_name on graphs when assigned to a variable
-                        let val = if let ValueKind::Graph(mut graph) = val.kind {
+                        if let ValueKind::Graph(ref graph_rc) = val.kind {
+                            let mut graph = graph_rc.borrow_mut();
                             // Only set type_name if it's not already set (e.g., for clones that keep their type)
                             if graph.type_name.is_none() {
                                 graph.type_name = Some(name.clone());
                             }
-                            Value::graph(graph)
-                        } else {
-                            val
-                        };
+                        }
 
                         // Try to update existing variable, or create new one if it doesn't exist
                         if self.env.exists(name) {
@@ -423,15 +441,24 @@ impl Executor {
                             // Phase 2 Implicit Self: Check if `self` is a graph with this property
                             // If so, assign to self.property instead of creating a local variable
                             // Properties are stored in __properties__/ branch
+                            //
+                            // IMPORTANT: This is suppressed when inside a lambda that was defined
+                            // outside a graph context. This prevents accidental modification of
+                            // graph properties by lambdas passed into graph methods.
+                            // Method calls still work via implicit self (DSL patterns).
                             let property_node_id = Graph::property_node_id(&name);
-                            let assigned_to_self = if let Ok(self_value) = self.env.get("self") {
-                                if let ValueKind::Graph(mut graph) = self_value.kind {
-                                    if graph.has_node(&property_node_id) {
-                                        // Update the graph property in __properties__/ branch
-                                        graph.add_node(property_node_id, val.clone())?;
-                                        // Write the modified graph back to self
-                                        self.env.set("self", Value::graph(graph))?;
-                                        true
+                            let assigned_to_self = if self.suppress_self_property_assignment == 0 {
+                                if let Ok(self_value) = self.env.get("self") {
+                                    if let ValueKind::Graph(ref graph_rc) = self_value.kind {
+                                        let mut graph = graph_rc.borrow_mut();
+                                        if graph.has_node(&property_node_id) {
+                                            // Update the graph property in __properties__/ branch
+                                            // Changes are visible through the shared Rc
+                                            graph.add_node(property_node_id, val.clone())?;
+                                            true
+                                        } else {
+                                            false
+                                        }
                                     } else {
                                         false
                                     }
@@ -456,21 +483,15 @@ impl Executor {
 
                         // Handle different collection types
                         match obj.kind {
-                            ValueKind::Graph(mut graph) => {
+                            ValueKind::Graph(ref graph_rc) => {
                                 // For graphs, index must be a string (node ID)
                                 let node_id = match &idx.kind {
                                     ValueKind::String(s) => s.clone(),
                                     _ => return Err(GraphoidError::type_error("string", idx.type_name())),
                                 };
 
-                                // Add or update the node
-                                graph.add_node(node_id, val)?;
-
-                                // Update the graph in the environment
-                                // We need to get the variable name from the object expression
-                                if let Expr::Variable { name, .. } = object.as_ref() {
-                                    self.env.set(name, Value::graph(graph))?;
-                                }
+                                // Add or update the node - changes visible through shared Rc
+                                graph_rc.borrow_mut().add_node(node_id, val)?;
                                 Ok(None)
                             }
                             ValueKind::Map(mut hash) => {
@@ -530,11 +551,13 @@ impl Executor {
                         let obj = self.eval_expr(object)?;
 
                         match obj.kind {
-                            ValueKind::Graph(mut graph) => {
+                            ValueKind::Graph(ref graph_rc) => {
                                 // Phase 19: Check if there's a setter for this property
-                                if let Some(setter_func) = graph.get_setter(property).cloned() {
+                                let setter_func = graph_rc.borrow().get_setter(property).cloned();
+                                if let Some(setter_func) = setter_func {
                                     // Call the setter with the value being assigned
                                     // The setter receives `self` (the graph) and the value as an argument
+                                    let graph = graph_rc.borrow().clone();
                                     self.call_graph_method(&graph, &setter_func, &[val], object)?;
 
                                     // The graph is already updated in the environment by call_graph_method
@@ -543,17 +566,13 @@ impl Executor {
                                     // No setter - update property or data node directly
                                     // First, check if this is a CLG property in __properties__/ branch
                                     let property_node_id = Graph::property_node_id(&property);
+                                    let mut graph = graph_rc.borrow_mut();
                                     if graph.has_node(&property_node_id) {
-                                        // Update CLG property
+                                        // Update CLG property - changes visible through shared Rc
                                         graph.add_node(property_node_id, val)?;
                                     } else {
                                         // Add/update as regular user data node
                                         graph.add_node(property.clone(), val)?;
-                                    }
-
-                                    // Update the graph in the environment
-                                    if let Expr::Variable { name, .. } = object.as_ref() {
-                                        self.env.set(name, Value::graph(graph))?;
                                     }
                                     Ok(None)
                                 }
@@ -622,20 +641,19 @@ impl Executor {
 
                     // Receiver must be a graph
                     match &receiver_value.kind {
-                        ValueKind::Graph(graph) => {
-                            // Clone the graph, attach the method/setter/static, and update the binding
-                            let mut graph_clone = graph.clone();
+                        ValueKind::Graph(ref graph_rc) => {
+                            // Attach the method/setter/static to the graph - changes visible through shared Rc
+                            let mut graph = graph_rc.borrow_mut();
                             if *is_static {
                                 // Phase 20: Attach as a static method
-                                graph_clone.attach_static_method(name.clone(), func.clone());
+                                graph.attach_static_method(name.clone(), func.clone());
                             } else if *is_setter {
                                 // Phase 19: Attach as a setter
-                                graph_clone.attach_setter(name.clone(), func.clone());
+                                graph.attach_setter(name.clone(), func.clone());
                             } else {
                                 // Regular method
-                                graph_clone.attach_method(name.clone(), func.clone());
+                                graph.attach_method(name.clone(), func.clone());
                             }
-                            self.env.define(receiver_name.clone(), Value::graph(graph_clone));
                         }
                         _ => {
                             return Err(GraphoidError::runtime(format!(
@@ -645,17 +663,54 @@ impl Executor {
                         }
                     }
                 } else {
-                    // Regular function - store in environment and global functions table
+                    // Regular function - store in environment and possibly global functions table
 
-                    // Store in global functions table (for recursion support and overloading)
-                    // Multiple functions with same name but different arities are supported
-                    self.global_functions
-                        .entry(name.clone())
-                        .or_insert_with(Vec::new)
-                        .push(func.clone());
+                    // Only add to global_functions at top level (function_call_depth == 0)
+                    // Functions defined inside other functions/lambdas are block-scoped
+                    // This provides proper test isolation in gspec
+                    if self.function_call_depth == 0 {
+                        // Store in global functions table (for recursion support and overloading)
+                        // Multiple functions with same name but different arities are supported
+                        self.global_functions
+                            .entry(name.clone())
+                            .or_insert_with(Vec::new)
+                            .push(func.clone());
+                    }
 
-                    // Store function in environment (last definition wins for direct calls)
-                    self.env.define(name.clone(), Value::function(func.clone()));
+                    // Store function in environment with support for local overloading
+                    // If a function with the same name exists, store them together as a list
+                    // This enables function overloading within scopes (e.g., inside test blocks)
+                    if let Ok(existing) = self.env.get(name) {
+                        match &existing.kind {
+                            ValueKind::Function(existing_func) => {
+                                // Convert single function to list of overloads
+                                let overloads = vec![
+                                    Value::function(existing_func.clone()),
+                                    Value::function(func.clone()),
+                                ];
+                                self.env.define(name.clone(), Value::list(List::from_vec(overloads)));
+                            }
+                            ValueKind::List(existing_list) => {
+                                // Already a list - check if it's function overloads
+                                let mut overloads = existing_list.to_vec();
+                                // Only add if existing entries are functions
+                                if overloads.iter().all(|v| matches!(v.kind, ValueKind::Function(_))) {
+                                    overloads.push(Value::function(func.clone()));
+                                    self.env.define(name.clone(), Value::list(List::from_vec(overloads)));
+                                } else {
+                                    // Not function overloads, just replace
+                                    self.env.define(name.clone(), Value::function(func.clone()));
+                                }
+                            }
+                            _ => {
+                                // Not a function, just replace
+                                self.env.define(name.clone(), Value::function(func.clone()));
+                            }
+                        }
+                    } else {
+                        // No existing value, store as single function
+                        self.env.define(name.clone(), Value::function(func.clone()));
+                    }
 
                     // NOW update the function's captured environment to include itself for recursion
                     // Since we use Rc<RefCell>, this updates all copies of the function
@@ -762,11 +817,16 @@ impl Executor {
                 let iterable_value = self.eval_expr(iterable)?;
 
                 // Get the list of values to iterate over
+                // Strings are iterable as graphs of characters
                 let values = match &iterable_value.kind {
                     ValueKind::List(ref items) => items.to_vec(),
+                    ValueKind::String(ref s) => {
+                        // Convert string to list of single-character strings
+                        s.chars().map(|c| Value::string(c.to_string())).collect()
+                    }
                     _other => {
                         return Err(GraphoidError::type_error(
-                            "list",
+                            "list or string",
                             iterable_value.type_name(),
                         ));
                     }
@@ -826,7 +886,14 @@ impl Executor {
             Stmt::Load { path, .. } => {
                 // Load statement - inline file contents into current scope
                 // Unlike import, this merges variables into the current namespace
-                self.execute_load(path)?;
+                let path_value = self.eval_expr(path)?;
+                let path_str = match &path_value.kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::runtime(
+                        "load path must be a string".to_string()
+                    )),
+                };
+                self.execute_load(&path_str)?;
                 Ok(None)
             }
             Stmt::Configure { settings, body, .. } => {
@@ -1143,9 +1210,9 @@ impl Executor {
         // If there's a parent, evaluate it and create child graph via inheritance
         if let Some(parent_box) = parent_expr {
             let parent_value = self.eval_expr(parent_box)?;
-            if let ValueKind::Graph(parent_graph) = parent_value.kind {
+            if let ValueKind::Graph(ref parent_graph_rc) = parent_value.kind {
                 // Create child that inherits from parent
-                let child = Graph::from_parent(parent_graph);
+                let child = Graph::from_parent(parent_graph_rc.borrow().clone());
                 return Ok(Value::graph(child));
             } else {
                 return Err(GraphoidError::runtime(format!(
@@ -1156,8 +1223,9 @@ impl Executor {
         }
 
         // No parent - create a new empty graph
-        // Parse configuration to determine graph type
+        // Parse configuration to determine graph type and ruleset
         let mut graph_type = GraphType::Directed; // Default
+        let mut ruleset: Option<String> = None;
 
         for (key, value_expr) in config {
             if key == "type" {
@@ -1174,10 +1242,24 @@ impl Executor {
                 } else {
                     return Err(GraphoidError::type_error("symbol", value.type_name()));
                 }
+            } else if key == "ruleset" {
+                let value = self.eval_expr(value_expr)?;
+                if let ValueKind::Symbol(s) = &value.kind {
+                    ruleset = Some(s.clone());
+                } else {
+                    return Err(GraphoidError::type_error("symbol", value.type_name()));
+                }
             }
         }
 
-        Ok(Value::graph(Graph::new(graph_type)))
+        let mut graph = Graph::new(graph_type);
+
+        // Apply ruleset if specified
+        if let Some(rs) = ruleset {
+            graph = graph.with_ruleset(rs);
+        }
+
+        Ok(Value::graph(graph))
     }
 
     /// Evaluates a named graph declaration: graph Name { configure {...}, properties, methods }
@@ -1206,8 +1288,8 @@ impl Executor {
         // Create the graph, possibly inheriting from parent
         let mut graph = if let Some(parent_box) = parent_expr {
             let parent_value = self.eval_expr(parent_box)?;
-            if let ValueKind::Graph(parent_graph) = parent_value.kind {
-                Graph::from_parent(parent_graph)
+            if let ValueKind::Graph(ref parent_graph_rc) = parent_value.kind {
+                Graph::from_parent(parent_graph_rc.borrow().clone())
             } else {
                 return Err(GraphoidError::runtime(format!(
                     "Cannot inherit from non-graph type '{}'. Expected graph.",
@@ -1446,7 +1528,7 @@ impl Executor {
             ValueKind::String(ref s) => !s.is_empty(),
             ValueKind::List(ref l) => l.len() > 0,
             ValueKind::Map(ref h) => h.len() > 0,
-            ValueKind::Graph(ref g) => g.node_count() > 0,
+            ValueKind::Graph(ref g) => g.borrow().node_count() > 0,
             _ => true, // Everything else is truthy
         };
 
@@ -1686,7 +1768,7 @@ impl Executor {
                 // Return character as a string
                 Ok(Value::string(chars[actual_index as usize].to_string()))
             }
-            ValueKind::Graph(ref graph) => {
+            ValueKind::Graph(ref graph_rc) => {
                 // Index must be a string for graphs (node ID)
                 let node_id = match &index_value.kind {
                     ValueKind::String(s) => s,
@@ -1704,6 +1786,7 @@ impl Executor {
                 }
 
                 // Look up the node
+                let graph = graph_rc.borrow();
                 match graph.get_node(&node_id) {
                     Some(value) => Ok(value.clone()),
                     None => Err(GraphoidError::runtime(format!(
@@ -1729,12 +1812,13 @@ impl Executor {
         let object_value = self.eval_expr(object)?;
 
         match &object_value.kind {
-            ValueKind::Graph(ref graph) => {
+            ValueKind::Graph(ref graph_rc) => {
                 // Don't allow access to internal nodes via property syntax
                 if property.starts_with("__") {
                     return Ok(Value::none());
                 }
 
+                let graph = graph_rc.borrow();
                 // First, check for CLG property in __properties__/ branch
                 let property_node_id = Graph::property_node_id(&property);
                 if let Some(value) = graph.get_node(&property_node_id) {
@@ -1779,7 +1863,7 @@ impl Executor {
 
         // Extract the graph from self
         let self_graph = match &self_value.kind {
-            ValueKind::Graph(g) => g.clone(),
+            ValueKind::Graph(ref g) => g.borrow().clone(),
             _ => {
                 return Err(GraphoidError::runtime(
                     "'super' can only be used within a graph method".to_string(),
@@ -1836,6 +1920,33 @@ impl Executor {
         self.super_context_stack.pop();
 
         result
+    }
+
+    /// Helper to set a variable value, checking graph properties if env.set fails.
+    /// This allows mutating methods to work on graph properties like `items.append!(x)`
+    /// where `items` is a property of the current `self` graph.
+    fn set_variable_or_graph_property(&mut self, var_name: &str, value: Value) -> Result<()> {
+        // Try to set in environment first
+        if self.env.set(var_name, value.clone()).is_ok() {
+            return Ok(());
+        }
+
+        // Variable not in environment - check if it's a property on `self` graph
+        if let Ok(self_value) = self.env.get("self") {
+            if let ValueKind::Graph(ref graph_rc) = self_value.kind {
+                let mut graph = graph_rc.borrow_mut();
+                // Check for property in __properties__/ branch
+                let property_node_id = Graph::property_node_id(var_name);
+                if graph.has_node(&property_node_id) {
+                    // Update the property on self
+                    graph.add_node(property_node_id, value)?;
+                    return Ok(());
+                }
+            }
+        }
+
+        // If we get here, the variable doesn't exist anywhere
+        Err(GraphoidError::undefined_variable(var_name))
     }
 
     /// Helper to evaluate arguments (positional only for now).
@@ -1898,19 +2009,59 @@ impl Executor {
                 )));
             }
 
-            // Look up the member in the module's namespace FIRST (module-qualified calls
-            // should always resolve to the module's definition, not global_functions)
+            // Look up the member in the module's namespace
             let member = module.namespace.get(method)?;
 
-            // If it's a function, call it with args
-            if let ValueKind::Function(func) = &member.kind {
-                // Evaluate argument expressions if not already done
+            // If it's a function or list of function overloads, call with correct arity
+            if let ValueKind::Function(_) = &member.kind {
+                // Evaluate argument expressions
                 let arg_values = if args.is_empty() {
                     Vec::new()
                 } else {
                     self.eval_arguments(args)?
                 };
-                return self.call_function(&func, &arg_values);
+                let arity = arg_values.len();
+
+                // Check global_functions for overloaded versions with matching arity
+                // Module functions are copied there during import (see load_module)
+                if let Some(overloads) = self.global_functions.get(method) {
+                    if let Some(func) = overloads.iter().find(|f| f.parameters.len() == arity).cloned() {
+                        return self.call_function(&func, &arg_values);
+                    }
+                }
+
+                // No matching overload found in global_functions, use the one from namespace
+                if let ValueKind::Function(func) = &member.kind {
+                    return self.call_function(func, &arg_values);
+                }
+            } else if let ValueKind::List(ref list) = &member.kind {
+                // Check if this is a list of function overloads (for scoped overloading support)
+                let items = list.to_vec();
+                let all_functions = items.iter().all(|v| matches!(v.kind, ValueKind::Function(_)));
+                if all_functions && !items.is_empty() {
+                    // Evaluate argument expressions
+                    let arg_values = if args.is_empty() {
+                        Vec::new()
+                    } else {
+                        self.eval_arguments(args)?
+                    };
+                    let arity = arg_values.len();
+
+                    // Find function with matching arity
+                    for item in &items {
+                        if let ValueKind::Function(func) = &item.kind {
+                            if func.parameters.len() == arity {
+                                return self.call_function(func, &arg_values);
+                            }
+                        }
+                    }
+
+                    // No matching arity found
+                    return Err(GraphoidError::runtime(format!(
+                        "No overload of '{}' matches arity {}",
+                        method, arity
+                    )));
+                }
             } else if let ValueKind::NativeFunction(native_func) = &member.kind {
                 // Native function - call it with evaluated args
                 let arg_values = self.eval_arguments(args)?;
@@ -1970,14 +2121,14 @@ impl Executor {
                 if let ValueKind::List(list) = &object_value.kind {
                     let mut list_to_mutate = list.clone();
                     let popped_value = list_to_mutate.pop()?; // Get popped value and mutate
-                    self.env.set(&var_name, Value::list(list_to_mutate))?;
+                    self.set_variable_or_graph_property(&var_name, Value::list(list_to_mutate))?;
                     return Ok(popped_value); // Return the popped value
                 }
             }
 
             // For other mutating methods, apply method and update variable
             let result = self.apply_method_to_value(object_value, base_method, &arg_values, object)?;
-            self.env.set(&var_name, result)?;
+            self.set_variable_or_graph_property(&var_name, result)?;
 
             // Mutating methods return none
             Ok(Value::none())
@@ -2302,7 +2453,23 @@ impl Executor {
             ValueKind::Time(timestamp) => self.eval_time_method(*timestamp, method, args),
             ValueKind::List(list) => self.eval_list_method(&list, method, args),
             ValueKind::Map(hash) => self.eval_map_method(&hash, method, args),
-            ValueKind::Graph(graph) => self.eval_graph_method(graph.clone(), method, args, object_expr),
+            ValueKind::Graph(ref graph_rc) => {
+                // Clone the graph for the method call
+                let graph = graph_rc.borrow().clone();
+
+                // Push the original Value onto the stack so call_graph_method_impl can use
+                // the same Rc<RefCell> when binding `self`. This ensures mutations inside
+                // methods are visible through all shared references (e.g., in closures).
+                self.graph_method_value_stack.push(value.clone());
+
+                // Call the method - this may mutate `graph` via self binding
+                let result = self.eval_graph_method(graph, method, args, object_expr);
+
+                // Pop the Value from the stack
+                self.graph_method_value_stack.pop();
+
+                result
+            }
             ValueKind::String(ref s) => self.eval_string_method(s, method, args, object_expr),
             ValueKind::Error(ref err) => self.eval_error_method(err, method, args),
             ValueKind::PatternNode(pn) => self.eval_pattern_node_method(pn, method, args),
@@ -3687,7 +3854,34 @@ impl Executor {
             // Count arguments to determine arity
             let arity = args.len();
 
-            // Check if there are overloaded functions with this name
+            // First check environment for local function overloads (stored as list)
+            // This handles functions defined inside lambdas/blocks
+            if let Ok(env_val) = self.env.get(name) {
+                if let ValueKind::List(ref list) = env_val.kind {
+                    let items = list.to_vec();
+                    // Check if this is a list of function overloads
+                    let all_functions = items.iter().all(|v| matches!(v.kind, ValueKind::Function(_)));
+                    if all_functions && !items.is_empty() {
+                        // Find function with matching arity
+                        for item in &items {
+                            if let ValueKind::Function(func) = &item.kind {
+                                if func.parameters.len() == arity {
+                                    // Process arguments and call the matched overload
+                                    let arg_values = self.process_arguments(func, args)?;
+
+                                    // Collect writeback info for mutable arguments
+                                    let writebacks = self.collect_writebacks(func, args);
+                                    self.writeback_stack.push(writebacks);
+
+                                    return self.call_function(func, &arg_values);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Then check global functions table for overloaded functions
             if let Some(overloads) = self.global_functions.get(name) {
                 // Find function with matching arity
                 if let Some(func) = overloads.iter().find(|f| f.parameters.len() == arity).cloned() {
@@ -3705,10 +3899,12 @@ impl Executor {
             // Phase 2 Implicit Self: Check if `self` is a graph with this method
             // This allows calling methods without explicit `self.` prefix
             if let Ok(self_value) = self.env.get("self") {
-                if let ValueKind::Graph(ref graph) = self_value.kind {
+                if let ValueKind::Graph(ref graph_rc) = self_value.kind {
+                    let graph = graph_rc.borrow();
                     if graph.has_method(name) {
                         // Clone the graph for method call
                         let graph_clone = graph.clone();
+                        drop(graph); // Release borrow before method call
                         // Create a dummy Variable expression for self to use in call_graph_method
                         let self_expr = Expr::Variable {
                             name: "self".to_string(),
@@ -3969,13 +4165,35 @@ impl Executor {
         //
         // Priority: Use the parent environment's `self` if it exists (in case the method
         // modified self before calling the block), otherwise fall back to block_self_stack.
-        if func.name.is_none() {
+        //
+        // IMPORTANT: Track whether this lambda was defined outside a graph context.
+        // If so, suppress implicit self PROPERTY assignment (but still allow method calls).
+        // This prevents accidental modification of graph properties by passed-in lambdas.
+        let suppress_property_assignment = if func.name.is_none() {
+            // Check if lambda was defined inside a graph method (captured env has 'self')
+            let captured_has_self = func.env.borrow().get("self").is_ok();
+
+            // Inject self for DSL-style method calls
             let block_self = saved_env.get("self").ok()
                 .or_else(|| self.block_self_stack.last().map(|e| e.value.clone()));
+            let has_block_self = block_self.is_some();
             if let Some(self_value) = block_self {
                 self.env.define("self".to_string(), self_value);
             }
+
+            // Suppress property assignment if lambda was defined outside graph context
+            !captured_has_self && has_block_self
+        } else {
+            false
+        };
+
+        if suppress_property_assignment {
+            self.suppress_self_property_assignment += 1;
         }
+
+        // Track function call depth for proper function scoping
+        // Functions defined inside function calls should not pollute global namespace
+        self.function_call_depth += 1;
 
         // Execute function body - either pattern matching or traditional
         let mut return_value = Value::none();
@@ -4094,6 +4312,14 @@ impl Executor {
                 let _ = saved_env.set("self", modified_self);
             }
         }
+
+        // Decrement suppress counter if we incremented it
+        if suppress_property_assignment {
+            self.suppress_self_property_assignment -= 1;
+        }
+
+        // Decrement function call depth
+        self.function_call_depth -= 1;
 
         // Restore original environment
         self.env = saved_env;
@@ -4239,14 +4465,26 @@ impl Executor {
 
         // Push self onto block_self_stack for implicit self in blocks
         // This allows closures called from within this method to access `self`
+        // Use the original Value from the stack to maintain Rc<RefCell> sharing
+        let block_self_value = if let Some(original_value) = self.graph_method_value_stack.last() {
+            original_value.clone()
+        } else {
+            Value::graph(graph.clone())
+        };
         self.block_self_stack.push(BlockSelfEntry {
-            value: Value::graph(graph.clone()),
+            value: block_self_value,
         });
 
         // Push function call onto the graph
         if let Some(ref func_id) = func.node_id {
             self.function_graph.borrow_mut().push_call(func_id.clone(), arg_values.to_vec());
         }
+
+        // Save and reset the suppress_self_property_assignment counter.
+        // Graph method bodies should ALWAYS be able to use implicit self property assignment,
+        // even when called from inside a lambda that has suppression enabled.
+        let saved_suppress = self.suppress_self_property_assignment;
+        self.suppress_self_property_assignment = 0;
 
         // Save current environment first
         let saved_env_clone = self.env.clone();
@@ -4264,8 +4502,17 @@ impl Executor {
         // Save current environment and switch to call environment
         let saved_env = std::mem::replace(&mut self.env, call_env);
 
-        // Bind `self` to the graph
-        self.env.define("self".to_string(), Value::graph(graph.clone()));
+        // Bind `self` to the graph.
+        // Use the original Value from graph_method_value_stack if available - this ensures
+        // that `self` shares the same Rc<RefCell> as the variable the method was called on,
+        // so mutations inside the method are visible through closures that captured that variable.
+        let self_value = if let Some(original_value) = self.graph_method_value_stack.last() {
+            original_value.clone()
+        } else {
+            // Fallback: create a new Value (this shouldn't happen in normal method calls)
+            Value::graph(graph.clone())
+        };
+        self.env.define("self".to_string(), self_value);
 
         // IMPORTANT: For instance methods, bind the class name from the CURRENT environment.
         // This enables patterns like `instance = ClassName {}` inside methods, where methods
@@ -4315,8 +4562,9 @@ impl Executor {
         self.env = saved_env;
 
         // Check method constraints before persisting changes
-        if let Some(Value { kind: ValueKind::Graph(ref modified_graph), .. }) = modified_self {
+        if let Some(Value { kind: ValueKind::Graph(ref modified_graph_rc), .. }) = modified_self {
             // Get the after state (use constrainable_node_ids for accurate constraint checking)
+            let modified_graph = modified_graph_rc.borrow();
             let after_node_ids: std::collections::HashSet<String> = modified_graph.constrainable_node_ids().into_iter().collect();
             let after_edge_count = modified_graph.data_edge_list().len();
 
@@ -4327,7 +4575,8 @@ impl Executor {
                         RuleSpec::ReadOnly => {
                             // Any change violates read_only
                             if before_node_ids != after_node_ids || before_edge_count != after_edge_count {
-                                // Pop call stack before returning error
+                                // Restore state before returning error
+                                self.suppress_self_property_assignment = saved_suppress;
                                 self.call_stack.pop();
                                 if func.node_id.is_some() {
                                     self.function_graph.borrow_mut().pop_call(Value::none());
@@ -4342,6 +4591,7 @@ impl Executor {
                             // Check if any nodes were removed
                             let removed: Vec<_> = before_node_ids.difference(&after_node_ids).collect();
                             if !removed.is_empty() {
+                                self.suppress_self_property_assignment = saved_suppress;
                                 self.call_stack.pop();
                                 if func.node_id.is_some() {
                                     self.function_graph.borrow_mut().pop_call(Value::none());
@@ -4355,6 +4605,7 @@ impl Executor {
                         RuleSpec::NoEdgeRemovals => {
                             // Check if edges were removed
                             if after_edge_count < before_edge_count {
+                                self.suppress_self_property_assignment = saved_suppress;
                                 self.call_stack.pop();
                                 if func.node_id.is_some() {
                                     self.function_graph.borrow_mut().pop_call(Value::none());
@@ -4393,6 +4644,7 @@ impl Executor {
                                     };
 
                                     if !is_allowed {
+                                        self.suppress_self_property_assignment = saved_suppress;
                                         self.call_stack.pop();
                                         if func.node_id.is_some() {
                                             self.function_graph.borrow_mut().pop_call(Value::none());
@@ -4404,6 +4656,7 @@ impl Executor {
                                     }
                                 }
                                 Err(e) => {
+                                    self.suppress_self_property_assignment = saved_suppress;
                                     self.call_stack.pop();
                                     if func.node_id.is_some() {
                                         self.function_graph.borrow_mut().pop_call(Value::none());
@@ -4422,19 +4675,22 @@ impl Executor {
         }
 
         // Persist mutations to `self` back to the original graph variable
-        if let Some(modified_graph) = modified_self {
+        // With Rc<RefCell<Graph>>, changes are automatically visible through the shared reference
+        // However, we still need to handle some edge cases for compatibility
+        if let Some(modified_graph_value) = modified_self {
             // Only update if object_expr is a simple variable reference
             if let Expr::Variable { name, .. } = object_expr {
                 // Try to set in environment first
-                if self.env.set(name, modified_graph.clone()).is_err() {
+                if self.env.set(name, modified_graph_value.clone()).is_err() {
                     // Variable not in environment - check if it's accessed via implicit self
                     // If so, update the property on the outer `self` graph
                     if let Ok(outer_self) = self.env.get("self") {
-                        if let ValueKind::Graph(mut outer_graph) = outer_self.kind.clone() {
+                        if let ValueKind::Graph(ref outer_graph_rc) = outer_self.kind {
+                            let mut outer_graph = outer_graph_rc.borrow_mut();
                             if outer_graph.has_node(name) {
                                 // Update the property on the outer self (add_node preserves edges)
-                                outer_graph.add_node(name.to_string(), modified_graph)?;
-                                self.env.set("self", Value::graph(outer_graph))?;
+                                // Changes visible through the shared Rc
+                                outer_graph.add_node(name.to_string(), modified_graph_value)?;
                             }
                             // If it's not a property on outer self either, ignore
                             // (could be a read-only method call on a computed expression)
@@ -4443,6 +4699,9 @@ impl Executor {
                 }
             }
         }
+
+        // Restore suppress_self_property_assignment counter
+        self.suppress_self_property_assignment = saved_suppress;
 
         // Pop method from call stack
         self.call_stack.pop();
@@ -4878,8 +5137,27 @@ impl Executor {
         let mut module_executor = Executor::with_env(module_env);
         module_executor.set_current_file(Some(resolved_path.clone()));
 
+        // Pass "magic" variables (starting with __) to the module environment
+        // This allows parent scope to communicate with modules (e.g., __SPEC_PATH__)
+        for (name, value) in self.env.get_all_bindings() {
+            if name.starts_with("__") {
+                module_executor.env.define(name, value);
+            }
+        }
+
         // Execute module source
         module_executor.execute_source(&source)?;
+
+        // Propagate "magic" variables back to parent (e.g., __SPEC_RESULT__)
+        // Skip internal module variables like __module_name__ and __module_alias__
+        for (name, value) in module_executor.env.get_all_bindings() {
+            if name.starts_with("__")
+                && name != "__module_name__"
+                && name != "__module_alias__"
+            {
+                self.env.define(name, value);
+            }
+        }
 
         // Extract module name and alias (from module declarations or filename)
         let module_name = if let Some(v) = module_executor.get_variable("__module_name__") {
@@ -4971,26 +5249,61 @@ impl Executor {
     /// Executes a load statement - merges file contents into current namespace
     fn execute_load(&mut self, file_path: &str) -> Result<()> {
         use std::fs;
+        use std::path::Path;
 
-        // Resolve the file path
-        let resolved_path = if let Some(ref current) = self.current_file {
-            self.module_manager.resolve_module_path(file_path, Some(current))?
+        // Resolve the file path:
+        // 1. If it's an absolute path or exists as given, use it directly
+        // 2. If relative and we have a current file, resolve relative to current file's directory
+        // 3. Fall back to module resolution for module-style imports
+        let resolved_path = if Path::new(file_path).is_absolute() {
+            PathBuf::from(file_path)
+        } else if Path::new(file_path).exists() {
+            // Relative path that exists from current working directory
+            PathBuf::from(file_path)
+        } else if let Some(ref current) = self.current_file {
+            // Try relative to current file's directory
+            let relative = current.parent().map(|p| p.join(file_path));
+            if let Some(ref path) = relative {
+                if path.exists() {
+                    path.clone()
+                } else {
+                    // Fall back to module resolution
+                    self.module_manager.resolve_module_path(file_path, Some(current))?
+                }
+            } else {
+                self.module_manager.resolve_module_path(file_path, Some(current))?
+            }
         } else {
             self.module_manager.resolve_module_path(file_path, None)?
         };
 
+        // Verify file exists
+        if !resolved_path.exists() {
+            return Err(GraphoidError::runtime(format!(
+                "File not found: '{}'",
+                file_path
+            )));
+        }
+
         // Read file source
         let source = fs::read_to_string(&resolved_path)?;
 
-        // Create temporary executor with fresh environment to execute the file
+        // Create temporary executor, starting with copy of current environment
+        // This allows loaded files to access functions/variables from the caller
         let temp_env = Environment::new();
         let mut temp_executor = Executor::with_env(temp_env);
         temp_executor.set_current_file(Some(resolved_path.clone()));
 
-        // Execute file source in temporary environment
+        // Copy all bindings from current environment (including parent scopes) to temp_executor
+        // This gives the loaded file access to DSL functions like describe, it, expect, etc.
+        for (name, value) in self.env.get_all_bindings_recursive() {
+            temp_executor.env.define(name, value);
+        }
+
+        // Execute file source
         temp_executor.execute_source(&source)?;
 
-        // Merge all variables from temporary environment into current environment
+        // Merge new/modified variables back from temporary environment
         let all_vars = temp_executor.env.get_all_bindings();
         for (name, value) in all_vars {
             // Skip internal module metadata variables
@@ -5062,48 +5375,49 @@ impl Executor {
         catch_clauses: &[crate::ast::CatchClause],
     ) -> Result<Option<Value>> {
         // Extract error type from GraphoidError
-        // First check if the error message contains a user-raised error type (e.g., "ValueError: message")
+        // User-raised errors are wrapped like: "Runtime error: ValueError: message"
+        // We need to extract the inner error type (ValueError) not the wrapper (Runtime error)
         let error_message = error.to_string();
         let error_type_name: String;
         let actual_message: String;
 
-        if let Some(colon_pos) = error_message.find(':') {
-            let potential_type = &error_message[..colon_pos];
-            // Check if it's a known error type
+        // First, strip the GraphoidError wrapper prefix if present
+        // These prefixes come from thiserror's #[error(...)] formatting
+        let prefixes = [
+            "Runtime error: ",
+            "Type error: ",
+            "Syntax error: ",
+            "IO error: ",
+            "Rule violation: ",
+            "Module not found: ",
+            "Circular dependency: ",
+            "Configuration error: ",
+        ];
+
+        let mut inner_message = error_message.as_str();
+        for prefix in &prefixes {
+            if let Some(stripped) = inner_message.strip_prefix(prefix) {
+                inner_message = stripped;
+                break;
+            }
+        }
+
+        // Now check if the inner message contains a user error type (e.g., "ValueError: message")
+        if let Some(colon_pos) = inner_message.find(':') {
+            let potential_type = &inner_message[..colon_pos];
+            // Check if it's a known user error type
             if matches!(potential_type, "ValueError" | "TypeError" | "IOError" | "NetworkError" | "ParseError" | "RuntimeError") {
                 error_type_name = potential_type.to_string();
-                actual_message = error_message[(colon_pos + 1)..].trim().to_string();
+                actual_message = inner_message[(colon_pos + 1)..].trim().to_string();
             } else {
-                // Not a recognized error type prefix, use GraphoidError type
-                error_type_name = match error {
-                    GraphoidError::SyntaxError { .. } => "SyntaxError".to_string(),
-                    GraphoidError::TypeError { .. } => "TypeError".to_string(),
-                    GraphoidError::RuntimeError { .. } => "RuntimeError".to_string(),
-                    GraphoidError::RuleViolation { .. } => "RuleViolation".to_string(),
-                    GraphoidError::ModuleNotFound { .. } => "ModuleNotFound".to_string(),
-                    GraphoidError::IOError { .. } => "IOError".to_string(),
-                    GraphoidError::CircularDependency { .. } => "CircularDependency".to_string(),
-                    GraphoidError::IoError(_) => "IoError".to_string(),
-                    GraphoidError::ConfigError { .. } => "ConfigError".to_string(),
-                    GraphoidError::LoopControl { .. } => "LoopControl".to_string(),
-                };
-                actual_message = error_message.clone();
+                // Not a recognized user error type, use the GraphoidError variant type
+                error_type_name = error.error_type();
+                actual_message = inner_message.to_string();
             }
         } else {
-            // No colon, use GraphoidError type
-            error_type_name = match error {
-                GraphoidError::SyntaxError { .. } => "SyntaxError".to_string(),
-                GraphoidError::TypeError { .. } => "TypeError".to_string(),
-                GraphoidError::RuntimeError { .. } => "RuntimeError".to_string(),
-                GraphoidError::RuleViolation { .. } => "RuleViolation".to_string(),
-                GraphoidError::ModuleNotFound { .. } => "ModuleNotFound".to_string(),
-                GraphoidError::IOError { .. } => "IOError".to_string(),
-                GraphoidError::CircularDependency { .. } => "CircularDependency".to_string(),
-                GraphoidError::IoError(_) => "IoError".to_string(),
-                GraphoidError::ConfigError { .. } => "ConfigError".to_string(),
-                    GraphoidError::LoopControl { .. } => "LoopControl".to_string(),
-            };
-            actual_message = error_message.clone();
+            // No colon in inner message, use GraphoidError variant type
+            error_type_name = error.error_type();
+            actual_message = inner_message.to_string();
         }
 
         // Search for a matching catch clause

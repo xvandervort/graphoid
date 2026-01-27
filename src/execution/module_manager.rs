@@ -123,25 +123,58 @@ impl ModuleManager {
     }
 
     fn get_stdlib_path() -> PathBuf {
-        // Try relative to executable location
+        // 1. Relative to executable: ../share/graphoid/stdlib
+        //    This handles standard installations like:
+        //    /usr/local/bin/gr -> /usr/local/share/graphoid/stdlib
+        //    ~/.local/bin/gr -> ~/.local/share/graphoid/stdlib
         if let Ok(exe_path) = std::env::current_exe() {
-            // Executable is in target/debug or target/release
-            // Go up to find project root, then look for stdlib
-            let mut path = exe_path.clone();
-
-            // Try various relative paths from executable
-            // target/debug/graphoid -> ../../stdlib
-            // target/release/graphoid -> ../../stdlib
-            for _ in 0..3 {
-                path.pop();
-                let stdlib = path.join("stdlib");
-                if stdlib.exists() && stdlib.is_dir() {
-                    return stdlib;
+            if let Some(bin_dir) = exe_path.parent() {
+                if let Some(prefix) = bin_dir.parent() {
+                    let stdlib = prefix.join("share/graphoid/stdlib");
+                    if stdlib.exists() && stdlib.is_dir() {
+                        return stdlib;
+                    }
                 }
             }
         }
 
-        // Fallback to "stdlib" in current directory
+        // 2. User installation: ~/.local/share/graphoid/stdlib (XDG standard)
+        if let Some(home) = std::env::var_os("HOME") {
+            let user_stdlib = PathBuf::from(home).join(".local/share/graphoid/stdlib");
+            if user_stdlib.exists() && user_stdlib.is_dir() {
+                return user_stdlib;
+            }
+        }
+
+        // 3. System-wide installations
+        for system_path in &[
+            "/usr/local/share/graphoid/stdlib",
+            "/usr/share/graphoid/stdlib",
+        ] {
+            let stdlib = PathBuf::from(system_path);
+            if stdlib.exists() && stdlib.is_dir() {
+                return stdlib;
+            }
+        }
+
+        // 4. Development mode: walk up from executable looking for stdlib/
+        //    This handles cargo run from the repo:
+        //    target/debug/gr -> ../../stdlib
+        if let Ok(exe_path) = std::env::current_exe() {
+            let mut path = exe_path.clone();
+            for _ in 0..5 {
+                path.pop();
+                let stdlib = path.join("stdlib");
+                if stdlib.exists() && stdlib.is_dir() {
+                    // Verify it's actually the Graphoid stdlib (has gspec.gr)
+                    if stdlib.join("gspec.gr").exists() {
+                        return stdlib;
+                    }
+                }
+            }
+        }
+
+        // 5. Fallback to "stdlib" in current directory (for running from repo root)
         PathBuf::from("stdlib")
     }
 

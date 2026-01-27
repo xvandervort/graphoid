@@ -1,0 +1,292 @@
+# random_spec.gr - Tests for the random stdlib module
+#
+# Tests random number generation and related functions.
+# Run with: gr spec tests/gspec/random_spec.gr
+
+import "random"
+
+describe "Random Module" {
+
+    describe "random()" {
+
+        it "returns a number" {
+            expect(rand.random()).to_be_a("num")
+        }
+
+        it "returns value in [0, 1) range" {
+            r = rand.random()
+            assert(expect(r).to_be_at_least(0))
+            assert(expect(r).to_be_less_than(1))
+        }
+
+        it "returns different values on consecutive calls" {
+            # Very unlikely to get same value twice
+            r1 = rand.random()
+            r2 = rand.random()
+            r3 = rand.random()
+            # At least two should be different
+            different = (r1 != r2) or (r2 != r3) or (r1 != r3)
+            expect(different).to_equal(true)
+        }
+    }
+
+    describe "randint(min, max)" {
+
+        it "returns a number" {
+            expect(rand.randint(1, 10)).to_be_a("num")
+        }
+
+        it "returns integer within range" {
+            result = rand.randint(1, 6)
+            assert(expect(result).to_be_at_least(1))
+            assert(expect(result).to_be_at_most(6))
+        }
+
+        it "returns whole numbers" {
+            result = rand.randint(1, 100)
+            # Check it's a whole number by comparing to floor value
+            expect(result).to_equal(result.down())
+        }
+
+        it "handles single value range" {
+            result = rand.randint(5, 5)
+            expect(result).to_equal(5)
+        }
+    }
+
+    describe "uniform(min, max)" {
+
+        it "returns a number" {
+            expect(rand.uniform(0, 100)).to_be_a("num")
+        }
+
+        it "returns value within range" {
+            result = rand.uniform(20.0, 30.0)
+            assert(expect(result).to_be_at_least(20.0))
+            assert(expect(result).to_be_at_most(30.0))
+        }
+
+        it "handles negative ranges" {
+            result = rand.uniform(-10.0, -5.0)
+            assert(expect(result).to_be_at_least(-10.0))
+            assert(expect(result).to_be_at_most(-5.0))
+        }
+    }
+
+    describe "choice(list)" {
+
+        it "returns element from the list" {
+            colors = ["red", "blue", "green"]
+            result = rand.choice(colors)
+            expect(colors).to_contain(result)
+        }
+
+        it "returns same type as list elements" {
+            numbers = [1, 2, 3, 4, 5]
+            result = rand.choice(numbers)
+            expect(result).to_be_a("num")
+        }
+
+        it "returns element from single-element list" {
+            single = ["only"]
+            result = rand.choice(single)
+            expect(result).to_equal("only")
+        }
+    }
+
+    describe "sample(list, count)" {
+
+        it "returns a list" {
+            numbers = [1, 2, 3, 4, 5]
+            result = rand.sample(numbers, 3)
+            expect(result).to_be_a("list")
+        }
+
+        it "returns requested number of elements" {
+            numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+            result = rand.sample(numbers, 3)
+            expect(result).to_have_length(3)
+        }
+
+        it "returns elements from original list" {
+            numbers = [1, 2, 3, 4, 5]
+            result = rand.sample(numbers, 2)
+            assert(expect(numbers).to_contain(result[0]))
+            assert(expect(numbers).to_contain(result[1]))
+        }
+
+        it "returns unique elements (no replacement)" {
+            numbers = [1, 2, 3, 4, 5]
+            result = rand.sample(numbers, 3)
+            # Check all elements are unique
+            unique = true
+            if result[0] == result[1] { unique = false }
+            if result[1] == result[2] { unique = false }
+            if result[0] == result[2] { unique = false }
+            expect(unique).to_equal(true)
+        }
+    }
+
+    describe "shuffle(list)" {
+
+        it "returns a list" {
+            items = [1, 2, 3, 4, 5]
+            result = rand.shuffle(items)
+            expect(result).to_be_a("list")
+        }
+
+        it "returns same length as input" {
+            items = ["a", "b", "c", "d", "e"]
+            result = rand.shuffle(items)
+            expect(result).to_have_length(5)
+        }
+
+        it "contains all original elements" {
+            items = [1, 2, 3]
+            result = rand.shuffle(items)
+            assert(expect(result).to_contain(1))
+            assert(expect(result).to_contain(2))
+            assert(expect(result).to_contain(3))
+        }
+
+        it "does not modify original list" {
+            original = [1, 2, 3, 4, 5]
+            shuffled = rand.shuffle(original)
+            # Original should still be in order
+            expect(original).to_equal([1, 2, 3, 4, 5])
+        }
+    }
+
+    describe "normal(mean, stddev)" {
+
+        it "returns a number" {
+            expect(rand.normal(0, 1)).to_be_a("num")
+        }
+
+        it "can return negative values" {
+            # With mean 0, about half should be negative
+            # Test by generating several and checking at least one
+            has_negative = false
+            for i in list.generate(1, 20, 1) {
+                if rand.normal(0, 1) < 0 {
+                    has_negative = true
+                }
+            }
+            expect(has_negative).to_equal(true)
+        }
+    }
+
+    describe "exponential(lambda)" {
+
+        it "returns a number" {
+            expect(rand.exponential(1.0)).to_be_a("num")
+        }
+
+        it "returns non-negative values" {
+            result = rand.exponential(0.5)
+            expect(result).to_be_at_least(0)
+        }
+    }
+
+    describe "deterministic random (seeded)" {
+
+        it "produces same sequence with same seed" {
+            rand.seed(12345)
+            first_a = rand.det_random()
+            second_a = rand.det_random()
+
+            rand.seed(12345)
+            first_b = rand.det_random()
+            second_b = rand.det_random()
+
+            assert(expect(first_a).to_equal(first_b))
+            assert(expect(second_a).to_equal(second_b))
+        }
+
+        it "produces different sequence with different seed" {
+            rand.seed(111)
+            a = rand.det_random()
+
+            rand.seed(222)
+            b = rand.det_random()
+
+            expect(a).to_not().to_equal(b)
+        }
+
+        it "det_random returns value in [0, 1)" {
+            rand.seed(42)
+            r = rand.det_random()
+            assert(expect(r).to_be_at_least(0))
+            assert(expect(r).to_be_less_than(1))
+        }
+    }
+
+    describe "uuid4()" {
+
+        it "returns a string" {
+            expect(rand.uuid4()).to_be_a("string")
+        }
+
+        it "returns UUID format (36 characters with dashes)" {
+            uuid = rand.uuid4()
+            expect(uuid).to_have_length(36)
+        }
+
+        it "contains dashes at correct positions" {
+            uuid = rand.uuid4()
+            # UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+            # Dashes at positions 8, 13, 18, 23
+            assert(expect(uuid[8]).to_equal("-"))
+            assert(expect(uuid[13]).to_equal("-"))
+            assert(expect(uuid[18]).to_equal("-"))
+            assert(expect(uuid[23]).to_equal("-"))
+        }
+
+        it "generates unique UUIDs" {
+            uuid1 = rand.uuid4()
+            uuid2 = rand.uuid4()
+            expect(uuid1).to_not().to_equal(uuid2)
+        }
+    }
+
+    describe "token(bytes)" {
+
+        it "returns a string" {
+            expect(rand.token(16)).to_be_a("string")
+        }
+
+        it "returns hex string of correct length" {
+            # 16 bytes = 32 hex characters
+            token = rand.token(16)
+            expect(token).to_have_length(32)
+        }
+
+        it "generates unique tokens" {
+            t1 = rand.token(16)
+            t2 = rand.token(16)
+            expect(t1).to_not().to_equal(t2)
+        }
+    }
+
+    describe "token_urlsafe(bytes)" {
+
+        it "returns a string" {
+            expect(rand.token_urlsafe(16)).to_be_a("string")
+        }
+
+        it "generates unique tokens" {
+            t1 = rand.token_urlsafe(16)
+            t2 = rand.token_urlsafe(16)
+            expect(t1).to_not().to_equal(t2)
+        }
+
+        it "contains only URL-safe characters" {
+            token = rand.token_urlsafe(32)
+            # URL-safe base64 uses A-Z, a-z, 0-9, -, _
+            # Just check it doesn't contain common non-URL-safe chars
+            assert(expect(token).to_not().to_contain("+"))
+            assert(expect(token).to_not().to_contain("/"))
+            assert(expect(token).to_not().to_contain("="))
+        }
+    }
+}

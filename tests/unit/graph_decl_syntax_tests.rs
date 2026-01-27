@@ -327,6 +327,7 @@ graph Animal {
     let animal = executor.get_variable("Animal").unwrap();
     match &animal.kind {
         ValueKind::Graph(g) => {
+            let g = g.borrow();
             assert_eq!(g.type_name, Some("Animal".to_string()));
         }
         _ => panic!("Expected graph"),
@@ -347,6 +348,7 @@ graph Point {
     let point = executor.get_variable("Point").unwrap();
     match &point.kind {
         ValueKind::Graph(g) => {
+            let g = g.borrow();
             // Properties are stored under __properties__/ branch
             assert!(g.has_node("__properties__/x"), "Should have __properties__/x");
             assert!(g.has_node("__properties__/y"), "Should have __properties__/y");
@@ -377,6 +379,7 @@ graph Counter {
     let counter = executor.get_variable("Counter").unwrap();
     match &counter.kind {
         ValueKind::Graph(g) => {
+            let g = g.borrow();
             assert!(g.has_method("increment"));
         }
         _ => panic!("Expected graph"),
@@ -458,6 +461,7 @@ graph TaskGraph(:dag) {
     let graph = executor.get_variable("TaskGraph").unwrap();
     match &graph.kind {
         ValueKind::Graph(g) => {
+            let g = g.borrow();
             assert!(g.rulesets.contains(&"dag".to_string()));
         }
         _ => panic!("Expected graph"),
@@ -479,6 +483,7 @@ graph Secret {
     let secret = executor.get_variable("Secret").unwrap();
     match &secret.kind {
         ValueKind::Graph(g) => {
+            let g = g.borrow();
             // Private method should be renamed with underscore prefix
             assert!(g.has_method("_helper"));
             assert!(!g.has_method("helper"));
@@ -1486,6 +1491,7 @@ graph Point {
     let point = executor.get_variable("Point").unwrap();
     match &point.kind {
         ValueKind::Graph(g) => {
+            let g = g.borrow();
             // Properties should be under __properties__/ branch
             assert!(g.has_node("__properties__/x"), "Property x should be at __properties__/x");
             assert!(g.has_node("__properties__/y"), "Property y should be at __properties__/y");
@@ -1519,6 +1525,7 @@ c.add_node("user_data", 42)
     let c = executor.get_variable("c").unwrap();
     match &c.kind {
         ValueKind::Graph(g) => {
+            let g = g.borrow();
             let data_nodes = g.data_node_ids();
 
             // User-added node should be in data_node_ids
@@ -1606,6 +1613,7 @@ graph Point {
     let point = executor.get_variable("Point").unwrap();
     match &point.kind {
         ValueKind::Graph(g) => {
+            let g = g.borrow();
             let props = g.property_node_ids();
             assert_eq!(props.len(), 3, "Should have 3 properties");
             assert!(props.contains(&"x".to_string()), "Should have property 'x'");

@@ -18,6 +18,10 @@ fn test_fs_module_has_functions() {
     assert!(functions.contains_key("read"));
     assert!(functions.contains_key("write"));
     assert!(functions.contains_key("close"));
+    assert!(functions.contains_key("list_dir"));
+    assert!(functions.contains_key("is_dir"));
+    assert!(functions.contains_key("is_file"));
+    assert!(functions.contains_key("exists"));
 }
 
 #[test]
@@ -179,4 +183,100 @@ fn test_fs_invalid_file_handle() {
 
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Invalid file handle"));
+}
+
+#[test]
+fn test_fs_is_dir() {
+    let module = FSModule;
+    let functions = module.functions();
+
+    let is_dir_fn = functions.get("is_dir").unwrap();
+
+    // Test with existing directory
+    let result = is_dir_fn(&[Value::string(".".to_string())]);
+    assert!(result.is_ok());
+    match &result.unwrap().kind {
+        graphoid::values::ValueKind::Boolean(b) => assert!(*b),
+        _ => panic!("Expected boolean"),
+    }
+
+    // Test with file (not a directory)
+    let result = is_dir_fn(&[Value::string("Cargo.toml".to_string())]);
+    assert!(result.is_ok());
+    match &result.unwrap().kind {
+        graphoid::values::ValueKind::Boolean(b) => assert!(!*b),
+        _ => panic!("Expected boolean"),
+    }
+
+    // Test with non-existent path
+    let result = is_dir_fn(&[Value::string("/nonexistent_path_12345".to_string())]);
+    assert!(result.is_ok());
+    match &result.unwrap().kind {
+        graphoid::values::ValueKind::Boolean(b) => assert!(!*b),
+        _ => panic!("Expected boolean"),
+    }
+}
+
+#[test]
+fn test_fs_is_file() {
+    let module = FSModule;
+    let functions = module.functions();
+
+    let is_file_fn = functions.get("is_file").unwrap();
+
+    // Test with existing file
+    let result = is_file_fn(&[Value::string("Cargo.toml".to_string())]);
+    assert!(result.is_ok());
+    match &result.unwrap().kind {
+        graphoid::values::ValueKind::Boolean(b) => assert!(*b),
+        _ => panic!("Expected boolean"),
+    }
+
+    // Test with directory (not a file)
+    let result = is_file_fn(&[Value::string(".".to_string())]);
+    assert!(result.is_ok());
+    match &result.unwrap().kind {
+        graphoid::values::ValueKind::Boolean(b) => assert!(!*b),
+        _ => panic!("Expected boolean"),
+    }
+
+    // Test with non-existent path
+    let result = is_file_fn(&[Value::string("/nonexistent_file_12345".to_string())]);
+    assert!(result.is_ok());
+    match &result.unwrap().kind {
+        graphoid::values::ValueKind::Boolean(b) => assert!(!*b),
+        _ => panic!("Expected boolean"),
+    }
+}
+
+#[test]
+fn test_fs_exists() {
+    let module = FSModule;
+    let functions = module.functions();
+
+    let exists_fn = functions.get("exists").unwrap();
+
+    // Test with existing file
+    let result = exists_fn(&[Value::string("Cargo.toml".to_string())]);
+    assert!(result.is_ok());
+    match &result.unwrap().kind {
+        graphoid::values::ValueKind::Boolean(b) => assert!(*b),
+        _ => panic!("Expected boolean"),
+    }
+
+    // Test with existing directory
+    let result = exists_fn(&[Value::string("src".to_string())]);
+    assert!(result.is_ok());
+    match &result.unwrap().kind {
+        graphoid::values::ValueKind::Boolean(b) => assert!(*b),
+        _ => panic!("Expected boolean"),
+    }
+
+    // Test with non-existent path
+    let result = exists_fn(&[Value::string("/nonexistent_path_12345".to_string())]);
+    assert!(result.is_ok());
+    match &result.unwrap().kind {
+        graphoid::values::ValueKind::Boolean(b) => assert!(!*b),
+        _ => panic!("Expected boolean"),
+    }
 }

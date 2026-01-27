@@ -2,6 +2,55 @@
 
 Strings in Graphoid represent text values. They are immutable sequences of Unicode characters, similar to strings in Python and JavaScript.
 
+---
+
+## Strings as Graphs of Characters
+
+In Graphoid, **everything is a graph**. Strings are no exception - they behave as graphs of characters, responding to many of the same methods as lists. This unified design means you can:
+
+- **Iterate** over characters just like iterating over list elements
+- **Use functional methods** like `map()`, `filter()`, and `reject()` on strings
+- **Access elements** with `first()`, `last()`, and `slice()`
+
+This approach follows Graphoid's core philosophy: data structures should be consistent and composable. If you know how to work with lists, you already know how to work with strings at the character level.
+
+### Iteration
+
+Strings can be iterated directly in `for` loops, yielding each character as a single-character string:
+
+```graphoid
+for c in "hello" {
+    print(c)  # Prints: h, e, l, l, o (one per line)
+}
+
+# Collect characters into a list
+chars = []
+for c in "abc" {
+    chars = chars.insert(chars.length(), c)
+}
+print(chars)  # ["a", "b", "c"]
+
+# Works with Unicode
+for c in "café" {
+    print(c)  # Prints: c, a, f, é
+}
+
+# Empty strings iterate zero times (no error)
+for c in "" {
+    print("never printed")
+}
+```
+
+Each character yielded during iteration is a **single-character string**, not a special character type. This means you can call any string method on individual characters:
+
+```graphoid
+for c in "hello" {
+    print(c.upper())  # Prints: H, E, L, L, O
+}
+```
+
+---
+
 ## String Literals
 
 ### Basic Strings
@@ -205,7 +254,68 @@ if password.length() < 8 {
 }
 ```
 
-**See also**: `is_empty()`
+**See also**: `is_empty()`, `first()`, `last()`
+
+---
+
+### first()
+
+Returns the first character of the string.
+
+**Syntax**: `string.first()`
+
+**Returns**: (string) First character, or `none` if empty
+
+**Examples**:
+```graphoid
+result = "hello".first()
+print(result)  # "h"
+
+result = "".first()
+print(result)  # none
+
+# Works with Unicode
+result = "émoji".first()
+print(result)  # "é"
+
+# Safe access pattern
+ch = text.first()
+if ch != none {
+    print("First character: " + ch)
+}
+```
+
+**See also**: `last()`, `[]` (indexing)
+
+---
+
+### last()
+
+Returns the last character of the string.
+
+**Syntax**: `string.last()`
+
+**Returns**: (string) Last character, or `none` if empty
+
+**Examples**:
+```graphoid
+result = "hello".last()
+print(result)  # "o"
+
+result = "".last()
+print(result)  # none
+
+# Works with Unicode
+result = "café".last()
+print(result)  # "é"
+
+# Check file extension
+if filename.last() == "/" {
+    print("Directory path")
+}
+```
+
+**See also**: `first()`, `[]` (indexing)
 
 ---
 
@@ -229,7 +339,55 @@ result = text.substring(6)      # "world"
 result = text.substring(6, 11)  # "world"
 ```
 
-**See also**: `[:]` (slice notation)
+**See also**: `[:]` (slice notation), `slice()`
+
+---
+
+### slice(start, end)
+
+Extracts a substring by character indices. This method mirrors the `slice()` method available on lists, providing consistent behavior across collection types.
+
+**Syntax**: `string.slice(start, end)`
+
+**Parameters**:
+- `start` (num): Starting index (inclusive, 0-based)
+- `end` (num): Ending index (exclusive)
+
+**Returns**: (string) Substring from `start` to `end`
+
+**Examples**:
+```graphoid
+result = "hello".slice(1, 4)
+print(result)  # "ell"
+
+# Start at beginning
+result = "hello".slice(0, 2)
+print(result)  # "he"
+
+# Go to end
+result = "hello".slice(3, 5)
+print(result)  # "lo"
+
+# Equal indices = empty string
+result = "hello".slice(2, 2)
+print(result)  # ""
+
+# Reversed indices = empty string (safe)
+result = "hello".slice(4, 2)
+print(result)  # ""
+
+# Out-of-bounds indices are clamped
+result = "hello".slice(0, 100)
+print(result)  # "hello"
+
+# Works with Unicode
+result = "café".slice(1, 3)
+print(result)  # "af"
+```
+
+**Consistency with lists**: This method behaves identically to `list.slice()`, allowing the same code patterns to work on both strings and lists.
+
+**See also**: `substring()`, `[:]` (slice notation), `list.slice()`
 
 ---
 
@@ -766,6 +924,172 @@ Tests if string contains only letters and digits.
 
 ---
 
+## Functional Methods
+
+Strings support functional programming methods that mirror those available on lists. This is part of Graphoid's "strings as graphs of characters" philosophy - strings respond to the same operations as other collections.
+
+### map(function)
+
+Transforms each character using a function, returning a **list** of results.
+
+**Syntax**: `string.map(function)`
+
+**Parameters**:
+- `function` (lambda): Function taking a character and returning a value
+
+**Returns**: (list) List of transformed values
+
+**Examples**:
+```graphoid
+# Transform to uppercase
+result = "abc".map(c => c.upper())
+print(result)  # ["A", "B", "C"]
+
+# Convert to character codes (via to_num on digits)
+result = "123".map(c => c.to_num())
+print(result)  # [1, 2, 3]
+
+# Each character's length (always 1)
+result = "hello".map(c => c.length())
+print(result)  # [1, 1, 1, 1, 1]
+
+# Empty string returns empty list
+result = "".map(c => c.upper())
+print(result)  # []
+
+# Join results back to string if needed
+chars = "hello".map(c => c.upper())
+result = string.join(chars, "")  # "HELLO"
+```
+
+**Note**: Unlike `filter()` and `reject()`, `map()` returns a **list** because transformations may produce non-string values.
+
+**See also**: `filter()`, `reject()`, `list.map()`
+
+---
+
+### filter(predicate)
+
+Keeps characters matching a predicate, returning a **string**.
+
+**Syntax**: `string.filter(predicate)`
+
+**Parameters**:
+- `predicate` (lambda): Function taking a character and returning bool
+
+**Returns**: (string) String containing only matching characters
+
+**Examples**:
+```graphoid
+# Keep only vowels
+vowels = "hello".filter(c => c == "e" or c == "o")
+print(vowels)  # "eo"
+
+# Keep only "l" characters
+result = "hello".filter(c => c == "l")
+print(result)  # "ll"
+
+# Result is a string, not a list
+print(result.type())  # "string"
+
+# Returns empty string when nothing matches
+result = "hello".filter(c => c == "z")
+print(result)  # ""
+
+# Returns same string when all match
+result = "aaa".filter(c => c == "a")
+print(result)  # "aaa"
+
+# Remove spaces
+result = "a B c".filter(c => c != " ")
+print(result)  # "aBc"
+
+# Empty string returns empty string
+result = "".filter(c => true)
+print(result)  # ""
+```
+
+**See also**: `reject()`, `map()`, `list.filter()`
+
+---
+
+### reject(predicate)
+
+Removes characters matching a predicate, returning a **string**. This is the inverse of `filter()`.
+
+**Syntax**: `string.reject(predicate)`
+
+**Parameters**:
+- `predicate` (lambda): Function taking a character and returning bool
+
+**Returns**: (string) String with matching characters removed
+
+**Examples**:
+```graphoid
+# Remove vowels (keep consonants)
+consonants = "hello".reject(c => c == "e" or c == "o")
+print(consonants)  # "hll"
+
+# Remove "l" characters
+result = "hello".reject(c => c == "l")
+print(result)  # "heo"
+
+# Result is a string, not a list
+print(result.type())  # "string"
+
+# Returns same string when nothing matches
+result = "hello".reject(c => c == "z")
+print(result)  # "hello"
+
+# Returns empty string when all match
+result = "aaa".reject(c => c == "a")
+print(result)  # ""
+
+# filter and reject are inverses
+s = "hello"
+filtered = s.filter(c => c == "l")
+rejected = s.reject(c => c == "l")
+print(filtered.length() + rejected.length())  # 5 (equals s.length())
+```
+
+**See also**: `filter()`, `map()`, `list.reject()`
+
+---
+
+### each(function)
+
+Calls a function for each character. Returns `none`.
+
+**Syntax**: `string.each(function)`
+
+**Parameters**:
+- `function` (lambda): Function taking a character
+
+**Returns**: (none) Always returns `none`
+
+**Examples**:
+```graphoid
+# Process each character
+"hello".each(c => print(c))
+# Prints: h, e, l, l, o (one per line)
+
+# each() returns none
+result = "abc".each(c => c)
+print(result)  # none
+
+# Empty string calls function zero times
+"".each(c => print("never called"))
+
+# Use map() instead if you need results
+result = "abc".map(c => c.upper())  # ["A", "B", "C"]
+```
+
+**Note**: Use `each()` for side effects. If you need to collect results, use `map()` instead.
+
+**See also**: `map()`, `list.each()`
+
+---
+
 ## Static Methods
 
 Static methods are called on the `string` type itself, not on string instances.
@@ -978,11 +1302,50 @@ fn sanitize(input) {
 safe = sanitize("  <script>alert('xss')</script>  ")
 ```
 
+### String/List Consistency
+
+Because strings behave as graphs of characters, you can use the same patterns for both:
+
+```graphoid
+# Both strings and lists support iteration
+for c in "hello" { print(c) }
+for item in ["h", "e", "l", "l", "o"] { print(item) }
+
+# Both support first()/last()
+"hello".first()                    # "h"
+["h", "e", "l", "l", "o"].first()  # "h"
+
+# Both support map() (returns list)
+"abc".map(c => c.upper())              # ["A", "B", "C"]
+["a", "b", "c"].map(c => c.upper())    # ["A", "B", "C"]
+
+# filter() returns same type
+"hello".filter(c => c == "l")          # "ll" (string)
+["h", "e", "l", "l", "o"].filter(c => c == "l")  # ["l", "l"] (list)
+
+# Write generic functions that work on both
+fn count_matches(collection, pred) {
+    matches = 0
+    for item in collection {
+        if pred(item) { matches = matches + 1 }
+    }
+    return matches
+}
+
+count_matches("hello", c => c == "l")           # 2
+count_matches(["h", "e", "l", "l", "o"], c => c == "l")  # 2
+```
+
 ---
 
 ## See Also
 
+- [list](list.md) - List type (strings share many methods with lists as both are graphs)
 - [regex](../stdlib/regex.md) - Pattern matching with regular expressions
 - [string (stdlib)](../stdlib/string.md) - Additional string utilities
-- [list](list.md) - List type (strings are similar)
 - [operators](../operators.md) - Complete operator reference
+
+### Related Concepts
+
+- **Everything is a Graph**: Strings are graphs of characters, just as lists are graphs of elements. This is Graphoid's foundational principle.
+- **Functional Methods**: `map()`, `filter()`, `reject()`, `each()` work consistently across all collection types.
