@@ -332,11 +332,14 @@ cd graphoid/rust
 # Build the compiler
 cargo build --release
 
+# Install
+make install
+
 # Run the REPL
-cargo run --release
+gr
 
 # Execute a program
-cargo run --release -- samples/hello.gr
+gr samples/01-basics/hello_world.gr
 ```
 
 **Learn More**:

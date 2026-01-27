@@ -1,0 +1,126 @@
+# approx_spec.gr - gspec tests for samples/05-stdlib/approx_demo.gr
+#
+# Tests the approx module for approximate equality comparisons
+#
+# Run with: gr spec tests/gspec/approx_spec.gr
+
+import "approx"
+# Note: time module import removed - it was polluting global scope for other specs
+
+describe "Approx Module" {
+
+    describe "absolute tolerance" {
+        it "returns true when values are within tolerance" {
+            result = approx.equal(3.14159, 3.14, 0.01)
+            assert(expect(result).to_be_truthy())
+        }
+
+        it "returns false when values exceed tolerance" {
+            result = approx.equal(3.14159, 3.14, 0.001)
+            assert(expect(result).to_be_falsy())
+        }
+
+        it "handles exact equality" {
+            result = approx.equal(5.0, 5.0, 0.001)
+            assert(expect(result).to_be_truthy())
+        }
+
+        it "handles very small tolerance" {
+            result = approx.equal(10.0, 10.0, 0.0001)
+            assert(expect(result).to_be_truthy())
+        }
+
+        it "handles negative numbers" {
+            result = approx.equal(-5.0, -5.01, 0.02)
+            assert(expect(result).to_be_truthy())
+        }
+
+        it "handles comparison across zero" {
+            result = approx.equal(-0.001, 0.001, 0.01)
+            assert(expect(result).to_be_truthy())
+        }
+    }
+
+    describe "eq alias" {
+        it "eq works same as equal" {
+            result = approx.eq(1.0, 1.0001, 0.001)
+            assert(expect(result).to_be_truthy())
+        }
+
+        it "eq returns false when outside tolerance" {
+            result = approx.eq(1.0, 1.01, 0.001)
+            assert(expect(result).to_be_falsy())
+        }
+    }
+
+    describe "within alias" {
+        it "within works same as equal" {
+            result = approx.within(2.5, 2.501, 0.01)
+            assert(expect(result).to_be_truthy())
+        }
+
+        it "within returns false when outside tolerance" {
+            result = approx.within(2.5, 2.6, 0.01)
+            assert(expect(result).to_be_falsy())
+        }
+    }
+
+    describe "relative tolerance" {
+        it "returns true when within relative tolerance" {
+            result = approx.equal(100.0, 99.0, 0.02, :relative)
+            assert(expect(result).to_be_truthy())
+        }
+
+        it "returns false when exceeding relative tolerance" {
+            result = approx.equal(100.0, 95.0, 0.02, :relative)
+            assert(expect(result).to_be_falsy())
+        }
+
+        it "scales with magnitude" {
+            # 2% tolerance on 1000 = ±20, diff is 10
+            result = approx.equal(1000.0, 990.0, 0.02, :relative)
+            assert(expect(result).to_be_truthy())
+        }
+
+        it "2% relative tolerance example" {
+            result = approx.equal(1000.0, 990.0, 0.02, :relative)
+            assert(expect(result).to_be_truthy())
+        }
+    }
+
+    describe "time comparisons" {
+        # Note: time module functions not accessible inside describe blocks
+        # Time comparison tests are validated in samples/05-stdlib/approx_demo.gr
+
+        it "symbols are valid types" {
+            assert(expect(:seconds.type()).to_equal("symbol"))
+            assert(expect(:minutes.type()).to_equal("symbol"))
+            assert(expect(:hours.type()).to_equal("symbol"))
+            assert(expect(:days.type()).to_equal("symbol"))
+            assert(expect(:relative.type()).to_equal("symbol"))
+        }
+    }
+
+    describe "practical use cases" {
+        it "handles floating-point precision issues" {
+            # Classic 0.1 + 0.2 problem
+            calculated = 0.1 + 0.2
+            expected = 0.3
+            result = approx.equal(calculated, expected, 0.0001)
+            assert(expect(result).to_be_truthy())
+        }
+
+        it "compares scientific calculations" {
+            pi_approx = 3.14159
+            pi_rough = 3.14
+            result = approx.equal(pi_approx, pi_rough, 0.01)
+            assert(expect(result).to_be_truthy())
+        }
+
+        it "relative tolerance works for percentages" {
+            # 5% tolerance
+            result = approx.equal(200.0, 195.0, 0.05, :relative)
+            assert(expect(result).to_be_truthy())
+        }
+    }
+}

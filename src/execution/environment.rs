@@ -93,6 +93,28 @@ impl Environment {
     pub fn get_all_bindings(&self) -> Vec<(String, Value)> {
         self.variables.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
     }
+
+    /// Gets all variable bindings from current scope AND all parent scopes.
+    /// Child scope bindings shadow parent bindings with the same name.
+    /// Returns a Vec of (name, value) pairs.
+    /// Used for load statement to pass full context to loaded files.
+    pub fn get_all_bindings_recursive(&self) -> Vec<(String, Value)> {
+        let mut bindings: HashMap<String, Value> = HashMap::new();
+
+        // First, collect parent bindings (if any)
+        if let Some(parent) = &self.parent {
+            for (name, value) in parent.get_all_bindings_recursive() {
+                bindings.insert(name, value);
+            }
+        }
+
+        // Then, add/overwrite with current scope bindings
+        for (name, value) in &self.variables {
+            bindings.insert(name.clone(), value.clone());
+        }
+
+        bindings.into_iter().collect()
+    }
 }
 
 impl Default for Environment {

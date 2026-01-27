@@ -9,8 +9,8 @@ print("=== Social Network Analyzer ===")
 print("Demonstrating graph-based social network analysis")
 print("")
 
-# Create network
-network = SocialNetwork.new("Tech Community")
+# Create network using CLG instantiation syntax
+network = SocialNetwork { name: "Tech Community" }
 
 # === Add Users ===
 print("--- Building Network ---")

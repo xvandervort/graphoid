@@ -1,0 +1,115 @@
+# string_mutating_methods_spec.gr - gspec tests for samples/02-intermediate/string_mutating_methods.gr
+#
+# Run with: gr spec tests/gspec/string_mutating_methods_spec.gr
+
+describe "String Mutating Methods" {
+
+    describe "upper!()" {
+        it "converts string to uppercase in place" {
+            text = "hello world"
+            text.upper!()
+            assert(expect(text).to_equal("HELLO WORLD"))
+        }
+
+        it "handles already uppercase string" {
+            text = "HELLO"
+            text.upper!()
+            assert(expect(text).to_equal("HELLO"))
+        }
+
+        it "handles mixed case" {
+            text = "HeLLo WoRLd"
+            text.upper!()
+            assert(expect(text).to_equal("HELLO WORLD"))
+        }
+    }
+
+    describe "lower!()" {
+        it "converts string to lowercase in place" {
+            text = "HELLO WORLD"
+            text.lower!()
+            assert(expect(text).to_equal("hello world"))
+        }
+
+        it "handles already lowercase string" {
+            text = "hello"
+            text.lower!()
+            assert(expect(text).to_equal("hello"))
+        }
+
+        it "handles mixed case" {
+            text = "HeLLo WoRLd"
+            text.lower!()
+            assert(expect(text).to_equal("hello world"))
+        }
+    }
+
+    describe "trim!()" {
+        it "removes leading and trailing whitespace" {
+            text = "  spaces around  "
+            text.trim!()
+            assert(expect(text).to_equal("spaces around"))
+        }
+
+        it "handles string with only leading whitespace" {
+            text = "   hello"
+            text.trim!()
+            assert(expect(text).to_equal("hello"))
+        }
+
+        it "handles string with only trailing whitespace" {
+            text = "hello   "
+            text.trim!()
+            assert(expect(text).to_equal("hello"))
+        }
+
+        it "handles string with no whitespace" {
+            text = "hello"
+            text.trim!()
+            assert(expect(text).to_equal("hello"))
+        }
+    }
+
+    describe "reverse!()" {
+        it "reverses string in place" {
+            text = "hello"
+            text.reverse!()
+            assert(expect(text).to_equal("olleh"))
+        }
+
+        it "handles palindrome" {
+            text = "radar"
+            text.reverse!()
+            assert(expect(text).to_equal("radar"))
+        }
+
+        it "handles single character" {
+            text = "a"
+            text.reverse!()
+            assert(expect(text).to_equal("a"))
+        }
+
+        it "handles empty string" {
+            text = ""
+            text.reverse!()
+            assert(expect(text).to_equal(""))
+        }
+    }
+
+    describe "return value" {
+        it "mutating methods return none" {
+            text = "test"
+            result = text.upper!()
+            assert(expect(result).to_be_none())
+        }
+    }
+
+    describe "chaining mutations" {
+        it "allows sequential mutations on same variable" {
+            text = "  hello world  "
+            text.trim!()
+            text.upper!()
+            assert(expect(text).to_equal("HELLO WORLD"))
+        }
+    }
+}

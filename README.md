@@ -130,14 +130,27 @@ print(response["body"])
 git clone https://github.com/yourusername/graphoid.git
 cd graphoid
 
-# Build with Cargo
-cargo build --release
+# Install to ~/.local (add ~/.local/bin to your PATH)
+make install
 
-# Run the REPL
-cargo run
+# Or install system-wide
+sudo make install PREFIX=/usr/local
+```
 
-# Or run a file
-cargo run -- examples/hello.gr
+### Running Graphoid
+
+```bash
+# Start the REPL
+gr
+
+# Run a file
+gr myprogram.gr
+
+# Run tests
+gr spec tests/
+
+# Show help
+gr help
 ```
 
 ### Hello World
@@ -234,7 +247,7 @@ samples/
 Run any example:
 
 ```bash
-cargo run -- samples/01-basics/hello_world.gr
+gr samples/01-basics/hello_world.gr
 ```
 
 ## Why Graphoid?
@@ -265,9 +278,21 @@ prices.append(1500)  # Automatically clamped to 1000
 
 Contributions are welcome! Please read the contributing guidelines and ensure:
 
-- Tests pass: `cargo test --lib`
+- Rust tests pass: `make test`
+- Spec tests pass: `make spec`
 - No warnings: `cargo build`
 - Code follows existing patterns
+
+### Development Commands
+
+```bash
+make build      # Build release binary
+make install    # Install to ~/.local
+make test       # Run Rust unit tests
+make spec       # Run Graphoid spec tests
+make clean      # Clean build artifacts
+make help       # Show all targets
+```
 
 ## License
 

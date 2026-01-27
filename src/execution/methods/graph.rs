@@ -781,7 +781,7 @@ impl Executor {
                 // Get the type name to check against
                 let check_type = match &args[0].kind {
                     ValueKind::String(s) => s.clone(),
-                    ValueKind::Graph(g) => g.type_name.clone().unwrap_or_else(|| "graph".to_string()),
+                    ValueKind::Graph(ref g) => g.borrow().type_name.clone().unwrap_or_else(|| "graph".to_string()),
                     _ => return Err(GraphoidError::runtime(format!(
                         "is_a() expects a type name (string) or graph, but got {}",
                         args[0].type_name()
@@ -844,7 +844,7 @@ impl Executor {
                 }
 
                 let other_graph = match &args[0].kind {
-                    ValueKind::Graph(g) => g.clone(),
+                    ValueKind::Graph(ref g) => g.borrow().clone(),
                     _ => {
                         return Err(GraphoidError::runtime(
                             "include() argument must be a graph".to_string()
@@ -1260,7 +1260,7 @@ impl Executor {
                 }
 
                 let other_graph = match &args[0].kind {
-                    ValueKind::Graph(g) => g,
+                    ValueKind::Graph(ref g) => g.borrow(),
                     _ => return Err(GraphoidError::type_error("graph", args[0].type_name())),
                 };
 
@@ -1270,7 +1270,7 @@ impl Executor {
                     None
                 };
 
-                let result = graph.add_subgraph(other_graph, conflict_strategy)?;
+                let result = graph.add_subgraph(&other_graph, conflict_strategy)?;
                 Ok(Value::graph(result))
             }
             "node_count" => {
@@ -1747,6 +1747,50 @@ impl Executor {
 
                 Ok(Value::string(output))
             }
+            "equals" => {
+                // Compare graphs with layer options
+                // Syntax: graph.equals(other, include: :rules) or graph.equals(other, only: :rules)
+                if args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "equals() requires at least 1 argument (the other graph to compare)".to_string()
+                    ));
+                }
+
+                // First argument must be a graph
+                let other_graph = match &args[0].kind {
+                    ValueKind::Graph(g) => g.borrow(),
+                    _ => return Err(GraphoidError::type_error("graph", args[0].type_name())),
+                };
+
+                // Parse options from remaining arguments
+                // Look for include: or only: named parameters
+                let mut layers: std::collections::HashSet<crate::values::ComparisonLayer> = std::collections::HashSet::new();
+                let mut only_mode = false;
+
+                // Check for named parameters in args[1..] which would be a hash
+                if args.len() > 1 {
+                    if let ValueKind::Map(opts) = &args[1].kind {
+                        // Check for include: key
+                        if let Some(include_val) = opts.get("include") {
+                            layers = self.parse_comparison_layers(include_val)?;
+                            only_mode = false;
+                        }
+                        // Check for only: key
+                        if let Some(only_val) = opts.get("only") {
+                            layers = self.parse_comparison_layers(only_val)?;
+                            only_mode = true;
+                        }
+                    }
+                }
+
+                // If no layers specified, default to data layer
+                if layers.is_empty() && !only_mode {
+                    layers.insert(crate::values::ComparisonLayer::Data);
+                }
+
+                let result = graph.equals_with_layers(&other_graph, Some(&layers), only_mode);
+                Ok(Value::boolean(result))
+            }
             _ => Err(GraphoidError::runtime(format!(
                 "Graph does not have method '{}'",
                 method
@@ -1754,4 +1798,53 @@ impl Executor {
         }
     }
 
+    /// Parse comparison layers from a value (symbol or list of symbols)
+    fn parse_comparison_layers(&self, value: &Value) -> Result<std::collections::HashSet<crate::values::ComparisonLayer>> {
+        let mut layers = std::collections::HashSet::new();
+
+        match &value.kind {
+            ValueKind::Symbol(s) => {
+                layers.insert(self.symbol_to_layer(s.as_str())?);
+            }
+            ValueKind::List(list) => {
+                for i in 0..list.len() {
+                    if let Some(item) = list.get(i) {
+                        if let ValueKind::Symbol(s) = &item.kind {
+                            layers.insert(self.symbol_to_layer(s.as_str())?);
+                        } else {
+                            return Err(GraphoidError::runtime(format!(
+                                "equals() layer must be a symbol, got {}",
+                                item.type_name()
+                            )));
+                        }
+                    }
+                }
+            }
+            _ => {
+                return Err(GraphoidError::runtime(format!(
+                    "equals() include:/only: must be a symbol or list of symbols, got {}",
+                    value.type_name()
+                )));
+            }
+        }
+
+        Ok(layers)
+    }
+
+    /// Convert a symbol string to ComparisonLayer
+    fn symbol_to_layer(&self, symbol: &str) -> Result<crate::values::ComparisonLayer> {
+        use crate::values::ComparisonLayer;
+        match symbol {
+            "data" => Ok(ComparisonLayer::Data),
+            "rules" => Ok(ComparisonLayer::Rules),
+            "rulesets" => Ok(ComparisonLayer::Rulesets),
+            "methods" => Ok(ComparisonLayer::Methods),
+            "properties" => Ok(ComparisonLayer::Properties),
+            "all" => Ok(ComparisonLayer::All),
+            _ => Err(GraphoidError::runtime(format!(
+                "Unknown comparison layer '{}'. Valid layers: :data, :rules, :rulesets, :methods, :properties, :all",
+                symbol
+            ))),
+        }
+    }
 }

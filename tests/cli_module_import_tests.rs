@@ -31,7 +31,7 @@ msg = tm.greeting
 "#).unwrap();
 
     // Execute main.gr using the CLI
-    let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
+    let output = Command::new(env!("CARGO_BIN_EXE_gr"))
         .arg(main_path.to_str().unwrap())
         .output()
         .expect("Failed to execute CLI");
@@ -79,7 +79,7 @@ print("PI:", pi_val)
 "#).unwrap();
 
     // Execute
-    let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
+    let output = Command::new(env!("CARGO_BIN_EXE_gr"))
         .arg(main_path.to_str().unwrap())
         .output()
         .expect("Failed to execute CLI");
@@ -108,7 +108,7 @@ import "./nonexistent_module"
 "#).unwrap();
 
     // Execute - should fail
-    let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
+    let output = Command::new(env!("CARGO_BIN_EXE_gr"))
         .arg(main_path.to_str().unwrap())
         .output()
         .expect("Failed to execute CLI");
@@ -151,7 +151,7 @@ print("Result:", result)
 "#).unwrap();
 
     // Execute
-    let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
+    let output = Command::new(env!("CARGO_BIN_EXE_gr"))
         .arg(main_path.to_str().unwrap())
         .output()
         .expect("Failed to execute CLI");

@@ -13,10 +13,32 @@ use num_bigint::BigInt;
 pub mod graph;
 pub mod list;
 pub mod hash;
+
+/// Layers that can be compared when using graph.equals() with include:/only: options
+///
+/// By default, graph comparison (==) only compares the Data layer.
+/// Use equals(other, include: [...]) to include additional layers.
+/// Use equals(other, only: [...]) to compare only specific layers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ComparisonLayer {
+    /// User data nodes (default for ==)
+    Data,
+    /// Ad-hoc rules attached via add_rule()
+    Rules,
+    /// Ruleset names (tree, dag, bst, etc.)
+    Rulesets,
+    /// Attached methods (__methods__/*)
+    Methods,
+    /// CLG properties (__properties__/*)
+    Properties,
+    /// All layers (everything)
+    All,
+}
 // pub mod tree; // DELETED in Step 5 - trees are now graphs with rules
 
 pub use graph::{Graph, GraphType, GraphNode, ExecutionPlan};
 pub use list::List;
+// ComparisonLayer is defined in this module, so it's already public
 pub use hash::Hash;
 // Tree type removed - use graph{}.with_ruleset(:tree) instead
 
@@ -479,8 +501,9 @@ pub enum ValueKind {
     Function(Function),
     /// Native function (Phase 11) - Rust-implemented stdlib function
     NativeFunction(crate::stdlib::NativeFunction),
-    /// Graph value (Phase 6)
-    Graph(Graph),
+    /// Graph value (Phase 6) - uses Rc<RefCell> for reference semantics
+    /// This allows graphs to be shared across closures without copying
+    Graph(Rc<RefCell<Graph>>),
     /// Module value (Phase 8) - imported module namespace
     Module(Module),
     /// Error object (Phase 9) - raised errors with type and location info
@@ -512,7 +535,7 @@ impl PartialEq for ValueKind {
             (ValueKind::Map(a), ValueKind::Map(b)) => a == b,
             (ValueKind::Function(a), ValueKind::Function(b)) => a == b,
             (ValueKind::NativeFunction(_), ValueKind::NativeFunction(_)) => false, // Never equal
-            (ValueKind::Graph(a), ValueKind::Graph(b)) => a == b,
+            (ValueKind::Graph(a), ValueKind::Graph(b)) => *a.borrow() == *b.borrow(),
             (ValueKind::Module(a), ValueKind::Module(b)) => a == b,
             (ValueKind::Error(a), ValueKind::Error(b)) => a == b,
             (ValueKind::PatternNode(a), ValueKind::PatternNode(b)) => a == b,
@@ -593,7 +616,7 @@ impl Value {
 
     pub fn graph(g: Graph) -> Self {
         let frozen = g.is_frozen();
-        Value { kind: ValueKind::Graph(g), frozen }
+        Value { kind: ValueKind::Graph(Rc::new(RefCell::new(g))), frozen }
     }
 
     pub fn module(m: Module) -> Self {
@@ -660,7 +683,7 @@ impl Value {
             ValueKind::Symbol(_) => true,
             ValueKind::Function(_) => true, // Functions are always truthy
             ValueKind::NativeFunction(_) => true, // Native functions are always truthy
-            ValueKind::Graph(g) => g.node_count() > 0,
+            ValueKind::Graph(g) => g.borrow().node_count() > 0,
             ValueKind::Module(_) => true, // Modules are always truthy
             ValueKind::Error(_) => true, // Errors are always truthy
             ValueKind::PatternNode(_) => true, // Pattern objects are always truthy
@@ -735,6 +758,7 @@ impl Value {
                 "<native function>".to_string()
             }
             ValueKind::Graph(g) => {
+                let g = g.borrow();
                 format!("<graph: {} nodes, {} edges>", g.node_count(), g.edge_count())
             }
             ValueKind::Module(m) => {
@@ -836,6 +860,7 @@ impl Value {
             }
             ValueKind::Graph(graph) => {
                 // Freeze all node values in the graph
+                let mut graph = graph.borrow_mut();
                 for node_id in graph.nodes.keys().cloned().collect::<Vec<_>>() {
                     if let Some(node) = graph.nodes.get_mut(&node_id) {
                         node.value.freeze();
@@ -867,7 +892,7 @@ impl Value {
                 new_map.graph = map.graph.deep_copy_unfrozen();
                 ValueKind::Map(new_map)
             }
-            ValueKind::Graph(graph) => ValueKind::Graph(graph.deep_copy_unfrozen()),
+            ValueKind::Graph(graph) => ValueKind::Graph(Rc::new(RefCell::new(graph.borrow().deep_copy_unfrozen()))),
             // Primitive types just clone
             other => other.clone(),
         };

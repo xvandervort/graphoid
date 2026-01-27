@@ -5,7 +5,7 @@ use std::process::Command;
 
 #[test]
 fn test_example_hello_world() {
-    let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
+    let output = Command::new(env!("CARGO_BIN_EXE_gr"))
         .arg("samples/01-basics/hello_world.gr")
         .output()
         .expect("Failed to execute hello_world.gr");
@@ -24,7 +24,7 @@ fn test_example_hello_world() {
 
 #[test]
 fn test_example_behaviors() {
-    let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
+    let output = Command::new(env!("CARGO_BIN_EXE_gr"))
         .arg("samples/02-intermediate/behaviors.gr")
         .output()
         .expect("Failed to execute behaviors.gr");
@@ -45,7 +45,7 @@ fn test_example_behaviors() {
 
 #[test]
 fn test_example_collections() {
-    let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
+    let output = Command::new(env!("CARGO_BIN_EXE_gr"))
         .arg("samples/01-basics/collections.gr")
         .output()
         .expect("Failed to execute collections.gr");
@@ -78,7 +78,7 @@ fn test_example_collections() {
 
 #[test]
 fn test_example_functions() {
-    let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
+    let output = Command::new(env!("CARGO_BIN_EXE_gr"))
         .arg("samples/01-basics/functions.gr")
         .output()
         .expect("Failed to execute functions.gr");
@@ -98,7 +98,7 @@ fn test_example_functions() {
 
 #[test]
 fn test_example_graphs() {
-    let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
+    let output = Command::new(env!("CARGO_BIN_EXE_gr"))
         .arg("samples/01-basics/graphs.gr")
         .output()
         .expect("Failed to execute graphs.gr");
@@ -119,7 +119,7 @@ fn test_example_graphs() {
 /// Test that verifies stdlib math module import works correctly
 #[test]
 fn test_modules_main_stdlib_math() {
-    let output = Command::new(env!("CARGO_BIN_EXE_graphoid"))
+    let output = Command::new(env!("CARGO_BIN_EXE_gr"))
         .arg("samples/04-modules/modules_main.gr")
         .output()
         .expect("Failed to execute modules_main.gr");

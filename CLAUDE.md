@@ -287,23 +287,25 @@ The `dev_docs/` directory contains **comprehensive development documentation** i
 ### Development Commands
 
 ```bash
-# Rust implementation (ACTIVE)
-# From project root
+# Build and install
+make build              # Build release binary
+make install            # Install to ~/.local
+make install PREFIX=/usr/local  # System-wide install
 
-# Build
-~/.cargo/bin/cargo build
+# Testing
+make test               # Run Rust unit tests
+make spec               # Run Graphoid spec tests
 
-# Run tests
-~/.cargo/bin/cargo test --lib
+# Running Graphoid (after installation)
+gr                      # Start REPL
+gr file.gr              # Run a file
+gr spec tests/          # Run spec tests
+gr help                 # Show help
 
-# Run REPL
-~/.cargo/bin/cargo run
-
-# Execute a .gr file
-~/.cargo/bin/cargo run -- path/to/file.gr
-
-# Run with release optimizations
-~/.cargo/bin/cargo build --release
+# During development (without installing)
+cargo build             # Debug build
+cargo test --lib        # Rust tests
+./target/debug/gr file.gr  # Run with debug build
 ```
 
 ### Python Reference Implementation
@@ -514,7 +516,7 @@ Graphoid includes **professional-grade tooling** from day one:
 
 ### 1. Testing Framework (Phase 13)
 - **RSpec-style** behavior-driven testing
-- Command: `graphoid spec`
+- Command: `gr spec`
 - File extension: `.spec.gr`
 - Natural language expectations
 - Hierarchical organization
@@ -629,8 +631,9 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 18-phase plan:
 - **HTTPS: ✅ Working** via `http.get()`
 - Total tests: **2,228+ passing**
 - Samples: **30/30 working**
-- Command: `~/.cargo/bin/cargo test --lib`
-- Build: `~/.cargo/bin/cargo build`
+- Install: `make install`
+- Run: `gr file.gr`
+- Test: `make test` (Rust) / `gr spec tests/` (Graphoid)
 
 ---
 
@@ -672,7 +675,7 @@ See `dev_docs/RUST_IMPLEMENTATION_ROADMAP.md` for the complete 18-phase plan:
 1. ✅ Implement feature in Rust
 2. ✅ Write Rust unit tests (TDD)
 3. ✅ **Create `.gr` example file(s)** demonstrating the feature
-4. ✅ Run the example to verify it works: `cargo run --quiet samples/your_example.gr`
+4. ✅ Run the example to verify it works: `gr samples/your_example.gr`
 5. ✅ Update `samples/README.md` with description
 6. ✅ Consider updating `docs/QUICKSTART.md` if it's a major feature
 
@@ -743,15 +746,15 @@ pub fn shortest_path(&self, from: &str, to: &str, edge_type: Option<&str>, weigh
 - ✅ **ALWAYS** create `.gr` example files in `samples/` for new features
 - ✅ **ALWAYS** write tests BEFORE implementation (TDD)
 - ✅ **ALWAYS** register methods/functions in executor after implementing
-- ✅ **ALWAYS** verify examples run: `cargo run --quiet samples/your_example.gr`
+- ✅ **ALWAYS** verify examples run: `gr samples/your_example.gr`
 - Tests in `tests/unit/` should import from the crate: `use graphoid::module::Type;`
 - Each source module can have a corresponding test file (e.g., `src/graph/rules.rs` → `tests/unit/graph_rules_tests.rs`)
 - Register new test files in `tests/unit_tests.rs`
 
 **Verification**:
 - Rust: Run `find src -name "*.rs" -exec grep -l "#\[cfg(test)\]" {} \;` - should return no results
-- Integration: Run `bash scripts/test_integration.sh` - all .gr files should execute
-- Examples: Run `for f in examples/*.gr; do cargo run --quiet "$f" || exit 1; done` - all examples should run successfully
+- Specs: Run `gr spec tests/gspec/` - all spec tests should pass
+- Samples: Run `for f in samples/**/*.gr; do gr "$f" || echo "FAIL: $f"; done` - samples should run
 
 **Why TDD**: Writing tests first ensures complete test coverage, better API design, prevents regressions, and validates requirements before implementation.
 
@@ -845,9 +848,10 @@ Still in progress: Testing framework, debugger, package manager.
 
 ### Can I use Graphoid today?
 
-Yes! The Rust implementation is functional. Try:
+Yes! Install and try it:
 ```bash
-~/.cargo/bin/cargo run --quiet samples/01-basics/hello_world.gr
+make install
+gr samples/01-basics/hello_world.gr
 ```
 
 ### What makes Graphoid different from other languages?
@@ -874,41 +878,28 @@ Yes! The Rust implementation is functional. Try:
 
 **START HERE**: Read `START_HERE_NEXT_SESSION.md` for detailed guide
 
-**Major Milestone Achieved: Pure Graphoid HTTPS Working! (December 2025)**
-
-**Last Session**: December 1-2, 2025
+**Last Session**: January 13, 2026
 
 **Recent Accomplishments**:
-- ✅ **TLS 1.3 Complete** - X25519, AES-GCM, HKDF working in pure Graphoid
-- ✅ **HTTPS Working** - `http.get("https://...")` fetches real websites
-- ✅ **6 Major Bugs Fixed** - Module resolution, HMAC, stdlib path, etc.
-- ✅ **Project Restructured** - No more `rust/` subdirectory
+- ✅ **Complete gspec Coverage** - All sample directories now tested
+- ✅ **27 gspec Test Files** - **621 tests passing** (was 490)
+- ✅ **5 New Spec Files** - class_like_graphs, graph_features, advanced_patterns, modules, approx
+- ✅ **Bug Fixed** - Module imports in spec files were polluting global scope
 
-**Next Goal**: Build Bitcoin Price Tracker application
-- Fetch BTC prices via HTTPS
-- Store in JSON
-- Perform statistical analysis
-- All in 100% Graphoid
+**Sample Test Coverage Status**
 
-**🚀 Recommended Next Steps:**
+| Directory | Samples | Coverage | Status |
+|-----------|---------|----------|--------|
+| `01-basics/` | 4 | 3 | Done |
+| `02-intermediate/` | 13 | 13 | **Complete** |
+| `03-advanced/` | 23 | 23 | **Complete** |
+| `04-modules/` | 6 | 6 | **Complete** |
+| `05-stdlib/` | 4 | 4 | **Complete** |
 
-1. **⭐ RECOMMENDED: Bitcoin Price Tracker** (The original goal!)
-   - Fetch BTC prices from a public API via HTTPS
-   - Store historical data in JSON files
-   - Calculate statistics (mean, std dev, trends)
-   - Ask: "Let's build the Bitcoin price tracker"
-
-2. **Add HTTP POST Support** (~1 day)
-   - Extend http.gr with `http.post(url, body, headers)`
-   - Needed for APIs that require POST
-
-3. **Complete API Reference Documentation** (~2-3 days)
-   - Finish remaining stdlib module documentation
-   - Document tls.gr and http.gr
-
-4. **Improve TLS Error Handling** (~1 day)
-   - Better error messages for connection failures
-   - Timeout handling
+**Potential Next Steps:**
+1. HTTP POST support for `http.gr`
+2. Continue toward self-hosting (concurrency, async)
+3. Package manager design
 
 ---
 

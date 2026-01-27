@@ -20,48 +20,46 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 ### Installing Graphoid
 
-The recommended way to install Graphoid system-wide:
-
 ```bash
-# Ensure ~/.cargo/bin is in your PATH (add to ~/.bashrc if not already there)
-echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
+# Clone the repository
+git clone https://github.com/yourusername/graphoid.git
+cd graphoid
 
-# Install Graphoid
-cargo install --path /path/to/grang
+# Install to ~/.local (recommended)
+make install
+
+# Or install system-wide
+sudo make install PREFIX=/usr/local
 ```
 
-After installation, `graphoid` will be available anywhere:
-
+Ensure `~/.local/bin` is in your PATH. Add to your `~/.bashrc` if needed:
 ```bash
-graphoid --version
-graphoid samples/01-basics/hello_world.gr
-graphoid   # Starts the REPL
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-### Building from Source (Alternative)
-
-If you prefer not to install system-wide:
+After installation, `gr` is available anywhere:
 
 ```bash
-cargo build --release
+gr version
+gr samples/01-basics/hello_world.gr
+gr   # Starts the REPL
 ```
-
-The compiled binary will be at `target/release/graphoid`.
 
 ### Quick Test
 
 ```bash
-graphoid
+gr
 ```
 
 You should see the Graphoid REPL prompt:
 
 ```
-graphoid>
+Graphoid v0.1.0
+Type /exit to quit, /help for help
+>
 ```
 
-Type `exit` or press Ctrl+D to quit.
+Type `/exit` or press Ctrl+D to quit.
 
 ## Your First Graphoid Program
 
@@ -70,34 +68,34 @@ Type `exit` or press Ctrl+D to quit.
 The fastest way to try Graphoid is the interactive REPL:
 
 ```bash
-~/.cargo/bin/cargo run --quiet
+gr
 ```
 
 Try these commands:
 
 ```graphoid
-graphoid> print("Hello, Graphoid!")
+> print("Hello, Graphoid!")
 Hello, Graphoid!
 
-graphoid> name = "Alice"
+> name = "Alice"
 Alice
 
-graphoid> age = 25
+> age = 25
 25
 
-graphoid> print(name, "is", age, "years old")
+> print(name, "is", age, "years old")
 Alice is 25 years old
 
-graphoid> numbers = [1, 2, 3, 4, 5]
+> numbers = [1, 2, 3, 4, 5]
 [1, 2, 3, 4, 5]
 
-graphoid> doubled = numbers.map(x => x * 2)
+> doubled = numbers.map(x => x * 2)
 [2, 4, 6, 8, 10]
 
-graphoid> print("Doubled:", doubled)
+> print("Doubled:", doubled)
 Doubled: [2, 4, 6, 8, 10]
 
-graphoid> exit
+> /exit
 ```
 
 ### File Mode
@@ -129,7 +127,7 @@ print("Even numbers:", evens)
 Run it:
 
 ```bash
-graphoid hello.gr
+gr hello.gr
 ```
 
 Output:
@@ -455,6 +453,19 @@ load "./utilities.gr"
 result = square(5)  # No module prefix needed
 ```
 
+The `load` statement accepts expressions, not just string literals:
+
+```graphoid
+# Load from a variable
+config_path = "config/" + environment + ".gr"
+load config_path
+
+# Dynamic loading in a loop
+for file in spec_files {
+    load file
+}
+```
+
 **Import vs Load:**
 - **`import`**: Creates isolated namespace, access via alias
 - **`load`**: Merges directly into current namespace
@@ -550,7 +561,7 @@ See `samples/04-modules/` for complete working module examples:
 
 Run them:
 ```bash
-graphoid samples/04-modules/app_main.gr
+gr samples/04-modules/app_main.gr
 ```
 
 ---
@@ -729,12 +740,12 @@ print("Highest:", sorted_scores.last())
 Check out the `samples/` directory for more complete examples:
 
 ```bash
-graphoid samples/01-basics/hello_world.gr
-graphoid samples/01-basics/collections.gr
-graphoid samples/02-intermediate/behaviors.gr
-graphoid samples/04-modules/app_main.gr
-graphoid samples/01-basics/functions.gr
-graphoid samples/01-basics/graphs.gr
+gr samples/01-basics/hello_world.gr
+gr samples/01-basics/collections.gr
+gr samples/02-intermediate/behaviors.gr
+gr samples/04-modules/app_main.gr
+gr samples/01-basics/functions.gr
+gr samples/01-basics/graphs.gr
 ```
 
 See `samples/README.md` for detailed descriptions.
@@ -750,7 +761,8 @@ See `samples/README.md` for detailed descriptions.
 See the comprehensive test suite:
 
 ```bash
-cargo test --lib
+make test          # Rust unit tests
+gr spec tests/     # Graphoid spec tests
 ```
 
 Currently **2,228+ tests passing** with zero failures!
@@ -846,8 +858,8 @@ m.PI                 # Access constant
 
 - **Examples**: `samples/`
 - **Documentation**: `docs/` and `dev_docs/`
-- **Tests**: Run `cargo test --lib` to see working examples
-- **REPL**: Try things interactively with `graphoid`
+- **Tests**: Run `make test` or `gr spec tests/`
+- **REPL**: Try things interactively with `gr`
 
 ## Tips & Tricks
 

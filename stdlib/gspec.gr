@@ -1,0 +1,515 @@
+# gspec.gr - RSpec-style testing framework for Graphoid
+#
+# Usage:
+#   import "gspec"
+#
+#   result = expect(5).to_equal(5)
+#   if result["pass"] { print("Test passed!") }
+
+module gspec_module alias gspec
+
+# =============================================================================
+# Expectation Graph - Wraps a value and provides matchers
+# =============================================================================
+
+graph Expectation {
+    _actual: none
+    _negated: false
+    _tolerance: none
+
+    # Create a new Expectation wrapping the given value
+    fn new(actual) {
+        e = self.clone()
+        e._actual = actual
+        e._negated = false
+        e._tolerance = none
+        return e
+    }
+
+    # Negate the expectation (for expect(x).negate().to_equal(y))
+    fn negate() {
+        _negated = true
+        return self
+    }
+
+    # Alias for negate() - more readable: expect(x).to_not().equal(y)
+    # Note: 'not' is a reserved keyword, so we use 'to_not' instead
+    fn to_not() {
+        return negate()
+    }
+
+    # Helper to build result map, applying negation
+    fn _result(passed, fail_msg, negated_fail_msg) {
+        final_passed = passed
+        if _negated {
+            final_passed = not passed
+        }
+
+        if final_passed {
+            return {"pass": true, "message": ""}
+        } else {
+            if _negated {
+                return {"pass": false, "message": negated_fail_msg}
+            } else {
+                return {"pass": false, "message": fail_msg}
+            }
+        }
+    }
+
+    # --- Equality Matchers ---
+
+    fn to_equal(expected) {
+        return _result(
+            _actual == expected,
+            "Expected " + expected.to_string() + " but got " + _actual.to_string(),
+            "Expected " + _actual.to_string() + " not to equal " + expected.to_string()
+        )
+    }
+
+    fn to_be(expected) {
+        return to_equal(expected)
+    }
+
+    # --- Truthiness Matchers ---
+
+    fn to_be_truthy() {
+        passed = false
+        if _actual { passed = true }
+        return _result(
+            passed,
+            "Expected " + _actual.to_string() + " to be truthy",
+            "Expected " + _actual.to_string() + " not to be truthy"
+        )
+    }
+
+    fn to_be_falsy() {
+        passed = true
+        if _actual { passed = false }
+        return _result(
+            passed,
+            "Expected " + _actual.to_string() + " to be falsy",
+            "Expected " + _actual.to_string() + " not to be falsy"
+        )
+    }
+
+    fn to_be_none() {
+        return _result(
+            _actual == none,
+            "Expected none but got " + _actual.to_string(),
+            "Expected value not to be none"
+        )
+    }
+
+    # --- Type Matchers ---
+
+    fn to_be_a(expected_type) {
+        actual_type = _actual.type()
+        return _result(
+            actual_type == expected_type,
+            "Expected a " + expected_type + " but got " + actual_type,
+            "Expected " + _actual.to_string() + " not to be a " + expected_type
+        )
+    }
+
+    # --- Collection Matchers ---
+
+    fn to_contain(element) {
+        return _result(
+            _actual.contains(element),
+            "Expected " + _actual.to_string() + " to contain " + element.to_string(),
+            "Expected " + _actual.to_string() + " not to contain " + element.to_string()
+        )
+    }
+
+    fn to_be_empty() {
+        return _result(
+            _actual.length() == 0,
+            "Expected empty but got " + _actual.to_string() + " with length " + _actual.length().to_string(),
+            "Expected " + _actual.to_string() + " not to be empty"
+        )
+    }
+
+    fn to_have_length(expected_length) {
+        actual_length = _actual.length()
+        return _result(
+            actual_length == expected_length,
+            "Expected length " + expected_length.to_string() + " but got " + actual_length.to_string(),
+            "Expected " + _actual.to_string() + " not to have length " + expected_length.to_string()
+        )
+    }
+
+    # --- Comparison Matchers ---
+
+    fn to_be_greater_than(expected) {
+        return _result(
+            _actual > expected,
+            "Expected " + _actual.to_string() + " to be greater than " + expected.to_string(),
+            "Expected " + _actual.to_string() + " not to be greater than " + expected.to_string()
+        )
+    }
+
+    fn to_be_less_than(expected) {
+        return _result(
+            _actual < expected,
+            "Expected " + _actual.to_string() + " to be less than " + expected.to_string(),
+            "Expected " + _actual.to_string() + " not to be less than " + expected.to_string()
+        )
+    }
+
+    fn to_be_at_least(expected) {
+        return _result(
+            _actual >= expected,
+            "Expected " + _actual.to_string() + " to be at least " + expected.to_string(),
+            "Expected " + _actual.to_string() + " not to be at least " + expected.to_string()
+        )
+    }
+
+    fn to_be_at_most(expected) {
+        return _result(
+            _actual <= expected,
+            "Expected " + _actual.to_string() + " to be at most " + expected.to_string(),
+            "Expected " + _actual.to_string() + " not to be at most " + expected.to_string()
+        )
+    }
+
+    # --- Approximate Matching ---
+
+    # Check if actual is within tolerance of expected (absolute difference)
+    # Example: expect(3.14159).to_be_close_to(3.14, 0.01)
+    fn to_be_close_to(expected, tolerance) {
+        diff = _actual - expected
+        if diff < 0 {
+            diff = -diff
+        }
+        return _result(
+            diff <= tolerance,
+            "Expected " + _actual.to_string() + " to be within " + tolerance.to_string() + " of " + expected.to_string() + " (difference: " + diff.to_string() + ")",
+            "Expected " + _actual.to_string() + " not to be close to " + expected.to_string()
+        )
+    }
+
+    # Alias for to_be_close_to - more RSpec-like naming
+    fn to_be_within(tolerance) {
+        # Returns self to allow chaining: expect(x).to_be_within(0.01).of(y)
+        # We store tolerance in the expectation for use by .of()
+        _tolerance = tolerance
+        return self
+    }
+
+    # Complete the to_be_within(x).of(y) chain
+    fn of(expected) {
+        diff = _actual - expected
+        if diff < 0 {
+            diff = -diff
+        }
+        tol = _tolerance
+        if tol == none {
+            tol = 0.0001  # default tolerance
+        }
+        return _result(
+            diff <= tol,
+            "Expected " + _actual.to_string() + " to be within " + tol.to_string() + " of " + expected.to_string() + " (difference: " + diff.to_string() + ")",
+            "Expected " + _actual.to_string() + " not to be within " + tol.to_string() + " of " + expected.to_string()
+        )
+    }
+
+    # --- Exception Matchers ---
+
+    fn to_raise(expected_type) {
+        caught_type = none
+        error_raised = false
+
+        try {
+            _actual()
+        } catch ValueError as e {
+            caught_type = "ValueError"
+            error_raised = true
+        } catch TypeError as e {
+            caught_type = "TypeError"
+            error_raised = true
+        } catch IOError as e {
+            caught_type = "IOError"
+            error_raised = true
+        } catch NetworkError as e {
+            caught_type = "NetworkError"
+            error_raised = true
+        } catch ParseError as e {
+            caught_type = "ParseError"
+            error_raised = true
+        } catch RuntimeError as e {
+            caught_type = "RuntimeError"
+            error_raised = true
+        } catch as e {
+            caught_type = e.type()
+            error_raised = true
+        }
+
+        passed = error_raised and caught_type == expected_type
+        fail_msg = "Expected " + expected_type + " but no error was raised"
+        if error_raised {
+            fail_msg = "Expected " + expected_type + " but got " + caught_type
+        }
+        return _result(
+            passed,
+            fail_msg,
+            "Expected not to raise " + expected_type + " but it did"
+        )
+    }
+
+    fn to_not_raise() {
+        error_raised = false
+        caught_msg = ""
+
+        try {
+            _actual()
+        } catch as e {
+            error_raised = true
+            caught_msg = e.message()
+        }
+
+        return _result(
+            not error_raised,
+            "Expected no error but got: " + caught_msg,
+            "Expected to raise an error but none was raised"
+        )
+    }
+}
+
+# =============================================================================
+# TestRunner Graph - Manages test execution and reporting
+# =============================================================================
+
+graph TestRunner {
+    passed: 0
+    failed: 0
+    skipped: 0
+    indent: 0
+    before_hooks: []
+    after_hooks: []
+    failed_tests: []
+    _context_stack: []
+
+    # Helper to build indentation string
+    fn _indent_str() {
+        return string.generate("  ", indent)
+    }
+
+    # Register a before_each hook for the current describe block
+    fn before_each(hook) {
+        before_hooks.append!(hook)
+    }
+
+    # Register an after_each hook for the current describe block
+    fn after_each(hook) {
+        after_hooks.append!(hook)
+    }
+
+    # Build the full context path for failed test reporting
+    fn _full_context() {
+        if _context_stack.length() == 0 {
+            return ""
+        }
+        return _context_stack.join(" > ")
+    }
+
+    # Describe a test suite
+    fn describe(name, block) {
+        print(_indent_str() + name)
+
+        # Save current hooks, update indent, push context, run block, restore all
+        saved_before = before_hooks.slice(0, before_hooks.length())
+        saved_after = after_hooks.slice(0, after_hooks.length())
+        _context_stack.append!(name)
+        indent = indent + 1
+        block()
+        indent = indent - 1
+        _context_stack.pop!()
+        before_hooks = saved_before
+        after_hooks = saved_after
+    }
+
+    # Context is an alias for describe (for nested grouping)
+    fn context(name, block) {
+        describe("when " + name, block)
+    }
+
+    # Define a single test case
+    # If block returns an expectation result (map with "pass" key), auto-assert it
+    fn it(description, block) {
+        prefix = _indent_str()
+
+        # Run before_each hooks
+        for hook in before_hooks {
+            hook()
+        }
+
+        # Run the test and catch any exceptions
+        test_passed = true
+        error_msg = ""
+
+        try {
+            result = block()
+            # Check if block returned an expectation result
+            if result != none {
+                if result.type() == "map" {
+                    if result.has_key("pass") {
+                        if not result["pass"] {
+                            test_passed = false
+                            error_msg = result["message"]
+                        }
+                    }
+                }
+            }
+        } catch as e {
+            test_passed = false
+            error_msg = e.message()
+        }
+
+        # Run after_each hooks (even if test failed)
+        for hook in after_hooks {
+            try {
+                hook()
+            } catch as e {
+                # Log but don't override test failure
+                if test_passed {
+                    test_passed = false
+                    error_msg = "after_each hook failed: " + e.message()
+                }
+            }
+        }
+
+        if test_passed {
+            passed = passed + 1
+            print(prefix + "  PASS: " + description)
+        } else {
+            failed = failed + 1
+            print(prefix + "  FAIL: " + description)
+            if error_msg.length() > 0 {
+                print(prefix + "    Error: " + error_msg)
+            }
+            # Record the failed test with full context
+            ctx = _full_context()
+            full_name = description
+            if ctx.length() > 0 {
+                full_name = ctx + " > " + description
+            }
+            failed_tests.append!({"name": full_name, "error": error_msg})
+        }
+    }
+
+    # Skip a test (xit = "excluded it")
+    fn xit(description, block) {
+        prefix = _indent_str()
+        skipped = skipped + 1
+        print(prefix + "  SKIP: " + description)
+    }
+
+    # Mark a test as pending (placeholder - no block needed)
+    fn pending(description) {
+        prefix = _indent_str()
+        skipped = skipped + 1
+        print(prefix + "  PENDING: " + description)
+    }
+
+    # Get test summary as a map
+    fn summary() {
+        total = passed + failed + skipped
+        return {
+            "passed": passed,
+            "failed": failed,
+            "skipped": skipped,
+            "total": total,
+            "failed_tests": failed_tests
+        }
+    }
+
+    # Print test summary
+    fn print_summary() {
+        total = passed + failed + skipped
+        print("")
+        print("=== Test Summary ===")
+        summary_line = passed.to_string() + " passed, " + failed.to_string() + " failed"
+        if skipped > 0 {
+            summary_line = summary_line + ", " + skipped.to_string() + " skipped"
+        }
+        summary_line = summary_line + ", " + total.to_string() + " total"
+        print(summary_line)
+        if failed == 0 {
+            if skipped > 0 {
+                print("ALL TESTS PASSED! (some skipped)")
+            } else {
+                print("ALL TESTS PASSED!")
+            }
+        } else {
+            print("SOME TESTS FAILED")
+        }
+    }
+
+    # Print final summary (called by spec runner after all files)
+    # Returns true if there were failures
+    fn final_summary() {
+        total = passed + failed + skipped
+        separator = string.generate("=", 60)
+
+        print("")
+        print(separator)
+        print("FINAL SUMMARY")
+        print(separator)
+
+        summary_line = passed.to_string() + " passed, " + failed.to_string() + " failed, " + skipped.to_string() + " skipped, " + total.to_string() + " total"
+        print(summary_line)
+
+        if failed_tests.length() > 0 {
+            print("")
+            print("Failed tests:")
+            for test in failed_tests {
+                print("  " + test["name"])
+                if test["error"].length() > 0 {
+                    print("    Error: " + test["error"])
+                }
+            }
+        }
+
+        if failed > 0 {
+            print("")
+            print("SOME TESTS FAILED")
+            return true
+        } else if skipped > 0 {
+            print("")
+            print("ALL TESTS PASSED (some skipped)")
+            return false
+        } else {
+            print("")
+            print("ALL TESTS PASSED")
+            return false
+        }
+    }
+}
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+# Create an Expectation for the given value
+fn expect(actual) {
+    return Expectation.new(actual)
+}
+
+# Assert an expectation result - raises AssertionError if it fails
+# This allows multiple assertions per test without needing to return:
+#
+#   runner.it("checks multiple things", () => {
+#       assert(expect(x).to_equal(1))
+#       assert(expect(y).to_equal(2))
+#       assert(expect(z).to_be_truthy())
+#   })
+#
+fn assert(result) {
+    if result.type() == "map" {
+        if result.has_key("pass") {
+            if not result["pass"] {
+                raise ValueError("Assertion failed: " + result["message"])
+            }
+        }
+    }
+}

@@ -1,0 +1,141 @@
+# bitwise_unsigned_spec.gr - Tests for unsigned mode bitwise operations
+#
+# Tests the configure { :unsigned } directive for logical right shift.
+# Run with: gr spec tests/gspec/bitwise_unsigned_spec.gr
+
+describe "Bitwise Unsigned Mode" {
+
+    describe "signed right shift (default)" {
+
+        it "preserves sign bit for negative numbers" {
+            # -16 >> 2 should be -4 in signed mode (arithmetic shift)
+            expect(-16 >> 2).to_equal(-4)
+        }
+
+        it "preserves sign bit for -8 >> 1" {
+            expect(-8 >> 1).to_equal(-4)
+        }
+
+        it "preserves sign bit for -32 >> 3" {
+            expect(-32 >> 3).to_equal(-4)
+        }
+
+        it "works normally for positive numbers" {
+            expect(64 >> 2).to_equal(16)
+        }
+
+        it "shifts positive numbers correctly" {
+            assert(expect(16 >> 1).to_equal(8))
+            assert(expect(32 >> 2).to_equal(8))
+            assert(expect(128 >> 4).to_equal(8))
+        }
+    }
+
+    describe "unsigned right shift" {
+
+        it "treats negative numbers as unsigned" {
+            configure { :unsigned } {
+                result = -16 >> 2
+                # In unsigned mode, -16 is treated as a large positive number
+                # The result should be a large positive number, not -4
+                expect(result).to_be_greater_than(0)
+            }
+        }
+
+        it "produces different result than signed for negative numbers" {
+            signed_result = -16 >> 2
+            unsigned_result = none
+            configure { :unsigned } {
+                unsigned_result = -16 >> 2
+            }
+            expect(unsigned_result).to_not().to_equal(signed_result)
+        }
+
+        it "returns same result as signed for positive numbers" {
+            signed_result = 64 >> 2
+            unsigned_result = none
+            configure { :unsigned } {
+                unsigned_result = 64 >> 2
+            }
+            expect(unsigned_result).to_equal(signed_result)
+        }
+
+        it "works with binary literals" {
+            configure { :unsigned } {
+                value = 0b10110000
+                shifted = value >> 2
+                # 176 >> 2 = 44
+                expect(shifted).to_equal(44)
+            }
+        }
+
+        it "works with hex literals" {
+            configure { :unsigned } {
+                value = 0xFF
+                shifted = value >> 4
+                # 255 >> 4 = 15
+                expect(shifted).to_equal(15)
+            }
+        }
+    }
+
+    describe "scoped configuration" {
+
+        it "mode reverts after block" {
+            # Before block - signed mode
+            before = -8 >> 1
+
+            # Inside block - unsigned mode
+            inside = none
+            configure { :unsigned } {
+                inside = -8 >> 1
+            }
+
+            # After block - signed mode again
+            after = -8 >> 1
+
+            assert(expect(before).to_equal(-4))
+            assert(expect(after).to_equal(-4))
+            assert(expect(inside).to_be_greater_than(0))
+        }
+
+        it "does not affect other bitwise operations" {
+            configure { :unsigned } {
+                # AND, OR, XOR, NOT should work the same
+                assert(expect(15 & 7).to_equal(7))
+                assert(expect(8 | 4).to_equal(12))
+                assert(expect(15 ^ 9).to_equal(6))
+            }
+        }
+
+        it "left shift is unaffected by unsigned mode" {
+            signed_left = 4 << 2
+            unsigned_left = none
+            configure { :unsigned } {
+                unsigned_left = 4 << 2
+            }
+            expect(unsigned_left).to_equal(signed_left)
+        }
+    }
+
+    describe "practical use cases" {
+
+        it "extracts bits correctly in unsigned mode" {
+            configure { :unsigned } {
+                # Extract lower nibble
+                value = 0xAB
+                lower = value & 0x0F
+                expect(lower).to_equal(0x0B)
+            }
+        }
+
+        it "can combine with masking operations" {
+            configure { :unsigned } {
+                value = 0xFF00AB12
+                # Extract second byte from right
+                byte2 = (value >> 8) & 0xFF
+                expect(byte2).to_equal(0xAB)
+            }
+        }
+    }
+}
