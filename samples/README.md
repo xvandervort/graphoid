@@ -23,7 +23,8 @@ samples/
 ├── 02-intermediate/    (13 files) - Core features
 ├── 03-advanced/        (5 files)  - Graph pattern matching
 ├── 04-modules/         (6 files)  - Code organization
-└── 05-stdlib/          (4 files)  - Standard library
+├── 05-stdlib/          (4 files)  - Standard library
+└── 06-projects/        (2 projects) - Full applications
 ```
 
 ## Learning Path
@@ -487,6 +488,35 @@ Topics:
 
 ```bash
 gr samples/05-stdlib/time_type.gr
+```
+
+## 06-projects/ - Full Applications
+
+Real-world applications built with Graphoid.
+
+### `dysregulation/` ⭐⭐⭐
+**Systems theory simulation of addiction and regulatory failure**
+
+Topics:
+- Complex system dynamics (Homeostasis vs. Dysregulation)
+- Simulation loop with time-series data
+- ASCII visualization of system state
+- Modeling hidden variables (Integrity)
+
+```bash
+gr samples/06-projects/dysregulation/main.gr
+```
+
+### `elevator/` ⭐⭐⭐
+**Elevator simulation**
+
+Topics:
+- Object-oriented graph patterns
+- State machines
+- Simulation logic
+
+```bash
+gr samples/06-projects/elevator/sim_demo.gr
 ```
 
 ---

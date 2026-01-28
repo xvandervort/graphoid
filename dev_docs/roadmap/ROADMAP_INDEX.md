@@ -60,6 +60,11 @@ These features are required by the Graphoid Platform and should be implemented a
 | Phase | Name | Priority | Duration | Dependencies |
 |-------|------|----------|----------|--------------|
 | [18.5](PHASE_18_5_PLATFORM_SUPPORT.md) | Platform Support | **CRITICAL** | 5-7 days | None |
+| [18.6](PHASE_18_6_SERVER_CAPABILITIES.md) | Server Capabilities | **CRITICAL** | 3-5 days | Phase 11 |
+
+### Unlocks
+Once Phase 18.6 is complete, development can begin on **GraphWeb**, a Sinatra-like web framework.
+See: [PLAN_WEB_FRAMEWORK.md](PLAN_WEB_FRAMEWORK.md)
 
 **Features**: Timers, signal handling, module reload, file watching, stack traces, runtime introspection.
 
@@ -268,15 +273,15 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 
 ## Timeline Estimates
 
-### Platform Support (Phase 18.5)
-**Estimated**: 1 week
+### Platform Support (Phase 18.5 - 18.6)
+**Estimated**: 2 weeks
 **Can Start**: Immediately (no dependencies)
 
 | Milestone | Features | Duration |
 |-----------|----------|----------|
 | Timers & Signals | `timer.after`, `timer.every`, `signal.on` | 2-3 days |
 | Module Management | `modules.reload`, `modules.unload` | 1-2 days |
-| File Watching | `fs.watch` | 1 day |
+| Server Caps | `net.bind`, `net.accept`, `http.Server` | 3-5 days |
 | Introspection | `error.stack()`, `__MODULE__`, `runtime.memory()` | 1-2 days |
 
 ### Foundation: Graph-Centric (Phases 15-18)
@@ -396,6 +401,7 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 9.1 | 2026-01-28 | Added Phase 18.6: Server Capabilities (bind/accept/listen) to enable interactive web simulations immediately, replacing the wait for WASM. |
 | 9.0 | 2026-01-23 | Added Phase 18.5: Platform Support (timers, signals, module reload, file watching, introspection). This phase has no dependencies and unblocks Graphoid Platform development. |
 | 8.0 | 2026-01-22 | Phase 29 rewritten as Compilation Strategy (dual-path, interpreter-first for dev, compiled for production). Moved Graphoid Platform out of numbered sequence (now GRAPHOID_PLATFORM.md). Renumbered: 31-33 → 30-32. |
 | 7.0 | 2026-01-20 | Phase 23 rewritten as Distribution Primitives (serialization, remote refs, routing hooks). Added Phase 30: Graphoid Platform (separate project for Pregel, Actors, MapReduce, CRDTs). Renumbered compilation phases: 30-32 → 31-33. |

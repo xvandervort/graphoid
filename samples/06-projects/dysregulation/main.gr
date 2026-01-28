@@ -1,0 +1,35 @@
+load "samples/06-projects/dysregulation/simulation.gr"
+
+# Scenario 1: Resilience
+# A moderate stressor is applied for a short time.
+# The system should adapt (tolerance), then recover when stress ends.
+print("===============================================================")
+print("SCENARIO 1: RESILIENCE (Short, Moderate Stress)")
+print("System adapts to maintain homeostasis and recovers fully.")
+print("===============================================================")
+
+sim1 = Simulation.new("Resilient System")
+schedule1 = [
+    [10, 30, 20.0]  # Start tick, End tick, Amount
+]
+sim1.run(50, schedule1)
+sim1.print_report()
+
+
+# Scenario 2: Dysregulation & Pathology
+# A heavy stressor is applied for a long time.
+# The stress damages the system integrity (controller).
+# When stress ends, the controller is too damaged to re-regulate.
+print("\n")
+print("===============================================================")
+print("SCENARIO 2: DYSREGULATION (Chronic, High Stress)")
+print("System integrity degrades. Regulation fails to reset.")
+print("Result: Crash/Death after stress removal.")
+print("===============================================================")
+
+sim2 = Simulation.new("Addicted System")
+schedule2 = [
+    [10, 60, 50.0]  # Higher dose, longer duration
+]
+sim2.run(90, schedule2)
+sim2.print_report()

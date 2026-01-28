@@ -1,0 +1,72 @@
+import "math"
+
+# The Biological System modeled as a Graph
+graph System {
+    # System Configuration
+    _set_point: 50.0          # The target level for the state
+    _adaptation_rate: 0.2     # How fast the controller adapts
+    _damage_rate: 0.001       # How fast stress damages integrity
+    _healing_rate: 0.005      # How fast integrity recovers
+    
+    # Current State Nodes (stored as properties for easy access)
+    _stressor: 0.0
+    _state: 50.0              # e.g., Dopamine level
+    _regulation: 0.0          # e.g., Receptor downregulation intensity
+    _integrity: 1.0           # 0.0 to 1.0 (Health of the controller)
+
+    fn new() {
+        return self.clone()
+    }
+
+    # Apply an external stressor (e.g., drug dose)
+    fn apply_stressor(amount) {
+        _stressor = amount
+        return self
+    }
+
+    # One unit of time passes
+    fn tick() {
+        # 1. Update Integrity
+        # Stress causes damage. System naturally tries to heal slowly.
+        damage = _stressor * _damage_rate
+        healing = _healing_rate
+        
+        _integrity = _integrity - damage + healing
+        
+        # Clamp integrity between 0.0 and 1.0
+        if _integrity > 1.0 { _integrity = 1.0 }
+        if _integrity < 0.0 { _integrity = 0.0 }
+
+        # 2. Update Regulation (The Controller)
+        # The controller tries to bring State back to SetPoint.
+        # CRITICAL: The speed/ability to adapt depends on Integrity.
+        error = _state - _set_point
+        adaptation = error * _adaptation_rate * _integrity
+        
+        _regulation = _regulation + adaptation
+
+        # 3. Update State (The Process Variable)
+        # State is boosted by Stressor and suppressed by Regulation
+        # We add some natural noise or decay to return to baseline if unperturbed
+        natural_decay = (_state - _set_point) * 0.1
+        
+        _state = _state + _stressor - _regulation - natural_decay
+        
+        # Clamp state to prevent explosion in math (optional, but realistic)
+        if _state < 0.0 { _state = 0.0 }
+        
+        return self
+    }
+
+    # Getters
+    fn state() { return _state }
+    fn regulation() { return _regulation }
+    fn integrity() { return _integrity }
+    fn stressor() { return _stressor }
+    fn set_point() { return _set_point }
+
+    # Status check
+    fn is_alive() {
+        return _state > 0.0 && _state < 200.0 && _integrity > 0.1
+    }
+}
