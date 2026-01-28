@@ -1,5 +1,5 @@
 use graphoid::execution::module_manager::{ModuleManager, Module};
-use graphoid::execution::environment::Environment;
+use graphoid::execution::Environment;
 use std::path::PathBuf;
 
 #[test]

@@ -10,5 +10,6 @@ pub mod values;
 pub mod graph;
 pub mod error;
 pub mod stdlib;
+pub mod namespace;
 
 pub use error::{GraphoidError, Result};

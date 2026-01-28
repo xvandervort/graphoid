@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use crate::error::{Result, GraphoidError, SourcePosition};
-use crate::execution::environment::Environment;
+use crate::execution::Environment;
 use crate::stdlib::NativeModule;
 
 #[derive(Debug, Clone, PartialEq)]

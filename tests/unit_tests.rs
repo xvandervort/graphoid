@@ -49,4 +49,5 @@ mod unit {
     pub mod semantic_edges_tests;
     pub mod exception_handling_tests;
     pub mod graph_equality_tests;
+    pub mod namespace_tests;
 }

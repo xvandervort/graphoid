@@ -13,7 +13,14 @@ pub mod module_manager;
 pub mod pattern_matcher;
 
 pub use config::{Config, ConfigStack, ErrorMode, BoundsCheckingMode, TypeCoercionMode, NoneHandlingMode};
+
+// Phase 15: Conditional Environment type based on feature flag
+#[cfg(not(feature = "graph_namespace"))]
 pub use environment::Environment;
+
+#[cfg(feature = "graph_namespace")]
+pub use crate::namespace::NamespaceGraph as Environment;
+
 pub use error_collector::{ErrorCollector, CollectedError};
 pub use executor::Executor;
 pub use function_graph::{FunctionGraph, FunctionNode, CallEdge, FunctionEdgeType};
