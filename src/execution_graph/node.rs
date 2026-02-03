@@ -206,6 +206,40 @@ impl ExecEdgeType {
     }
 }
 
+impl AstGraphNode {
+    /// Get a string property by name.
+    pub fn get_str(&self, key: &str) -> Option<String> {
+        match self.properties.get(key) {
+            Some(AstProperty::Str(s)) => Some(s.clone()),
+            _ => None,
+        }
+    }
+
+    /// Get an integer property by name.
+    pub fn get_int(&self, key: &str) -> Option<i64> {
+        match self.properties.get(key) {
+            Some(AstProperty::Int(n)) => Some(*n),
+            _ => None,
+        }
+    }
+
+    /// Get a boolean property by name.
+    pub fn get_bool(&self, key: &str) -> Option<bool> {
+        match self.properties.get(key) {
+            Some(AstProperty::Bool(b)) => Some(*b),
+            _ => None,
+        }
+    }
+
+    /// Get a float property by name.
+    pub fn get_num(&self, key: &str) -> Option<f64> {
+        match self.properties.get(key) {
+            Some(AstProperty::Num(n)) => Some(*n),
+            _ => None,
+        }
+    }
+}
+
 /// Property values stored on AST graph nodes.
 /// A small enum for AST-level metadata, avoiding the full Value type.
 #[derive(Debug, Clone, PartialEq)]

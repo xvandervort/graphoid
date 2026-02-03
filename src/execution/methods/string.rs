@@ -5,7 +5,7 @@
 
 use crate::ast::Expr;
 use crate::error::{GraphoidError, Result};
-use crate::execution::executor::Executor;
+use crate::execution::Executor;
 use crate::values::{Value, ValueKind, List};
 
 impl Executor {

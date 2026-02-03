@@ -113,4 +113,39 @@ impl ExecutionGraph {
             edges.retain(|(_, to)| to.arena_id != arena_id);
         }
     }
+
+    /// Merge another graph into this one, remapping arena IDs to avoid conflicts.
+    /// Returns the remapped root NodeRef of the merged graph (if it had one).
+    pub fn merge(&mut self, other: ExecutionGraph) -> Option<NodeRef> {
+        let offset = self.nodes.next_arena_id();
+        let other_max = other.nodes.max_arena_id();
+        let other_root = other.root;
+
+        // Remap helper
+        let remap = |nr: NodeRef| -> NodeRef {
+            NodeRef::new(ArenaId(nr.arena_id.0 + offset), nr.index)
+        };
+
+        // Merge arenas with remapped IDs
+        for (old_arena_id, nodes) in other.nodes.into_arenas() {
+            let new_arena_id = ArenaId(old_arena_id.0 + offset);
+            self.nodes.insert_arena(new_arena_id, nodes);
+        }
+
+        // Merge edges with remapped IDs
+        for (from, edge_list) in other.edges {
+            let new_from = remap(from);
+            let new_edges: Vec<(ExecEdgeType, NodeRef)> = edge_list
+                .into_iter()
+                .map(|(et, to)| (et, remap(to)))
+                .collect();
+            self.edges.entry(new_from).or_default().extend(new_edges);
+        }
+
+        // Update next_id in ArenaSet to avoid future conflicts
+        self.nodes.set_next_id(offset + other_max + 1);
+
+        // Return remapped root
+        other_root.map(remap)
+    }
 }

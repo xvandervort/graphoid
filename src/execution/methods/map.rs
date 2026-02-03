@@ -4,7 +4,7 @@
 //! extracted from the main executor for better code organization.
 
 use crate::error::{GraphoidError, Result};
-use crate::execution::executor::Executor;
+use crate::execution::Executor;
 use crate::graph::{RuleSpec, RuleInstance};
 use crate::values::{Value, ValueKind, List, Hash};
 

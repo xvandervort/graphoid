@@ -96,4 +96,34 @@ impl<T> ArenaSet<T> {
     pub fn total_node_count(&self) -> usize {
         self.arenas.values().map(|a| a.len()).sum()
     }
+
+    /// Get the next arena ID that would be allocated.
+    pub fn next_arena_id(&self) -> u32 {
+        self.next_id
+    }
+
+    /// Get the maximum arena ID currently in use.
+    pub fn max_arena_id(&self) -> u32 {
+        self.arenas.keys().map(|id| id.0).max().unwrap_or(0)
+    }
+
+    /// Set the next arena ID counter (for merge operations).
+    pub fn set_next_id(&mut self, id: u32) {
+        if id > self.next_id {
+            self.next_id = id;
+        }
+    }
+
+    /// Insert a pre-built arena at a specific ID.
+    pub fn insert_arena(&mut self, arena_id: ArenaId, nodes: Vec<T>) {
+        self.arenas.insert(arena_id, nodes);
+        if arena_id.0 >= self.next_id {
+            self.next_id = arena_id.0 + 1;
+        }
+    }
+
+    /// Consume self and return an iterator of (ArenaId, Vec<T>) pairs.
+    pub fn into_arenas(self) -> impl Iterator<Item = (ArenaId, Vec<T>)> {
+        self.arenas.into_iter()
+    }
 }

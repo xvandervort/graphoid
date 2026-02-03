@@ -10,7 +10,7 @@ pub fn eval_var(source: &str, var_name: &str) -> graphoid::values::Value {
 
 pub fn eval_source(source: &str) -> graphoid::values::Value {
     let mut executor = GraphExecutor::new();
-    executor.execute_source(source).unwrap()
+    executor.execute_source_value(source).unwrap()
 }
 
 pub fn as_number(val: &graphoid::values::Value) -> f64 {

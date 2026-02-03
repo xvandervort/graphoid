@@ -7,7 +7,7 @@ use crate::ast::BinaryOp;
 use crate::execution::ErrorMode;
 use crate::error::{GraphoidError, Result, SourcePosition};
 use crate::execution::config::PrecisionMode;
-use crate::execution::executor::Executor;
+use crate::execution::Executor;
 use crate::values::{BigNum, List, Value, ValueKind};
 
 impl Executor {
@@ -1512,6 +1512,7 @@ impl Executor {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn eval_bitwise_not(&self, val: Value) -> Result<Value> {
         match &val.kind {
             ValueKind::BigNumber(bn) => {

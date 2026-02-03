@@ -689,7 +689,13 @@ impl AstToGraphConverter {
                 if let Some(rest) = rest_name {
                     props.insert("rest_name".to_string(), AstProperty::Str(rest.clone()));
                 }
-                // Note: sub-patterns would need Element edges, but keeping simple for now
+                let node = self.add_node(arena, AstNodeType::MatchPatternNode, props, default_pos());
+                // Add Element edges for sub-patterns
+                for (i, elem) in elements.iter().enumerate() {
+                    let elem_ref = self.convert_match_pattern(elem, arena);
+                    self.graph.add_edge(node, ExecEdgeType::Element(i as u32), elem_ref);
+                }
+                return node;
             }
         }
         self.add_node(arena, AstNodeType::MatchPatternNode, props, default_pos())
