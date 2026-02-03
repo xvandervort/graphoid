@@ -67,7 +67,6 @@ pretty_assertions = "1.4"
 default = []
 profiling = ["criterion"]
 graph_namespace = []  # Phase 15: Use graph-based namespace instead of HashMap-based Environment
-graph_execution = []  # Phase 16: Use graph-based executor instead of tree-walking interpreter
 
 [[bin]]
 name = "gr"

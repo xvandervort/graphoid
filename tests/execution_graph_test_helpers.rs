@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use graphoid::execution_graph::graph_executor::GraphExecutor;
+use graphoid::execution::Executor as GraphExecutor;
 use graphoid::values::ValueKind;
 
 pub fn eval_var(source: &str, var_name: &str) -> graphoid::values::Value {

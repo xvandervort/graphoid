@@ -1,6 +1,6 @@
 mod execution_graph_test_helpers;
 use execution_graph_test_helpers::{eval_var, as_number, as_string};
-use graphoid::execution_graph::graph_executor::GraphExecutor;
+use graphoid::execution::Executor as GraphExecutor;
 
 // --- If/else ---
 

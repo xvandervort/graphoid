@@ -1,6 +1,6 @@
 //! Execution engine
 //!
-//! This module executes AST nodes.
+//! This module executes AST nodes via graph traversal (GraphExecutor).
 
 pub mod config;
 pub mod environment;
@@ -9,13 +9,9 @@ pub mod function_graph;
 pub mod module_manager;
 pub mod pattern_matcher;
 
-// When graph_execution is enabled, executor.rs is replaced by GraphExecutor.
-// The arithmetic and methods modules use conditional Executor type.
+// The arithmetic and methods modules provide impl blocks for Executor (= GraphExecutor).
 pub mod arithmetic;
 pub mod methods;
-
-#[cfg(not(feature = "graph_execution"))]
-pub mod executor;
 
 pub use config::{Config, ConfigStack, ErrorMode, BoundsCheckingMode, TypeCoercionMode, NoneHandlingMode};
 
@@ -28,11 +24,7 @@ pub use crate::namespace::NamespaceGraph as Environment;
 
 pub use error_collector::{ErrorCollector, CollectedError};
 
-// Phase 16: Conditional Executor type based on feature flag
-#[cfg(not(feature = "graph_execution"))]
-pub use executor::Executor;
-
-#[cfg(feature = "graph_execution")]
+// Phase 16: GraphExecutor is the executor, re-exported as Executor for API compatibility.
 pub use crate::execution_graph::graph_executor::GraphExecutor as Executor;
 
 pub use function_graph::{FunctionGraph, FunctionNode, CallEdge, FunctionEdgeType};

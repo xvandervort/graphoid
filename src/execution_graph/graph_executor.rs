@@ -22,7 +22,6 @@ use super::converter::AstToGraphConverter;
 use super::node::*;
 
 /// The graph-based executor. Traverses an ExecutionGraph to produce values.
-#[allow(dead_code)]
 pub struct GraphExecutor {
     pub(crate) env: Environment,
     pub(crate) call_stack: Vec<String>,
@@ -66,7 +65,6 @@ struct GraphPatternClause {
     body_ref: NodeRef,
 }
 
-#[allow(dead_code)]
 impl GraphExecutor {
     pub fn new() -> Self {
         GraphExecutor {
@@ -464,9 +462,7 @@ impl GraphExecutor {
         self.eval_binary_op(&op, left, right)
     }
 
-    /// When the graph_execution feature is active, arithmetic.rs and its full
-    /// implementations are used. Otherwise, use a self-contained version.
-    #[cfg(feature = "graph_execution")]
+    /// Delegates to arithmetic.rs for full implementations.
     fn eval_binary_op(&mut self, op: &BinaryOp, left: Value, right: Value) -> Result<Value> {
         match op {
             BinaryOp::BitwiseAnd => self.eval_bitwise_and(left, right),
@@ -487,151 +483,6 @@ impl GraphExecutor {
             BinaryOp::DotGreater => self.eval_element_wise(left, right, BinaryOp::Greater),
             BinaryOp::DotGreaterEqual => self.eval_element_wise(left, right, BinaryOp::GreaterEqual),
             _ => self.apply_scalar_op(left, right, op),
-        }
-    }
-
-    /// Self-contained binary op evaluation for standalone (no feature flag) mode.
-    #[cfg(not(feature = "graph_execution"))]
-    fn eval_binary_op(&mut self, op: &BinaryOp, left: Value, right: Value) -> Result<Value> {
-        match op {
-            BinaryOp::Add => match (&left.kind, &right.kind) {
-                (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::number(l + r)),
-                (ValueKind::String(l), ValueKind::String(r)) => Ok(Value::string(format!("{}{}", l, r))),
-                (ValueKind::String(l), _) => Ok(Value::string(format!("{}{}", l, right.to_string()))),
-                (_, ValueKind::String(r)) => Ok(Value::string(format!("{}{}", left.to_string(), r))),
-                _ => Err(GraphoidError::type_error("number or string", &format!("{} and {}", left.type_name(), right.type_name()))),
-            },
-            BinaryOp::Subtract => match (&left.kind, &right.kind) {
-                (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::number(l - r)),
-                _ => Err(GraphoidError::type_error("number", &format!("{} and {}", left.type_name(), right.type_name()))),
-            },
-            BinaryOp::Multiply => match (&left.kind, &right.kind) {
-                (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::number(l * r)),
-                (ValueKind::String(s), ValueKind::Number(n)) | (ValueKind::Number(n), ValueKind::String(s)) => {
-                    Ok(Value::string(s.repeat(*n as usize)))
-                }
-                _ => Err(GraphoidError::type_error("number", &format!("{} and {}", left.type_name(), right.type_name()))),
-            },
-            BinaryOp::Divide => match (&left.kind, &right.kind) {
-                (ValueKind::Number(l), ValueKind::Number(r)) => {
-                    if *r == 0.0 { return Err(GraphoidError::division_by_zero()); }
-                    Ok(Value::number(l / r))
-                }
-                _ => Err(GraphoidError::type_error("number", &format!("{} and {}", left.type_name(), right.type_name()))),
-            },
-            BinaryOp::IntDiv => match (&left.kind, &right.kind) {
-                (ValueKind::Number(l), ValueKind::Number(r)) => {
-                    if *r == 0.0 { return Err(GraphoidError::division_by_zero()); }
-                    Ok(Value::number((*l as i64 / *r as i64) as f64))
-                }
-                _ => Err(GraphoidError::type_error("number", &format!("{} and {}", left.type_name(), right.type_name()))),
-            },
-            BinaryOp::Modulo => match (&left.kind, &right.kind) {
-                (ValueKind::Number(l), ValueKind::Number(r)) => {
-                    if *r == 0.0 { return Err(GraphoidError::division_by_zero()); }
-                    Ok(Value::number(l % r))
-                }
-                _ => Err(GraphoidError::type_error("number", &format!("{} and {}", left.type_name(), right.type_name()))),
-            },
-            BinaryOp::Power => match (&left.kind, &right.kind) {
-                (ValueKind::Number(l), ValueKind::Number(r)) => Ok(Value::number(l.powf(*r))),
-                _ => Err(GraphoidError::type_error("number", &format!("{} and {}", left.type_name(), right.type_name()))),
-            },
-            BinaryOp::Equal => Ok(Value::boolean(left == right)),
-            BinaryOp::NotEqual => Ok(Value::boolean(left != right)),
-            BinaryOp::Less | BinaryOp::LessEqual | BinaryOp::Greater | BinaryOp::GreaterEqual => {
-                match (&left.kind, &right.kind) {
-                    (ValueKind::Number(l), ValueKind::Number(r)) => {
-                        let result = match op {
-                            BinaryOp::Less => l < r,
-                            BinaryOp::LessEqual => l <= r,
-                            BinaryOp::Greater => l > r,
-                            BinaryOp::GreaterEqual => l >= r,
-                            _ => unreachable!(),
-                        };
-                        Ok(Value::boolean(result))
-                    }
-                    (ValueKind::String(l), ValueKind::String(r)) => {
-                        let result = match op {
-                            BinaryOp::Less => l < r,
-                            BinaryOp::LessEqual => l <= r,
-                            BinaryOp::Greater => l > r,
-                            BinaryOp::GreaterEqual => l >= r,
-                            _ => unreachable!(),
-                        };
-                        Ok(Value::boolean(result))
-                    }
-                    _ => Err(GraphoidError::type_error("comparable types", &format!("{} and {}", left.type_name(), right.type_name()))),
-                }
-            }
-            BinaryOp::BitwiseAnd | BinaryOp::BitwiseOr | BinaryOp::BitwiseXor |
-            BinaryOp::LeftShift | BinaryOp::RightShift => {
-                match (&left.kind, &right.kind) {
-                    (ValueKind::Number(l), ValueKind::Number(r)) => {
-                        let (li, ri) = (l.trunc() as i64, r.trunc() as i64);
-                        let result = match op {
-                            BinaryOp::BitwiseAnd => li & ri,
-                            BinaryOp::BitwiseOr => li | ri,
-                            BinaryOp::BitwiseXor => li ^ ri,
-                            BinaryOp::LeftShift => li << (ri & 63),
-                            BinaryOp::RightShift => li >> (ri & 63),
-                            _ => unreachable!(),
-                        };
-                        Ok(Value::number(result as f64))
-                    }
-                    _ => Err(GraphoidError::type_error("number", &format!("{} and {}", left.type_name(), right.type_name()))),
-                }
-            }
-            BinaryOp::DotAdd | BinaryOp::DotSubtract | BinaryOp::DotMultiply |
-            BinaryOp::DotDivide | BinaryOp::DotIntDiv | BinaryOp::DotPower |
-            BinaryOp::DotEqual | BinaryOp::DotNotEqual | BinaryOp::DotLess |
-            BinaryOp::DotLessEqual | BinaryOp::DotGreater | BinaryOp::DotGreaterEqual => {
-                let base_op = match op {
-                    BinaryOp::DotAdd => BinaryOp::Add,
-                    BinaryOp::DotSubtract => BinaryOp::Subtract,
-                    BinaryOp::DotMultiply => BinaryOp::Multiply,
-                    BinaryOp::DotDivide => BinaryOp::Divide,
-                    BinaryOp::DotIntDiv => BinaryOp::IntDiv,
-                    BinaryOp::DotPower => BinaryOp::Power,
-                    BinaryOp::DotEqual => BinaryOp::Equal,
-                    BinaryOp::DotNotEqual => BinaryOp::NotEqual,
-                    BinaryOp::DotLess => BinaryOp::Less,
-                    BinaryOp::DotLessEqual => BinaryOp::LessEqual,
-                    BinaryOp::DotGreater => BinaryOp::Greater,
-                    BinaryOp::DotGreaterEqual => BinaryOp::GreaterEqual,
-                    _ => unreachable!(),
-                };
-                use crate::values::List;
-                match (&left.kind, &right.kind) {
-                    (ValueKind::List(l), ValueKind::List(r)) => {
-                        let l_items = l.to_vec();
-                        let r_items = r.to_vec();
-                        let mut results = Vec::new();
-                        for (le, re) in l_items.iter().zip(r_items.iter()) {
-                            results.push(self.eval_binary_op(&base_op, le.clone(), re.clone())?);
-                        }
-                        Ok(Value::list(List::from_vec(results)))
-                    }
-                    (ValueKind::List(l), _) => {
-                        let items = l.to_vec();
-                        let mut results = Vec::new();
-                        for elem in items.iter() {
-                            results.push(self.eval_binary_op(&base_op, elem.clone(), right.clone())?);
-                        }
-                        Ok(Value::list(List::from_vec(results)))
-                    }
-                    (_, ValueKind::List(r)) => {
-                        let items = r.to_vec();
-                        let mut results = Vec::new();
-                        for elem in items.iter() {
-                            results.push(self.eval_binary_op(&base_op, left.clone(), elem.clone())?);
-                        }
-                        Ok(Value::list(List::from_vec(results)))
-                    }
-                    _ => self.eval_binary_op(&base_op, left, right),
-                }
-            }
-            _ => Err(GraphoidError::runtime(format!("Unimplemented operator: {:?}", op))),
         }
     }
 
@@ -2109,7 +1960,6 @@ impl GraphExecutor {
                     }
                     return self.eval_time_static_method(&method_name, &args);
                 }
-                #[cfg(feature = "graph_execution")]
                 "list" => {
                     let arg_refs = self.get_ordered_edges(node_ref, "Argument");
                     let mut args = Vec::new();
@@ -2119,7 +1969,6 @@ impl GraphExecutor {
                     }
                     return self.eval_list_static_method(&method_name, &args);
                 }
-                #[cfg(feature = "graph_execution")]
                 "string" => {
                     let arg_refs = self.get_ordered_edges(node_ref, "Argument");
                     let mut args = Vec::new();
@@ -2147,7 +1996,6 @@ impl GraphExecutor {
     }
 
     /// Full method dispatch using implementations from src/execution/methods/*.rs.
-    #[cfg(feature = "graph_execution")]
     fn dispatch_method(&mut self, object: Value, method: &str, args: Vec<Value>, object_expr: &Expr) -> Result<Value> {
         // Check if this is a mutating method (ends with !)
         let is_mutating = method.ends_with('!');
@@ -2183,7 +2031,6 @@ impl GraphExecutor {
         self.dispatch_method_inner(object, base_method, args, object_expr)
     }
 
-    #[cfg(feature = "graph_execution")]
     fn dispatch_method_inner(&mut self, object: Value, method: &str, args: Vec<Value>, object_expr: &Expr) -> Result<Value> {
         // Universal methods that work on all types (skip for modules — module members take priority)
         if !matches!(&object.kind, ValueKind::Module(_)) {
@@ -2819,7 +2666,7 @@ impl GraphExecutor {
         }
     }
 
-    /// Convert a value to its string representation (matching executor.rs behavior).
+    /// Convert a value to its string representation.
     fn value_to_string_impl(&self, value: &Value) -> Value {
         match &value.kind {
             ValueKind::String(s) => Value::string(s.clone()),
@@ -2847,97 +2694,6 @@ impl GraphExecutor {
                 Value::string(format!("{{{}}}", entries.join(", ")))
             }
             _ => Value::string(value.to_string()),
-        }
-    }
-
-    /// Simplified method dispatch for standalone mode (no feature flag).
-    #[cfg(not(feature = "graph_execution"))]
-    fn dispatch_method(&mut self, object: Value, method: &str, args: Vec<Value>, _object_expr: &Expr) -> Result<Value> {
-        match &object.kind {
-            ValueKind::String(s) => {
-                match method {
-                    "length" => Ok(Value::number(s.len() as f64)),
-                    "upper" => Ok(Value::string(s.to_uppercase())),
-                    "lower" => Ok(Value::string(s.to_lowercase())),
-                    "trim" => Ok(Value::string(s.trim().to_string())),
-                    "contains" => {
-                        let substr = args.first().map(|v| v.to_string()).unwrap_or_default();
-                        Ok(Value::boolean(s.contains(&substr)))
-                    }
-                    "starts_with" => {
-                        let prefix = args.first().map(|v| v.to_string()).unwrap_or_default();
-                        Ok(Value::boolean(s.starts_with(&prefix)))
-                    }
-                    "ends_with" => {
-                        let suffix = args.first().map(|v| v.to_string()).unwrap_or_default();
-                        Ok(Value::boolean(s.ends_with(&suffix)))
-                    }
-                    "split" => {
-                        let delimiter = args.first().map(|v| v.to_string()).unwrap_or_default();
-                        let parts: Vec<Value> = s.split(&delimiter).map(|p| Value::string(p.to_string())).collect();
-                        Ok(Value::list(crate::values::List::from_vec(parts)))
-                    }
-                    "replace" => {
-                        if args.len() < 2 { return Err(GraphoidError::runtime("replace() requires 2 arguments".to_string())); }
-                        Ok(Value::string(s.replace(&args[0].to_string(), &args[1].to_string())))
-                    }
-                    _ => Err(GraphoidError::runtime(format!("Unknown string method: {}", method))),
-                }
-            }
-            ValueKind::List(l) => {
-                match method {
-                    "length" => Ok(Value::number(l.len() as f64)),
-                    "append" => {
-                        let mut new_list = l.clone();
-                        if let Some(val) = args.first() { new_list.append_raw(val.clone())?; }
-                        Ok(Value::list(new_list))
-                    }
-                    "map" => {
-                        let items = l.to_vec();
-                        let mut result = Vec::new();
-                        if let Some(func_val) = args.first() {
-                            if let ValueKind::Function(ref func) = func_val.kind {
-                                for item in items {
-                                    result.push(self.call_graph_function(func.clone(), vec![item])?);
-                                }
-                            }
-                        }
-                        Ok(Value::list(crate::values::List::from_vec(result)))
-                    }
-                    "filter" => {
-                        let items = l.to_vec();
-                        let mut result = Vec::new();
-                        if let Some(func_val) = args.first() {
-                            if let ValueKind::Function(ref func) = func_val.kind {
-                                for item in items {
-                                    let keep = self.call_graph_function(func.clone(), vec![item.clone()])?;
-                                    if keep.is_truthy() { result.push(item); }
-                                }
-                            }
-                        }
-                        Ok(Value::list(crate::values::List::from_vec(result)))
-                    }
-                    _ => Err(GraphoidError::runtime(format!("Unknown list method: {}", method))),
-                }
-            }
-            ValueKind::Map(m) => {
-                match method {
-                    "keys" => {
-                        let keys: Vec<Value> = m.keys().into_iter().map(|k| Value::string(k)).collect();
-                        Ok(Value::list(crate::values::List::from_vec(keys)))
-                    }
-                    "values" => {
-                        let vals: Vec<Value> = m.values().into_iter().collect();
-                        Ok(Value::list(crate::values::List::from_vec(vals)))
-                    }
-                    "length" => Ok(Value::number(m.len() as f64)),
-                    _ => Err(GraphoidError::runtime(format!("Unknown map method: {}", method))),
-                }
-            }
-            ValueKind::Number(_) => self.dispatch_number_method(&object, method, &args),
-            _ => Err(GraphoidError::runtime(format!(
-                "Cannot call method '{}' on type '{}'", method, object.type_name()
-            ))),
         }
     }
 

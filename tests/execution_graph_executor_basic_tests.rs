@@ -1,6 +1,6 @@
 mod execution_graph_test_helpers;
 use execution_graph_test_helpers::{eval_var, as_number, as_string, as_bool};
-use graphoid::execution_graph::graph_executor::GraphExecutor;
+use graphoid::execution::Executor as GraphExecutor;
 use graphoid::values::ValueKind;
 
 fn as_symbol(val: &graphoid::values::Value) -> String {
