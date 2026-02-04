@@ -3,7 +3,6 @@
 //! This module executes AST nodes via graph traversal (GraphExecutor).
 
 pub mod config;
-pub mod environment;
 pub mod error_collector;
 pub mod function_graph;
 pub mod module_manager;
@@ -15,11 +14,7 @@ pub mod methods;
 
 pub use config::{Config, ConfigStack, ErrorMode, BoundsCheckingMode, TypeCoercionMode, NoneHandlingMode};
 
-// Phase 15: Conditional Environment type based on feature flag
-#[cfg(not(feature = "graph_namespace"))]
-pub use environment::Environment;
-
-#[cfg(feature = "graph_namespace")]
+// Phase 15: NamespaceGraph is the environment, re-exported as Environment for API compatibility.
 pub use crate::namespace::NamespaceGraph as Environment;
 
 pub use error_collector::{ErrorCollector, CollectedError};
