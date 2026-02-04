@@ -78,6 +78,9 @@ pub enum GraphoidError {
 
     #[error("Loop control: {control}")]
     LoopControl { control: LoopControlType },
+
+    #[error("Return control flow")]
+    ReturnControl { value: crate::values::Value },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -164,6 +167,7 @@ impl GraphoidError {
             GraphoidError::IoError(_) => "IOError".to_string(),
             GraphoidError::ConfigError { .. } => "ConfigError".to_string(),
             GraphoidError::LoopControl { .. } => "LoopControl".to_string(),
+            GraphoidError::ReturnControl { .. } => "ReturnControl".to_string(),
         }
     }
 
@@ -180,6 +184,7 @@ impl GraphoidError {
             GraphoidError::RuleViolation { .. } => SourcePosition::unknown(),
             GraphoidError::IoError(_) => SourcePosition::unknown(),
             GraphoidError::LoopControl { .. } => SourcePosition::unknown(),
+            GraphoidError::ReturnControl { .. } => SourcePosition::unknown(),
             GraphoidError::ConfigError { .. } => SourcePosition::unknown(),
         }
     }
@@ -241,6 +246,7 @@ impl Clone for GraphoidError {
                 }
             }
             GraphoidError::LoopControl { control } => GraphoidError::LoopControl { control: *control },
+            GraphoidError::ReturnControl { value } => GraphoidError::ReturnControl { value: value.clone() },
         }
     }
 }

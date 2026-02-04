@@ -651,12 +651,40 @@ Result: 8
 
 ---
 
-## Open Questions
+## Design Decisions (Resolved)
 
-1. **Hybrid approach?** - Can we keep AST enums for some operations?
-2. **Lazy evaluation?** - Build graph lazily during execution?
-3. **Incremental parsing?** - Update graph on code changes?
-4. **Memory layout?** - Arena allocation for nodes?
+1. **No hybrid approach** — The AST is fully graph-based. No fallback to Rust enums for any operations. This is non-negotiable given the "everything is a graph" mandate.
+
+2. **No lazy evaluation** — The full graph is built upfront before execution begins. Lazy construction would block graph-wide optimization passes (constant folding, dead code elimination, CSE), complicate parallel execution analysis, and add per-node "is this built?" branching overhead.
+
+3. **Yes: Incremental parsing** — Subgraphs can be rebuilt without reconstructing the entire execution graph. When source changes (REPL input, module reload, IDE edit), only the affected subgraph is re-parsed and swapped in. This is a natural graph operation (subgraph replacement) and provides the foundation for:
+   - Fast REPL re-evaluation
+   - Hot module reload (Phase 18.5)
+   - Future IDE/LSP support
+
+4. **Yes: Arena allocation with per-scope arenas** — Nodes are arena-allocated for cache-friendly layout, fast bump-pointer allocation, and simplified Rust ownership (indices instead of `Rc`/`RefCell`). Arenas are scoped per-module or per-function so that incremental re-parsing can drop and rebuild individual subgraphs without leaking the entire arena. The top-level execution graph references nodes via `(ArenaId, NodeIndex)` pairs rather than raw indices.
+
+   ```
+   ┌─────────────────────────────────────────────┐
+   │  ExecutionGraph                              │
+   │                                              │
+   │  ┌──────────────┐  ┌──────────────┐          │
+   │  │ Arena: main   │  │ Arena: mod_a │          │
+   │  │ [node][node]  │  │ [node][node] │          │
+   │  │ [node][node]  │  │ [node]       │          │
+   │  └──────────────┘  └──────────────┘          │
+   │                                              │
+   │  ┌──────────────┐  ┌──────────────┐          │
+   │  │ Arena: fn_foo │  │ Arena: fn_bar│          │
+   │  │ [node][node]  │  │ [node][node] │          │
+   │  └──────────────┘  └──────────────┘          │
+   │                                              │
+   │  Edges reference: (ArenaId, NodeIndex)       │
+   │  Re-parse fn_foo → drop Arena:fn_foo,        │
+   │    allocate new arena, rebuild subgraph,     │
+   │    repoint edges from parent                 │
+   └─────────────────────────────────────────────┘
+   ```
 
 ---
 

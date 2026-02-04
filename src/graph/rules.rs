@@ -1170,7 +1170,7 @@ impl Rule for MethodConstraintRule {
 
     fn validate(&self, _graph: &Graph, _context: &RuleContext) -> Result<(), GraphoidError> {
         // Method constraints are not validated at graph operation time
-        // They're checked in call_graph_method() in executor.rs
+        // They're checked in call_graph_method() in graph_executor.rs
         Ok(())
     }
 

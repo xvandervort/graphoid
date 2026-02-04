@@ -1,8 +1,8 @@
 # Graphoid Implementation Roadmap
 
-**Version**: 9.0
-**Last Updated**: January 23, 2026
-**Status**: Phases 0-14 Complete, Phase 18.5 (Platform Support) and Phase 15 (Namespace Graph) Next
+**Version**: 9.2
+**Last Updated**: January 28, 2026
+**Status**: Phases 0-15 Complete, Phase 16 (Execution Graph) In Progress
 
 ---
 
@@ -44,23 +44,23 @@ The claim "everything is a graph" is currently FALSE at two levels:
 
 These phases fix this fundamental architectural gap.
 
-| Phase | Name | Priority | Duration | Dependencies |
-|-------|------|----------|----------|--------------|
-| [15](PHASE_15_NAMESPACE_GRAPH.md) | Namespace as Graph | **BLOCKER** | 7-10 days | None |
-| [16](PHASE_16_EXECUTION_GRAPH.md) | Execution as Graph | **BLOCKER** | 14-21 days | Phase 15 |
-| [17](PHASE_17_MODULES_GRAPH.md) | Modules as Graph | **BLOCKER** | 7-10 days | Phase 15, 16 |
-| [18](PHASE_18_COMPLETE_GRAPH_MODEL.md) | Complete Graph Model | **BLOCKER** | 10-14 days | Phase 15, 16 |
+| Phase | Name | Priority | Duration | Dependencies | Status |
+|-------|------|----------|----------|--------------|--------|
+| [15](PHASE_15_NAMESPACE_GRAPH.md) | Namespace as Graph | **BLOCKER** | 7-10 days | None | ✅ Complete |
+| [16](PHASE_16_EXECUTION_GRAPH.md) | Execution as Graph | **BLOCKER** | 14-21 days | Phase 15 | 🔄 Next |
+| [17](PHASE_17_MODULES_GRAPH.md) | Modules as Graph | **BLOCKER** | 7-10 days | Phase 15, 16 | |
+| [18](PHASE_18_COMPLETE_GRAPH_MODEL.md) | Complete Graph Model | **BLOCKER** | 10-14 days | Phase 15, 16 | |
 
 **Total Graph Foundation**: 38-55 days
 
-### Platform Support (CRITICAL - Unblocks Platform Development)
+### Platform Support (Planned After Graph Foundation)
 
-These features are required by the Graphoid Platform and should be implemented as soon as possible.
+These features are required by the Graphoid Platform. They will be implemented **in sequence after completing the graph-centric foundation** (Phases 16-18).
 
-| Phase | Name | Priority | Duration | Dependencies |
-|-------|------|----------|----------|--------------|
-| [18.5](PHASE_18_5_PLATFORM_SUPPORT.md) | Platform Support | **CRITICAL** | 5-7 days | None |
-| [18.6](PHASE_18_6_SERVER_CAPABILITIES.md) | Server Capabilities | **CRITICAL** | 3-5 days | Phase 11 |
+| Phase | Name | Priority | Duration | Dependencies | Status |
+|-------|------|----------|----------|--------------|--------|
+| [18.5](PHASE_18_5_PLATFORM_SUPPORT.md) | Platform Support | **CRITICAL** | 5-7 days | None | 📋 Planned |
+| [18.6](PHASE_18_6_SERVER_CAPABILITIES.md) | Server Capabilities | **CRITICAL** | 3-5 days | Phase 18.5 | 📋 Planned |
 
 ### Unlocks
 Once Phase 18.6 is complete, development can begin on **GraphWeb**, a Sinatra-like web framework.
@@ -68,7 +68,7 @@ See: [PLAN_WEB_FRAMEWORK.md](PLAN_WEB_FRAMEWORK.md)
 
 **Features**: Timers, signal handling, module reload, file watching, stack traces, runtime introspection.
 
-**Note**: Phase 18.5 has no dependencies on the graph-centric foundation (Phases 15-18). It can be implemented immediately to unblock platform development while graph work proceeds in parallel.
+**Execution Plan**: Complete graph-centric phases (16-18) first, then implement 18.5 → 18.6 in sequence.
 
 **See**: [GRAPH_CENTRIC_ARCHITECTURE_RATIONALE.md](GRAPH_CENTRIC_ARCHITECTURE_RATIONALE.md) for detailed justification.
 
@@ -401,6 +401,7 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 9.2 | 2026-01-28 | Phase 15 (Namespace as Graph) complete. Phases 18.5-18.6 planned for after graph-centric foundation. Phase 16 next. |
 | 9.1 | 2026-01-28 | Added Phase 18.6: Server Capabilities (bind/accept/listen) to enable interactive web simulations immediately, replacing the wait for WASM. |
 | 9.0 | 2026-01-23 | Added Phase 18.5: Platform Support (timers, signals, module reload, file watching, introspection). This phase has no dependencies and unblocks Graphoid Platform development. |
 | 8.0 | 2026-01-22 | Phase 29 rewritten as Compilation Strategy (dual-path, interpreter-first for dev, compiled for production). Moved Graphoid Platform out of numbered sequence (now GRAPHOID_PLATFORM.md). Renumbered: 31-33 → 30-32. |
