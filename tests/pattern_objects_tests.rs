@@ -209,14 +209,21 @@ fn test_path_with_direction() {
 }
 
 #[test]
-fn test_path_missing_required_param() {
+fn test_path_min_only_defaults_max() {
+    // When only min is specified, max defaults to min
     let code = r#"
-        pp = path(edge_type: "FOLLOWS", min: 1)
-        pp
+        pp = path(edge_type: "FOLLOWS", min: 2)
+        pp.min
     "#;
     let result = execute_and_return(code);
-    assert!(result.is_err(), "Expected error for missing max parameter");
-    assert!(result.unwrap_err().contains("requires 'max' parameter"));
+    assert!(result.is_ok());
+    let value = result.unwrap();
+    // min should be 2
+    if let graphoid::values::ValueKind::Number(n) = value.kind {
+        assert_eq!(n as usize, 2, "Expected min=2, got {}", n);
+    } else {
+        panic!("Expected number, got {:?}", value);
+    }
 }
 
 #[test]

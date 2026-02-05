@@ -63,6 +63,11 @@ impl Parser {
         // Check for priv keyword (Phase 10)
         let is_private = self.match_token(&TokenType::Priv);
 
+        // Phase 17: priv { } block — marks all contained declarations as private
+        if is_private && self.check(&TokenType::LeftBrace) {
+            return self.parse_priv_block();
+        }
+
         // If we have priv followed by an identifier and =, it's a private variable declaration
         if is_private && matches!(self.peek().token_type, TokenType::Identifier(_)) {
             // Look ahead to see if there's an = after the identifier
@@ -684,9 +689,84 @@ impl Parser {
             None
         };
 
+        // Phase 17: Check for selective import: import "math" { sin, cos }
+        let selections = if self.check(&TokenType::LeftBrace) {
+            if alias.is_some() {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Cannot use both 'as' alias and selective import '{ ... }'".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+            self.advance(); // consume {
+
+            let mut items = Vec::new();
+            // Parse comma-separated list of identifiers with optional aliases
+            loop {
+                // Check for empty braces
+                if self.check(&TokenType::RightBrace) {
+                    if items.is_empty() {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Empty selective import '{ }' is not allowed".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+                    break;
+                }
+
+                // Parse identifier
+                let item_name = if let TokenType::Identifier(id) = &self.peek().token_type {
+                    let name = id.clone();
+                    self.advance();
+                    name
+                } else {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected identifier in selective import".to_string(),
+                        position: self.peek().position(),
+                    });
+                };
+
+                // Check for optional 'as' alias
+                let item_alias = if self.match_token(&TokenType::As) {
+                    if let TokenType::Identifier(id) = &self.peek().token_type {
+                        let a = id.clone();
+                        self.advance();
+                        Some(a)
+                    } else {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected identifier after 'as' in selective import".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+                } else {
+                    None
+                };
+
+                items.push(crate::ast::ImportItem {
+                    name: item_name,
+                    alias: item_alias,
+                });
+
+                // Check for comma or end of list
+                if !self.match_token(&TokenType::Comma) {
+                    break;
+                }
+            }
+
+            if !self.match_token(&TokenType::RightBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '}' after selective import list".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+            Some(items)
+        } else {
+            None
+        };
+
         Ok(Stmt::Import {
             module,
             alias,
+            selections,
             position,
         })
     }
@@ -698,6 +778,45 @@ impl Parser {
         let path = self.expression()?;
 
         Ok(Stmt::Load { path, position })
+    }
+
+    /// Phase 17: Parse priv { ... } block — all contained declarations marked private
+    fn parse_priv_block(&mut self) -> Result<Stmt> {
+        let position = self.previous_position();
+
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' after 'priv'".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        let mut body = Vec::new();
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            // Check for nested priv (warn but allow)
+            if self.check(&TokenType::Priv) {
+                // Emit a warning via eprintln (nested priv is redundant)
+                eprintln!("Warning: nested 'priv' inside priv block is redundant at {:?}", self.peek().position());
+            }
+
+            let mut stmt = self.statement()?;
+            // Mark the statement as private
+            match &mut stmt {
+                Stmt::VariableDecl { is_private, .. } => *is_private = true,
+                Stmt::FunctionDecl { is_private, .. } => *is_private = true,
+                _ => {} // Other statement types don't have is_private
+            }
+            body.push(stmt);
+        }
+
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' after priv block".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        Ok(Stmt::PrivBlock { body, position })
     }
 
     fn module_declaration(&mut self) -> Result<Stmt> {

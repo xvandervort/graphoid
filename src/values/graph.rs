@@ -2822,9 +2822,11 @@ impl Graph {
 
         let method_id = Self::method_node_id(&name);
 
-        // Phase 21: If the function has a guard or if a method with this name already exists,
-        // we need to store multiple variants as a list.
-        if func.guard.is_some() || self.nodes.contains_key(&method_id) {
+        // Phase 21: If a method with this name already exists, we need to store
+        // multiple variants as a list. This handles both AST-based guards (func.guard)
+        // and NodeRef-based guards (stored in graph_method_guards).
+        // Note: We check `contains_key` first to handle overloaded methods.
+        if self.nodes.contains_key(&method_id) || func.guard.is_some() {
             // Check if method already exists
             if let Some(existing_node) = self.nodes.get_mut(&method_id) {
                 // Method exists - convert to list if needed and append

@@ -236,7 +236,7 @@ fn test_convert_break_continue() {
 
 #[test]
 fn test_convert_import() {
-    let stmt = Stmt::Import { module: "math".to_string(), alias: None, position: dummy_pos() };
+    let stmt = Stmt::Import { module: "math".to_string(), alias: None, selections: None, position: dummy_pos() };
     let (graph, root) = convert_program(vec![stmt]);
     let elements = graph.get_ordered_edges(root, "Element");
     let import = graph.get_node(elements[0]).unwrap();
@@ -246,7 +246,7 @@ fn test_convert_import() {
 
 #[test]
 fn test_convert_import_with_alias() {
-    let stmt = Stmt::Import { module: "math".to_string(), alias: Some("m".to_string()), position: dummy_pos() };
+    let stmt = Stmt::Import { module: "math".to_string(), alias: Some("m".to_string()), selections: None, position: dummy_pos() };
     let (graph, root) = convert_program(vec![stmt]);
     let elements = graph.get_ordered_edges(root, "Element");
     let import = graph.get_node(elements[0]).unwrap();

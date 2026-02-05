@@ -2,6 +2,13 @@
 
 use crate::error::SourcePosition;
 
+/// Phase 17: A selectively imported item from a module
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportItem {
+    pub name: String,
+    pub alias: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
     pub statements: Vec<Stmt>,
@@ -63,6 +70,7 @@ pub enum Stmt {
     Import {
         module: String,
         alias: Option<String>,
+        selections: Option<Vec<ImportItem>>,  // Phase 17: None = full import, Some = selective
         position: SourcePosition,
     },
     ModuleDecl {
@@ -104,6 +112,11 @@ pub enum Stmt {
     },
     Expression {
         expr: Expr,
+        position: SourcePosition,
+    },
+    /// Phase 17: Privacy block — marks all contained declarations as private
+    PrivBlock {
+        body: Vec<Stmt>,
         position: SourcePosition,
     },
 }

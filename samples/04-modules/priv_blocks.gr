@@ -1,0 +1,53 @@
+# Phase 17: priv { } Blocks
+#
+# The priv { } block groups multiple private declarations together.
+# All functions and variables inside are marked private to the module.
+# This is more concise than writing `priv` before each declaration.
+
+print("=== priv { } Block Demonstration ===")
+
+# Group related private helpers together
+priv {
+    fn validate(x) {
+        return x > 0
+    }
+
+    fn clamp(x, lo, hi) {
+        if x < lo {
+            return lo
+        }
+        if x > hi {
+            return hi
+        }
+        return x
+    }
+
+    DEFAULT_MIN = 0
+    DEFAULT_MAX = 100
+}
+
+# Public API that uses the private helpers
+fn safe_value(x) {
+    if validate(x) {
+        return clamp(x, DEFAULT_MIN, DEFAULT_MAX)
+    }
+    return DEFAULT_MIN
+}
+
+print("safe_value(50)  = " + safe_value(50).to_string())
+print("safe_value(200) = " + safe_value(200).to_string())
+print("safe_value(-5)  = " + safe_value(-5).to_string())
+
+print("")
+
+# You can still use the original priv keyword for individual items
+priv fn another_helper() {
+    return 42
+}
+
+priv SINGLE_SECRET = "hidden"
+
+print("Individual priv still works: " + another_helper().to_string())
+
+print("")
+print("=== Examples Complete ===")

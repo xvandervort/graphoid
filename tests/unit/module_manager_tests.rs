@@ -97,6 +97,7 @@ fn test_register_and_get_module() {
         file_path: PathBuf::from("test.gr"),
         config: None,
         private_symbols: std::collections::HashSet::new(),
+        exports: vec![],
     };
 
     manager.register_module("test_module".to_string(), module);

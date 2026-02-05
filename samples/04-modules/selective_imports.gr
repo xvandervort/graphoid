@@ -1,0 +1,54 @@
+# Phase 17: Selective Imports
+#
+# Instead of importing an entire module, you can selectively import
+# specific symbols directly into the current scope.
+
+print("=== Selective Import Syntax ===")
+print("")
+print("  import \"module\" { fn1, fn2 }        # Import specific symbols")
+print("  import \"module\" { fn1 as alias }     # Import with alias")
+print("  import \"module\" { fn1, fn2 as f2 }   # Mix both styles")
+print("")
+
+# Note: Selective imports bind symbols directly — the module itself
+# is NOT accessible as a namespace. This is useful when you only need
+# a few items from a large module.
+
+print("=== priv { } Block Syntax ===")
+print("")
+print("  priv {                    # Group private declarations")
+print("      fn helper() { ... }")
+print("      secret = 42")
+print("  }")
+print("")
+
+# The priv { } block marks all declarations inside it as private.
+# This is equivalent to writing `priv fn` / `priv variable` for each,
+# but more concise when you have several private items.
+
+print("=== Module Introspection ===")
+print("")
+print("  module.name()     # Module name as declared")
+print("  module.path()     # File path of the module")
+print("  module.exports()  # List of public symbol names")
+print("  module.imports()  # List of dependency module paths")
+print("")
+
+print("=== Example: Using priv blocks locally ===")
+
+priv {
+    fn internal_multiply(a, b) {
+        return a * b
+    }
+    FACTOR = 10
+}
+
+fn scale(x) {
+    return internal_multiply(x, FACTOR)
+}
+
+result = scale(5)
+print("scale(5) = " + result.to_string())
+
+print("")
+print("=== Examples Complete ===")
