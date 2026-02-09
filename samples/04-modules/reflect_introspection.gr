@@ -1,10 +1,11 @@
-# reflect_introspection.gr - Phase 17: Module Universe Introspection
+# reflect_introspection.gr - Module Universe Introspection
 #
 # The reflect module provides runtime access to the module universe:
-# - reflect.loaded_modules()  — list all loaded module names
-# - reflect.module("name")    — access a loaded module by name
-# - reflect.universe()        — module dependency graph
-# - reflect.current_scope()   — info about the current scope
+# - reflect.loaded_modules()   — list all loaded module names
+# - reflect.module("name")     — access a loaded module by name
+# - reflect.universe()         — persistent universe graph (types + modules + imports)
+# - reflect.type_hierarchy()   — type subgraph only
+# - reflect.current_scope()    — info about the current scope
 
 import "math"
 import "json"
@@ -26,10 +27,25 @@ if missing == none {
     print("Missing module: none (as expected)")
 }
 
-# --- Universe graph ---
+# --- Universe graph (Phase 18: persistent, includes type hierarchy) ---
 universe = reflect.universe()
 print("Universe nodes: " + universe.nodes().length().to_string())
 print("Universe edges: " + universe.edges().length().to_string())
+
+# Check type hierarchy in universe
+print("Has type:int? " + universe.has_node("type:int").to_string())
+print("int -> num? " + universe.has_path("type:int", "type:num").to_string())
+print("int -> any? " + universe.has_path("type:int", "type:any").to_string())
+
+# Check module nodes and import edges
+print("Has module:math? " + universe.has_node("module:math").to_string())
+print("main imports math? " + universe.has_path("scope:main", "module:math").to_string())
+
+# --- Type hierarchy subgraph ---
+th = reflect.type_hierarchy()
+print("Type hierarchy nodes: " + th.nodes().length().to_string())
+print("Type hierarchy edges: " + th.edges().length().to_string())
+print("list -> collection? " + th.has_path("type:list", "type:collection").to_string())
 
 # --- Current scope ---
 scope = reflect.current_scope()

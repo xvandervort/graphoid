@@ -21,11 +21,14 @@
 - `reflect.loaded_modules()` — list all loaded module names
 - `reflect.universe()` — module dependency graph as a Graph value
 - `reflect.current_scope()` — current scope info (type, variables, depth)
-- All tests pass (645 gspec + 1279 Rust)
+- All tests pass (660 gspec + 1293 Rust)
 
-### Deferred to Phase 18 (Complete Graph Model)
-- Modules as persistent nodes in universe graph (currently built lazily on demand)
-- Import creates edges instead of copies (currently copies into namespace)
+### Previously Deferred — Now Implemented in Phase 18
+- ✅ Modules as persistent nodes in universe graph (Phase 18: `module:{name}` nodes)
+- ✅ Import creates edges in universe graph (Phase 18: `scope:main --imports--> module:{name}`)
+- ✅ Type hierarchy as graph (Phase 18: 17 type nodes + 16 subtype_of edges)
+- ✅ `reflect.type_hierarchy()` — type subgraph extraction
+- ✅ `graph.has_node()` method exposed to .gr files
 
 ---
 

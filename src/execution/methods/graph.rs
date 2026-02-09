@@ -434,6 +434,22 @@ impl Executor {
 
                 Ok(Value::boolean(graph.has_ruleset(ruleset_name)))
             }
+            "has_node" => {
+                // Check if a node exists in the graph
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "has_node() expects 1 argument (node_id), but got {}",
+                        args.len()
+                    )));
+                }
+                let node_id = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
+                    _other => {
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
+                    }
+                };
+                Ok(Value::boolean(graph.has_node(node_id)))
+            }
             "has_path" => {
                 // Check if a path exists between two nodes
                 if args.len() != 2 {

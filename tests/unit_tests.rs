@@ -51,4 +51,5 @@ mod unit {
     pub mod namespace_tests;
     pub mod module_graph_tests;
     pub mod reflect_tests;
+    pub mod universe_graph_tests;
 }

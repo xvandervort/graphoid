@@ -57,6 +57,8 @@ pub struct GraphExecutor {
     func_to_fg_id: HashMap<String, String>,
     /// Phase 17: when true, variable definitions/assignments are tracked as private
     in_priv_block: bool,
+    /// Phase 18: persistent universe graph (type hierarchy + modules + import edges)
+    universe_graph: Rc<RefCell<crate::values::graph::Graph>>,
 }
 
 /// A pattern clause stored as graph references (for pattern-matching functions).
@@ -98,6 +100,60 @@ impl GraphExecutor {
             next_func_id: 0,
             func_to_fg_id: HashMap::new(),
             in_priv_block: false,
+            universe_graph: Rc::new(RefCell::new(Self::build_initial_universe_graph())),
+        }
+    }
+
+    /// Build the initial universe graph with the built-in type hierarchy.
+    fn build_initial_universe_graph() -> crate::values::graph::Graph {
+        use crate::values::graph::{Graph, GraphType};
+        let mut g = Graph::new(GraphType::Directed);
+
+        let type_nodes = [
+            "type:any", "type:num", "type:int", "type:float", "type:bignum",
+            "type:string", "type:bool", "type:none", "type:symbol",
+            "type:collection", "type:list", "type:map", "type:graph",
+            "type:function", "type:module", "type:error", "type:time",
+        ];
+        for tn in &type_nodes {
+            let _ = g.add_node(tn.to_string(), Value::string(tn.to_string()));
+        }
+
+        let subtypes: &[(&str, &str)] = &[
+            ("type:num", "type:any"),
+            ("type:int", "type:num"),
+            ("type:float", "type:num"),
+            ("type:bignum", "type:num"),
+            ("type:string", "type:any"),
+            ("type:bool", "type:any"),
+            ("type:none", "type:any"),
+            ("type:symbol", "type:any"),
+            ("type:collection", "type:any"),
+            ("type:list", "type:collection"),
+            ("type:map", "type:collection"),
+            ("type:graph", "type:collection"),
+            ("type:function", "type:any"),
+            ("type:module", "type:any"),
+            ("type:error", "type:any"),
+            ("type:time", "type:any"),
+        ];
+        for (child, parent) in subtypes {
+            let _ = g.add_edge(child, parent, "subtype_of".to_string(), None, HashMap::new());
+        }
+
+        // Add scope:main node (source of import edges)
+        let _ = g.add_node("scope:main".to_string(), Value::string("main".to_string()));
+
+        g
+    }
+
+    /// Register a module node in the persistent universe graph (idempotent).
+    fn register_module_in_universe(&self, module: &crate::execution::module_manager::Module) {
+        let display_name = module.alias.clone().unwrap_or_else(|| module.name.clone());
+        let node_id = format!("module:{}", display_name);
+        let mut ug = self.universe_graph.borrow_mut();
+        if !ug.has_node(&node_id) {
+            let _ = ug.add_node(node_id, Value::string(display_name));
         }
     }
 
@@ -2533,34 +2589,39 @@ impl GraphExecutor {
                         "reflect.universe() takes no arguments, but got {}", args.len()
                     )));
                 }
-                use crate::values::graph::{Graph, GraphType};
-                let mut graph = Graph::new(GraphType::Directed);
-                // Add a node for each loaded module (prefer alias as node id)
-                for module in self.module_manager.get_all_modules() {
-                    let node_name = module.alias.clone().unwrap_or_else(|| module.name.clone());
-                    let _ = graph.add_node(
-                        node_name,
-                        Value::string(module.file_path.to_string_lossy().to_string()),
-                    );
+                // Phase 18: Return clone of persistent universe graph
+                let graph_clone = self.universe_graph.borrow().clone();
+                Ok(Value::graph(graph_clone))
+            }
+            "type_hierarchy" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "reflect.type_hierarchy() takes no arguments, but got {}", args.len()
+                    )));
                 }
-                // Add edges from dependency data
-                for (from_key, to_key) in self.module_manager.get_dependency_edges() {
-                    // Resolve keys to module names for cleaner graph (prefer alias)
-                    let from_name = self.module_manager.get_module(&from_key)
-                        .map(|m| m.alias.clone().unwrap_or_else(|| m.name.clone()))
-                        .unwrap_or(from_key);
-                    let to_name = self.module_manager.get_module(&to_key)
-                        .map(|m| m.alias.clone().unwrap_or_else(|| m.name.clone()))
-                        .unwrap_or(to_key);
-                    // Only add edge if both nodes exist
-                    if graph.has_node(&from_name) && graph.has_node(&to_name) {
-                        let _ = graph.add_edge(
-                            &from_name, &to_name,
-                            "imports".to_string(), None, HashMap::new(),
-                        );
+                // Phase 18: Extract type subgraph from universe graph
+                use crate::values::graph::{Graph, GraphType};
+                let ug = self.universe_graph.borrow();
+                let mut subgraph = Graph::new(GraphType::Directed);
+                // Copy only type:* nodes
+                for (node_id, graph_node) in &ug.nodes {
+                    if node_id.starts_with("type:") {
+                        let _ = subgraph.add_node(node_id.clone(), graph_node.value.clone());
                     }
                 }
-                Ok(Value::graph(graph))
+                // Copy only subtype_of edges between type nodes
+                for (node_id, graph_node) in &ug.nodes {
+                    if !node_id.starts_with("type:") { continue; }
+                    for (neighbor_id, edge_info) in &graph_node.neighbors {
+                        if edge_info.edge_type == "subtype_of" && neighbor_id.starts_with("type:") {
+                            let _ = subgraph.add_edge(
+                                node_id, neighbor_id,
+                                "subtype_of".to_string(), None, HashMap::new(),
+                            );
+                        }
+                    }
+                }
+                Ok(Value::graph(subgraph))
             }
             "current_scope" => {
                 if !args.is_empty() {
@@ -3408,6 +3469,7 @@ impl GraphExecutor {
                 )),
             };
 
+            let mut imported_items = Vec::new();
             for i in 0..count as u32 {
                 let item_ref = self.get_edge_target(node_ref, &ExecEdgeType::Element(i))
                     .ok_or_else(|| GraphoidError::runtime(
@@ -3432,8 +3494,19 @@ impl GraphExecutor {
                 })?;
 
                 // Bind using alias if provided, otherwise original name
-                let bind_name = item_alias.unwrap_or(item_name);
+                let bind_name = item_alias.unwrap_or(item_name.clone());
                 self.env.define(bind_name, value);
+                imported_items.push(item_name);
+            }
+
+            // Phase 18: Add selective import edge to universe graph
+            {
+                let mod_display = module.alias.clone().unwrap_or_else(|| module.name.clone());
+                let mod_node_id = format!("module:{}", mod_display);
+                let mut ug = self.universe_graph.borrow_mut();
+                let mut props = HashMap::new();
+                props.insert("items".to_string(), Value::string(imported_items.join(",")));
+                let _ = ug.add_edge("scope:main", &mod_node_id, "imports".to_string(), None, props);
             }
 
             return Ok(Value::none());
@@ -3447,6 +3520,13 @@ impl GraphExecutor {
         } else {
             module_name
         };
+
+        // Phase 18: Add full import edge to universe graph
+        {
+            let mod_node_id = format!("module:{}", binding_name);
+            let mut ug = self.universe_graph.borrow_mut();
+            let _ = ug.add_edge("scope:main", &mod_node_id, "imports".to_string(), None, HashMap::new());
+        }
 
         self.env.define(binding_name, module_value);
         Ok(Value::none())
@@ -3524,6 +3604,7 @@ impl GraphExecutor {
                         &cache_key,
                     );
                 }
+                self.register_module_in_universe(&module);
                 return Ok(Value::module(module));
             }
         }
@@ -3653,6 +3734,8 @@ impl GraphExecutor {
         let module_key = resolved_path.to_string_lossy().to_string();
         self.module_manager.register_module(module_key.clone(), module.clone());
         self.module_manager.end_loading(&resolved_path);
+
+        self.register_module_in_universe(&module);
 
         // Phase 17: Record dependency edge (current file imports this module)
         if let Some(ref current) = self.current_file {
