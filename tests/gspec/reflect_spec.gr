@@ -1,0 +1,62 @@
+# reflect_spec.gr - gspec tests for reflect module (Phase 17 architectural vision)
+#
+# Covers: reflect.current_scope(), reflect.loaded_modules(),
+#         reflect.module(), reflect.universe()
+#
+# Note: Module imports don't work inside describe/it blocks due to spec
+# runner scope. Tests that need imports are verified via sample files.
+#
+# Run with: gr spec tests/gspec/reflect_spec.gr
+
+describe "reflect.current_scope" {
+    it "returns a map" {
+        scope = reflect.current_scope()
+        assert(expect(scope.type()).to_equal("map"))
+    }
+
+    it "has a type key with string value" {
+        scope = reflect.current_scope()
+        t = scope["type"]
+        assert(expect(t.type()).to_equal("string"))
+    }
+
+    it "has a variables key with list value" {
+        scope = reflect.current_scope()
+        vars = scope["variables"]
+        assert(expect(vars.type()).to_equal("list"))
+    }
+
+    it "has a depth key with number value" {
+        scope = reflect.current_scope()
+        d = scope["depth"]
+        assert(expect(d.type()).to_equal("num"))
+    }
+
+    it "variables list includes locally defined vars" {
+        my_test_var = 42
+        scope = reflect.current_scope()
+        vars = scope["variables"]
+        assert(expect(vars.contains("my_test_var")).to_be_truthy())
+    }
+}
+
+describe "reflect.loaded_modules" {
+    it "returns a list" {
+        modules = reflect.loaded_modules()
+        assert(expect(modules.type()).to_equal("list"))
+    }
+}
+
+describe "reflect.module" {
+    it "returns none for nonexistent module" {
+        result = reflect.module("does_not_exist_xyz")
+        assert(expect(result).to_be_none())
+    }
+}
+
+describe "reflect.universe" {
+    it "returns a graph" {
+        u = reflect.universe()
+        assert(expect(u.type()).to_equal("graph"))
+    }
+}

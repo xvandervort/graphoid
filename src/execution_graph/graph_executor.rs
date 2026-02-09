@@ -2114,35 +2114,27 @@ impl GraphExecutor {
 
         // Check for static method calls on built-in type identifiers (time, list, string)
         if let Some(ref name) = obj_var_name {
-            match name.as_str() {
-                "time" if !self.env.exists("time") => {
-                    let arg_refs = self.get_ordered_edges(node_ref, "Argument");
-                    let mut args = Vec::new();
-                    for arg_ref in &arg_refs {
-                        let val = self.execute_node(*arg_ref)?;
-                        args.push(val);
-                    }
-                    return self.eval_time_static_method(&method_name, &args);
+            let static_dispatch = match name.as_str() {
+                "time" if !self.env.exists("time") => Some("time"),
+                "list" => Some("list"),
+                "string" => Some("string"),
+                "reflect" if !self.env.exists("reflect") => Some("reflect"),
+                _ => None,
+            };
+            if let Some(type_name) = static_dispatch {
+                let arg_refs = self.get_ordered_edges(node_ref, "Argument");
+                let mut args = Vec::new();
+                for arg_ref in &arg_refs {
+                    let val = self.execute_node(*arg_ref)?;
+                    args.push(val);
                 }
-                "list" => {
-                    let arg_refs = self.get_ordered_edges(node_ref, "Argument");
-                    let mut args = Vec::new();
-                    for arg_ref in &arg_refs {
-                        let val = self.execute_node(*arg_ref)?;
-                        args.push(val);
-                    }
-                    return self.eval_list_static_method(&method_name, &args);
-                }
-                "string" => {
-                    let arg_refs = self.get_ordered_edges(node_ref, "Argument");
-                    let mut args = Vec::new();
-                    for arg_ref in &arg_refs {
-                        let val = self.execute_node(*arg_ref)?;
-                        args.push(val);
-                    }
-                    return self.eval_string_static_method(&method_name, &args);
-                }
-                _ => {}
+                return match type_name {
+                    "time" => self.eval_time_static_method(&method_name, &args),
+                    "list" => self.eval_list_static_method(&method_name, &args),
+                    "string" => self.eval_string_static_method(&method_name, &args),
+                    "reflect" => self.eval_reflect_static_method(&method_name, &args),
+                    _ => unreachable!(),
+                };
             }
         }
 
@@ -2496,6 +2488,105 @@ impl GraphExecutor {
             }
             _ => Err(GraphoidError::runtime(format!(
                 "Time does not have method '{}'", method
+            ))),
+        }
+    }
+
+    /// Phase 17: reflect.* static methods for module introspection
+    fn eval_reflect_static_method(&self, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "loaded_modules" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "reflect.loaded_modules() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                let modules = self.module_manager.get_all_modules();
+                let mut names: Vec<String> = modules.iter()
+                    .map(|m| m.alias.clone().unwrap_or_else(|| m.name.clone()))
+                    .collect();
+                names.sort();
+                names.dedup();
+                let items: Vec<Value> = names.into_iter()
+                    .map(Value::string)
+                    .collect();
+                Ok(Value::list(crate::values::List::from_vec(items)))
+            }
+            "module" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "reflect.module() expects 1 argument (module name), but got {}", args.len()
+                    )));
+                }
+                let name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+                match self.module_manager.find_module_by_name(&name) {
+                    Some(m) => Ok(Value::module(m.clone())),
+                    None => Ok(Value::none()),
+                }
+            }
+            "universe" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "reflect.universe() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                use crate::values::graph::{Graph, GraphType};
+                let mut graph = Graph::new(GraphType::Directed);
+                // Add a node for each loaded module (prefer alias as node id)
+                for module in self.module_manager.get_all_modules() {
+                    let node_name = module.alias.clone().unwrap_or_else(|| module.name.clone());
+                    let _ = graph.add_node(
+                        node_name,
+                        Value::string(module.file_path.to_string_lossy().to_string()),
+                    );
+                }
+                // Add edges from dependency data
+                for (from_key, to_key) in self.module_manager.get_dependency_edges() {
+                    // Resolve keys to module names for cleaner graph (prefer alias)
+                    let from_name = self.module_manager.get_module(&from_key)
+                        .map(|m| m.alias.clone().unwrap_or_else(|| m.name.clone()))
+                        .unwrap_or(from_key);
+                    let to_name = self.module_manager.get_module(&to_key)
+                        .map(|m| m.alias.clone().unwrap_or_else(|| m.name.clone()))
+                        .unwrap_or(to_key);
+                    // Only add edge if both nodes exist
+                    if graph.has_node(&from_name) && graph.has_node(&to_name) {
+                        let _ = graph.add_edge(
+                            &from_name, &to_name,
+                            "imports".to_string(), None, HashMap::new(),
+                        );
+                    }
+                }
+                Ok(Value::graph(graph))
+            }
+            "current_scope" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "reflect.current_scope() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                use crate::namespace::ScopeType;
+                let mut hash = crate::values::Hash::new();
+                let scope_type_str = match self.env.current_scope_type() {
+                    ScopeType::Global => "global",
+                    ScopeType::Function(_) => "function",
+                    ScopeType::Block => "block",
+                    ScopeType::Module(_) => "module",
+                    ScopeType::Class(_) => "class",
+                };
+                let _ = hash.insert("type".to_string(), Value::string(scope_type_str.to_string()));
+                let var_names: Vec<Value> = self.env.get_variable_names().into_iter()
+                    .map(Value::string)
+                    .collect();
+                let _ = hash.insert("variables".to_string(), Value::list(crate::values::List::from_vec(var_names)));
+                let _ = hash.insert("depth".to_string(), Value::number(self.env.scope_depth() as f64));
+                Ok(Value::map(hash))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "reflect does not have method '{}'", method
             ))),
         }
     }

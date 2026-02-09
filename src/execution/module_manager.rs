@@ -409,6 +409,21 @@ impl ModuleManager {
         keys
     }
 
+    /// Find a loaded module by name (tries direct key, native: prefix, name, then alias)
+    pub fn find_module_by_name(&self, name: &str) -> Option<&Module> {
+        if let Some(m) = self.modules.get(name) { return Some(m); }
+        if let Some(m) = self.modules.get(&format!("native:{}", name)) { return Some(m); }
+        // Search by Module.name field
+        if let Some(m) = self.modules.values().find(|m| m.name == name) { return Some(m); }
+        // Search by Module.alias field (e.g., "math" for module math_module alias math)
+        self.modules.values().find(|m| m.alias.as_deref() == Some(name))
+    }
+
+    /// Get all loaded modules
+    pub fn get_all_modules(&self) -> Vec<&Module> {
+        self.modules.values().collect()
+    }
+
     /// Get all dependency edges as (from, to) pairs
     pub fn get_dependency_edges(&self) -> Vec<(String, String)> {
         let mut edges = Vec::new();
