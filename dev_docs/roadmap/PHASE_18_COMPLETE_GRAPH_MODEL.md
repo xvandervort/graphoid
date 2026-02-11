@@ -29,8 +29,7 @@ universe
 ├── types/                    # Type hierarchy (Section 2)
 │   ├── any
 │   ├── num
-│   │   ├── int
-│   │   └── float
+│   │   └── bignum
 │   ├── string
 │   ├── bool
 │   └── collection
@@ -87,7 +86,7 @@ validated = u.query({ has_edge: { label: "behavior", to: "rule:validate_age" } }
 
 ---
 
-## 1. Complex Graphs ✅ COMPLETE (Feb 9, 2026)
+## 1. Complex Graphs (Partial)
 
 Graphs can have functions, properties, and behaviors attached, making them more complex. There's no special "class" type - these are just graphs with more structure.
 
@@ -193,9 +192,11 @@ ValidatedPerson ──behavior──► rule:validate_age
 
 ---
 
-## 2. Type System as Graph ✅ COMPLETE (Feb 9, 2026)
+## 2. Type System as Graph (Partial)
 
-**Implemented**: Persistent universe graph on GraphExecutor with 17 type nodes (any, num, int, float, bignum, string, bool, none, symbol, collection, list, map, graph, function, module, error, time) + 16 subtype_of edges. Module nodes added when modules load. Import edges added when exec_import runs. `reflect.universe()` returns clone of persistent graph. `reflect.type_hierarchy()` extracts type subgraph. `graph.has_node()` method exposed. 1293 Rust + 660 gspec tests pass.
+**Implemented so far**: Persistent universe graph on GraphExecutor with 15 type nodes + 14 subtype_of edges. Module nodes added when modules load. Import edges added when exec_import runs. `reflect.universe()` returns clone of persistent graph. `reflect.type_hierarchy()` extracts type subgraph. `graph.has_node()` method exposed.
+
+**Still needed**: `is_subtype()` function, `common_type()` function, user-defined graph types in type hierarchy.
 
 ### Type Hierarchy
 
@@ -211,11 +212,11 @@ ValidatedPerson ──behavior──► rule:validate_age
 │        ┌──────┐       ┌──────┐      ┌──────┐                        │
 │        │ num  │       │string│      │ bool │                        │
 │        └──┬───┘       └──────┘      └──────┘                        │
-│       ┌───┴───┐                                                     │
-│       ▼       ▼                                                     │
-│   ┌──────┐ ┌──────┐                                                 │
-│   │ int  │ │float │                                                 │
-│   └──────┘ └──────┘                                                 │
+│           │                                                         │
+│           ▼                                                         │
+│       ┌────────┐                                                    │
+│       │ bignum │                                                    │
+│       └────────┘                                                    │
 │                                                                     │
 │  Collection types:                                                  │
 │        ┌──────────┐                                                 │
@@ -237,13 +238,13 @@ ValidatedPerson ──behavior──► rule:validate_age
 
 ```graphoid
 # Subtype check = path exists in type graph
-is_subtype(Employee, Person)  # true (path exists)
-is_subtype(int, num)          # true
-is_subtype(string, num)       # false (no path)
+is_subtype(:Employee, :Person)  # true (path exists)
+is_subtype(:bignum, :num)       # true
+is_subtype(:string, :num)       # false (no path)
 
 # Common supertype = lowest common ancestor
-common_type(int, float)       # num
-common_type(string, int)      # any
+common_type(:list, :map)        # :collection
+common_type(:string, :num)      # :any
 
 # Type inference = constraint propagation
 fn add(a, b) { return a + b }
@@ -251,18 +252,19 @@ fn add(a, b) { return a + b }
 # This is constraint edges in the type graph
 ```
 
-### Runtime Type as Node Property
+### Runtime Type
 
-```
-Every value node has type edge:
-  value:42 ──has_type──► type:int
-  value:"hi" ──has_type──► type:string
-  alice ──has_type──► Person
+Type is intrinsic to every value (via `typeof()`). No explicit `has_type` edges are needed — the type hierarchy in the universe graph is for querying subtype relationships, not for tagging individual values.
+
+```graphoid
+typeof(42)       # "num"
+typeof("hi")     # "string"
+typeof(alice)    # "graph"
 ```
 
 ---
 
-## 3. Patterns as Graph Templates ✅ COMPLETE (Feb 9, 2026)
+## 3. Patterns as Graph Templates (Partial)
 
 ### Pattern Structure
 
@@ -362,7 +364,7 @@ Pattern is a graph, value is a graph, matching is subgraph isomorphism.
 
 ---
 
-## 4. Exceptions as Alternative Paths ✅ COMPLETE (Feb 9, 2026)
+## 4. Exceptions as Alternative Paths (Partial)
 
 ### Exception Path in Execution Graph
 
@@ -584,34 +586,45 @@ fn do_stuff() {
 
 ### Day 1: Universe Graph Structure
 
-- [ ] Define canonical universe graph structure
-- [ ] Implement `reflect.universe()` returning universe graph
+- [x] Define canonical universe graph structure
+- [x] Implement `reflect.universe()` returning universe graph
 - [ ] Implement subgraph accessors: `.modules()`, `.packages()`, `.connections()`, `.types()`
-- [ ] Tests for universe structure queries
+- [x] Tests for universe structure queries
 
 ### Week 1: Complex Graphs (Days 2-5)
 
-- [ ] Graphs with properties and methods
-- [ ] Graph instantiation with instantiated_from edge
-- [ ] Graph extension via from edge
-- [ ] Method lookup via graph traversal
-- [ ] Tests for complex graph model
+- [x] Graphs with properties and methods (pre-existing)
+- [ ] Graph instantiation with `instantiated_from` edge
+- [x] Graph extension via `from` edge (pre-existing)
+- [ ] Method lookup via `instantiated_from` edge traversal
+- [x] `configure { behaviors: [...] }` applies rules to graph declarations
+- [x] Graph templates registered as `graph:Name` nodes in universe
+- [ ] Tests for instantiated_from and method lookup
 
 ### Week 1-2: Types and Patterns (Days 5-8)
 
-- [ ] Type hierarchy as graph
-- [ ] Subtype check as path finding
-- [ ] Pattern as graph template
-- [ ] Match as subgraph isomorphism
-- [ ] Tests for type and pattern graphs
+- [x] Type hierarchy as graph (17 nodes + 16 subtype_of edges)
+- [ ] `is_subtype()` function (path check in type graph)
+- [ ] `common_type()` function (LCA in type graph)
+- [ ] Runtime `has_type` edges on values
+- [ ] User-defined graph types get `subtype_of` edge to `type:any`
+- [ ] `reflect.pattern()` returning pattern as queryable graph
+- [x] `g.match()` graph pattern matching (pre-existing)
+- [ ] Tests for type operations and pattern reflection
 
-### Week 2: Exceptions and Iterators (Days 9-12)
+### Week 2: Exceptions (Days 9-10)
 
-- [ ] Exception paths in execution graph
-- [ ] Propagation via caller edges
-- [ ] Iterator as node with next edges
-- [ ] Lazy generators
-- [ ] Tests for exceptions and iterators
+- [x] Error type hierarchy in universe graph (6 types + 2 IOError subtypes)
+- [x] `catch IOError` catches FileError/NetError via `has_path()`
+- [ ] Exception propagation via caller edges in execution graph
+- [x] Tests for error hierarchy and catch subtypes
+
+### Week 2: Iterators as Graph (Days 11-12)
+
+- [ ] Iterator as graph node with `next` edges
+- [ ] Lazy generators as graph nodes
+- [ ] Pipeline combinators as graph transformations
+- [ ] Tests for iterator graph model
 
 ### Week 2: Effects (Days 13-14)
 
@@ -624,18 +637,20 @@ fn do_stuff() {
 
 ## Success Criteria
 
-- [ ] Universe graph structure defined with namespaced subgraphs
-- [ ] `reflect.universe()` returns queryable universe graph
-- [ ] Complex graphs have properties, methods, behaviors as subgraph structure
-- [ ] Graph instantiation creates instantiated_from edges
-- [ ] Graph extension works via from edges
-- [ ] Type hierarchy is a graph
-- [ ] Pattern matching uses subgraph isomorphism
-- [ ] Exceptions use alternative execution paths
-- [ ] Iterators are traversable node chains
+- [x] Universe graph structure defined with namespaced subgraphs
+- [x] `reflect.universe()` returns queryable universe graph
+- [x] Complex graphs have properties, methods, behaviors as subgraph structure
+- [ ] Graph instantiation creates `instantiated_from` edges
+- [x] Graph extension works via `from` edges
+- [x] Type hierarchy is a graph
+- [ ] `is_subtype()` and `common_type()` use graph traversal
+- [ ] Pattern reflection via `reflect.pattern()`
+- [x] `g.match()` uses graph pattern matching
+- [ ] Exceptions propagate via caller edges
+- [ ] Iterators are graph nodes with `next` edges
 - [ ] Effects are tracked as nodes
-- [ ] All existing tests pass
-- [ ] New graph-model tests pass
+- [x] All existing tests pass
+- [x] New graph-model tests pass
 
 ---
 
@@ -664,9 +679,9 @@ fido = Dog { name: "Fido" }
 assert(fido.has_edge({ label: "instantiated_from", to: Dog }), "instantiated_from edge")
 
 # test_type_graph.gr
-type_graph = reflect.type_graph()
-assert(type_graph.has_path("int", "any"), "int is subtype of any")
-assert(not type_graph.has_path("string", "num"), "string not subtype of num")
+type_graph = reflect.type_hierarchy()
+assert(type_graph.has_path("type:bignum", "type:any"), "bignum is subtype of any")
+assert(not type_graph.has_path("type:string", "type:num"), "string not subtype of num")
 
 # test_pattern_graph.gr
 pattern = reflect.pattern({ name: n, age: a } if a > 18)

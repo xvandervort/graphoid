@@ -110,7 +110,7 @@ impl GraphExecutor {
         let mut g = Graph::new(GraphType::Directed);
 
         let type_nodes = [
-            "type:any", "type:num", "type:int", "type:float", "type:bignum",
+            "type:any", "type:num", "type:bignum",
             "type:string", "type:bool", "type:none", "type:symbol",
             "type:collection", "type:list", "type:map", "type:graph",
             "type:function", "type:module", "type:error", "type:time",
@@ -121,8 +121,6 @@ impl GraphExecutor {
 
         let subtypes: &[(&str, &str)] = &[
             ("type:num", "type:any"),
-            ("type:int", "type:num"),
-            ("type:float", "type:num"),
             ("type:bignum", "type:num"),
             ("type:string", "type:any"),
             ("type:bool", "type:any"),

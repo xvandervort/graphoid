@@ -33,9 +33,9 @@ print("Universe nodes: " + universe.nodes().length().to_string())
 print("Universe edges: " + universe.edges().length().to_string())
 
 # Check type hierarchy in universe
-print("Has type:int? " + universe.has_node("type:int").to_string())
-print("int -> num? " + universe.has_path("type:int", "type:num").to_string())
-print("int -> any? " + universe.has_path("type:int", "type:any").to_string())
+print("Has type:num? " + universe.has_node("type:num").to_string())
+print("bignum -> num? " + universe.has_path("type:bignum", "type:num").to_string())
+print("num -> any? " + universe.has_path("type:num", "type:any").to_string())
 
 # Check module nodes and import edges
 print("Has module:math? " + universe.has_node("module:math").to_string())

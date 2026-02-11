@@ -11,9 +11,9 @@ describe "universe graph type hierarchy" {
         assert(expect(u.has_node("type:any")).to_be_truthy())
     }
 
-    it "has type:int node" {
+    it "has type:num node" {
         u = reflect.universe()
-        assert(expect(u.has_node("type:int")).to_be_truthy())
+        assert(expect(u.has_node("type:num")).to_be_truthy())
     }
 
     it "has type:collection node" {
@@ -26,14 +26,14 @@ describe "universe graph type hierarchy" {
         assert(expect(u.has_node("scope:main")).to_be_truthy())
     }
 
-    it "int is subtype of num" {
+    it "bignum is subtype of num" {
         u = reflect.universe()
-        assert(expect(u.has_path("type:int", "type:num")).to_be_truthy())
+        assert(expect(u.has_path("type:bignum", "type:num")).to_be_truthy())
     }
 
-    it "int has path to any (via num)" {
+    it "num has path to any" {
         u = reflect.universe()
-        assert(expect(u.has_path("type:int", "type:any")).to_be_truthy())
+        assert(expect(u.has_path("type:num", "type:any")).to_be_truthy())
     }
 
     it "list is subtype of collection" {
@@ -47,9 +47,9 @@ describe "universe graph type hierarchy" {
         assert(expect(result).to_equal(false))
     }
 
-    it "has 17 type nodes" {
+    it "has 15 type nodes" {
         u = reflect.universe()
-        types = ["type:any", "type:num", "type:int", "type:float", "type:bignum",
+        types = ["type:any", "type:num", "type:bignum",
                  "type:string", "type:bool", "type:none", "type:symbol",
                  "type:collection", "type:list", "type:map", "type:graph",
                  "type:function", "type:module", "type:error", "type:time"]
@@ -59,7 +59,7 @@ describe "universe graph type hierarchy" {
                 count = count + 1
             }
         }
-        assert(expect(count).to_equal(17))
+        assert(expect(count).to_equal(15))
     }
 }
 
@@ -71,7 +71,7 @@ describe "reflect.type_hierarchy" {
 
     it "contains type nodes" {
         th = reflect.type_hierarchy()
-        assert(expect(th.has_node("type:int")).to_be_truthy())
+        assert(expect(th.has_node("type:num")).to_be_truthy())
         assert(expect(th.has_node("type:any")).to_be_truthy())
     }
 
@@ -83,7 +83,7 @@ describe "reflect.type_hierarchy" {
 
     it "preserves subtype edges" {
         th = reflect.type_hierarchy()
-        assert(expect(th.has_path("type:float", "type:any")).to_be_truthy())
+        assert(expect(th.has_path("type:bignum", "type:any")).to_be_truthy())
     }
 }
 

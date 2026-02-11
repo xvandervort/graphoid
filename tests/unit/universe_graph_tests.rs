@@ -22,7 +22,7 @@ fn test_universe_has_all_type_nodes() {
     let mut executor = Executor::new();
     let code = r#"
         u = reflect.universe()
-        types = ["type:any", "type:num", "type:int", "type:float", "type:bignum",
+        types = ["type:any", "type:num", "type:bignum",
                  "type:string", "type:bool", "type:none", "type:symbol",
                  "type:collection", "type:list", "type:map", "type:graph",
                  "type:function", "type:module", "type:error", "type:time"]
@@ -36,7 +36,7 @@ fn test_universe_has_all_type_nodes() {
     "#;
     executor.execute_source(code).unwrap();
     let result = executor.env().get("result").unwrap();
-    assert!(matches!(&result.kind, ValueKind::Number(n) if *n == 17.0));
+    assert!(matches!(&result.kind, ValueKind::Number(n) if *n == 15.0));
 }
 
 #[test]
@@ -56,11 +56,11 @@ fn test_universe_has_scope_main_node() {
 // ============================================================================
 
 #[test]
-fn test_universe_int_is_subtype_of_num() {
+fn test_universe_bignum_is_subtype_of_num() {
     let mut executor = Executor::new();
     let code = r#"
         u = reflect.universe()
-        result = u.has_path("type:int", "type:num")
+        result = u.has_path("type:bignum", "type:num")
     "#;
     executor.execute_source(code).unwrap();
     let result = executor.env().get("result").unwrap();
@@ -68,11 +68,11 @@ fn test_universe_int_is_subtype_of_num() {
 }
 
 #[test]
-fn test_universe_int_has_path_to_any() {
+fn test_universe_num_has_path_to_any() {
     let mut executor = Executor::new();
     let code = r#"
         u = reflect.universe()
-        result = u.has_path("type:int", "type:any")
+        result = u.has_path("type:num", "type:any")
     "#;
     executor.execute_source(code).unwrap();
     let result = executor.env().get("result").unwrap();
@@ -154,7 +154,7 @@ fn test_type_hierarchy_has_only_type_nodes() {
     let code = r#"
         import "math"
         th = reflect.type_hierarchy()
-        has_type = th.has_node("type:int")
+        has_type = th.has_node("type:num")
         has_module = th.has_node("module:math")
         has_scope = th.has_node("scope:main")
     "#;
@@ -172,7 +172,7 @@ fn test_type_hierarchy_has_subtype_edges() {
     let mut executor = Executor::new();
     let code = r#"
         th = reflect.type_hierarchy()
-        result = th.has_path("type:float", "type:any")
+        result = th.has_path("type:bignum", "type:any")
     "#;
     executor.execute_source(code).unwrap();
     let result = executor.env().get("result").unwrap();
