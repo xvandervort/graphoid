@@ -1093,15 +1093,15 @@ impl Parser {
                 k
             } else {
                 return Err(GraphoidError::SyntaxError {
-                    message: format!("Expected config key (readable, writable, accessible), got {:?}", self.peek().token_type),
+                    message: format!("Expected config key (readable, writable, accessible, behaviors), got {:?}", self.peek().token_type),
                     position: self.peek().position(),
                 });
             };
 
             // Validate key
-            if !["readable", "writable", "accessible"].contains(&key.as_str()) {
+            if !["readable", "writable", "accessible", "behaviors"].contains(&key.as_str()) {
                 return Err(GraphoidError::SyntaxError {
-                    message: format!("Unknown config key '{}'. Valid keys: readable, writable, accessible", key),
+                    message: format!("Unknown config key '{}'. Valid keys: readable, writable, accessible, behaviors", key),
                     position: self.peek().position(),
                 });
             }

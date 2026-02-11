@@ -209,3 +209,148 @@ fn test_universe_is_snapshot() {
     assert!(matches!(&before.kind, ValueKind::Boolean(false)));
     assert!(matches!(&after.kind, ValueKind::Boolean(false)));
 }
+
+// ============================================================================
+// Graph template nodes in universe (Section 1)
+// ============================================================================
+
+#[test]
+fn test_universe_has_graph_template_after_decl() {
+    let mut executor = Executor::new();
+    let code = r#"
+        graph Person {
+            name: "unnamed"
+        }
+        u = reflect.universe()
+        result = u.has_node("graph:Person")
+    "#;
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+    assert!(matches!(&result.kind, ValueKind::Boolean(true)));
+}
+
+#[test]
+fn test_universe_graph_template_is_subtype_of_graph() {
+    let mut executor = Executor::new();
+    let code = r#"
+        graph Animal {
+            name: "unnamed"
+        }
+        u = reflect.universe()
+        result = u.has_path("graph:Animal", "type:graph")
+    "#;
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+    assert!(matches!(&result.kind, ValueKind::Boolean(true)));
+}
+
+#[test]
+fn test_universe_child_graph_subtypes_parent() {
+    let mut executor = Executor::new();
+    let code = r#"
+        graph Animal {
+            name: "unnamed"
+        }
+        graph Dog from Animal {
+            breed: "unknown"
+        }
+        u = reflect.universe()
+        result = u.has_path("graph:Dog", "graph:Animal")
+    "#;
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+    assert!(matches!(&result.kind, ValueKind::Boolean(true)));
+}
+
+// ============================================================================
+// Behaviors via configure (Section 1)
+// ============================================================================
+
+#[test]
+fn test_behaviors_config_applies_rule() {
+    let mut executor = Executor::new();
+    let code = r#"
+        graph DAG {
+            configure { behaviors: [:no_cycles] }
+        }
+        result = DAG.has_rule(:no_cycles)
+    "#;
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+    assert!(matches!(&result.kind, ValueKind::Boolean(true)));
+}
+
+// ============================================================================
+// Exception type hierarchy (Section 4)
+// ============================================================================
+
+#[test]
+fn test_universe_has_error_type_nodes() {
+    let mut executor = Executor::new();
+    let code = r#"
+        u = reflect.universe()
+        has_ve = u.has_node("error:ValueError")
+        has_io = u.has_node("error:IOError")
+        has_fe = u.has_node("error:FileError")
+    "#;
+    executor.execute_source(code).unwrap();
+    let has_ve = executor.env().get("has_ve").unwrap();
+    let has_io = executor.env().get("has_io").unwrap();
+    let has_fe = executor.env().get("has_fe").unwrap();
+    assert!(matches!(&has_ve.kind, ValueKind::Boolean(true)));
+    assert!(matches!(&has_io.kind, ValueKind::Boolean(true)));
+    assert!(matches!(&has_fe.kind, ValueKind::Boolean(true)));
+}
+
+#[test]
+fn test_universe_error_hierarchy_paths() {
+    let mut executor = Executor::new();
+    let code = r#"
+        u = reflect.universe()
+        fe_to_io = u.has_path("error:FileError", "error:IOError")
+        ne_to_io = u.has_path("error:NetError", "error:IOError")
+        io_to_error = u.has_path("error:IOError", "type:error")
+        fe_to_error = u.has_path("error:FileError", "type:error")
+        ve_not_io = u.has_path("error:ValueError", "error:IOError")
+    "#;
+    executor.execute_source(code).unwrap();
+    assert!(matches!(&executor.env().get("fe_to_io").unwrap().kind, ValueKind::Boolean(true)));
+    assert!(matches!(&executor.env().get("ne_to_io").unwrap().kind, ValueKind::Boolean(true)));
+    assert!(matches!(&executor.env().get("io_to_error").unwrap().kind, ValueKind::Boolean(true)));
+    assert!(matches!(&executor.env().get("fe_to_error").unwrap().kind, ValueKind::Boolean(true)));
+    assert!(matches!(&executor.env().get("ve_not_io").unwrap().kind, ValueKind::Boolean(false)));
+}
+
+#[test]
+fn test_catch_ioerror_catches_fileerror() {
+    let mut executor = Executor::new();
+    let code = r#"
+        result = "not caught"
+        try {
+            raise("FileError: test file error")
+        } catch IOError as e {
+            result = "caught: " + e.type()
+        }
+    "#;
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+    assert!(matches!(&result.kind, ValueKind::String(s) if s == "caught: FileError"));
+}
+
+#[test]
+fn test_catch_valueerror_does_not_catch_ioerror() {
+    let mut executor = Executor::new();
+    let code = r#"
+        result = "not caught"
+        try {
+            raise("IOError: test io error")
+        } catch ValueError as e {
+            result = "caught ValueError"
+        } catch as e {
+            result = "caught generic"
+        }
+    "#;
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+    assert!(matches!(&result.kind, ValueKind::String(s) if s == "caught generic"));
+}

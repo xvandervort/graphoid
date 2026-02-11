@@ -144,6 +144,23 @@ impl GraphExecutor {
         // Add scope:main node (source of import edges)
         let _ = g.add_node("scope:main".to_string(), Value::string("main".to_string()));
 
+        // Error type hierarchy (subtypes of type:error)
+        let error_types = [
+            "RuntimeError", "ValueError", "TypeError",
+            "IOError", "NetworkError", "ParseError",
+        ];
+        for et in &error_types {
+            let node_id = format!("error:{}", et);
+            let _ = g.add_node(node_id.clone(), Value::string(et.to_string()));
+            let _ = g.add_edge(&node_id, "type:error", "subtype_of".to_string(), None, HashMap::new());
+        }
+        // IOError subtypes
+        for sub in &["FileError", "NetError"] {
+            let node_id = format!("error:{}", sub);
+            let _ = g.add_node(node_id.clone(), Value::string(sub.to_string()));
+            let _ = g.add_edge(&node_id, "error:IOError", "subtype_of".to_string(), None, HashMap::new());
+        }
+
         g
     }
 
@@ -3309,7 +3326,7 @@ impl GraphExecutor {
 
                 let (error_type_name, actual_message) = if let Some(colon_pos) = inner_message.find(':') {
                     let potential_type = &inner_message[..colon_pos];
-                    if matches!(potential_type, "ValueError" | "TypeError" | "IOError" | "NetworkError" | "ParseError" | "RuntimeError") {
+                    if matches!(potential_type, "ValueError" | "TypeError" | "IOError" | "NetworkError" | "ParseError" | "RuntimeError" | "FileError" | "NetError") {
                         (potential_type.to_string(), inner_message[(colon_pos + 1)..].trim().to_string())
                     } else {
                         (e.error_type(), inner_message.to_string())
@@ -3326,9 +3343,15 @@ impl GraphExecutor {
                     let variable = self.get_str_property(*catch_ref, "variable");
                     let catch_body_ref = self.get_edge_target(*catch_ref, &ExecEdgeType::Body);
 
-                    // Check if this catch matches the error type
+                    // Check if this catch matches the error type (with hierarchy)
                     let matches = match &catch_error_type {
-                        Some(et) => *et == error_type_name,
+                        Some(et) => {
+                            *et == error_type_name || {
+                                let catch_id = format!("error:{}", et);
+                                let actual_id = format!("error:{}", error_type_name);
+                                self.universe_graph.borrow().has_path(&actual_id, &catch_id)
+                            }
+                        }
                         None => true, // Bare catch catches everything
                     };
 
@@ -4003,6 +4026,12 @@ impl GraphExecutor {
                         readable_props.extend(values.clone());
                         writable_props.extend(values);
                     }
+                    "behaviors" => {
+                        for rule_name in &values {
+                            let spec = Self::symbol_to_rule_spec(rule_name, None)?;
+                            graph.add_rule(crate::graph::RuleInstance::new(spec))?;
+                        }
+                    }
                     _ => {
                         let config_id = format!("__config__/{}", key);
                         let config_list: Vec<Value> = values.iter().map(|v| Value::string(v.clone())).collect();
@@ -4026,6 +4055,25 @@ impl GraphExecutor {
             if !graph.has_method(&setter_name) {
                 let setter = self.generate_setter_method(prop_name);
                 graph.attach_method(setter_name, setter);
+            }
+        }
+
+        // Phase 18: Register graph template in universe graph
+        {
+            let node_id = format!("graph:{}", name);
+            let mut ug = self.universe_graph.borrow_mut();
+            if !ug.has_node(&node_id) {
+                let _ = ug.add_node(node_id.clone(), Value::string(name.clone()));
+                let _ = ug.add_edge(&node_id, "type:graph", "subtype_of".to_string(), None, HashMap::new());
+            }
+            // If graph has a parent, add subtype_of edge to parent graph node
+            if let Some(ref parent) = graph.parent {
+                if let Some(ref parent_name) = parent.type_name {
+                    let parent_node_id = format!("graph:{}", parent_name);
+                    if ug.has_node(&parent_node_id) {
+                        let _ = ug.add_edge(&node_id, &parent_node_id, "subtype_of".to_string(), None, HashMap::new());
+                    }
+                }
             }
         }
 

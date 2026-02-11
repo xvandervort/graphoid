@@ -87,6 +87,105 @@ describe "reflect.type_hierarchy" {
     }
 }
 
+describe "universe module nodes" {
+    it "has module node after import" {
+        import "math"
+        u = reflect.universe()
+        assert(expect(u.has_node("module:math")).to_be_truthy())
+    }
+
+    it "has import edge after import" {
+        import "math"
+        u = reflect.universe()
+        assert(expect(u.has_path("scope:main", "module:math")).to_be_truthy())
+    }
+}
+
+describe "graph templates in universe" {
+    it "has graph:Name node after declaration" {
+        graph Person {
+            name: "unnamed"
+        }
+        u = reflect.universe()
+        assert(expect(u.has_node("graph:Person")).to_be_truthy())
+    }
+
+    it "graph template is subtype of type:graph" {
+        graph Animal {
+            name: "unnamed"
+        }
+        u = reflect.universe()
+        assert(expect(u.has_path("graph:Animal", "type:graph")).to_be_truthy())
+    }
+
+    it "child graph is subtype of parent" {
+        graph Vehicle {
+            speed: 0
+        }
+        graph Car from Vehicle {
+            doors: 4
+        }
+        u = reflect.universe()
+        assert(expect(u.has_path("graph:Car", "graph:Vehicle")).to_be_truthy())
+    }
+}
+
+describe "behaviors via configure" {
+    it "applies rule from configure block" {
+        graph DAG {
+            configure { behaviors: [:no_cycles] }
+        }
+        assert(expect(DAG.has_rule(:no_cycles)).to_be_truthy())
+    }
+}
+
+describe "exception type hierarchy" {
+    it "has error type nodes in universe" {
+        u = reflect.universe()
+        assert(expect(u.has_node("error:ValueError")).to_be_truthy())
+        assert(expect(u.has_node("error:IOError")).to_be_truthy())
+        assert(expect(u.has_node("error:FileError")).to_be_truthy())
+    }
+
+    it "FileError is subtype of IOError" {
+        u = reflect.universe()
+        assert(expect(u.has_path("error:FileError", "error:IOError")).to_be_truthy())
+    }
+
+    it "IOError is subtype of type:error" {
+        u = reflect.universe()
+        assert(expect(u.has_path("error:IOError", "type:error")).to_be_truthy())
+    }
+
+    it "ValueError is not subtype of IOError" {
+        u = reflect.universe()
+        result = u.has_path("error:ValueError", "error:IOError")
+        assert(expect(result).to_equal(false))
+    }
+
+    it "catch IOError catches FileError" {
+        result = "not caught"
+        try {
+            raise("FileError: test file error")
+        } catch IOError as e {
+            result = "caught: " + e.type()
+        }
+        assert(expect(result).to_equal("caught: FileError"))
+    }
+
+    it "catch ValueError does not catch IOError" {
+        result = "not caught"
+        try {
+            raise("IOError: test io error")
+        } catch ValueError as e {
+            result = "caught ValueError"
+        } catch as e {
+            result = "caught generic"
+        }
+        assert(expect(result).to_equal("caught generic"))
+    }
+}
+
 describe "graph.has_node" {
     it "returns true for existing node" {
         g = graph { type: :directed }
