@@ -1338,7 +1338,11 @@ impl GraphExecutor {
                     // Implicit self method call: if `self` is a graph with this method,
                     // call it as a method call (with proper self binding)
                     // Uses eval_graph_method for proper guard evaluation (Phase 21)
-                    if let Ok(self_value) = self.env.get("self") {
+                    // Also checks block_self_stack for trailing block contexts
+                    // (e.g., `obj.method() { || bare_call() }` where bare_call is a method on obj)
+                    let implicit_self = self.env.get("self").ok()
+                        .or_else(|| self.block_self_stack.last().cloned());
+                    if let Some(self_value) = implicit_self {
                         if let ValueKind::Graph(ref graph_rc) = self_value.kind {
                             let graph = graph_rc.borrow();
                             if graph.has_method(&func_name) {
