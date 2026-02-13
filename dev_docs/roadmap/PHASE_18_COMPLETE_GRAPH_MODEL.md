@@ -604,12 +604,12 @@ fn do_stuff() {
 ### Week 1-2: Types and Patterns (Days 5-8)
 
 - [x] Type hierarchy as graph (15 nodes + 14 subtype_of edges)
-- [ ] `is_subtype()` function (path check in type graph)
-- [ ] `common_type()` function (LCA in type graph)
-- [ ] User-defined graph types get `subtype_of` edge to `type:any`
-- [ ] `reflect.pattern()` returning pattern as queryable graph
+- [~] `is_subtype()` function — SKIPPED: not useful to users; type hierarchy already queryable via `reflect.type_hierarchy()` + `has_path()`
+- [~] `common_type()` function — SKIPPED: academic; no practical use case in a duck-typed language
+- [~] User-defined graph types get `subtype_of` edge — SKIPPED: tied to above
+- [x] `reflect.pattern()` returning pattern as queryable graph
 - [x] `g.match()` graph pattern matching (pre-existing)
-- [ ] Tests for type operations and pattern reflection
+- [x] Tests for pattern reflection
 
 ### Week 2: Exceptions (Days 9-10)
 
@@ -639,11 +639,11 @@ fn do_stuff() {
 - [x] Universe graph structure defined with namespaced subgraphs
 - [x] `reflect.universe()` returns queryable universe graph
 - [x] Complex graphs have properties, methods, behaviors as subgraph structure
-- [ ] Graph instantiation creates `instantiated_from` edges
+- [x] Graph instantiation creates `instantiated_from` edges
 - [x] Graph extension works via `from` edges
 - [x] Type hierarchy is a graph
-- [ ] `is_subtype()` and `common_type()` use graph traversal
-- [ ] Pattern reflection via `reflect.pattern()`
+- [~] `is_subtype()` and `common_type()` — SKIPPED (not useful to users)
+- [x] Pattern reflection via `reflect.pattern()`
 - [x] `g.match()` uses graph pattern matching
 - [ ] Exceptions propagate via caller edges
 - [ ] Iterators are graph nodes with `next` edges

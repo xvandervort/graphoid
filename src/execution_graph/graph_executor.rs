@@ -2226,6 +2226,12 @@ impl GraphExecutor {
             };
             if let Some(type_name) = static_dispatch {
                 let arg_refs = self.get_ordered_edges(node_ref, "Argument");
+
+                // Special form: reflect.pattern() inspects unevaluated AST structure
+                if type_name == "reflect" && method_name == "pattern" {
+                    return self.eval_reflect_pattern(&arg_refs);
+                }
+
                 let mut args = Vec::new();
                 for arg_ref in &arg_refs {
                     let val = self.execute_node(*arg_ref)?;
@@ -2697,6 +2703,159 @@ impl GraphExecutor {
                 "reflect does not have method '{}'", method
             ))),
         }
+    }
+
+    /// Phase 18 Section 3: reflect.pattern() — inspect unevaluated expression as pattern graph.
+    ///
+    /// This is a special form: the first argument is NOT evaluated. Instead, its
+    /// execution graph structure is walked to build a pattern graph with binding,
+    /// literal, and wildcard nodes. An optional second argument (a lambda) is
+    /// evaluated and becomes a guard node.
+    fn eval_reflect_pattern(&mut self, arg_refs: &[NodeRef]) -> Result<Value> {
+        if arg_refs.is_empty() || arg_refs.len() > 2 {
+            return Err(GraphoidError::runtime(format!(
+                "reflect.pattern() expects 1-2 arguments, but got {}", arg_refs.len()
+            )));
+        }
+
+        use crate::values::graph::{Graph, GraphType};
+        use crate::values::Hash;
+
+        let mut pattern_graph = Graph::new(GraphType::Directed);
+        let expr_ref = arg_refs[0];
+        let node = self.get_node(expr_ref)?;
+
+        match &node.node_type {
+            AstNodeType::MapExpr => {
+                // Map destructuring pattern: { key: binding, key2: literal, ... }
+                let entry_refs = self.get_ordered_edges(expr_ref, "Element");
+                let mut root_props = Hash::new();
+                let _ = root_props.insert("pattern_type".to_string(), Value::string("map".to_string()));
+                let _ = root_props.insert("field_count".to_string(), Value::number(entry_refs.len() as f64));
+                let _ = pattern_graph.add_node("pattern:root".to_string(), Value::map(root_props));
+
+                for entry_ref in &entry_refs {
+                    let entry_node = self.get_node(*entry_ref)?;
+                    let key = entry_node.get_str("key").unwrap_or_default();
+                    let field_id = format!("field:{}", key);
+
+                    // Get the value expression node
+                    if let Some(val_ref) = self.get_edge_target(*entry_ref, &ExecEdgeType::ValueEdge) {
+                        let val_node = self.get_node(val_ref)?;
+                        let field_value = self.pattern_node_to_value(&key, None, val_node)?;
+                        let _ = pattern_graph.add_node(field_id.clone(), Value::map(field_value));
+                    } else {
+                        let mut props = Hash::new();
+                        let _ = props.insert("type".to_string(), Value::string("unknown".to_string()));
+                        let _ = props.insert("key".to_string(), Value::string(key.clone()));
+                        let _ = pattern_graph.add_node(field_id.clone(), Value::map(props));
+                    }
+                    let _ = pattern_graph.add_edge("pattern:root", &field_id, "has_field".to_string(), None, HashMap::new());
+                }
+            }
+            AstNodeType::ListExpr => {
+                // List destructuring pattern: [binding, literal, wildcard, ...]
+                let elem_refs = self.get_ordered_edges(expr_ref, "Element");
+                let mut root_props = Hash::new();
+                let _ = root_props.insert("pattern_type".to_string(), Value::string("list".to_string()));
+                let _ = root_props.insert("element_count".to_string(), Value::number(elem_refs.len() as f64));
+                let _ = pattern_graph.add_node("pattern:root".to_string(), Value::map(root_props));
+
+                for (i, elem_ref) in elem_refs.iter().enumerate() {
+                    let elem_node = self.get_node(*elem_ref)?;
+                    let elem_id = format!("element:{}", i);
+                    let elem_value = self.pattern_node_to_value("", Some(i), elem_node)?;
+                    let _ = pattern_graph.add_node(elem_id.clone(), Value::map(elem_value));
+                    let _ = pattern_graph.add_edge("pattern:root", &elem_id, "has_element".to_string(), None, HashMap::new());
+                }
+            }
+            // Single-node patterns: identifier (binding/wildcard) or any literal type.
+            // Reuse pattern_node_to_value then swap "type" → "pattern_type" for root node.
+            AstNodeType::Identifier | AstNodeType::NumberLit | AstNodeType::StringLit |
+            AstNodeType::BoolLit | AstNodeType::NoneLit | AstNodeType::SymbolLit => {
+                let mut root_props = self.pattern_node_to_value("", None, node)?;
+                if let Some(type_val) = root_props.get("type").cloned() {
+                    let _ = root_props.insert("pattern_type".to_string(), type_val);
+                    let _ = root_props.remove("type");
+                }
+                let _ = pattern_graph.add_node("pattern:root".to_string(), Value::map(root_props));
+            }
+            other => {
+                return Err(GraphoidError::runtime(format!(
+                    "reflect.pattern() cannot interpret {:?} as a pattern", other
+                )));
+            }
+        }
+
+        // Optional guard (second argument — evaluated as a lambda)
+        if arg_refs.len() == 2 {
+            let _guard_val = self.execute_node(arg_refs[1])?;
+            let mut guard_props = Hash::new();
+            let _ = guard_props.insert("type".to_string(), Value::string("guard".to_string()));
+            let _ = pattern_graph.add_node("guard:0".to_string(), Value::map(guard_props));
+            let _ = pattern_graph.add_edge("pattern:root", "guard:0", "has_guard".to_string(), None, HashMap::new());
+        }
+
+        Ok(Value::graph(pattern_graph))
+    }
+
+    /// Helper: convert an execution graph node to a pattern node value (Hash/map).
+    fn pattern_node_to_value(&self, key: &str, index: Option<usize>, node: &AstGraphNode) -> Result<crate::values::Hash> {
+        use crate::values::Hash;
+        let mut props = Hash::new();
+
+        // Add key or index if present
+        if !key.is_empty() {
+            let _ = props.insert("key".to_string(), Value::string(key.to_string()));
+        }
+        if let Some(i) = index {
+            let _ = props.insert("index".to_string(), Value::number(i as f64));
+        }
+
+        match &node.node_type {
+            AstNodeType::Identifier => {
+                let name = node.get_str("name").unwrap_or_default();
+                if name == "_" {
+                    let _ = props.insert("type".to_string(), Value::string("wildcard".to_string()));
+                } else {
+                    let _ = props.insert("type".to_string(), Value::string("binding".to_string()));
+                    let _ = props.insert("name".to_string(), Value::string(name));
+                }
+            }
+            AstNodeType::NumberLit => {
+                let _ = props.insert("type".to_string(), Value::string("literal".to_string()));
+                if let Some(n) = node.get_num("value") {
+                    let _ = props.insert("value".to_string(), Value::number(n));
+                }
+            }
+            AstNodeType::StringLit => {
+                let _ = props.insert("type".to_string(), Value::string("literal".to_string()));
+                if let Some(s) = node.get_str("value") {
+                    let _ = props.insert("value".to_string(), Value::string(s));
+                }
+            }
+            AstNodeType::BoolLit => {
+                let _ = props.insert("type".to_string(), Value::string("literal".to_string()));
+                if let Some(b) = node.get_bool("value") {
+                    let _ = props.insert("value".to_string(), Value::boolean(b));
+                }
+            }
+            AstNodeType::NoneLit => {
+                let _ = props.insert("type".to_string(), Value::string("literal".to_string()));
+                let _ = props.insert("value".to_string(), Value::none());
+            }
+            AstNodeType::SymbolLit => {
+                let _ = props.insert("type".to_string(), Value::string("literal".to_string()));
+                if let Some(s) = node.get_str("value") {
+                    let _ = props.insert("value".to_string(), Value::symbol(s));
+                }
+            }
+            _ => {
+                let _ = props.insert("type".to_string(), Value::string("expression".to_string()));
+            }
+        }
+
+        Ok(props)
     }
 
     /// BigNum methods: to_int, to_bigint

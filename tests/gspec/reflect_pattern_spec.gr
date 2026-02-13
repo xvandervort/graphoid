@@ -1,0 +1,151 @@
+# reflect.pattern() — Pattern introspection as graph
+#
+# reflect.pattern(expr) is a special form that inspects the unevaluated
+# expression structure and returns it as a queryable pattern graph.
+
+describe "reflect.pattern()" {
+
+    describe "map patterns" {
+        it "returns a graph with pattern:root and field nodes" {
+            p = reflect.pattern({ name: n, age: a })
+            expect(typeof(p)).to_equal("graph")
+            expect(p.has_node("pattern:root")).to_equal(true)
+            expect(p.has_node("field:name")).to_equal(true)
+            expect(p.has_node("field:age")).to_equal(true)
+        }
+
+        it "has has_field edges from root to fields" {
+            p = reflect.pattern({ name: n, age: a })
+            expect(p.has_path("pattern:root", "field:name")).to_equal(true)
+            expect(p.has_path("pattern:root", "field:age")).to_equal(true)
+        }
+
+        it "stores binding info on field nodes" {
+            p = reflect.pattern({ name: n })
+            field = p.get_node("field:name")
+            expect(field["type"]).to_equal("binding")
+            expect(field["key"]).to_equal("name")
+            expect(field["name"]).to_equal("n")
+        }
+
+        it "stores literal info on literal fields" {
+            p = reflect.pattern({ age: 30 })
+            field = p.get_node("field:age")
+            expect(field["type"]).to_equal("literal")
+            expect(field["value"]).to_equal(30)
+        }
+
+        it "marks wildcard fields" {
+            p = reflect.pattern({ name: _ })
+            field = p.get_node("field:name")
+            expect(field["type"]).to_equal("wildcard")
+        }
+
+        it "stores pattern_type as map on root" {
+            p = reflect.pattern({ x: a })
+            root = p.get_node("pattern:root")
+            expect(root["pattern_type"]).to_equal("map")
+            expect(root["field_count"]).to_equal(1)
+        }
+    }
+
+    describe "list patterns" {
+        it "returns a graph with element nodes" {
+            p = reflect.pattern([x, y, z])
+            expect(p.has_node("pattern:root")).to_equal(true)
+            expect(p.has_node("element:0")).to_equal(true)
+            expect(p.has_node("element:1")).to_equal(true)
+            expect(p.has_node("element:2")).to_equal(true)
+        }
+
+        it "has has_element edges from root" {
+            p = reflect.pattern([x, y])
+            expect(p.has_path("pattern:root", "element:0")).to_equal(true)
+            expect(p.has_path("pattern:root", "element:1")).to_equal(true)
+        }
+
+        it "distinguishes binding, literal, and wildcard elements" {
+            p = reflect.pattern([x, 42, _])
+            e0 = p.get_node("element:0")
+            e1 = p.get_node("element:1")
+            e2 = p.get_node("element:2")
+            expect(e0["type"]).to_equal("binding")
+            expect(e0["name"]).to_equal("x")
+            expect(e1["type"]).to_equal("literal")
+            expect(e1["value"]).to_equal(42)
+            expect(e2["type"]).to_equal("wildcard")
+        }
+
+        it "stores element indices" {
+            p = reflect.pattern([a, b])
+            expect(p.get_node("element:0")["index"]).to_equal(0)
+            expect(p.get_node("element:1")["index"]).to_equal(1)
+        }
+
+        it "stores pattern_type as list on root" {
+            p = reflect.pattern([a])
+            root = p.get_node("pattern:root")
+            expect(root["pattern_type"]).to_equal("list")
+            expect(root["element_count"]).to_equal(1)
+        }
+    }
+
+    describe "literal patterns" {
+        it "handles number literals" {
+            p = reflect.pattern(42)
+            root = p.get_node("pattern:root")
+            expect(root["pattern_type"]).to_equal("literal")
+            expect(root["value"]).to_equal(42)
+        }
+
+        it "handles string literals" {
+            p = reflect.pattern("hello")
+            root = p.get_node("pattern:root")
+            expect(root["pattern_type"]).to_equal("literal")
+            expect(root["value"]).to_equal("hello")
+        }
+
+        it "handles boolean literals" {
+            p = reflect.pattern(true)
+            root = p.get_node("pattern:root")
+            expect(root["pattern_type"]).to_equal("literal")
+            expect(root["value"]).to_equal(true)
+        }
+
+        it "handles symbol literals" {
+            p = reflect.pattern(:foo)
+            root = p.get_node("pattern:root")
+            expect(root["pattern_type"]).to_equal("literal")
+            expect(root["value"]).to_equal(:foo)
+        }
+    }
+
+    describe "binding and wildcard patterns" {
+        it "treats a bare identifier as a binding" {
+            p = reflect.pattern(x)
+            root = p.get_node("pattern:root")
+            expect(root["pattern_type"]).to_equal("binding")
+            expect(root["name"]).to_equal("x")
+        }
+
+        it "treats _ as a wildcard" {
+            p = reflect.pattern(_)
+            root = p.get_node("pattern:root")
+            expect(root["pattern_type"]).to_equal("wildcard")
+        }
+    }
+
+    describe "guard support" {
+        it "adds a guard node when a second argument is provided" {
+            p = reflect.pattern({ age: a }, a => a > 18)
+            expect(p.has_node("guard:0")).to_equal(true)
+            expect(p.has_path("pattern:root", "guard:0")).to_equal(true)
+        }
+
+        it "stores guard type on guard node" {
+            p = reflect.pattern({ age: a }, a => a > 18)
+            gv = p.get_node("guard:0")
+            expect(gv["type"]).to_equal("guard")
+        }
+    }
+}
