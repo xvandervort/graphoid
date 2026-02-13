@@ -1,0 +1,60 @@
+# graph_instantiation.gr - Graph Template Instantiation
+#
+# Demonstrates Phase 18's `instantiated_from` edge: when a graph is
+# instantiated from a template, methods are looked up via edge traversal
+# to the template rather than being cloned onto the instance.
+
+# --- Define a graph template with properties and methods ---
+graph Person {
+    name: "unnamed"
+    age: 0
+
+    fn greet() {
+        return "Hi, I'm " + self.name + " (age " + self.age.to_string() + ")"
+    }
+
+    fn is_adult() {
+        return self.age >= 18
+    }
+}
+
+# --- Instantiate with property overrides ---
+alice = Person { name: "Alice", age: 30 }
+bob = Person { name: "Bob", age: 15 }
+
+print(alice.greet())        # Hi, I'm Alice (age 30)
+print(bob.greet())          # Hi, I'm Bob (age 15)
+print("Alice adult? " + alice.is_adult().to_string())  # true
+print("Bob adult? " + bob.is_adult().to_string())      # false
+
+# --- Template introspection ---
+t = alice.template()
+print("Template type: " + typeof(t))          # graph
+print("Template default name: " + t.name)     # unnamed
+
+# Non-instances have no template
+g = graph { type: :directed }
+print("Plain graph template: " + typeof(g.template()))  # none
+
+# --- Inheritance + instantiation ---
+graph Animal {
+    name: "unnamed"
+    fn speak() { return self.name + " makes a sound" }
+}
+
+graph Dog from Animal {
+    breed: "unknown"
+    fn fetch() { return self.name + " fetches the ball!" }
+}
+
+rex = Dog { name: "Rex", breed: "Labrador" }
+print(rex.speak())   # Rex makes a sound (inherited via template)
+print(rex.fetch())   # Rex fetches the ball!
+
+# --- Per-instance method overrides ---
+# Instances start lightweight (no method copies), but you can add or
+# override methods on individual instances using fn receiver.method() syntax.
+carol = Person { name: "Carol", age: 25 }
+fn carol.greet() { return "Hey! I'm " + self.name }
+print(carol.greet())   # Hey! I'm Carol  (overridden)
+print(alice.greet())   # Hi, I'm Alice (age 30)  (unchanged)

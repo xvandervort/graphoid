@@ -603,10 +603,9 @@ fn do_stuff() {
 
 ### Week 1-2: Types and Patterns (Days 5-8)
 
-- [x] Type hierarchy as graph (17 nodes + 16 subtype_of edges)
+- [x] Type hierarchy as graph (15 nodes + 14 subtype_of edges)
 - [ ] `is_subtype()` function (path check in type graph)
 - [ ] `common_type()` function (LCA in type graph)
-- [ ] Runtime `has_type` edges on values
 - [ ] User-defined graph types get `subtype_of` edge to `type:any`
 - [ ] `reflect.pattern()` returning pattern as queryable graph
 - [x] `g.match()` graph pattern matching (pre-existing)

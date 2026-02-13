@@ -199,3 +199,100 @@ describe "graph.has_node" {
         assert(expect(result).to_equal(false))
     }
 }
+
+describe "instantiated_from edge" {
+    it "instance method found via template traversal" {
+        graph Person {
+            name: "unnamed"
+            fn greet() { return "Hi, I'm " + self.name }
+        }
+        p = Person { name: "Alice" }
+        assert(expect(p.greet()).to_equal("Hi, I'm Alice"))
+    }
+
+    it "instance property overrides template default" {
+        graph Item {
+            label: "default"
+        }
+        item = Item { label: "custom" }
+        assert(expect(item.label).to_equal("custom"))
+    }
+
+    it "inherited methods work via template traversal" {
+        graph Animal {
+            name: "unnamed"
+            fn speak() { return self.name + " speaks" }
+        }
+        graph Dog from Animal {
+            breed: "unknown"
+            fn fetch() { return self.name + " fetches" }
+        }
+        d = Dog { name: "Rex", breed: "Lab" }
+        assert(expect(d.speak()).to_equal("Rex speaks"))
+        assert(expect(d.fetch()).to_equal("Rex fetches"))
+    }
+
+    it "multiple instances share template" {
+        graph Counter {
+            count: 0
+            fn value() { return self.count }
+        }
+        a = Counter { count: 10 }
+        b = Counter { count: 20 }
+        assert(expect(a.value() + b.value()).to_equal(30))
+    }
+
+    it ".template() returns template graph" {
+        graph Shape {
+            sides: 0
+        }
+        s = Shape { sides: 4 }
+        t = s.template()
+        assert(expect(typeof(t)).to_equal("graph"))
+        assert(expect(t.sides).to_equal(0))
+    }
+
+    it ".template() returns none for non-instance" {
+        g = graph { type: :directed }
+        assert(expect(g.template()).to_equal(none))
+    }
+}
+
+describe "fn receiver.method() syntax" {
+    it "overrides a template method on one instance" {
+        graph Greeter {
+            name: "unnamed"
+            fn greet() { return "Hello from " + self.name }
+        }
+        p = Greeter { name: "Alice" }
+        fn p.greet() { return "Custom: " + self.name }
+        assert(expect(p.greet()).to_equal("Custom: Alice"))
+    }
+
+    it "does not affect other instances" {
+        graph Greeter {
+            name: "unnamed"
+            fn greet() { return "Hello from " + self.name }
+        }
+        a = Greeter { name: "Alice" }
+        b = Greeter { name: "Bob" }
+        fn a.greet() { return "Custom: " + self.name }
+        assert(expect(a.greet()).to_equal("Custom: Alice"))
+        assert(expect(b.greet()).to_equal("Hello from Bob"))
+    }
+
+    it "adds a new method not on template" {
+        graph Shape {
+            sides: 0
+        }
+        s = Shape { sides: 4 }
+        fn s.describe() { return "I have " + self.sides.to_string() + " sides" }
+        assert(expect(s.describe()).to_equal("I have 4 sides"))
+    }
+
+    it "works on plain graphs too" {
+        g = graph { type: :directed }
+        fn g.hello() { return "hi" }
+        assert(expect(g.hello()).to_equal("hi"))
+    }
+}

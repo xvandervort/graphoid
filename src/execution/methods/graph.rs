@@ -103,8 +103,7 @@ impl Executor {
         // Phase 20: Check for static methods first (called on class, not instances)
         if let Some(static_func) = graph.get_static_method(method) {
             // Static method found - call it WITHOUT binding `self`
-            let static_func_clone = static_func.clone();
-            return self.call_static_method(&static_func_clone, args);
+            return self.call_static_method(&static_func, args);
         }
 
         // Check for user-defined instance methods (class-like graphs)
@@ -809,6 +808,21 @@ impl Executor {
 
                 let type_name = graph.type_name.clone().unwrap_or_else(|| "graph".to_string());
                 Ok(Value::string(type_name))
+            }
+            "template" => {
+                // Phase 18: Returns the template graph this instance was created from,
+                // or none if this graph is not an instance.
+                // e.g., p = Person { name: "Alice" }; p.template() => Person graph
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "template() takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                match &graph.template {
+                    Some(tmpl) => Ok(Value::graph(tmpl.borrow().clone())),
+                    None => Ok(Value::none()),
+                }
             }
             "is_a" => {
                 // Checks if the graph is an instance of a type, walking the inheritance chain

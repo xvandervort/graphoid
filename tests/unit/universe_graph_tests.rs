@@ -354,3 +354,167 @@ fn test_catch_valueerror_does_not_catch_ioerror() {
     let result = executor.env().get("result").unwrap();
     assert!(matches!(&result.kind, ValueKind::String(s) if s == "caught generic"));
 }
+
+// ============================================================================
+// instantiated_from edge + method lookup via template traversal (Section 1)
+// ============================================================================
+
+#[test]
+fn test_instance_method_via_template_traversal() {
+    let mut executor = Executor::new();
+    let code = r#"
+        graph Person {
+            name: "unnamed"
+            fn greet() { return "Hi, I'm " + self.name }
+        }
+        p = Person { name: "Alice" }
+        result = p.greet()
+    "#;
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+    assert!(matches!(&result.kind, ValueKind::String(s) if s == "Hi, I'm Alice"));
+}
+
+#[test]
+fn test_template_method_visible_on_instance() {
+    // Template methods are accessible on instances via template traversal
+    let mut executor = Executor::new();
+    let code = r#"
+        graph Greeter {
+            greeting: "hello"
+            fn hello() { return self.greeting + " world" }
+        }
+        g = Greeter { greeting: "hi" }
+        result = g.hello()
+    "#;
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+    assert!(matches!(&result.kind, ValueKind::String(s) if s == "hi world"));
+}
+
+#[test]
+fn test_template_returns_template_graph() {
+    let mut executor = Executor::new();
+    let code = r#"
+        graph Animal {
+            name: "unnamed"
+            fn speak() { return "roar" }
+        }
+        a = Animal { name: "Rex" }
+        t = a.template()
+        is_graph = typeof(t) == "graph"
+        template_name = t.name
+    "#;
+    executor.execute_source(code).unwrap();
+    let is_graph = executor.env().get("is_graph").unwrap();
+    let template_name = executor.env().get("template_name").unwrap();
+    assert!(matches!(&is_graph.kind, ValueKind::Boolean(true)));
+    // Template's name is "unnamed" (the default, not the instance's "Rex")
+    assert!(matches!(&template_name.kind, ValueKind::String(s) if s == "unnamed"));
+}
+
+#[test]
+fn test_template_returns_none_for_non_instance() {
+    let mut executor = Executor::new();
+    let code = r#"
+        g = graph { type: :directed }
+        result = g.template()
+    "#;
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+    assert!(matches!(&result.kind, ValueKind::None));
+}
+
+#[test]
+fn test_inherited_methods_via_template_traversal() {
+    let mut executor = Executor::new();
+    let code = r#"
+        graph Animal {
+            name: "unnamed"
+            fn speak() { return self.name + " speaks" }
+        }
+        graph Dog from Animal {
+            breed: "unknown"
+            fn fetch() { return self.name + " fetches" }
+        }
+        d = Dog { name: "Rex", breed: "Lab" }
+        speak_result = d.speak()
+        fetch_result = d.fetch()
+    "#;
+    executor.execute_source(code).unwrap();
+    let speak = executor.env().get("speak_result").unwrap();
+    let fetch = executor.env().get("fetch_result").unwrap();
+    assert!(matches!(&speak.kind, ValueKind::String(s) if s == "Rex speaks"));
+    assert!(matches!(&fetch.kind, ValueKind::String(s) if s == "Rex fetches"));
+}
+
+#[test]
+fn test_multiple_instances_share_template() {
+    let mut executor = Executor::new();
+    let code = r#"
+        graph Counter {
+            count: 0
+            fn value() { return self.count }
+        }
+        a = Counter { count: 10 }
+        b = Counter { count: 20 }
+        result = a.value() + b.value()
+    "#;
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+    assert!(matches!(&result.kind, ValueKind::Number(n) if *n == 30.0));
+}
+
+#[test]
+fn test_fn_receiver_overrides_template_method() {
+    let mut executor = Executor::new();
+    let code = r#"
+        graph Greeter {
+            name: "unnamed"
+            fn greet() { return "Hello from " + self.name }
+        }
+        p = Greeter { name: "Alice" }
+        fn p.greet() { return "Custom hello from " + self.name }
+        result = p.greet()
+    "#;
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+    assert!(matches!(&result.kind, ValueKind::String(s) if s == "Custom hello from Alice"));
+}
+
+#[test]
+fn test_fn_receiver_does_not_affect_other_instances() {
+    let mut executor = Executor::new();
+    let code = r#"
+        graph Greeter {
+            name: "unnamed"
+            fn greet() { return "Hello from " + self.name }
+        }
+        a = Greeter { name: "Alice" }
+        b = Greeter { name: "Bob" }
+        fn a.greet() { return "Custom: " + self.name }
+        result_a = a.greet()
+        result_b = b.greet()
+    "#;
+    executor.execute_source(code).unwrap();
+    let a = executor.env().get("result_a").unwrap();
+    let b = executor.env().get("result_b").unwrap();
+    assert!(matches!(&a.kind, ValueKind::String(s) if s == "Custom: Alice"));
+    assert!(matches!(&b.kind, ValueKind::String(s) if s == "Hello from Bob"));
+}
+
+#[test]
+fn test_fn_receiver_new_method_on_instance() {
+    let mut executor = Executor::new();
+    let code = r#"
+        graph Shape {
+            sides: 0
+        }
+        s = Shape { sides: 4 }
+        fn s.describe() { return "I have " + self.sides.to_string() + " sides" }
+        result = s.describe()
+    "#;
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+    assert!(matches!(&result.kind, ValueKind::String(s) if s == "I have 4 sides"));
+}

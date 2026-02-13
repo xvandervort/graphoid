@@ -3,7 +3,9 @@
 //! Graphoid's graph type uses index-free adjacency for O(1) neighbor lookups.
 //! Each node stores direct pointers to its neighbors, avoiding index scans.
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::rc::Rc;
 use super::{Value, ValueKind, PatternNode, PatternEdge, PatternPath, Function, List, ComparisonLayer};
 use crate::graph::rules::{Rule, RuleContext, GraphOperation, RuleSpec, RuleInstance, RuleSeverity};
 use crate::graph::rulesets::get_ruleset_rules;
@@ -225,6 +227,12 @@ pub struct Graph {
     /// Used for super calls and is_a() checks
     pub parent: Option<Box<Graph>>,
 
+    /// Template graph reference for instantiation (Phase 18)
+    /// When a graph is instantiated from a template (e.g., `p = Person { name: "Alice" }`),
+    /// this stores a reference to the template. Method lookup follows this edge
+    /// to find methods on the template rather than cloning them onto the instance.
+    pub template: Option<Rc<RefCell<Graph>>>,
+
     /// Type name for is_a() and type_of() checks (Phase 18)
     /// Set when graph is assigned to a variable: `Dog = graph{}`
     pub type_name: Option<String>,
@@ -277,6 +285,7 @@ impl Graph {
             rulesets: Vec::new(),
             rules: Vec::new(),
             parent: None,
+            template: None,
             type_name: None,  // Phase 18: set on assignment
             // Freeze state
             frozen: false,
@@ -3284,22 +3293,42 @@ impl Graph {
                 _ => {}
             }
         }
+        // Phase 18: Follow template edge for method lookup
+        if let Some(ref tmpl) = self.template {
+            return tmpl.borrow().get_method_variants(name);
+        }
         Vec::new()
     }
 
     /// Check if this graph has a method with the given name
     pub fn has_method(&self, name: &str) -> bool {
         let method_id = Self::method_node_id(name);
-        self.nodes.contains_key(&method_id)
+        if self.nodes.contains_key(&method_id) {
+            return true;
+        }
+        // Phase 18: Follow template edge
+        if let Some(ref tmpl) = self.template {
+            return tmpl.borrow().has_method(name);
+        }
+        false
     }
 
     /// Get all method names attached to this graph
     pub fn method_names(&self) -> Vec<String> {
         const PREFIX: &str = "__methods__/";
-        self.nodes.keys()
+        let mut names: Vec<String> = self.nodes.keys()
             .filter(|id| id.starts_with(PREFIX))
             .map(|id| id[PREFIX.len()..].to_string())
-            .collect()
+            .collect();
+        // Phase 18: Include template methods
+        if let Some(ref tmpl) = self.template {
+            for name in tmpl.borrow().method_names() {
+                if !names.contains(&name) {
+                    names.push(name);
+                }
+            }
+        }
+        names
     }
 
     /// Remove a method from this graph by name
@@ -3321,6 +3350,21 @@ impl Graph {
         self.nodes.remove(&method_id);
 
         true
+    }
+
+    /// Remove all methods (instance + static) from this graph
+    /// Used when creating instances — methods are looked up via template traversal.
+    /// Static methods are also under `__methods__/__static__*` so the prefix filter catches them.
+    pub fn remove_all_methods(&mut self) {
+        let method_ids: Vec<String> = self.nodes.keys()
+            .filter(|id| id.starts_with("__methods__/"))
+            .cloned()
+            .collect();
+        for id in method_ids {
+            self.nodes.remove(&id);
+        }
+        // Also remove the __methods__ branch node if it exists
+        self.nodes.remove("__methods__");
     }
 
     /// Include all methods from another graph (mixin pattern)
@@ -3447,12 +3491,16 @@ impl Graph {
 
     /// Get a static method attached to this graph by name
     /// Returns the Function if the static method exists
-    pub fn get_static_method(&self, name: &str) -> Option<&Function> {
+    pub fn get_static_method(&self, name: &str) -> Option<Function> {
         let static_id = Self::static_method_node_id(name);
         if let Some(node) = self.nodes.get(&static_id) {
             if let ValueKind::Function(func) = &node.value.kind {
-                return Some(func);
+                return Some(func.clone());
             }
+        }
+        // Phase 18: Follow template edge
+        if let Some(ref tmpl) = self.template {
+            return tmpl.borrow().get_static_method(name);
         }
         None
     }
@@ -3460,7 +3508,14 @@ impl Graph {
     /// Check if this graph has a static method with the given name
     pub fn has_static_method(&self, name: &str) -> bool {
         let static_id = Self::static_method_node_id(name);
-        self.nodes.contains_key(&static_id)
+        if self.nodes.contains_key(&static_id) {
+            return true;
+        }
+        // Phase 18: Follow template edge
+        if let Some(ref tmpl) = self.template {
+            return tmpl.borrow().has_static_method(name);
+        }
+        false
     }
 
     /// Get all data node IDs (excluding internal branches)

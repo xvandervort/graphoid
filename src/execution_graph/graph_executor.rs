@@ -1094,6 +1094,8 @@ impl GraphExecutor {
         let name = self.get_str_property(node_ref, "name")
             .ok_or_else(|| GraphoidError::runtime("Missing function name".to_string()))?;
         let is_private = self.get_bool_property(node_ref, "is_private").unwrap_or(false);
+        let receiver = self.get_str_property(node_ref, "receiver");
+        let is_static = self.get_bool_property(node_ref, "is_static").unwrap_or(false);
 
         let body_ref = self.get_edge_target(node_ref, &ExecEdgeType::Body)
             .ok_or_else(|| GraphoidError::runtime("Missing function body".to_string()))?;
@@ -1182,12 +1184,38 @@ impl GraphExecutor {
             env: env.clone(),
             node_id: Some(func_id),
             is_setter: false,
-            is_static: false,
+            is_static,
             guard: None,
         };
 
         // Register in function graph for tracking
         self.function_graph.borrow_mut().register_function(func.clone());
+
+        // If receiver is specified (fn graph.method() syntax), attach to that graph
+        if let Some(recv_name) = receiver {
+            let recv_val = self.env.get(&recv_name).map_err(|_| {
+                GraphoidError::runtime(format!(
+                    "Cannot attach method '{}' to '{}': variable not found",
+                    name, recv_name
+                ))
+            })?;
+            match &recv_val.kind {
+                ValueKind::Graph(g) => {
+                    if is_static {
+                        g.borrow_mut().attach_static_method(name, func);
+                    } else {
+                        g.borrow_mut().attach_method(name, func);
+                    }
+                    return Ok(Value::none());
+                }
+                _ => {
+                    return Err(GraphoidError::runtime(format!(
+                        "Cannot attach method to '{}': not a graph",
+                        recv_name
+                    )));
+                }
+            }
+        }
 
         // Store in global functions (overloading by arity)
         self.global_functions
@@ -4145,11 +4173,18 @@ impl GraphExecutor {
             ValueKind::Graph(base_graph) => {
                 let mut new_graph = base_graph.borrow().clone();
 
+                // Phase 18: Set template reference for edge-based method lookup
+                // Methods are looked up via template traversal, not cloned onto instances
+                new_graph.template = Some(std::rc::Rc::clone(base_graph));
+
+                // Strip cloned methods from instance — they live on the template
+                new_graph.remove_all_methods();
+
                 // Apply overrides
                 let override_refs = self.get_ordered_edges_cloned(node_ref, "Override");
                 for ovr_ref in override_refs {
                     let ovr_node = self.get_node(ovr_ref)?;
-                    let prop_name = ovr_node.get_str("name").unwrap_or_default();
+                    let prop_name = ovr_node.get_str("key").unwrap_or_default();
                     if let Some(val_ref) = self.get_edge_target(ovr_ref, &ExecEdgeType::ValueEdge) {
                         let val = self.execute_node(val_ref)?;
                         let node_id = crate::values::Graph::property_node_id(&prop_name);
