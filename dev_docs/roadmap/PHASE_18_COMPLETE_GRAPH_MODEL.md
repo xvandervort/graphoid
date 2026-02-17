@@ -615,7 +615,7 @@ fn do_stuff() {
 
 - [x] Error type hierarchy in universe graph (6 types + 2 IOError subtypes)
 - [x] `catch IOError` catches FileError/NetError via `has_path()`
-- [ ] Exception propagation via caller edges in execution graph
+- [x] Exception propagation via caller edges in execution graph
 - [x] Tests for error hierarchy and catch subtypes
 
 ### Week 2: Iterators as Graph (Days 11-12)
@@ -645,7 +645,7 @@ fn do_stuff() {
 - [~] `is_subtype()` and `common_type()` — SKIPPED (not useful to users)
 - [x] Pattern reflection via `reflect.pattern()`
 - [x] `g.match()` uses graph pattern matching
-- [ ] Exceptions propagate via caller edges
+- [x] Exceptions propagate via caller edges
 - [ ] Iterators are graph nodes with `next` edges
 - [ ] Effects are tracked as nodes
 - [x] All existing tests pass

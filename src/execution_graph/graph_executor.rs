@@ -1840,7 +1840,13 @@ impl GraphExecutor {
         // Restore environment
         self.function_call_depth -= 1;
         self.call_stack.pop();
-        self.function_graph.borrow_mut().pop_call(result.as_ref().ok().cloned().unwrap_or(Value::none()));
+        // Record exception propagation edge if function exited with error
+        if result.is_err() {
+            let error_type = result.as_ref().unwrap_err().error_type();
+            self.function_graph.borrow_mut().pop_call_exception(error_type);
+        } else {
+            self.function_graph.borrow_mut().pop_call(result.as_ref().ok().cloned().unwrap_or(Value::none()));
+        }
         let call_env_after = std::mem::replace(&mut self.env, saved_env);
 
         // Update closure state (for closures that modify captured variables)
@@ -2698,6 +2704,61 @@ impl GraphExecutor {
                 let _ = hash.insert("variables".to_string(), Value::list(crate::values::List::from_vec(var_names)));
                 let _ = hash.insert("depth".to_string(), Value::number(self.env.scope_depth() as f64));
                 Ok(Value::map(hash))
+            }
+            "call_graph" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "reflect.call_graph() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                // Phase 18 Section 4: Return function graph as queryable Graphoid graph
+                // with function nodes, call edges, and exception propagation edges.
+                use crate::values::graph::{Graph, GraphType};
+                use crate::execution::function_graph::FunctionEdgeType;
+                let fg = self.function_graph.borrow();
+                let mut g = Graph::new(GraphType::Directed);
+
+                // Add function nodes with properties
+                for (node_id, fn_node) in fg.get_all_function_nodes() {
+                    let mut props = crate::values::Hash::new();
+                    let name = fn_node.function.name.clone().unwrap_or_else(|| "anonymous".to_string());
+                    let _ = props.insert("name".to_string(), Value::string(name.clone()));
+                    let _ = props.insert("call_count".to_string(), Value::number(fn_node.call_count as f64));
+                    // Use "fn:{name}" as the graph node ID for user-friendliness
+                    let graph_node_id = format!("fn:{}", name);
+                    // Avoid duplicate node IDs (multiple overloads get same name)
+                    if g.nodes.contains_key(&graph_node_id) {
+                        // Use full internal ID for disambiguation
+                        let _ = g.add_node(format!("fn:{}", node_id), Value::map(props));
+                    } else {
+                        let _ = g.add_node(graph_node_id, Value::map(props));
+                    }
+                }
+
+                // Add edges (call and exception)
+                for edge in fg.get_all_edges() {
+                    let edge_label = match &edge.edge_type {
+                        FunctionEdgeType::Call => "calls",
+                        FunctionEdgeType::ExceptionPropagation => "exception",
+                        FunctionEdgeType::Captures => "captures",
+                        FunctionEdgeType::PassedTo => "passed_to",
+                        FunctionEdgeType::Imports => "imports",
+                    };
+                    // Map internal IDs to fn:{name} node IDs
+                    let from_name = fg.get_function(&edge.from)
+                        .and_then(|n| n.function.name.clone())
+                        .unwrap_or_else(|| edge.from.clone());
+                    let to_name = fg.get_function(&edge.to)
+                        .and_then(|n| n.function.name.clone())
+                        .unwrap_or_else(|| edge.to.clone());
+                    let from_id = format!("fn:{}", from_name);
+                    let to_id = format!("fn:{}", to_name);
+                    if g.nodes.contains_key(&from_id) && g.nodes.contains_key(&to_id) {
+                        let _ = g.add_edge(&from_id, &to_id, edge_label.to_string(), None, HashMap::new());
+                    }
+                }
+
+                Ok(Value::graph(g))
             }
             _ => Err(GraphoidError::runtime(format!(
                 "reflect does not have method '{}'", method

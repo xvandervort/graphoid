@@ -167,3 +167,61 @@ for node_id in p.nodes() {
 # Binds: f
 # Binds: l
 ```
+
+---
+
+### reflect.call_graph()
+
+Returns the function call graph as a queryable graph. Includes function nodes, call edges, and exception propagation edges.
+
+```graphoid
+fn greet(name) { return "hello " + name }
+greet("world")
+
+cg = reflect.call_graph()
+print(cg.has_node("fn:greet"))          # true
+node = cg.get_node("fn:greet")
+print(node["name"])                      # "greet"
+print(node["call_count"])                # 1
+```
+
+**Returns**: `graph` — The function call graph.
+
+#### Node structure
+
+Each function that has been called becomes a node with ID `fn:{name}`:
+
+```
+fn:greet  →  { name: "greet", call_count: 1 }
+```
+
+#### Edge types
+
+| Edge Type | Label | Meaning |
+|-----------|-------|---------|
+| Call | `calls` | Normal function call (A called B) |
+| Exception | `exception` | Exception propagated from A to B |
+| Capture | `captures` | Closure captured a variable |
+
+#### Exception propagation
+
+When an exception propagates through function calls, `exception` edges trace the path:
+
+```graphoid
+fn boom() { raise ValueError("oops") }
+fn middle() { boom() }
+fn outer() { middle() }
+
+try { outer() } catch as e { }
+
+cg = reflect.call_graph()
+edges = cg.edges()
+for edge in edges {
+    if edge[2] == "exception" {
+        print(edge[0] + " --> " + edge[1])
+    }
+}
+# Output:
+# fn:boom --> fn:middle
+# fn:middle --> fn:outer
+```

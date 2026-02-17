@@ -70,6 +70,9 @@ pub enum FunctionEdgeType {
 
     /// Module import
     Imports,
+
+    /// Exception propagation (function exited via exception to caller)
+    ExceptionPropagation,
 }
 
 /// The global function graph tracking all functions and calls
@@ -170,6 +173,35 @@ impl FunctionGraph {
                     edge.return_value = Some(return_value);
                     edge.duration = Some(duration);
                 }
+            }
+        }
+    }
+
+    /// Pop a function that exited via exception, creating an ExceptionPropagation edge
+    /// from this function to its caller (if any).
+    pub fn pop_call_exception(&mut self, error_type: String) {
+        if let Some((func_id, _, start_instant)) = self.call_path.pop() {
+            let duration = start_instant.elapsed().as_secs_f64();
+
+            // Update total time if profiling enabled
+            if self.profiling_enabled {
+                if let Some(node) = self.nodes.get_mut(&func_id) {
+                    node.total_time += duration;
+                }
+            }
+
+            // Create exception propagation edge to caller (if any)
+            if let Some((caller_id, _, _)) = self.call_path.last() {
+                let edge = CallEdge {
+                    from: func_id,
+                    to: caller_id.clone(),
+                    edge_type: FunctionEdgeType::ExceptionPropagation,
+                    arguments: vec![Value::string(error_type)],
+                    return_value: None,
+                    start_time: current_time(),
+                    duration: Some(duration),
+                };
+                self.edges.push(edge);
             }
         }
     }
@@ -292,6 +324,11 @@ impl FunctionGraph {
     /// Get all function nodes
     pub fn get_all_functions(&self) -> Vec<&FunctionNode> {
         self.nodes.values().collect()
+    }
+
+    /// Get all function nodes with their IDs
+    pub fn get_all_function_nodes(&self) -> impl Iterator<Item = (&String, &FunctionNode)> {
+        self.nodes.iter()
     }
 
     /// Get user-defined functions (excludes __toplevel__ synthetic function)

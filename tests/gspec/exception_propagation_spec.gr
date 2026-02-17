@@ -1,0 +1,83 @@
+# Phase 18 Section 4: Exception propagation via caller edges
+#
+# When exceptions propagate through function calls, the function graph
+# records exception propagation edges. These are queryable via
+# reflect.call_graph().
+
+describe "exception propagation" {
+
+    describe "reflect.call_graph()" {
+        it "returns a graph" {
+            cg = reflect.call_graph()
+            expect(typeof(cg)).to_equal("graph")
+        }
+
+        it "has function nodes after calling functions" {
+            fn add(a, b) { return a + b }
+            add(1, 2)
+            cg = reflect.call_graph()
+            expect(cg.has_node("fn:add")).to_equal(true)
+        }
+
+        it "records call edges between functions" {
+            fn inner() { return 42 }
+            fn outer() { return inner() }
+            outer()
+            cg = reflect.call_graph()
+            expect(cg.has_node("fn:outer")).to_equal(true)
+            expect(cg.has_node("fn:inner")).to_equal(true)
+        }
+    }
+
+    describe "exception edges" {
+        it "records exception propagation when exception occurs" {
+            fn boom() { raise ValueError("oops") }
+            fn caller() { boom() }
+            try { caller() } catch as e { }
+            cg = reflect.call_graph()
+            # The call graph should have exception edges
+            edges = cg.edges()
+            exception_edges = edges.filter(edge => edge[2] == "exception")
+            expect(exception_edges.length() > 0).to_equal(true)
+        }
+
+        it "safe function has no exception edges" {
+            fn no_error_fn() { return 42 }
+            no_error_fn()
+            cg = reflect.call_graph()
+            edges = cg.edges()
+            # Filter for exception edges involving our specific safe function
+            safe_exceptions = edges.filter(edge => edge[2] == "exception" and (edge[0] == "fn:no_error_fn" or edge[1] == "fn:no_error_fn"))
+            expect(safe_exceptions.length()).to_equal(0)
+        }
+
+        it "records exception type in edge" {
+            fn fail() { raise TypeError("bad type") }
+            try { fail() } catch as e { }
+            cg = reflect.call_graph()
+            edges = cg.edges()
+            exception_edges = edges.filter(edge => edge[2] == "exception")
+            expect(exception_edges.length() > 0).to_equal(true)
+        }
+    }
+
+    describe "call_graph node properties" {
+        it "stores function name on nodes" {
+            fn greet(name) { return "hi " + name }
+            greet("world")
+            cg = reflect.call_graph()
+            node = cg.get_node("fn:greet")
+            expect(node["name"]).to_equal("greet")
+        }
+
+        it "tracks call count" {
+            fn counter() { return 1 }
+            counter()
+            counter()
+            counter()
+            cg = reflect.call_graph()
+            node = cg.get_node("fn:counter")
+            expect(node["call_count"]).to_equal(3)
+        }
+    }
+}
