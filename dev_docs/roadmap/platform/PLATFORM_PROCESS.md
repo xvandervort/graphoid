@@ -2,7 +2,7 @@
 
 **Status**: Design
 **Priority**: 7 (Advanced)
-**Dependencies**: Phase 19 Concurrency, Platform Runtime, Platform Monitor
+**Dependencies**: Phase 19 Concurrency (19.1-19.5), Platform Runtime, Platform Monitor
 
 ---
 

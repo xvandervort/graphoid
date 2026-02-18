@@ -659,7 +659,7 @@ Result: 8
 
 3. **Yes: Incremental parsing** — Subgraphs can be rebuilt without reconstructing the entire execution graph. When source changes (REPL input, module reload, IDE edit), only the affected subgraph is re-parsed and swapped in. This is a natural graph operation (subgraph replacement) and provides the foundation for:
    - Fast REPL re-evaluation
-   - Hot module reload (Phase 18.5)
+   - Hot module reload (Phase 19.4)
    - Future IDE/LSP support
 
 4. **Yes: Arena allocation with per-scope arenas** — Nodes are arena-allocated for cache-friendly layout, fast bump-pointer allocation, and simplified Rust ownership (indices instead of `Rc`/`RefCell`). Arenas are scoped per-module or per-function so that incremental re-parsing can drop and rebuild individual subgraphs without leaking the entire arena. The top-level execution graph references nodes via `(ArenaId, NodeIndex)` pairs rather than raw indices.

@@ -1,8 +1,8 @@
 # Graphoid: Canonical Language Specification
 
-**Version**: 1.0
-**Last Updated**: January 2025
-**Status**: Definitive specification for fresh Rust implementation
+**Version**: 2.0
+**Last Updated**: February 2026
+**Status**: Definitive specification for Graphoid implementation
 
 ---
 
@@ -26,12 +26,15 @@ Graphoid is built on the radical principle that **every aspect of computation ca
 - Assignment creates edges: `📛 "fruits" → 📊 LinearGraph`
 - The namespace itself IS a graph that can be inspected and manipulated
 
-#### Level 3: Runtime Environment as Graphs (Future)
-- function calls as graph traversals
-- functions are nodes with parameter and return edges
+#### Level 3: Runtime Environment as Graphs
+- Function calls as graph traversals
+- Functions are nodes with parameter and return edges
 - Call stack as path through function graph
 - Modules as subgraphs with import/export edges
 - Recursion as cycles in the call graph
+- Actors are graph nodes with `on_message` behavior
+- Channels are edges with queue semantics
+- Supervision is edge relationships between actor nodes
 
 ---
 
@@ -4103,21 +4106,345 @@ tests/
 
 ---
 
+## Concurrency
+
+Graphoid's concurrency model follows the **share-nothing** principle: each spawned task has its own namespace and communicates with other tasks exclusively through channels. This eliminates shared mutable state and the bugs that come with it.
+
+**Core principles**:
+1. **Share nothing** — tasks have isolated namespaces, no shared memory
+2. **Communicate via channels** — explicit message passing, never implicit sharing
+3. **Actors are graphs** — a graph with `on_message` IS an actor (no separate `actor` keyword)
+4. **Channels are values** — first-class, passed like any other value
+5. **Supervision via graph edges** — declarative, using existing `graph X from supervisor {}` syntax
+
+### Spawning Tasks
+
+The `spawn` keyword creates a new concurrent task with its own isolated namespace. `spawn` is fire-and-forget — use channels to communicate results.
+
+```graphoid
+# Spawn a task — fire and forget
+spawn {
+    print("running in background")
+}
+
+# Spawn and get a result via channel
+ch = channel()
+spawn {
+    result = expensive_computation()
+    ch.send(result)
+}
+answer = ch.receive()
+
+# Spawn an actor (graph with on_message)
+counter = spawn Counter{}
+counter.send(:increment)
+```
+
+**Semantics**:
+- `spawn { block }` — creates a new task, returns nothing (fire-and-forget)
+- `spawn GraphType{}` — creates a new actor from a graph definition, returns an actor reference
+- The spawned task gets a copy of any values captured from the enclosing scope (share-nothing)
+- The spawned task runs concurrently — scheduling is managed by the runtime
+
+### Channels
+
+A channel is a typed communication pipe between tasks. Channels are first-class values created by the built-in `channel()` function.
+
+```graphoid
+# Create an unbuffered channel
+ch = channel()
+
+# Create a buffered channel
+ch = channel(capacity: 100)
+
+# Send a value (blocks if unbuffered and no receiver ready, or buffer full)
+ch.send(42)
+
+# Receive a value (blocks until a value is available)
+msg = ch.receive()
+
+# Non-blocking receive (returns none if nothing available)
+msg = ch.try_receive()
+
+# Close a channel (no more sends allowed)
+ch.close()
+```
+
+**Semantics**:
+- Unbuffered channels synchronize sender and receiver — `send` blocks until a receiver is ready
+- Buffered channels allow up to `capacity` unread messages before `send` blocks
+- `receive()` blocks until a message is available or the channel is closed
+- `try_receive()` returns immediately — the message if available, `none` otherwise
+- Sending on a closed channel raises an exception
+- Receiving from a closed, empty channel returns `none`
+- Channels can be passed to spawned tasks like any other value
+
+### Multiplexing Channels with `select()`
+
+The built-in `select()` function waits on multiple channels simultaneously. It returns a list containing the source channel and the received message. Use `match` to dispatch.
+
+```graphoid
+ch1 = channel()
+ch2 = channel()
+
+# Wait for whichever channel has data first
+[source, msg] = select(ch1, ch2)
+match source {
+    ch1 => handle_ch1(msg)
+    ch2 => handle_ch2(msg)
+}
+
+# With timeout (milliseconds)
+[source, msg] = select(ch1, ch2, timeout: 5000)
+match source {
+    ch1 => handle_ch1(msg)
+    ch2 => handle_ch2(msg)
+    :timeout => handle_timeout()
+}
+
+# With default (non-blocking)
+[source, msg] = select(ch1, ch2, default: true)
+match source {
+    ch1 => handle_ch1(msg)
+    ch2 => handle_ch2(msg)
+    :default => nothing_ready()
+}
+```
+
+**Semantics**:
+- `select()` blocks until at least one channel has a message (or timeout/default)
+- If multiple channels are ready, one is chosen non-deterministically
+- With `timeout: ms`, returns `[:timeout, none]` if no channel is ready within the duration
+- With `default: true`, returns `[:default, none]` immediately if no channel is ready
+- Takes any number of channel arguments
+
+### Actors: Graphs with `on_message`
+
+An actor is simply a graph that defines an `on_message` handler. No special `actor` keyword is needed — this follows the "everything is a graph" philosophy.
+
+```graphoid
+graph Counter {
+    count = 0
+
+    fn on_message(msg) {
+        match msg {
+            :increment => { count = count + 1 }
+            :decrement => { count = count - 1 }
+            :reset => { count = 0 }
+            :get => { return count }
+        }
+    }
+}
+
+# Spawn an actor — returns an actor reference
+counter = spawn Counter{}
+counter = spawn Counter{ count: 100 }
+
+# Send a message (fire-and-forget)
+counter.send(:increment)
+
+# Request-response (sends message, blocks for reply)
+value = counter.request(:get)
+```
+
+**Semantics**:
+- Any graph defining `fn on_message(msg)` can be spawned as an actor
+- `spawn GraphType{}` creates the actor in its own task with an isolated namespace
+- `.send(msg)` enqueues a message to the actor's mailbox (non-blocking, fire-and-forget)
+- `.request(msg)` sends a message and blocks until the actor returns a value from `on_message`
+- Messages are processed one at a time, in order (no concurrent access to actor state)
+- An actor's state (its graph properties) is private — accessible only via messages
+
+### Graph-Native Messaging
+
+Since actors are nodes in a graph, message routing uses graph operations:
+
+```graphoid
+# Send to a specific actor by reference
+counter.send(:increment)
+
+# Send to actors via graph methods
+g = graph{}
+g.add_node("alice", spawn Worker{})
+g.add_node("bob", spawn Worker{})
+g.add_edge("alice", "bob", "COLLABORATES")
+
+# By node ID
+g.send(:task, to: "alice")
+
+# By predicate — sends to all matching nodes
+g.send(:ping, where: n => n.get("status") == "active")
+
+# Along edges — graph traversal determines recipients
+g.send(:hello, from: "alice", via: "COLLABORATES")
+
+# Broadcast to all actor nodes
+g.broadcast(:heartbeat)
+
+# Request-response from matching nodes
+results = g.request(:get_status, where: n => n.get("type") == "server")
+```
+
+**Semantics**:
+- `g.send(:msg, to: id)` — sends to a specific node
+- `g.send(:msg, where: predicate)` — sends to all nodes matching the predicate
+- `g.send(:msg, from: id, via: edge_type)` — sends to neighbors reachable via edge traversal
+- `g.broadcast(:msg)` — sends to all actor nodes in the graph
+- `g.request(...)` — like `send` but collects return values from all recipients
+- Non-actor nodes are silently skipped
+
+### Supervision
+
+Supervisors are graphs that monitor child actors and restart them on failure. Defined declaratively using `graph X from supervisor {}`.
+
+```graphoid
+graph AppSupervisor from supervisor {
+    strategy = :one_for_one
+    max_restarts = 3
+}
+
+# Spawn supervisor and workers
+sup = spawn AppSupervisor{}
+worker1 = spawn DatabaseWorker{}
+worker2 = spawn CacheWorker{}
+
+# Register children — creates supervision edges in the graph
+sup.supervise(worker1, restart: :permanent)
+sup.supervise(worker2, restart: :transient)
+```
+
+**Restart strategies**:
+- `:one_for_one` — only restart the failed child
+- `:one_for_all` — restart all children if one fails
+- `:rest_for_one` — restart the failed child and all children started after it
+
+**Restart modes** (per child):
+- `:permanent` — always restart
+- `:transient` — restart only on abnormal exit (unhandled exception)
+- `:temporary` — never restart
+
+**Semantics**:
+- Supervision relationships are edges in the namespace graph (`supervises` edge type)
+- When a supervised actor crashes (unhandled exception), the supervisor is notified
+- The supervisor applies its restart strategy
+- `max_restarts` limits restarts within a time window to prevent infinite restart loops
+- Unsupervised actors that crash log the exception to stderr and terminate
+
+### Exception Behavior in Tasks
+
+```graphoid
+# Unsupervised task — exception logged to stderr, task terminates
+spawn {
+    raise("something broke")  # logged, task dies
+}
+
+# Supervised actor — exception reported to supervisor
+sup.supervise(worker, restart: :permanent)
+# If worker's on_message raises, supervisor restarts it
+
+# Channel-based error propagation — explicit by design
+ch = channel()
+spawn {
+    try {
+        ch.send(dangerous_operation())
+    } catch as e {
+        ch.send(["error", e.message()])
+    }
+}
+```
+
+**Semantics**:
+- Exceptions do NOT propagate across task boundaries automatically
+- Unsupervised tasks: unhandled exception is logged to stderr, task terminates
+- Supervised actors: unhandled exception triggers the supervisor's restart strategy
+- For explicit error propagation, use channels with try/catch in the spawned task
+
+### Timers
+
+Timer functions for scheduling and delays. Requires the concurrency runtime.
+
+```graphoid
+import "timer"
+
+# Blocking sleep
+timer.sleep(1000)  # sleep 1 second
+
+# One-shot timer — spawns internal task, sends to channel after delay
+ch = timer.after(1000)
+msg = ch.receive()  # blocks for ~1 second, receives :tick
+
+# One-shot with custom value
+ch = timer.after(1000, "wake up")
+msg = ch.receive()  # receives "wake up"
+
+# Recurring timer — sends :tick to channel every N ms
+ch = timer.every(5000)
+spawn {
+    for msg in ch {
+        print("tick")
+    }
+}
+
+# Cancel a timer
+handle = timer.every(1000)
+handle.close()  # closing the channel cancels the timer
+```
+
+**Semantics**:
+- `timer.sleep(ms)` — blocks the current task for the specified duration
+- `timer.after(ms)` — returns a channel that receives a single `:tick` after the delay
+- `timer.after(ms, value)` — returns a channel that receives the specified value
+- `timer.every(ms)` — returns a channel that receives `:tick` repeatedly
+- Closing the returned channel cancels the timer
+- Timer accuracy is approximate (not real-time guarantees)
+
+### Signal Handling
+
+OS signal handlers for graceful process management.
+
+```graphoid
+import "signal"
+
+# Register a signal handler — returns a channel
+sigint = signal.on(:sigint)
+
+# Wait for signal in a task
+spawn {
+    sigint.receive()
+    print("Ctrl+C received, shutting down...")
+    cleanup()
+    exit(0)
+}
+
+# Available signals
+# :sigint  — Ctrl+C / interrupt
+# :sigterm — termination request
+# :sighup  — hangup (optional, platform-dependent)
+```
+
+**Semantics**:
+- `signal.on(signal)` — returns a channel that receives a message when the signal fires
+- Multiple calls to `signal.on(:sigint)` return independent channels (all receive the signal)
+- Signal delivery is asynchronous — the channel receives the signal name as a symbol
+- Only a limited set of signals are supported (platform-dependent)
+
+---
+
 ## Future Directions
 
 ### Near-Term (Next 6 Months)
 - Achieve 90%+ self-hosting
-- FFI (Foreign function Interface) for native code access
+- FFI (Foreign Function Interface) for native code access
 - Performance optimization (JIT compilation)
 
 ### Mid-Term (6-12 Months)
-- Concurrency primitives (threads, async/await, channels)
+- `async`/`await` syntactic sugar over spawn+channel patterns
+- Data parallelism (`parallel_map`, `parallel_filter`, etc.)
 - Advanced pattern matching
 - Unit-safe numerics (compile-time unit checking)
-- Self-modification capabilities with governance
 
 ### Long-Term (1-2 Years)
-- Distributed graph systems
+- Distributed graph systems (virtual actors, passivation/hydration)
 - Network programming as graph partitioning
 - Self-aware computational systems
 - Graph-based memory management
@@ -4147,7 +4474,11 @@ Statement ::=
     | ModuleDeclaration
     | ConfigureBlock
     | PrecisionBlock
+    | SpawnStatement
     | ExpressionStatement
+
+SpawnStatement ::= "spawn" Block
+                 | "spawn" Identifier ("{" GraphInit "}")?
 
 VariableDeclaration ::= Type? Identifier "=" Expression
 Type ::= "num" | "string" | "bool" | "list" | "hash" | "tree" | "graph"
@@ -4258,7 +4589,8 @@ From highest to lowest:
 and, or, not, if, else, while, for, in, break, next,
 return, fn, import, load, module, alias, configure,
 precision, true, false, none, num, string, bool, list,
-hash, tree, graph
+hash, tree, graph, spawn, from, as, try, catch, raise,
+finally, match, priv, supervisor
 ```
 
 ### Appendix D: Standard Library Module Index
@@ -4275,6 +4607,8 @@ hash, tree, graph
 - **http** - HTTP client
 - **crypto** - Cryptography
 - **statistics** (stats) - Statistical functions
+- **timer** - Timers and delays (sleep, after, every)
+- **signal** - OS signal handling
 
 ---
 

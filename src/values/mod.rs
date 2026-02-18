@@ -220,7 +220,7 @@ pub struct Function {
     pub env: Rc<RefCell<Environment>>,
     /// Node ID in the function graph (set when registered, prevents duplicate registration)
     pub node_id: Option<String>,
-    /// Phase 19: Is this a setter (computed property assignment)? Setters are called on property assignment.
+    /// Is this a setter (computed property assignment)? Setters are called on property assignment.
     pub is_setter: bool,
     /// Phase 20: Is this a static method (class method)? Called on the class, not instances.
     pub is_static: bool,
