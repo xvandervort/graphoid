@@ -176,10 +176,9 @@ configure { precision: :high, :integer } {
 - `:high` - Use Float128 for high-precision floating-point (~34 decimal digits)
 - `:integer` - Use Int64 integers (truncates decimals on assignment, auto-grows to BigInt on overflow)
 - `:unsigned` - Use UInt64 unsigned integers (0 and positive only, auto-grows to BigInt on overflow)
-- `:extended` - Synonym for `:high` (both enable auto-growth)
 
 **Auto-Promotion on Overflow** (Phase 3):
-When using `:high` or `:extended` precision modes with `:integer` or `:unsigned`, integer operations automatically promote to BigInt on overflow:
+When using `:high` precision mode with `:integer` or `:unsigned`, integer operations automatically promote to BigInt on overflow:
 
 ```graphoid
 configure { precision: :high, :integer } {
@@ -208,7 +207,6 @@ is_num = regular.is_bignum()  # false - still num!
 - `to_num()` - Convert bignum to num (may lose precision)
 - `to_int()` - Convert to Int64 (truncates decimals, errors if out of range)
 - `to_bignum()` - Convert num to bignum (explicit promotion)
-- `to_bigint()` - Convert to arbitrary-precision integer (truncates decimals)
 - `to_string()` - Convert to string representation
 - `fits_in_num()` - Check if conversion to num is safe (no critical precision loss)
 - `is_bignum()` - Type checking (returns true for bignum, false for num)
@@ -225,9 +223,8 @@ if precise.fits_in_num() {
     safe = precise.to_num()
 }
 
-# Convert to integer types
+# Convert to integer type
 int_version = precise.to_int()      # 123 (truncates to Int64)
-bigint_version = precise.to_bigint()  # 123 (arbitrary precision integer)
 
 # Convert num to bignum
 num small = 42.0

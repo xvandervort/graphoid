@@ -1,0 +1,15 @@
+module privmod
+
+fn public_api(x) {
+    return internal_helper(x) * 2
+}
+
+public_value = 100
+
+priv {
+    fn internal_helper(x) {
+        return x + 10
+    }
+
+    secret_value = 999
+}

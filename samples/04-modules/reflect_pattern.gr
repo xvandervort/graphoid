@@ -1,0 +1,85 @@
+# reflect_pattern.gr — Pattern Introspection
+#
+# reflect.pattern(expr) is a special form that inspects an unevaluated
+# expression and returns it as a queryable pattern graph. The expression
+# is NOT evaluated — identifiers become bindings, literals stay as
+# literal match values, and _ becomes a wildcard.
+
+# --- Map destructuring pattern ---
+p = reflect.pattern({ name: n, age: a, active: true })
+print("=== Map pattern: { name: n, age: a, active: true } ===")
+print("Nodes: " + p.nodes().length().to_string())
+
+root = p.get_node("pattern:root")
+print("Root pattern_type: " + root["pattern_type"])
+print("Field count: " + root["field_count"].to_string())
+
+name_field = p.get_node("field:name")
+print("field:name → type=" + name_field["type"] + ", binding=" + name_field["name"])
+
+age_field = p.get_node("field:age")
+print("field:age → type=" + age_field["type"] + ", binding=" + age_field["name"])
+
+active_field = p.get_node("field:active")
+print("field:active → type=" + active_field["type"] + ", value=" + active_field["value"].to_string())
+
+# --- List pattern ---
+print("")
+print("=== List pattern: [head, 42, _] ===")
+lp = reflect.pattern([head, 42, _])
+lroot = lp.get_node("pattern:root")
+print("Root pattern_type: " + lroot["pattern_type"])
+print("Element count: " + lroot["element_count"].to_string())
+
+e0 = lp.get_node("element:0")
+e1 = lp.get_node("element:1")
+e2 = lp.get_node("element:2")
+print("element:0 → type=" + e0["type"] + ", name=" + e0["name"])
+print("element:1 → type=" + e1["type"] + ", value=" + e1["value"].to_string())
+print("element:2 → type=" + e2["type"])
+
+# --- Literal pattern ---
+print("")
+print("=== Literal pattern: 42 ===")
+lit = reflect.pattern(42)
+lr = lit.get_node("pattern:root")
+print("pattern_type: " + lr["pattern_type"])
+print("value: " + lr["value"].to_string())
+
+# --- Binding pattern ---
+print("")
+print("=== Binding pattern: x ===")
+bp = reflect.pattern(x)
+br = bp.get_node("pattern:root")
+print("pattern_type: " + br["pattern_type"])
+print("name: " + br["name"])
+
+# --- Wildcard pattern ---
+print("")
+print("=== Wildcard pattern: _ ===")
+wp = reflect.pattern(_)
+wr = wp.get_node("pattern:root")
+print("pattern_type: " + wr["pattern_type"])
+
+# --- Guard support ---
+print("")
+print("=== Pattern with guard: { age: a }, a => a > 18 ===")
+gp = reflect.pattern({ age: a }, a => a > 18)
+print("Has guard node: " + gp.has_node("guard:0").to_string())
+print("Root → guard path: " + gp.has_path("pattern:root", "guard:0").to_string())
+
+# --- Practical use: extracting binding names from a pattern ---
+print("")
+print("=== Practical: extract all bindings ===")
+complex = reflect.pattern({ first: f, last: l, email: _ })
+nodes = complex.nodes()
+bindings = []
+for node_id in nodes {
+    if node_id != "pattern:root" {
+        val = complex.get_node(node_id)
+        if val["type"] == "binding" {
+            bindings.append!(val["name"])
+        }
+    }
+}
+print("Bindings: " + bindings.to_string())

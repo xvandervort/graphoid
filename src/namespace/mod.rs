@@ -115,6 +115,21 @@ impl NamespaceGraph {
             .unwrap_or(ScopeType::Global)
     }
 
+    /// Get the depth of the current scope (0 = global, 1 = one level deep, etc.)
+    pub fn scope_depth(&self) -> usize {
+        let mut depth = 0;
+        let mut id = self.current_scope_id;
+        while let Some(scope) = self.scopes.get(&id) {
+            if let Some(parent) = scope.parent {
+                depth += 1;
+                id = parent;
+            } else {
+                break;
+            }
+        }
+        depth
+    }
+
     /// Defines a new variable in the current scope
     ///
     /// If the variable already exists in this scope, it will be redefined.
@@ -199,6 +214,21 @@ impl NamespaceGraph {
                 return false;
             }
         }
+    }
+
+    /// Checks if a variable exists in the current scope only (not parent scopes)
+    pub fn exists_in_current_scope(&self, name: &str) -> bool {
+        self.scopes
+            .get(&self.current_scope_id)
+            .map(|s| s.variables.contains_key(name))
+            .unwrap_or(false)
+    }
+
+    /// Gets a variable value from the current scope only (not parent scopes)
+    pub fn get_in_current_scope(&self, name: &str) -> Option<Value> {
+        self.scopes
+            .get(&self.current_scope_id)
+            .and_then(|s| s.variables.get(name).cloned())
     }
 
     /// Gets all variable names in the current scope only (not parent scopes)

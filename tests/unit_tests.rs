@@ -46,8 +46,12 @@ mod unit {
     pub mod fs_list_dir_tests;
     pub mod exec_tests;
     pub mod graph_decl_syntax_tests;
-    pub mod semantic_edges_tests;
     pub mod exception_handling_tests;
     pub mod graph_equality_tests;
     pub mod namespace_tests;
+    pub mod module_graph_tests;
+    pub mod reflect_tests;
+    pub mod universe_graph_tests;
+    pub mod reflect_pattern_tests;
+    pub mod exception_propagation_tests;
 }

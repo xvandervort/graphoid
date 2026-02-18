@@ -367,13 +367,29 @@ impl AstToGraphConverter {
             Stmt::Continue { position } => {
                 self.add_node(arena, AstNodeType::ContinueStmt, HashMap::new(), position.clone())
             }
-            Stmt::Import { module, alias, position } => {
+            Stmt::Import { module, alias, selections, position } => {
                 let mut props = HashMap::new();
                 props.insert("module".to_string(), AstProperty::Str(module.clone()));
                 if let Some(a) = alias {
                     props.insert("alias".to_string(), AstProperty::Str(a.clone()));
                 }
-                self.add_node(arena, AstNodeType::ImportStmt, props, position.clone())
+                if let Some(ref items) = selections {
+                    props.insert("selection_count".to_string(), AstProperty::Int(items.len() as i64));
+                }
+                let node = self.add_node(arena, AstNodeType::ImportStmt, props, position.clone());
+                // Phase 17: Store each selective import item as a child node
+                if let Some(items) = selections {
+                    for (i, item) in items.iter().enumerate() {
+                        let mut item_props = HashMap::new();
+                        item_props.insert("name".to_string(), AstProperty::Str(item.name.clone()));
+                        if let Some(ref a) = item.alias {
+                            item_props.insert("alias".to_string(), AstProperty::Str(a.clone()));
+                        }
+                        let item_node = self.add_node(arena, AstNodeType::ImportItemNode, item_props, position.clone());
+                        self.graph.add_edge(node, ExecEdgeType::Element(i as u32), item_node);
+                    }
+                }
+                node
             }
             Stmt::ModuleDecl { name, alias, position } => {
                 let mut props = HashMap::new();
@@ -471,6 +487,14 @@ impl AstToGraphConverter {
                     self.graph.add_edge(node, ExecEdgeType::Setting(key.clone()), cfg_node);
                 }
 
+                node
+            }
+            Stmt::PrivBlock { body, position } => {
+                let node = self.add_node(arena, AstNodeType::PrivBlockStmt, HashMap::new(), position.clone());
+                for (i, s) in body.iter().enumerate() {
+                    let s_ref = self.convert_stmt(s, arena);
+                    self.graph.add_edge(node, ExecEdgeType::Element(i as u32), s_ref);
+                }
                 node
             }
         }

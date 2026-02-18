@@ -37,8 +37,6 @@ pub struct GraphExecutor {
     pub(crate) output_buffer: String,
     pub(crate) method_context_stack: Vec<String>,
     pub(crate) super_context_stack: Vec<crate::values::Graph>,
-    #[allow(dead_code)]
-    pub(crate) writeback_stack: Vec<Vec<()>>, // Required by method files; mutation writeback not yet needed
     pub(crate) block_self_stack: Vec<Value>,
     pub(crate) graph_method_value_stack: Vec<Value>,
     pub(crate) suppress_self_property_assignment: usize,
@@ -49,10 +47,16 @@ pub struct GraphExecutor {
     graph_function_bodies: HashMap<String, NodeRef>,
     /// Maps function IDs to their pattern clauses (for pattern-matching functions)
     graph_pattern_clauses: HashMap<String, Vec<GraphPatternClause>>,
+    /// Maps function IDs to their guard NodeRef (for structure-based dispatch)
+    pub(crate) graph_method_guards: HashMap<String, NodeRef>,
     /// Counter for generating unique function IDs
     next_func_id: usize,
     /// Maps Function.node_id -> FunctionGraph node_id for identity-based lambda tracking
     func_to_fg_id: HashMap<String, String>,
+    /// Phase 17: when true, variable definitions/assignments are tracked as private
+    in_priv_block: bool,
+    /// Phase 18: persistent universe graph (type hierarchy + modules + import edges)
+    universe_graph: Rc<RefCell<crate::values::graph::Graph>>,
 }
 
 /// A pattern clause stored as graph references (for pattern-matching functions).
@@ -82,7 +86,6 @@ impl GraphExecutor {
             output_buffer: String::new(),
             method_context_stack: Vec::new(),
             super_context_stack: Vec::new(),
-            writeback_stack: Vec::new(),
             block_self_stack: Vec::new(),
             graph_method_value_stack: Vec::new(),
             suppress_self_property_assignment: 0,
@@ -90,8 +93,79 @@ impl GraphExecutor {
             graph: None,
             graph_function_bodies: HashMap::new(),
             graph_pattern_clauses: HashMap::new(),
+            graph_method_guards: HashMap::new(),
             next_func_id: 0,
             func_to_fg_id: HashMap::new(),
+            in_priv_block: false,
+            universe_graph: Rc::new(RefCell::new(Self::build_initial_universe_graph())),
+        }
+    }
+
+    /// Build the initial universe graph with the built-in type hierarchy.
+    fn build_initial_universe_graph() -> crate::values::graph::Graph {
+        use crate::values::graph::{Graph, GraphType};
+        let mut g = Graph::new(GraphType::Directed);
+
+        let type_nodes = [
+            "type:any", "type:num", "type:bignum",
+            "type:string", "type:bool", "type:none", "type:symbol",
+            "type:collection", "type:list", "type:map", "type:graph",
+            "type:function", "type:module", "type:error", "type:time",
+        ];
+        for tn in &type_nodes {
+            let _ = g.add_node(tn.to_string(), Value::string(tn.to_string()));
+        }
+
+        let subtypes: &[(&str, &str)] = &[
+            ("type:num", "type:any"),
+            ("type:bignum", "type:num"),
+            ("type:string", "type:any"),
+            ("type:bool", "type:any"),
+            ("type:none", "type:any"),
+            ("type:symbol", "type:any"),
+            ("type:collection", "type:any"),
+            ("type:list", "type:collection"),
+            ("type:map", "type:collection"),
+            ("type:graph", "type:collection"),
+            ("type:function", "type:any"),
+            ("type:module", "type:any"),
+            ("type:error", "type:any"),
+            ("type:time", "type:any"),
+        ];
+        for (child, parent) in subtypes {
+            let _ = g.add_edge(child, parent, "subtype_of".to_string(), None, HashMap::new());
+        }
+
+        // Add scope:main node (source of import edges)
+        let _ = g.add_node("scope:main".to_string(), Value::string("main".to_string()));
+
+        // Error type hierarchy (subtypes of type:error)
+        let error_types = [
+            "RuntimeError", "ValueError", "TypeError",
+            "IOError", "NetworkError", "ParseError",
+        ];
+        for et in &error_types {
+            let node_id = format!("error:{}", et);
+            let _ = g.add_node(node_id.clone(), Value::string(et.to_string()));
+            let _ = g.add_edge(&node_id, "type:error", "subtype_of".to_string(), None, HashMap::new());
+        }
+        // IOError subtypes
+        for sub in &["FileError", "NetError"] {
+            let node_id = format!("error:{}", sub);
+            let _ = g.add_node(node_id.clone(), Value::string(sub.to_string()));
+            let _ = g.add_edge(&node_id, "error:IOError", "subtype_of".to_string(), None, HashMap::new());
+        }
+
+        g
+    }
+
+    /// Register a module node in the persistent universe graph (idempotent).
+    fn register_module_in_universe(&self, module: &crate::execution::module_manager::Module) {
+        let display_name = module.alias.clone().unwrap_or_else(|| module.name.clone());
+        let node_id = format!("module:{}", display_name);
+        let mut ug = self.universe_graph.borrow_mut();
+        if !ug.has_node(&node_id) {
+            let _ = ug.add_node(node_id, Value::string(display_name));
         }
     }
 
@@ -184,7 +258,7 @@ impl GraphExecutor {
     }
 
     /// Execute a single node by dispatching on its type.
-    fn execute_node(&mut self, node_ref: NodeRef) -> Result<Value> {
+    pub(crate) fn execute_node(&mut self, node_ref: NodeRef) -> Result<Value> {
         let node = self.get_node(node_ref)?;
         let node_type = node.node_type.clone();
 
@@ -259,6 +333,9 @@ impl GraphExecutor {
             // Super method calls
             AstNodeType::SuperMethodCallExpr => self.exec_super_method_call(node_ref),
 
+            // Phase 17: Privacy block
+            AstNodeType::PrivBlockStmt => self.exec_priv_block(node_ref),
+
             _ => Err(GraphoidError::runtime(format!(
                 "Unimplemented node type: {:?}", node_type
             ))),
@@ -284,6 +361,30 @@ impl GraphExecutor {
     fn get_property(&self, node_ref: NodeRef, key: &str) -> Option<AstProperty> {
         self.get_node(node_ref).ok()
             .and_then(|n| n.properties.get(key).cloned())
+    }
+
+    /// Write back a value to either an environment variable or an implicit self property.
+    /// Used by mutating methods (bang methods) to handle both regular variables and
+    /// graph properties accessed via implicit self.
+    fn set_variable_or_self_property(&mut self, name: &str, value: Value) -> Result<()> {
+        if self.env.exists(name) {
+            self.env.set(name, value)?;
+        } else if self.suppress_self_property_assignment == 0 {
+            if let Ok(self_value) = self.env.get("self") {
+                if let ValueKind::Graph(ref graph_rc) = self_value.kind {
+                    let property_node_id = crate::values::Graph::property_node_id(name);
+                    if graph_rc.borrow().has_node(&property_node_id) {
+                        graph_rc.borrow_mut().add_node(property_node_id, value).ok();
+                        return Ok(());
+                    }
+                }
+            }
+            // Variable doesn't exist anywhere — define it
+            self.env.define(name.to_string(), value);
+        } else {
+            self.env.define(name.to_string(), value);
+        }
+        Ok(())
     }
 
     fn get_str_property(&self, node_ref: NodeRef, key: &str) -> Option<String> {
@@ -330,16 +431,6 @@ impl GraphExecutor {
                             use f128::f128;
                             Ok(Value::bignum(BigNum::Float128(f128::from(n))))
                         }
-                    }
-                    PrecisionMode::Extended => {
-                        use num_bigint::BigInt;
-                        let big_int = if n.fract() == 0.0 {
-                            BigInt::from(n as i64)
-                        } else {
-                            // Fractional value - truncate to integer for BigInt
-                            BigInt::from(n.trunc() as i64)
-                        };
-                        Ok(Value::bignum(BigNum::BigInt(big_int)))
                     }
                     PrecisionMode::Standard => Ok(Value::number(n)),
                 }
@@ -610,7 +701,7 @@ impl GraphExecutor {
         value = self.truncate_if_integer_mode(value);
 
         // Track private symbols for module exports
-        if is_private {
+        if is_private || self.in_priv_block {
             self.private_symbols.insert(name.clone());
         }
 
@@ -748,6 +839,10 @@ impl GraphExecutor {
             "variable" => {
                 let name = self.get_str_property(node_ref, "target_name")
                     .ok_or_else(|| GraphoidError::runtime("Missing target name".to_string()))?;
+                // Track private symbols inside priv { } blocks
+                if self.in_priv_block {
+                    self.private_symbols.insert(name.clone());
+                }
                 if self.env.exists(&name) {
                     self.env.set(&name, value.clone())?;
                 } else {
@@ -986,6 +1081,8 @@ impl GraphExecutor {
         let name = self.get_str_property(node_ref, "name")
             .ok_or_else(|| GraphoidError::runtime("Missing function name".to_string()))?;
         let is_private = self.get_bool_property(node_ref, "is_private").unwrap_or(false);
+        let receiver = self.get_str_property(node_ref, "receiver");
+        let is_static = self.get_bool_property(node_ref, "is_static").unwrap_or(false);
 
         let body_ref = self.get_edge_target(node_ref, &ExecEdgeType::Body)
             .ok_or_else(|| GraphoidError::runtime("Missing function body".to_string()))?;
@@ -1074,12 +1171,38 @@ impl GraphExecutor {
             env: env.clone(),
             node_id: Some(func_id),
             is_setter: false,
-            is_static: false,
+            is_static,
             guard: None,
         };
 
         // Register in function graph for tracking
         self.function_graph.borrow_mut().register_function(func.clone());
+
+        // If receiver is specified (fn graph.method() syntax), attach to that graph
+        if let Some(recv_name) = receiver {
+            let recv_val = self.env.get(&recv_name).map_err(|_| {
+                GraphoidError::runtime(format!(
+                    "Cannot attach method '{}' to '{}': variable not found",
+                    name, recv_name
+                ))
+            })?;
+            match &recv_val.kind {
+                ValueKind::Graph(g) => {
+                    if is_static {
+                        g.borrow_mut().attach_static_method(name, func);
+                    } else {
+                        g.borrow_mut().attach_method(name, func);
+                    }
+                    return Ok(Value::none());
+                }
+                _ => {
+                    return Err(GraphoidError::runtime(format!(
+                        "Cannot attach method to '{}': not a graph",
+                        recv_name
+                    )));
+                }
+            }
+        }
 
         // Store in global functions (overloading by arity)
         self.global_functions
@@ -1088,12 +1211,68 @@ impl GraphExecutor {
             .push(func.clone());
 
         // Track private symbols for module exports
-        if is_private {
+        if is_private || self.in_priv_block {
             self.private_symbols.insert(name.clone());
         }
 
-        // Also store in environment so it can be passed as a value
-        self.env.define(name, Value::function(func));
+        // Store in environment with overloading support
+        // Only create overloads for functions IN THE SAME SCOPE with different arities
+        // Using get_in_current_scope to avoid accidentally overloading with parent scope functions
+        let new_arity = func.params.len();
+        if let Some(existing) = self.env.get_in_current_scope(&name) {
+            match &existing.kind {
+                ValueKind::Function(existing_func) => {
+                    let existing_arity = existing_func.params.len();
+                    if existing_arity != new_arity {
+                        // Different arity in same scope - create overload list
+                        let list = crate::values::List::from_vec(vec![existing, Value::function(func)]);
+                        self.env.define(name, Value::list(list));
+                    } else {
+                        // Same arity in same scope - replace
+                        self.env.define(name, Value::function(func));
+                    }
+                }
+                ValueKind::List(list) => {
+                    // Check if this arity already exists in the list
+                    let mut has_same_arity = false;
+                    for item in list.to_vec() {
+                        if let ValueKind::Function(f) = &item.kind {
+                            if f.params.len() == new_arity {
+                                has_same_arity = true;
+                                break;
+                            }
+                        }
+                    }
+                    if has_same_arity {
+                        // Same arity exists - replace that overload
+                        let mut new_items: Vec<Value> = list.to_vec().into_iter()
+                            .filter(|item| {
+                                if let ValueKind::Function(f) = &item.kind {
+                                    f.params.len() != new_arity
+                                } else {
+                                    true
+                                }
+                            })
+                            .collect();
+                        new_items.push(Value::function(func));
+                        let new_list = crate::values::List::from_vec(new_items);
+                        self.env.define(name, Value::list(new_list));
+                    } else {
+                        // Different arity - append new function
+                        let mut new_list = list.clone();
+                        let _ = new_list.append_raw(Value::function(func));
+                        self.env.define(name, Value::list(new_list));
+                    }
+                }
+                _ => {
+                    // Replace non-function with new function
+                    self.env.define(name, Value::function(func));
+                }
+            }
+        } else {
+            // No function with this name in current scope - define new
+            self.env.define(name, Value::function(func));
+        }
 
         Ok(Value::none())
     }
@@ -1145,7 +1324,12 @@ impl GraphExecutor {
 
                     // Implicit self method call: if `self` is a graph with this method,
                     // call it as a method call (with proper self binding)
-                    if let Ok(self_value) = self.env.get("self") {
+                    // Uses eval_graph_method for proper guard evaluation (Phase 21)
+                    // Also checks block_self_stack for trailing block contexts
+                    // (e.g., `obj.method() { || bare_call() }` where bare_call is a method on obj)
+                    let implicit_self = self.env.get("self").ok()
+                        .or_else(|| self.block_self_stack.last().cloned());
+                    if let Some(self_value) = implicit_self {
                         if let ValueKind::Graph(ref graph_rc) = self_value.kind {
                             let graph = graph_rc.borrow();
                             if graph.has_method(&func_name) {
@@ -1155,11 +1339,62 @@ impl GraphExecutor {
                                     name: "self".to_string(),
                                     position: SourcePosition::unknown(),
                                 };
-                                if let Some(func) = graph_clone.get_method(&func_name).cloned() {
-                                    return self.call_graph_method(&graph_clone, &func, &arg_values, &self_expr);
+                                // Use eval_graph_method which handles guard dispatch
+                                self.graph_method_value_stack.push(self_value.clone());
+                                let result = self.eval_graph_method(graph_clone, &func_name, &arg_values, &self_expr);
+                                self.graph_method_value_stack.pop();
+                                return result;
+                            }
+                        }
+                    }
+
+                    // Check environment for function (respects scoping - shadows global_functions)
+                    if let Ok(env_val) = self.env.get(&func_name) {
+                        match &env_val.kind {
+                            ValueKind::Function(func) => {
+                                if has_named {
+                                    return self.call_graph_function_named(func.clone(), arg_values, arg_names);
+                                } else {
+                                    return self.call_graph_function(func.clone(), arg_values);
+                                }
+                            }
+                            ValueKind::List(list) => {
+                                // List of overloads - find matching arity
+                                let arity = arg_values.len();
+                                for item in list.to_vec() {
+                                    if let ValueKind::Function(func) = &item.kind {
+                                        let param_count = func.params.len();
+                                        let has_variadic = func.parameters.iter().any(|p| p.is_variadic);
+                                        if param_count == arity || (has_variadic && arity >= param_count - 1) {
+                                            if has_named {
+                                                return self.call_graph_function_named(func.clone(), arg_values, arg_names);
+                                            } else {
+                                                return self.call_graph_function(func.clone(), arg_values);
+                                            }
+                                        }
+                                    }
+                                }
+                                // Fall through if no matching arity
+                            }
+                            _ => {} // Not a function, fall through
+                        }
+                    }
+
+                    // Fall back to global_functions for overloaded functions (by arity)
+                    if let Some(overloads) = self.global_functions.get(&func_name) {
+                        let arity = arg_values.len();
+                        for func in overloads {
+                            let param_count = func.params.len();
+                            let has_variadic = func.parameters.iter().any(|p| p.is_variadic);
+                            if param_count == arity || (has_variadic && arity >= param_count - 1) {
+                                if has_named {
+                                    return self.call_graph_function_named(func.clone(), arg_values, arg_names);
+                                } else {
+                                    return self.call_graph_function(func.clone(), arg_values);
                                 }
                             }
                         }
+                        // No matching arity found - fall through to error or other handling
                     }
                 }
             }
@@ -1178,6 +1413,32 @@ impl GraphExecutor {
             }
             ValueKind::NativeFunction(native_func) => {
                 native_func(&arg_values)
+            }
+            ValueKind::List(list) => {
+                // List of function overloads - find the right one by arity
+                let arity = arg_values.len();
+                for item in list.to_vec() {
+                    if let ValueKind::Function(func) = &item.kind {
+                        let param_count = func.params.len();
+                        let has_variadic = func.parameters.iter().any(|p| p.is_variadic);
+                        if param_count == arity || (has_variadic && arity >= param_count - 1) {
+                            if has_named {
+                                return self.call_graph_function_named(func.clone(), arg_values, arg_names);
+                            } else {
+                                return self.call_graph_function(func.clone(), arg_values);
+                            }
+                        }
+                    }
+                }
+                // No matching overload - fall back to first function (for better error message)
+                if let Some(first) = list.get(0) {
+                    if let ValueKind::Function(func) = &first.kind {
+                        return self.call_graph_function(func.clone(), arg_values);
+                    }
+                }
+                Err(GraphoidError::runtime(format!(
+                    "No matching function overload for {} arguments", arity
+                )))
             }
             _ => Err(GraphoidError::type_error("function", callee_val.type_name())),
         }
@@ -1291,27 +1552,20 @@ impl GraphExecutor {
                         ));
                     }
                 }
-                if edge_type.is_none() {
-                    return Err(GraphoidError::runtime(
-                        "path() requires 'edge_type' parameter".to_string()
-                    ));
-                }
-                if min.is_none() {
-                    return Err(GraphoidError::runtime(
-                        "path() requires 'min' parameter".to_string()
-                    ));
-                }
-                if max.is_none() {
-                    return Err(GraphoidError::runtime(
-                        "path() requires 'max' parameter".to_string()
-                    ));
-                }
-                if min.unwrap() > max.unwrap() {
+                // All parameters are optional with sensible defaults
+                // edge_type: None means any edge type (represented as empty string)
+                // min: defaults to 1
+                // max: defaults to min (or 1 if min not specified)
+                let min_val = min.unwrap_or(1);
+                let max_val = max.unwrap_or(min_val);
+                if min_val > max_val {
                     return Err(GraphoidError::runtime(
                         "path() min cannot be greater than max".to_string()
                     ));
                 }
-                Ok(Some(Value::pattern_path(edge_type.unwrap(), min.unwrap(), max.unwrap(), direction)))
+                // Empty string means match any edge type
+                let edge_type_str = edge_type.unwrap_or_default();
+                Ok(Some(Value::pattern_path(edge_type_str, min_val, max_val, direction)))
             }
             _ => Ok(None),
         }
@@ -1573,7 +1827,13 @@ impl GraphExecutor {
         // Restore environment
         self.function_call_depth -= 1;
         self.call_stack.pop();
-        self.function_graph.borrow_mut().pop_call(result.as_ref().ok().cloned().unwrap_or(Value::none()));
+        // Record exception propagation edge if function exited with error
+        if result.is_err() {
+            let error_type = result.as_ref().unwrap_err().error_type();
+            self.function_graph.borrow_mut().pop_call_exception(error_type);
+        } else {
+            self.function_graph.borrow_mut().pop_call(result.as_ref().ok().cloned().unwrap_or(Value::none()));
+        }
         let call_env_after = std::mem::replace(&mut self.env, saved_env);
 
         // Update closure state (for closures that modify captured variables)
@@ -1950,35 +2210,33 @@ impl GraphExecutor {
 
         // Check for static method calls on built-in type identifiers (time, list, string)
         if let Some(ref name) = obj_var_name {
-            match name.as_str() {
-                "time" if !self.env.exists("time") => {
-                    let arg_refs = self.get_ordered_edges(node_ref, "Argument");
-                    let mut args = Vec::new();
-                    for arg_ref in &arg_refs {
-                        let val = self.execute_node(*arg_ref)?;
-                        args.push(val);
-                    }
-                    return self.eval_time_static_method(&method_name, &args);
+            let static_dispatch = match name.as_str() {
+                "time" if !self.env.exists("time") => Some("time"),
+                "list" => Some("list"),
+                "string" => Some("string"),
+                "reflect" if !self.env.exists("reflect") => Some("reflect"),
+                _ => None,
+            };
+            if let Some(type_name) = static_dispatch {
+                let arg_refs = self.get_ordered_edges(node_ref, "Argument");
+
+                // Special form: reflect.pattern() inspects unevaluated AST structure
+                if type_name == "reflect" && method_name == "pattern" {
+                    return self.eval_reflect_pattern(&arg_refs);
                 }
-                "list" => {
-                    let arg_refs = self.get_ordered_edges(node_ref, "Argument");
-                    let mut args = Vec::new();
-                    for arg_ref in &arg_refs {
-                        let val = self.execute_node(*arg_ref)?;
-                        args.push(val);
-                    }
-                    return self.eval_list_static_method(&method_name, &args);
+
+                let mut args = Vec::new();
+                for arg_ref in &arg_refs {
+                    let val = self.execute_node(*arg_ref)?;
+                    args.push(val);
                 }
-                "string" => {
-                    let arg_refs = self.get_ordered_edges(node_ref, "Argument");
-                    let mut args = Vec::new();
-                    for arg_ref in &arg_refs {
-                        let val = self.execute_node(*arg_ref)?;
-                        args.push(val);
-                    }
-                    return self.eval_string_static_method(&method_name, &args);
-                }
-                _ => {}
+                return match type_name {
+                    "time" => self.eval_time_static_method(&method_name, &args),
+                    "list" => self.eval_list_static_method(&method_name, &args),
+                    "string" => self.eval_string_static_method(&method_name, &args),
+                    "reflect" => self.eval_reflect_static_method(&method_name, &args),
+                    _ => unreachable!(),
+                };
             }
         }
 
@@ -2018,13 +2276,13 @@ impl GraphExecutor {
                 if let ValueKind::List(list) = &object.kind {
                     let mut list_to_mutate = list.clone();
                     let popped_value = list_to_mutate.pop()?;
-                    self.env.set(&var_name, Value::list(list_to_mutate))?;
+                    self.set_variable_or_self_property(&var_name, Value::list(list_to_mutate))?;
                     return Ok(popped_value);
                 }
             }
 
             let result = self.dispatch_method_inner(object, base_method, args, object_expr)?;
-            self.env.set(&var_name, result)?;
+            self.set_variable_or_self_property(&var_name, result)?;
             return Ok(Value::none());
         }
 
@@ -2062,6 +2320,31 @@ impl GraphExecutor {
                 self.eval_pattern_match_results_method(&results_clone, method, &args)
             }
             ValueKind::Module(ref module) => {
+                // Phase 17: Module introspection methods
+                match method {
+                    "exports" => {
+                        let items: Vec<Value> = module.exports.iter()
+                            .map(|s| Value::string(s.clone()))
+                            .collect();
+                        return Ok(Value::list(crate::values::List::from_vec(items)));
+                    }
+                    "name" => {
+                        return Ok(Value::string(module.name.clone()));
+                    }
+                    "path" => {
+                        return Ok(Value::string(module.file_path.to_string_lossy().to_string()));
+                    }
+                    "imports" => {
+                        let key = format!("file:{}", module.file_path.to_string_lossy());
+                        let deps = self.module_manager.get_dependencies(&key);
+                        let items: Vec<Value> = deps.into_iter()
+                            .map(Value::string)
+                            .collect();
+                        return Ok(Value::list(crate::values::List::from_vec(items)));
+                    }
+                    _ => {}
+                }
+
                 // Module method dispatch: look up method in module namespace
                 if module.private_symbols.contains(method) {
                     return Err(GraphoidError::runtime(format!(
@@ -2311,10 +2594,321 @@ impl GraphExecutor {
         }
     }
 
-    /// BigNum methods: to_int, to_bigint
+    /// Phase 17: reflect.* static methods for module introspection
+    fn eval_reflect_static_method(&self, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "loaded_modules" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "reflect.loaded_modules() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                let modules = self.module_manager.get_all_modules();
+                let mut names: Vec<String> = modules.iter()
+                    .map(|m| m.alias.clone().unwrap_or_else(|| m.name.clone()))
+                    .collect();
+                names.sort();
+                names.dedup();
+                let items: Vec<Value> = names.into_iter()
+                    .map(Value::string)
+                    .collect();
+                Ok(Value::list(crate::values::List::from_vec(items)))
+            }
+            "module" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "reflect.module() expects 1 argument (module name), but got {}", args.len()
+                    )));
+                }
+                let name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+                match self.module_manager.find_module_by_name(&name) {
+                    Some(m) => Ok(Value::module(m.clone())),
+                    None => Ok(Value::none()),
+                }
+            }
+            "universe" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "reflect.universe() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                // Phase 18: Return clone of persistent universe graph
+                let graph_clone = self.universe_graph.borrow().clone();
+                Ok(Value::graph(graph_clone))
+            }
+            "type_hierarchy" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "reflect.type_hierarchy() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                // Phase 18: Extract type subgraph from universe graph
+                use crate::values::graph::{Graph, GraphType};
+                let ug = self.universe_graph.borrow();
+                let mut subgraph = Graph::new(GraphType::Directed);
+                // Copy only type:* nodes
+                for (node_id, graph_node) in &ug.nodes {
+                    if node_id.starts_with("type:") {
+                        let _ = subgraph.add_node(node_id.clone(), graph_node.value.clone());
+                    }
+                }
+                // Copy only subtype_of edges between type nodes
+                for (node_id, graph_node) in &ug.nodes {
+                    if !node_id.starts_with("type:") { continue; }
+                    for (neighbor_id, edge_info) in &graph_node.neighbors {
+                        if edge_info.edge_type == "subtype_of" && neighbor_id.starts_with("type:") {
+                            let _ = subgraph.add_edge(
+                                node_id, neighbor_id,
+                                "subtype_of".to_string(), None, HashMap::new(),
+                            );
+                        }
+                    }
+                }
+                Ok(Value::graph(subgraph))
+            }
+            "current_scope" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "reflect.current_scope() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                use crate::namespace::ScopeType;
+                let mut hash = crate::values::Hash::new();
+                let scope_type_str = match self.env.current_scope_type() {
+                    ScopeType::Global => "global",
+                    ScopeType::Function(_) => "function",
+                    ScopeType::Block => "block",
+                    ScopeType::Module(_) => "module",
+                    ScopeType::Class(_) => "class",
+                };
+                let _ = hash.insert("type".to_string(), Value::string(scope_type_str.to_string()));
+                let var_names: Vec<Value> = self.env.get_variable_names().into_iter()
+                    .map(Value::string)
+                    .collect();
+                let _ = hash.insert("variables".to_string(), Value::list(crate::values::List::from_vec(var_names)));
+                let _ = hash.insert("depth".to_string(), Value::number(self.env.scope_depth() as f64));
+                Ok(Value::map(hash))
+            }
+            "call_graph" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "reflect.call_graph() takes no arguments, but got {}", args.len()
+                    )));
+                }
+                // Phase 18 Section 4: Return function graph as queryable Graphoid graph
+                // with function nodes, call edges, and exception propagation edges.
+                use crate::values::graph::{Graph, GraphType};
+                use crate::execution::function_graph::FunctionEdgeType;
+                let fg = self.function_graph.borrow();
+                let mut g = Graph::new(GraphType::Directed);
+
+                // Add function nodes with properties
+                for (node_id, fn_node) in fg.get_all_function_nodes() {
+                    let mut props = crate::values::Hash::new();
+                    let name = fn_node.function.name.clone().unwrap_or_else(|| "anonymous".to_string());
+                    let _ = props.insert("name".to_string(), Value::string(name.clone()));
+                    let _ = props.insert("call_count".to_string(), Value::number(fn_node.call_count as f64));
+                    // Use "fn:{name}" as the graph node ID for user-friendliness
+                    let graph_node_id = format!("fn:{}", name);
+                    // Avoid duplicate node IDs (multiple overloads get same name)
+                    if g.nodes.contains_key(&graph_node_id) {
+                        // Use full internal ID for disambiguation
+                        let _ = g.add_node(format!("fn:{}", node_id), Value::map(props));
+                    } else {
+                        let _ = g.add_node(graph_node_id, Value::map(props));
+                    }
+                }
+
+                // Add edges (call and exception)
+                for edge in fg.get_all_edges() {
+                    let edge_label = match &edge.edge_type {
+                        FunctionEdgeType::Call => "calls",
+                        FunctionEdgeType::ExceptionPropagation => "exception",
+                        FunctionEdgeType::Captures => "captures",
+                        FunctionEdgeType::PassedTo => "passed_to",
+                        FunctionEdgeType::Imports => "imports",
+                    };
+                    // Map internal IDs to fn:{name} node IDs
+                    let from_name = fg.get_function(&edge.from)
+                        .and_then(|n| n.function.name.clone())
+                        .unwrap_or_else(|| edge.from.clone());
+                    let to_name = fg.get_function(&edge.to)
+                        .and_then(|n| n.function.name.clone())
+                        .unwrap_or_else(|| edge.to.clone());
+                    let from_id = format!("fn:{}", from_name);
+                    let to_id = format!("fn:{}", to_name);
+                    if g.nodes.contains_key(&from_id) && g.nodes.contains_key(&to_id) {
+                        let _ = g.add_edge(&from_id, &to_id, edge_label.to_string(), None, HashMap::new());
+                    }
+                }
+
+                Ok(Value::graph(g))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "reflect does not have method '{}'", method
+            ))),
+        }
+    }
+
+    /// Phase 18 Section 3: reflect.pattern() — inspect unevaluated expression as pattern graph.
+    ///
+    /// This is a special form: the first argument is NOT evaluated. Instead, its
+    /// execution graph structure is walked to build a pattern graph with binding,
+    /// literal, and wildcard nodes. An optional second argument (a lambda) is
+    /// evaluated and becomes a guard node.
+    fn eval_reflect_pattern(&mut self, arg_refs: &[NodeRef]) -> Result<Value> {
+        if arg_refs.is_empty() || arg_refs.len() > 2 {
+            return Err(GraphoidError::runtime(format!(
+                "reflect.pattern() expects 1-2 arguments, but got {}", arg_refs.len()
+            )));
+        }
+
+        use crate::values::graph::{Graph, GraphType};
+        use crate::values::Hash;
+
+        let mut pattern_graph = Graph::new(GraphType::Directed);
+        let expr_ref = arg_refs[0];
+        let node = self.get_node(expr_ref)?;
+
+        match &node.node_type {
+            AstNodeType::MapExpr => {
+                // Map destructuring pattern: { key: binding, key2: literal, ... }
+                let entry_refs = self.get_ordered_edges(expr_ref, "Element");
+                let mut root_props = Hash::new();
+                let _ = root_props.insert("pattern_type".to_string(), Value::string("map".to_string()));
+                let _ = root_props.insert("field_count".to_string(), Value::number(entry_refs.len() as f64));
+                let _ = pattern_graph.add_node("pattern:root".to_string(), Value::map(root_props));
+
+                for entry_ref in &entry_refs {
+                    let entry_node = self.get_node(*entry_ref)?;
+                    let key = entry_node.get_str("key").unwrap_or_default();
+                    let field_id = format!("field:{}", key);
+
+                    // Get the value expression node
+                    if let Some(val_ref) = self.get_edge_target(*entry_ref, &ExecEdgeType::ValueEdge) {
+                        let val_node = self.get_node(val_ref)?;
+                        let field_value = self.pattern_node_to_value(&key, None, val_node)?;
+                        let _ = pattern_graph.add_node(field_id.clone(), Value::map(field_value));
+                    } else {
+                        let mut props = Hash::new();
+                        let _ = props.insert("type".to_string(), Value::string("unknown".to_string()));
+                        let _ = props.insert("key".to_string(), Value::string(key.clone()));
+                        let _ = pattern_graph.add_node(field_id.clone(), Value::map(props));
+                    }
+                    let _ = pattern_graph.add_edge("pattern:root", &field_id, "has_field".to_string(), None, HashMap::new());
+                }
+            }
+            AstNodeType::ListExpr => {
+                // List destructuring pattern: [binding, literal, wildcard, ...]
+                let elem_refs = self.get_ordered_edges(expr_ref, "Element");
+                let mut root_props = Hash::new();
+                let _ = root_props.insert("pattern_type".to_string(), Value::string("list".to_string()));
+                let _ = root_props.insert("element_count".to_string(), Value::number(elem_refs.len() as f64));
+                let _ = pattern_graph.add_node("pattern:root".to_string(), Value::map(root_props));
+
+                for (i, elem_ref) in elem_refs.iter().enumerate() {
+                    let elem_node = self.get_node(*elem_ref)?;
+                    let elem_id = format!("element:{}", i);
+                    let elem_value = self.pattern_node_to_value("", Some(i), elem_node)?;
+                    let _ = pattern_graph.add_node(elem_id.clone(), Value::map(elem_value));
+                    let _ = pattern_graph.add_edge("pattern:root", &elem_id, "has_element".to_string(), None, HashMap::new());
+                }
+            }
+            // Single-node patterns: identifier (binding/wildcard) or any literal type.
+            // Reuse pattern_node_to_value then swap "type" → "pattern_type" for root node.
+            AstNodeType::Identifier | AstNodeType::NumberLit | AstNodeType::StringLit |
+            AstNodeType::BoolLit | AstNodeType::NoneLit | AstNodeType::SymbolLit => {
+                let mut root_props = self.pattern_node_to_value("", None, node)?;
+                if let Some(type_val) = root_props.get("type").cloned() {
+                    let _ = root_props.insert("pattern_type".to_string(), type_val);
+                    let _ = root_props.remove("type");
+                }
+                let _ = pattern_graph.add_node("pattern:root".to_string(), Value::map(root_props));
+            }
+            other => {
+                return Err(GraphoidError::runtime(format!(
+                    "reflect.pattern() cannot interpret {:?} as a pattern", other
+                )));
+            }
+        }
+
+        // Optional guard (second argument — evaluated as a lambda)
+        if arg_refs.len() == 2 {
+            let _guard_val = self.execute_node(arg_refs[1])?;
+            let mut guard_props = Hash::new();
+            let _ = guard_props.insert("type".to_string(), Value::string("guard".to_string()));
+            let _ = pattern_graph.add_node("guard:0".to_string(), Value::map(guard_props));
+            let _ = pattern_graph.add_edge("pattern:root", "guard:0", "has_guard".to_string(), None, HashMap::new());
+        }
+
+        Ok(Value::graph(pattern_graph))
+    }
+
+    /// Helper: convert an execution graph node to a pattern node value (Hash/map).
+    fn pattern_node_to_value(&self, key: &str, index: Option<usize>, node: &AstGraphNode) -> Result<crate::values::Hash> {
+        use crate::values::Hash;
+        let mut props = Hash::new();
+
+        // Add key or index if present
+        if !key.is_empty() {
+            let _ = props.insert("key".to_string(), Value::string(key.to_string()));
+        }
+        if let Some(i) = index {
+            let _ = props.insert("index".to_string(), Value::number(i as f64));
+        }
+
+        match &node.node_type {
+            AstNodeType::Identifier => {
+                let name = node.get_str("name").unwrap_or_default();
+                if name == "_" {
+                    let _ = props.insert("type".to_string(), Value::string("wildcard".to_string()));
+                } else {
+                    let _ = props.insert("type".to_string(), Value::string("binding".to_string()));
+                    let _ = props.insert("name".to_string(), Value::string(name));
+                }
+            }
+            AstNodeType::NumberLit => {
+                let _ = props.insert("type".to_string(), Value::string("literal".to_string()));
+                if let Some(n) = node.get_num("value") {
+                    let _ = props.insert("value".to_string(), Value::number(n));
+                }
+            }
+            AstNodeType::StringLit => {
+                let _ = props.insert("type".to_string(), Value::string("literal".to_string()));
+                if let Some(s) = node.get_str("value") {
+                    let _ = props.insert("value".to_string(), Value::string(s));
+                }
+            }
+            AstNodeType::BoolLit => {
+                let _ = props.insert("type".to_string(), Value::string("literal".to_string()));
+                if let Some(b) = node.get_bool("value") {
+                    let _ = props.insert("value".to_string(), Value::boolean(b));
+                }
+            }
+            AstNodeType::NoneLit => {
+                let _ = props.insert("type".to_string(), Value::string("literal".to_string()));
+                let _ = props.insert("value".to_string(), Value::none());
+            }
+            AstNodeType::SymbolLit => {
+                let _ = props.insert("type".to_string(), Value::string("literal".to_string()));
+                if let Some(s) = node.get_str("value") {
+                    let _ = props.insert("value".to_string(), Value::symbol(s));
+                }
+            }
+            _ => {
+                let _ = props.insert("type".to_string(), Value::string("expression".to_string()));
+            }
+        }
+
+        Ok(props)
+    }
+
+    /// BigNum methods: to_int, to_string, to_num
     fn eval_bignum_method(&self, bn: &crate::values::BigNum, method: &str, args: &[Value]) -> Result<Value> {
         use crate::values::BigNum;
-        use num_bigint::BigInt;
         match method {
             "to_int" => {
                 if !args.is_empty() {
@@ -2351,23 +2945,6 @@ impl GraphExecutor {
                             )),
                         }
                     }
-                }
-            }
-            "to_bigint" => {
-                if !args.is_empty() {
-                    return Err(GraphoidError::runtime(format!(
-                        "Method 'to_bigint' takes no arguments, but got {}", args.len()
-                    )));
-                }
-                match bn {
-                    BigNum::Int64(i) => Ok(Value::bignum(BigNum::BigInt(BigInt::from(*i)))),
-                    BigNum::UInt64(u) => Ok(Value::bignum(BigNum::BigInt(BigInt::from(*u)))),
-                    BigNum::Float128(f) => {
-                        let f64_val: f64 = (*f).into();
-                        let truncated = f64_val.trunc() as i64;
-                        Ok(Value::bignum(BigNum::BigInt(BigInt::from(truncated))))
-                    }
-                    BigNum::BigInt(bi) => Ok(Value::bignum(BigNum::BigInt(bi.clone()))),
                 }
             }
             "to_string" | "to_str" => {
@@ -2899,7 +3476,8 @@ impl GraphExecutor {
                 if let Some(val) = graph.get_node(&property) {
                     Ok(val.clone())
                 } else {
-                    Err(GraphoidError::runtime(format!("Property '{}' not found on graph", property)))
+                    // Return none for missing properties (consistent with other languages)
+                    Ok(Value::none())
                 }
             }
             ValueKind::Module(ref module) => {
@@ -2967,7 +3545,7 @@ impl GraphExecutor {
 
                 let (error_type_name, actual_message) = if let Some(colon_pos) = inner_message.find(':') {
                     let potential_type = &inner_message[..colon_pos];
-                    if matches!(potential_type, "ValueError" | "TypeError" | "IOError" | "NetworkError" | "ParseError" | "RuntimeError") {
+                    if matches!(potential_type, "ValueError" | "TypeError" | "IOError" | "NetworkError" | "ParseError" | "RuntimeError" | "FileError" | "NetError") {
                         (potential_type.to_string(), inner_message[(colon_pos + 1)..].trim().to_string())
                     } else {
                         (e.error_type(), inner_message.to_string())
@@ -2984,9 +3562,15 @@ impl GraphExecutor {
                     let variable = self.get_str_property(*catch_ref, "variable");
                     let catch_body_ref = self.get_edge_target(*catch_ref, &ExecEdgeType::Body);
 
-                    // Check if this catch matches the error type
+                    // Check if this catch matches the error type (with hierarchy)
                     let matches = match &catch_error_type {
-                        Some(et) => *et == error_type_name,
+                        Some(et) => {
+                            *et == error_type_name || {
+                                let catch_id = format!("error:{}", et);
+                                let actual_id = format!("error:{}", error_type_name);
+                                self.universe_graph.borrow().has_path(&actual_id, &catch_id)
+                            }
+                        }
                         None => true, // Bare catch catches everything
                     };
 
@@ -3113,10 +3697,64 @@ impl GraphExecutor {
         let node = self.get_node(node_ref)?;
         let module_name = node.get_str("module").unwrap_or_default();
         let alias = node.get_str("alias");
+        let selection_count = node.get_int("selection_count");
 
         // Use the module loading infrastructure
         let module_value = self.load_module(&module_name, alias.as_ref())?;
 
+        // Phase 17: Selective import — bind selected symbols directly
+        if let Some(count) = selection_count {
+            let module = match &module_value.kind {
+                ValueKind::Module(m) => m,
+                _ => return Err(GraphoidError::runtime(
+                    format!("'{}' is not a module", module_name)
+                )),
+            };
+
+            let mut imported_items = Vec::new();
+            for i in 0..count as u32 {
+                let item_ref = self.get_edge_target(node_ref, &ExecEdgeType::Element(i))
+                    .ok_or_else(|| GraphoidError::runtime(
+                        format!("Missing import item {} in selective import", i)
+                    ))?;
+                let item_node = self.get_node(item_ref)?;
+                let item_name = item_node.get_str("name").unwrap_or_default();
+                let item_alias = item_node.get_str("alias");
+
+                // Check privacy
+                if module.private_symbols.contains(&item_name) {
+                    return Err(GraphoidError::runtime(
+                        format!("Cannot import private symbol '{}' from module '{}'", item_name, module_name)
+                    ));
+                }
+
+                // Look up the value in the module's namespace
+                let value = module.namespace.get(&item_name).map_err(|_| {
+                    GraphoidError::runtime(
+                        format!("Symbol '{}' not found in module '{}'", item_name, module_name)
+                    )
+                })?;
+
+                // Bind using alias if provided, otherwise original name
+                let bind_name = item_alias.unwrap_or(item_name.clone());
+                self.env.define(bind_name, value);
+                imported_items.push(item_name);
+            }
+
+            // Phase 18: Add selective import edge to universe graph
+            {
+                let mod_display = module.alias.clone().unwrap_or_else(|| module.name.clone());
+                let mod_node_id = format!("module:{}", mod_display);
+                let mut ug = self.universe_graph.borrow_mut();
+                let mut props = HashMap::new();
+                props.insert("items".to_string(), Value::string(imported_items.join(",")));
+                let _ = ug.add_edge("scope:main", &mod_node_id, "imports".to_string(), None, props);
+            }
+
+            return Ok(Value::none());
+        }
+
+        // Full import: existing behavior — bind module value to name
         let binding_name = if let Some(alias_name) = alias {
             alias_name
         } else if let ValueKind::Module(ref m) = module_value.kind {
@@ -3124,6 +3762,13 @@ impl GraphExecutor {
         } else {
             module_name
         };
+
+        // Phase 18: Add full import edge to universe graph
+        {
+            let mod_node_id = format!("module:{}", binding_name);
+            let mut ug = self.universe_graph.borrow_mut();
+            let _ = ug.add_edge("scope:main", &mod_node_id, "imports".to_string(), None, HashMap::new());
+        }
 
         self.env.define(binding_name, module_value);
         Ok(Value::none())
@@ -3153,6 +3798,24 @@ impl GraphExecutor {
         Ok(Value::none())
     }
 
+    /// Phase 17: Execute a priv { } block — run all child statements
+    fn exec_priv_block(&mut self, node_ref: NodeRef) -> Result<Value> {
+        let prev = self.in_priv_block;
+        self.in_priv_block = true;
+        let mut i = 0u32;
+        let result = loop {
+            match self.get_edge_target(node_ref, &ExecEdgeType::Element(i)) {
+                Some(child_ref) => {
+                    self.execute_node(child_ref)?;
+                }
+                None => break Ok(Value::none()),
+            }
+            i += 1;
+        };
+        self.in_priv_block = prev;
+        result
+    }
+
     fn load_module(&mut self, module_path: &str, _alias: Option<&String>) -> Result<Value> {
         use std::fs;
         use crate::execution::module_manager::Module;
@@ -3164,6 +3827,8 @@ impl GraphExecutor {
                 return Ok(Value::module(module.clone()));
             }
             if let Some((native_env, native_alias)) = self.module_manager.get_native_module_env(module_path) {
+                let native_exports: Vec<String> = native_env.get_all_bindings()
+                    .into_iter().map(|(name, _)| name).collect();
                 let module = Module {
                     name: module_path.to_string(),
                     alias: native_alias,
@@ -3171,8 +3836,17 @@ impl GraphExecutor {
                     file_path: PathBuf::from(format!("<native:{}>", module_path)),
                     config: None,
                     private_symbols: std::collections::HashSet::new(),
+                    exports: native_exports,
                 };
-                self.module_manager.register_module(cache_key, module.clone());
+                self.module_manager.register_module(cache_key.clone(), module.clone());
+                // Phase 17: Record dependency edge for native modules
+                if let Some(ref current) = self.current_file {
+                    self.module_manager.record_dependency(
+                        &current.to_string_lossy(),
+                        &cache_key,
+                    );
+                }
+                self.register_module_in_universe(&module);
                 return Ok(Value::module(module));
             }
         }
@@ -3232,6 +3906,14 @@ impl GraphExecutor {
             if let ValueKind::String(alias) = &v.kind { Some(alias.clone()) } else { None }
         } else { None };
 
+        // Phase 17: Compute exports (all bindings minus private symbols)
+        let all_bindings: Vec<String> = module_executor.env.get_all_bindings()
+            .into_iter().map(|(name, _)| name).collect();
+        let module_exports: Vec<String> = all_bindings.into_iter()
+            .filter(|name| !module_executor.private_symbols.contains(name))
+            .filter(|name| !name.starts_with("__"))  // exclude magic variables
+            .collect();
+
         let module = Module {
             name: module_name,
             alias: module_alias,
@@ -3239,6 +3921,7 @@ impl GraphExecutor {
             file_path: resolved_path.clone(),
             config: None,
             private_symbols: module_executor.private_symbols.clone(),
+            exports: module_exports,
         };
 
         // Merge the module's execution graph into the parent's graph
@@ -3290,8 +3973,19 @@ impl GraphExecutor {
                 .extend(func_list.iter().cloned());
         }
 
-        self.module_manager.register_module(resolved_path.to_string_lossy().to_string(), module.clone());
+        let module_key = resolved_path.to_string_lossy().to_string();
+        self.module_manager.register_module(module_key.clone(), module.clone());
         self.module_manager.end_loading(&resolved_path);
+
+        self.register_module_in_universe(&module);
+
+        // Phase 17: Record dependency edge (current file imports this module)
+        if let Some(ref current) = self.current_file {
+            self.module_manager.record_dependency(
+                &current.to_string_lossy(),
+                &module_key,
+            );
+        }
 
         Ok(Value::module(module))
     }
@@ -3299,7 +3993,16 @@ impl GraphExecutor {
     fn execute_load(&mut self, path_str: &str) -> Result<()> {
         use std::fs;
 
-        let resolved_path = if let Some(ref current) = self.current_file {
+        // For load(), first try the path relative to current working directory.
+        // This is important for spec_runner which loads files like "tests/gspec/foo_spec.gr"
+        // from the project root, even though spec_runner.gr itself is in stdlib.
+        let cwd_path = PathBuf::from(path_str);
+        let resolved_path = if cwd_path.exists() && cwd_path.is_file() {
+            cwd_path.canonicalize().map_err(|e| GraphoidError::IOError {
+                message: format!("Failed to canonicalize path: {}", e),
+                position: crate::error::SourcePosition::unknown(),
+            })?
+        } else if let Some(ref current) = self.current_file {
             self.module_manager.resolve_module_path(path_str, Some(current))?
         } else {
             self.module_manager.resolve_module_path(path_str, None)?
@@ -3417,6 +4120,7 @@ impl GraphExecutor {
             body_ref: NodeRef,
             param_names: Vec<String>,
             parameters: Vec<Parameter>,
+            guard_ref: Option<NodeRef>,
         }
         let mut method_infos = Vec::new();
         for method_ref in &method_refs {
@@ -3424,6 +4128,9 @@ impl GraphExecutor {
             let method_name = method_node.get_str("name").unwrap_or_default();
             let is_static = method_node.get_bool("is_static").unwrap_or(false);
             let is_private = method_node.get_bool("is_private").unwrap_or(false);
+
+            // Check for guard expression (stored as NodeRef, evaluated at dispatch time)
+            let guard_ref = self.get_edge_target(*method_ref, &ExecEdgeType::Guard);
 
             if let Some(body_ref) = self.get_edge_target(*method_ref, &ExecEdgeType::Body) {
                 let mut param_names = Vec::new();
@@ -3446,10 +4153,12 @@ impl GraphExecutor {
                         is_variadic,
                     });
                 }
-                method_infos.push(MethodInfo { method_name, is_static, is_private, body_ref, param_names, parameters });
+                method_infos.push(MethodInfo { method_name, is_static, is_private, body_ref, param_names, parameters, guard_ref });
             }
         }
         // Now register methods (mutable borrow is safe here)
+        // Use variant counters to give each method overload a unique func_id
+        let mut method_variant_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
         for mi in method_infos {
             {
                 // Private methods are renamed with underscore prefix
@@ -3459,8 +4168,17 @@ impl GraphExecutor {
                     mi.method_name.clone()
                 };
 
-                let func_id = format!("__graph_method_{}_{}", name, registered_name);
+                // Get variant index for this method name to ensure unique func_id
+                let variant_idx = *method_variant_counts.get(&registered_name).unwrap_or(&0);
+                method_variant_counts.insert(registered_name.clone(), variant_idx + 1);
+
+                let func_id = format!("__graph_method_{}_{}_{}", name, registered_name, variant_idx);
                 self.store_function_body(func_id.clone(), mi.body_ref);
+
+                // Store guard NodeRef for dispatch-time evaluation
+                if let Some(guard_ref) = mi.guard_ref {
+                    self.graph_method_guards.insert(func_id.clone(), guard_ref);
+                }
 
                 let env = Rc::new(RefCell::new(self.env.clone()));
                 let func = Function {
@@ -3473,7 +4191,7 @@ impl GraphExecutor {
                     node_id: Some(func_id),
                     is_setter: false,
                     is_static: mi.is_static,
-                    guard: None,
+                    guard: None,  // Guard evaluated at dispatch time via graph_method_guards
                 };
 
                 graph.attach_method(registered_name, func);
@@ -3527,6 +4245,12 @@ impl GraphExecutor {
                         readable_props.extend(values.clone());
                         writable_props.extend(values);
                     }
+                    "behaviors" => {
+                        for rule_name in &values {
+                            let spec = Self::symbol_to_rule_spec(rule_name, None)?;
+                            graph.add_rule(crate::graph::RuleInstance::new(spec))?;
+                        }
+                    }
                     _ => {
                         let config_id = format!("__config__/{}", key);
                         let config_list: Vec<Value> = values.iter().map(|v| Value::string(v.clone())).collect();
@@ -3553,6 +4277,25 @@ impl GraphExecutor {
             }
         }
 
+        // Phase 18: Register graph template in universe graph
+        {
+            let node_id = format!("graph:{}", name);
+            let mut ug = self.universe_graph.borrow_mut();
+            if !ug.has_node(&node_id) {
+                let _ = ug.add_node(node_id.clone(), Value::string(name.clone()));
+                let _ = ug.add_edge(&node_id, "type:graph", "subtype_of".to_string(), None, HashMap::new());
+            }
+            // If graph has a parent, add subtype_of edge to parent graph node
+            if let Some(ref parent) = graph.parent {
+                if let Some(ref parent_name) = parent.type_name {
+                    let parent_node_id = format!("graph:{}", parent_name);
+                    if ug.has_node(&parent_node_id) {
+                        let _ = ug.add_edge(&node_id, &parent_node_id, "subtype_of".to_string(), None, HashMap::new());
+                    }
+                }
+            }
+        }
+
         let graph_val = Value::graph(graph);
         self.env.define(name, graph_val.clone());
         Ok(graph_val)
@@ -3562,17 +4305,55 @@ impl GraphExecutor {
         use crate::values::Graph;
         use crate::values::graph::GraphType;
 
-        let node = self.get_node(node_ref)?;
-        let graph_type_str = node.get_str("graph_type");
+        // Get graph type from Setting("type") edge if present
+        let mut graph_type_str: Option<String> = None;
+        let mut ruleset_str: Option<String> = None;
 
-        let graph_type = match graph_type_str.as_deref() {
+        let edges = self.get_edges_cloned(node_ref);
+        for (edge_type, target) in &edges {
+            if let ExecEdgeType::Setting(key) = edge_type {
+                let val = self.execute_node(*target)?;
+                match key.as_str() {
+                    "type" => {
+                        graph_type_str = Some(val.to_string_value());
+                    }
+                    "ruleset" => {
+                        ruleset_str = Some(val.to_string_value());
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Strip leading colon from symbol values (":directed" -> "directed")
+        let type_str_normalized = graph_type_str.as_ref().map(|s| {
+            if s.starts_with(':') { s[1..].to_string() } else { s.clone() }
+        });
+        let graph_type = match type_str_normalized.as_deref() {
             Some("directed") | Some("dag") => GraphType::Directed,
             Some("undirected") => GraphType::Undirected,
             Some("tree") => GraphType::Directed, // Trees are directed graphs with constraints
             _ => GraphType::Directed,
         };
 
-        let graph = Graph::new(graph_type);
+        let mut graph = Graph::new(graph_type);
+
+        // Apply ruleset if specified
+        // Also normalize ruleset string (strip leading colon)
+        let ruleset_normalized = ruleset_str.as_ref().map(|s| {
+            if s.starts_with(':') { s[1..].to_string() } else { s.clone() }
+        });
+        if let Some(ruleset) = ruleset_normalized {
+            graph.rulesets.push(ruleset);
+        } else if let Some(ref type_str) = type_str_normalized {
+            // Auto-apply ruleset for certain types
+            match type_str.as_str() {
+                "dag" => { graph.rulesets.push("dag".to_string()); }
+                "tree" => { graph.rulesets.push("tree".to_string()); }
+                _ => {}
+            }
+        }
+
         Ok(Value::graph(graph))
     }
 
@@ -3585,11 +4366,18 @@ impl GraphExecutor {
             ValueKind::Graph(base_graph) => {
                 let mut new_graph = base_graph.borrow().clone();
 
+                // Phase 18: Set template reference for edge-based method lookup
+                // Methods are looked up via template traversal, not cloned onto instances
+                new_graph.template = Some(std::rc::Rc::clone(base_graph));
+
+                // Strip cloned methods from instance — they live on the template
+                new_graph.remove_all_methods();
+
                 // Apply overrides
                 let override_refs = self.get_ordered_edges_cloned(node_ref, "Override");
                 for ovr_ref in override_refs {
                     let ovr_node = self.get_node(ovr_ref)?;
-                    let prop_name = ovr_node.get_str("name").unwrap_or_default();
+                    let prop_name = ovr_node.get_str("key").unwrap_or_default();
                     if let Some(val_ref) = self.get_edge_target(ovr_ref, &ExecEdgeType::ValueEdge) {
                         let val = self.execute_node(val_ref)?;
                         let node_id = crate::values::Graph::property_node_id(&prop_name);
@@ -3775,7 +4563,6 @@ impl GraphExecutor {
     }
 
     fn exec_super_method_call(&mut self, node_ref: NodeRef) -> Result<Value> {
-        // For now, basic super method dispatch
         let node = self.get_node(node_ref)?;
         let method_name = node.get_str("method").unwrap_or_default();
 
@@ -3785,18 +4572,42 @@ impl GraphExecutor {
             args.push(self.execute_node(arg_ref)?);
         }
 
-        // Look up the super context
-        if let Some(parent_graph) = self.super_context_stack.last().cloned() {
-            let method_node_id = format!("__methods__/{}", method_name);
-            if let Some(method_val) = parent_graph.get_node(&method_node_id) {
-                if let ValueKind::Function(func) = &method_val.kind {
-                    return self.call_graph_function(func.clone(), args);
+        // Get the current self graph and look up the method on its parent
+        // super.method() calls the parent's method but with `self` bound to the child
+        let self_value = self.env.get("self")?;
+        if let ValueKind::Graph(ref graph_rc) = self_value.kind {
+            // Clone what we need before releasing borrows
+            let child_graph = graph_rc.borrow().clone();
+            let func_to_call: Option<Function> = {
+                if let Some(ref parent_box) = child_graph.parent {
+                    let parent = parent_box.as_ref();
+                    let method_node_id = format!("__methods__/{}", method_name);
+                    if let Some(method_val) = parent.get_node(&method_node_id) {
+                        if let ValueKind::Function(func) = &method_val.kind {
+                            Some(func.clone())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    return Err(GraphoidError::runtime("No parent graph available for super call".to_string()));
                 }
+            };
+
+            if let Some(func) = func_to_call {
+                // Call parent's method with `self` bound to child graph
+                // This ensures properties like `speed` access the child's values
+                let self_expr = Expr::Variable {
+                    name: "self".to_string(),
+                    position: SourcePosition::unknown(),
+                };
+                return self.call_graph_method_impl(&child_graph, &func, &args, &self_expr, false);
             }
-            Err(GraphoidError::runtime(format!("No method '{}' on parent graph", method_name)))
-        } else {
-            Err(GraphoidError::runtime("No super context available".to_string()))
+            return Err(GraphoidError::runtime(format!("No method '{}' on parent graph", method_name)));
         }
+        Err(GraphoidError::runtime("super can only be used within a graph method".to_string()))
     }
 
     // =========================================================================

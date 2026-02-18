@@ -75,6 +75,8 @@ pub enum AstNodeType {
     GraphPropertyNode,
     GraphMethodNode,
     GraphRuleNode,
+    ImportItemNode,  // Phase 17: selective import item (name + optional alias)
+    PrivBlockStmt,   // Phase 17: priv { } block (children are private declarations)
 }
 
 /// Edge types connecting nodes in the execution graph.

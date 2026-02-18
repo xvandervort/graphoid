@@ -64,31 +64,19 @@ impl Executor {
     }
 
     /// Phase 3: Checks if integer operation should grow to BigInt due to overflow.
-    /// This applies to Int64 and UInt64 operations in :integer mode with :high or :extended precision.
+    /// This applies to Int64 and UInt64 operations in :integer mode with :high precision.
     pub(crate) fn should_grow_to_bigint_i64(&self, _left: i64, _right: i64, would_overflow: bool) -> bool {
-        // Only auto-grow in :high or :extended precision modes
-        if !matches!(
-            self.config_stack.current().precision_mode,
-            PrecisionMode::High | PrecisionMode::Extended
-        ) {
+        if self.config_stack.current().precision_mode != PrecisionMode::High {
             return false;
         }
-
-        // Check if the operation would overflow
         would_overflow
     }
 
     /// Phase 3: Checks if UInt64 operation should grow to BigInt.
     pub(crate) fn should_grow_to_bigint_u64(&self, _left: u64, _right: u64, would_overflow: bool) -> bool {
-        // Only auto-grow in :high or :extended precision modes
-        if !matches!(
-            self.config_stack.current().precision_mode,
-            PrecisionMode::High | PrecisionMode::Extended
-        ) {
+        if self.config_stack.current().precision_mode != PrecisionMode::High {
             return false;
         }
-
-        // Check if the operation would overflow
         would_overflow
     }
 
@@ -294,11 +282,7 @@ impl Executor {
                             Ok(Value::bignum(BigNum::Float128(lv + rv)))
                         }
                     }
-                    PrecisionMode::Extended => {
-                        Err(GraphoidError::runtime(
-                            "Extended precision (BigInt) not yet implemented".to_string()
-                        ))
-                    }
+
                     PrecisionMode::Standard => {
                         // Standard f64 arithmetic with optional auto-promotion
                         let result = l + r;
@@ -417,11 +401,7 @@ impl Executor {
                             Ok(Value::bignum(BigNum::Float128(lv - rv)))
                         }
                     }
-                    PrecisionMode::Extended => {
-                        Err(GraphoidError::runtime(
-                            "Extended precision (BigInt) not yet implemented".to_string()
-                        ))
-                    }
+
                     PrecisionMode::Standard => {
                         Ok(Value::number(l - r))
                     }
@@ -537,11 +517,7 @@ impl Executor {
                             Ok(Value::bignum(BigNum::Float128(lv * rv)))
                         }
                     }
-                    PrecisionMode::Extended => {
-                        Err(GraphoidError::runtime(
-                            "Extended precision (BigInt) not yet implemented".to_string()
-                        ))
-                    }
+
                     PrecisionMode::Standard => {
                         // Standard f64 arithmetic with optional auto-promotion
                         let result = l * r;
@@ -654,11 +630,7 @@ impl Executor {
                             Ok(Value::bignum(BigNum::Float128(lv / rv)))
                         }
                     }
-                    PrecisionMode::Extended => {
-                        Err(GraphoidError::runtime(
-                            "Extended precision (BigInt) not yet implemented".to_string()
-                        ))
-                    }
+
                     PrecisionMode::Standard => {
                         if *r == 0.0 {
                             // Check error mode
@@ -817,17 +789,6 @@ impl Executor {
                             Ok(Value::number((l / r).trunc()))
                         }
                     }
-                    PrecisionMode::Extended => {
-                        // Phase 1B: Extended precision uses BigInt (future)
-                        use num_bigint::BigInt;
-                        let lv = BigInt::from(*l as i64);
-                        let rv = BigInt::from(*r as i64);
-                        use num_traits::Zero;
-                        if rv.is_zero() {
-                            return Err(GraphoidError::division_by_zero());
-                        }
-                        Ok(Value::bignum(BigNum::BigInt(&lv / &rv)))
-                    }
                 }
             }
 
@@ -929,11 +890,7 @@ impl Executor {
                             Ok(Value::bignum(BigNum::Float128(lv % rv)))
                         }
                     }
-                    PrecisionMode::Extended => {
-                        Err(GraphoidError::runtime(
-                            "Extended precision (BigInt) not yet implemented".to_string()
-                        ))
-                    }
+
                     PrecisionMode::Standard => {
                         if *r == 0.0 {
                             // Check error mode for modulo by zero
@@ -1071,11 +1028,7 @@ impl Executor {
                             Ok(Value::bignum(BigNum::Float128(f128::from(result))))
                         }
                     }
-                    PrecisionMode::Extended => {
-                        Err(GraphoidError::runtime(
-                            "Extended precision (BigInt) not yet implemented".to_string()
-                        ))
-                    }
+
                     PrecisionMode::Standard => {
                         // Standard f64 arithmetic with optional auto-promotion
                         let result = l.powf(*r);

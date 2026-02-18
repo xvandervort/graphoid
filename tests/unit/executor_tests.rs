@@ -8455,35 +8455,8 @@ result = very_large
     assert!(matches!(result.kind, ValueKind::BigNumber(BigNum::BigInt(_))));
 }
 
-#[test]
-fn test_extended_precision_mode_uses_bigint() {
-    let source = r#"
-configure { precision: :extended } {
-    big = 12345.0
-    frac = 67.89
-}
-result_big = big
-result_frac = frac
-"#;
-    let mut executor = Executor::new();
-    executor.execute_source(source).unwrap();
-
-    let result_big = executor.get_variable("result_big").unwrap();
-    let result_frac = executor.get_variable("result_frac").unwrap();
-
-    // Both should be BigInt in Extended mode
-    assert!(matches!(result_big.kind, ValueKind::BigNumber(BigNum::BigInt(_))));
-    assert!(matches!(result_frac.kind, ValueKind::BigNumber(BigNum::BigInt(_))));
-
-    // Fractional value should be truncated
-    if let ValueKind::BigNumber(BigNum::BigInt(bi)) = &result_frac.kind {
-        use num_traits::ToPrimitive;
-        assert_eq!(bi.to_i64().unwrap(), 67);
-    }
-}
-
 // ============================================================================
-// Total: 2 large literal detection tests
+// Total: 1 large literal detection test
 // ============================================================================
 
 // ============================================================================
@@ -9100,110 +9073,6 @@ configure { precision: :high } {
     }
 }
 
-// ===== to_bigint() tests (4 tests) =====
-
-#[test]
-fn test_int64_to_bigint() {
-    // Convert Int64 to BigInt
-    let source = r#"
-configure { precision: :high, :integer } {
-    bignum x = 12345.0
-    result = x.to_bigint()
-}
-"#;
-    let mut executor = Executor::new();
-    executor.execute_source(source).unwrap();
-
-    let result = executor.get_variable("result").unwrap();
-
-    // Should be BigInt
-    if let ValueKind::BigNumber(bn) = &result.kind {
-        assert!(matches!(bn, BigNum::BigInt(_)),
-            "Expected BigInt, got {:?}", bn);
-    } else {
-        panic!("Expected BigNumber type, got {:?}", result.kind);
-    }
-}
-
-#[test]
-fn test_uint64_to_bigint() {
-    // Convert UInt64 to BigInt
-    let source = r#"
-configure { precision: :high, :integer } {
-    # Create a UInt64 value
-    bignum x = 18446744073709551615.0  # UInt64::MAX
-    result = x.to_bigint()
-}
-"#;
-    let mut executor = Executor::new();
-    executor.execute_source(source).unwrap();
-
-    let result = executor.get_variable("result").unwrap();
-
-    // Should be BigInt
-    if let ValueKind::BigNumber(bn) = &result.kind {
-        assert!(matches!(bn, BigNum::BigInt(_)),
-            "Expected BigInt, got {:?}", bn);
-    } else {
-        panic!("Expected BigNumber type, got {:?}", result.kind);
-    }
-}
-
-#[test]
-fn test_float128_to_bigint_truncates() {
-    // Convert Float128 to BigInt, truncating fractional part
-    let source = r#"
-configure { precision: :high } {
-    bignum x = 9876.543
-    result = x.to_bigint()
-}
-"#;
-    let mut executor = Executor::new();
-    executor.execute_source(source).unwrap();
-
-    let result = executor.get_variable("result").unwrap();
-
-    // Should be BigInt with value 9876 (truncated)
-    if let ValueKind::BigNumber(bn) = &result.kind {
-        use num_bigint::BigInt;
-        assert!(matches!(bn, BigNum::BigInt(_)),
-            "Expected BigInt, got {:?}", bn);
-
-        // Verify value is 9876
-        if let BigNum::BigInt(bi) = bn {
-            assert_eq!(*bi, BigInt::from(9876),
-                "Expected BigInt(9876), got {:?}", bi);
-        }
-    } else {
-        panic!("Expected BigNumber type, got {:?}", result.kind);
-    }
-}
-
-#[test]
-fn test_bigint_to_bigint_identity() {
-    // BigInt to BigInt should be identity (no change)
-    let source = r#"
-configure { precision: :high, :integer } {
-    bignum a = 9223372036854775807.0  # Int64::MAX
-    bignum b = 2.0
-    big = a * b  # Creates a BigInt
-    result = big.to_bigint()
-}
-"#;
-    let mut executor = Executor::new();
-    executor.execute_source(source).unwrap();
-
-    let result = executor.get_variable("result").unwrap();
-
-    // Should still be BigInt
-    if let ValueKind::BigNumber(bn) = &result.kind {
-        assert!(matches!(bn, BigNum::BigInt(_)),
-            "Expected BigInt, got {:?}", bn);
-    } else {
-        panic!("Expected BigNumber type, got {:?}", result.kind);
-    }
-}
-
 // ============================================================================
-// Total: 8 BigInt conversion tests
+// Total: 4 BigInt conversion tests
 // ============================================================================

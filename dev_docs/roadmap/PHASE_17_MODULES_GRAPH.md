@@ -3,7 +3,32 @@
 **Duration**: 7-10 days
 **Priority**: Critical (Part of graph-centric foundation)
 **Dependencies**: Phase 15 (Namespace Graph), Phase 16 (Execution Graph)
-**Status**: Planning
+**Status**: Complete
+
+---
+
+## Current Implementation Status (Feb 9, 2026)
+
+### ✅ Completed
+- Selective imports (`import "math" { sin, cos }`)
+- Import aliases (`import "math" as m`)
+- Item renames (`import "math" { sin as sine }`)
+- `priv { }` blocks for grouping private declarations
+- Module introspection: `.name()`, `.path()`, `.exports()`, `.imports()`
+- Dependency tracking in ModuleManager (dependencies, dependents)
+- `topological_sort()`, `find_cycles()` algorithms
+- `reflect.module("name")` — access loaded module by name
+- `reflect.loaded_modules()` — list all loaded module names
+- `reflect.universe()` — module dependency graph as a Graph value
+- `reflect.current_scope()` — current scope info (type, variables, depth)
+- All tests pass (660 gspec + 1293 Rust)
+
+### Previously Deferred — Now Implemented in Phase 18
+- ✅ Modules as persistent nodes in universe graph (Phase 18: `module:{name}` nodes)
+- ✅ Import creates edges in universe graph (Phase 18: `scope:main --imports--> module:{name}`)
+- ✅ Type hierarchy as graph (Phase 18: 17 type nodes + 16 subtype_of edges)
+- ✅ `reflect.type_hierarchy()` — type subgraph extraction
+- ✅ `graph.has_node()` method exposed to .gr files
 
 ---
 

@@ -1,0 +1,17 @@
+module seltest
+
+fn public_fn(x) {
+    return x * 10
+}
+
+fn another_fn(x) {
+    return x + 1
+}
+
+public_var = 99
+
+priv secret_var = 42
+
+priv fn secret_fn(x) {
+    return x * 100
+}

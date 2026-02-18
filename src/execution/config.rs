@@ -85,8 +85,7 @@ pub enum NoneHandlingMode {
 #[derive(Debug, Clone, PartialEq)]
 pub enum PrecisionMode {
     Standard,  // f64 (default)
-    High,      // i64/u64 or f128
-    Extended,  // BigInt (arbitrary precision)
+    High,      // i64/u64 or f128 (BigInt used internally for overflow, never user-visible)
 }
 
 /// Bit width for integer wrapping (Phase 13)
@@ -366,9 +365,8 @@ fn parse_precision_mode(value: &Value) -> Result<PrecisionMode> {
     match &value.kind {
         ValueKind::Symbol(s) => match s.as_str() {
             "high" => Ok(PrecisionMode::High),
-            "extended" => Ok(PrecisionMode::Extended),
             _ => Err(GraphoidError::ConfigError {
-                message: format!("Invalid precision: :{}, expected :high or :extended", s),
+                message: format!("Invalid precision: :{}, expected :high", s),
             }),
         },
         _ => Err(GraphoidError::ConfigError {

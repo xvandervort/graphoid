@@ -103,8 +103,7 @@ impl Executor {
         // Phase 20: Check for static methods first (called on class, not instances)
         if let Some(static_func) = graph.get_static_method(method) {
             // Static method found - call it WITHOUT binding `self`
-            let static_func_clone = static_func.clone();
-            return self.call_static_method(&static_func_clone, args);
+            return self.call_static_method(&static_func, args);
         }
 
         // Check for user-defined instance methods (class-like graphs)
@@ -145,13 +144,14 @@ impl Executor {
 
             // Phase 21: Find matching method variant by evaluating guards
             // Guards are evaluated with `self` bound to the graph
+            // Guards can be stored as AST Expr (func.guard) or as NodeRef (graph_method_guards)
             let mut matching_func: Option<Function> = None;
             let mut fallback_func: Option<Function> = None;
 
             for func in method_variants {
+                // Check for AST-based guard first
                 if let Some(guard_expr) = &func.guard {
                     // Evaluate guard with `self` bound to graph
-                    // Create temporary environment for guard evaluation
                     let saved_env = self.env.clone();
                     self.env.define("self".to_string(), Value::graph(graph.clone()));
 
@@ -169,6 +169,32 @@ impl Executor {
                             // Guard evaluation failed, skip this variant
                             continue;
                         }
+                    }
+                } else if let Some(func_id) = &func.node_id {
+                    // Check for NodeRef-based guard (graph-based methods)
+                    if let Some(&guard_ref) = self.graph_method_guards.get(func_id) {
+                        // Evaluate guard NodeRef with `self` bound to graph
+                        let saved_env = self.env.clone();
+                        self.env.define("self".to_string(), Value::graph(graph.clone()));
+
+                        let guard_result = self.execute_node(guard_ref);
+                        self.env = saved_env;
+
+                        match guard_result {
+                            Ok(guard_val) => {
+                                if guard_val.is_truthy() {
+                                    matching_func = Some(func.clone());
+                                    break;
+                                }
+                            }
+                            Err(_) => {
+                                // Guard evaluation failed, skip this variant
+                                continue;
+                            }
+                        }
+                    } else {
+                        // No guard - this is a fallback
+                        fallback_func = Some(func.clone());
                     }
                 } else {
                     // No guard - this is the fallback
@@ -406,6 +432,22 @@ impl Executor {
                 };
 
                 Ok(Value::boolean(graph.has_ruleset(ruleset_name)))
+            }
+            "has_node" => {
+                // Check if a node exists in the graph
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "has_node() expects 1 argument (node_id), but got {}",
+                        args.len()
+                    )));
+                }
+                let node_id = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
+                    _other => {
+                        return Err(GraphoidError::type_error("string", args[0].type_name()));
+                    }
+                };
+                Ok(Value::boolean(graph.has_node(node_id)))
             }
             "has_path" => {
                 // Check if a path exists between two nodes
@@ -766,6 +808,21 @@ impl Executor {
 
                 let type_name = graph.type_name.clone().unwrap_or_else(|| "graph".to_string());
                 Ok(Value::string(type_name))
+            }
+            "template" => {
+                // Phase 18: Returns the template graph this instance was created from,
+                // or none if this graph is not an instance.
+                // e.g., p = Person { name: "Alice" }; p.template() => Person graph
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "template() takes no arguments, but got {}",
+                        args.len()
+                    )));
+                }
+                match &graph.template {
+                    Some(tmpl) => Ok(Value::graph(tmpl.borrow().clone())),
+                    None => Ok(Value::none()),
+                }
             }
             "is_a" => {
                 // Checks if the graph is an instance of a type, walking the inheritance chain

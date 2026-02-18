@@ -1,0 +1,21 @@
+# Phase 17: Module Introspection
+#
+# Modules expose introspection methods that let you query their
+# structure at runtime — their name, file path, public exports,
+# and dependencies.
+
+print("=== Module Introspection ===")
+
+import "utils_module"
+
+print("Module name: " + utils.name())
+print("Module path: " + utils.path())
+
+exports = utils.exports()
+print("Exports: " + exports.to_string())
+
+imports = utils.imports()
+print("Imports: " + imports.to_string())
+
+print("")
+print("=== Examples Complete ===")

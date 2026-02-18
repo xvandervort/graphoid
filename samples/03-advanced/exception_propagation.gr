@@ -1,0 +1,76 @@
+# exception_propagation.gr — Exception paths in the call graph
+#
+# Phase 18 Section 4: When exceptions propagate through function calls,
+# the function graph records exception propagation edges alongside normal
+# call edges. These can be inspected via reflect.call_graph().
+
+# --- Define a call chain where an exception propagates ---
+
+fn deep_error() {
+    raise ValueError("something went wrong in deep_error")
+}
+
+fn middle() {
+    deep_error()
+}
+
+fn outer() {
+    middle()
+}
+
+# --- Catch the exception ---
+
+try {
+    outer()
+} catch as e {
+    print("Caught: " + e.message())
+}
+
+# --- Inspect the call graph ---
+
+cg = reflect.call_graph()
+print("")
+print("=== Call Graph Analysis ===")
+print("Nodes: " + cg.nodes().length().to_string())
+
+# Show all function nodes
+print("")
+print("Function nodes:")
+for node_id in cg.nodes() {
+    node = cg.get_node(node_id)
+    print("  " + node_id + " (calls: " + node["call_count"].to_string() + ")")
+}
+
+# Show all edges
+print("")
+print("Edges:")
+edges = cg.edges()
+for edge in edges {
+    src = edge[0]
+    dst = edge[1]
+    label = edge[2]
+    print("  " + src + " --" + label + "--> " + dst)
+}
+
+# --- Filter for exception edges ---
+
+print("")
+print("Exception propagation path:")
+exception_edges = edges.filter(edge => edge[2] == "exception")
+for edge in exception_edges {
+    print("  " + edge[0] + " --> " + edge[1])
+}
+print("Total exception edges: " + exception_edges.length().to_string())
+
+# --- Normal function calls leave only call edges ---
+
+print("")
+print("=== Adding a safe function call ===")
+fn safe_fn() { return 42 }
+result = safe_fn()
+print("safe_fn returned: " + result.to_string())
+
+cg2 = reflect.call_graph()
+all_edges = cg2.edges()
+safe_exceptions = all_edges.filter(edge => edge[2] == "exception" and edge[0] == "fn:safe_fn")
+print("Exception edges for safe_fn: " + safe_exceptions.length().to_string())

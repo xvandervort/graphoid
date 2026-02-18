@@ -12,6 +12,7 @@ pub struct Module {
     pub file_path: PathBuf,
     pub config: Option<ConfigScope>,
     pub private_symbols: std::collections::HashSet<String>,  // Phase 10: Track private symbols
+    pub exports: Vec<String>,  // Phase 17: Public symbol names (all bindings minus private_symbols)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,6 +50,12 @@ pub struct ModuleManager {
 
     /// Native modules: name → NativeModule
     native_modules: HashMap<String, Box<dyn NativeModule>>,
+
+    /// Phase 17: Module dependency graph — module_key → set of imported module_keys
+    dependencies: HashMap<String, HashSet<String>>,
+
+    /// Phase 17: Reverse dependencies — module_key → set of modules that import it
+    dependents: HashMap<String, HashSet<String>>,
 }
 
 impl ModuleManager {
@@ -63,6 +70,8 @@ impl ModuleManager {
                 Self::get_stdlib_path(),
             ],
             native_modules: HashMap::new(),
+            dependencies: HashMap::new(),
+            dependents: HashMap::new(),
         };
 
         // Register built-in native modules
@@ -355,5 +364,195 @@ impl ModuleManager {
     /// Get import stack depth (for testing)
     pub fn import_stack_depth(&self) -> usize {
         self.import_stack.len()
+    }
+
+    // =========================================================================
+    // Phase 17: Module dependency graph
+    // =========================================================================
+
+    /// Record that `from_module` imports `to_module` (creates a dependency edge)
+    pub fn record_dependency(&mut self, from_module: &str, to_module: &str) {
+        self.dependencies
+            .entry(from_module.to_string())
+            .or_default()
+            .insert(to_module.to_string());
+        self.dependents
+            .entry(to_module.to_string())
+            .or_default()
+            .insert(from_module.to_string());
+    }
+
+    /// Helper: convert HashSet<String> to sorted Vec<String>
+    fn sorted_vec_from_set(set: Option<&HashSet<String>>) -> Vec<String> {
+        set.map(|deps| {
+            let mut v: Vec<String> = deps.iter().cloned().collect();
+            v.sort();
+            v
+        })
+        .unwrap_or_default()
+    }
+
+    /// Get modules that `module_key` directly imports
+    pub fn get_dependencies(&self, module_key: &str) -> Vec<String> {
+        Self::sorted_vec_from_set(self.dependencies.get(module_key))
+    }
+
+    /// Get modules that import `module_key`
+    pub fn get_dependents(&self, module_key: &str) -> Vec<String> {
+        Self::sorted_vec_from_set(self.dependents.get(module_key))
+    }
+
+    /// Get all loaded module keys
+    pub fn get_all_module_keys(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self.modules.keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+
+    /// Find a loaded module by name (tries direct key, native: prefix, name, then alias)
+    pub fn find_module_by_name(&self, name: &str) -> Option<&Module> {
+        if let Some(m) = self.modules.get(name) { return Some(m); }
+        if let Some(m) = self.modules.get(&format!("native:{}", name)) { return Some(m); }
+        // Search by Module.name field
+        if let Some(m) = self.modules.values().find(|m| m.name == name) { return Some(m); }
+        // Search by Module.alias field (e.g., "math" for module math_module alias math)
+        self.modules.values().find(|m| m.alias.as_deref() == Some(name))
+    }
+
+    /// Get all loaded modules
+    pub fn get_all_modules(&self) -> Vec<&Module> {
+        self.modules.values().collect()
+    }
+
+    /// Get all dependency edges as (from, to) pairs
+    pub fn get_dependency_edges(&self) -> Vec<(String, String)> {
+        let mut edges = Vec::new();
+        for (from, tos) in &self.dependencies {
+            for to in tos {
+                edges.push((from.clone(), to.clone()));
+            }
+        }
+        edges.sort();
+        edges
+    }
+
+    /// Topological sort of modules (returns error if cycles exist)
+    pub fn topological_order(&self) -> Result<Vec<String>> {
+        // Collect all nodes
+        let mut all_nodes: HashSet<String> = HashSet::new();
+        for (from, tos) in &self.dependencies {
+            all_nodes.insert(from.clone());
+            for to in tos {
+                all_nodes.insert(to.clone());
+            }
+        }
+        // Also include modules with no dependencies
+        for key in self.modules.keys() {
+            all_nodes.insert(key.clone());
+        }
+
+        // Kahn's algorithm
+        let mut in_degree: HashMap<String, usize> = HashMap::new();
+        for node in &all_nodes {
+            in_degree.insert(node.clone(), 0);
+        }
+        for (_from, tos) in &self.dependencies {
+            for to in tos {
+                *in_degree.entry(to.clone()).or_insert(0) += 1;
+            }
+        }
+
+        let mut queue: Vec<String> = in_degree.iter()
+            .filter(|(_, &deg)| deg == 0)
+            .map(|(k, _)| k.clone())
+            .collect();
+        queue.sort(); // deterministic order
+
+        let mut result = Vec::new();
+        while let Some(node) = queue.pop() {
+            result.push(node.clone());
+            if let Some(deps) = self.dependencies.get(&node) {
+                for dep in deps {
+                    if let Some(deg) = in_degree.get_mut(dep) {
+                        *deg -= 1;
+                        if *deg == 0 {
+                            // Insert sorted to maintain deterministic order
+                            let pos = queue.binary_search(dep).unwrap_or_else(|p| p);
+                            queue.insert(pos, dep.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        if result.len() < all_nodes.len() {
+            Err(GraphoidError::runtime(
+                "Circular dependency detected in module graph".to_string()
+            ))
+        } else {
+            Ok(result)
+        }
+    }
+
+    /// Find all cycles in the dependency graph (returns list of cycle paths)
+    pub fn find_cycles(&self) -> Vec<Vec<String>> {
+        let mut cycles = Vec::new();
+        let mut visited: HashSet<String> = HashSet::new();
+        let mut rec_stack: HashSet<String> = HashSet::new();
+        let mut path: Vec<String> = Vec::new();
+
+        let mut all_nodes: Vec<String> = HashSet::<String>::new()
+            .into_iter()
+            .collect();
+        for (from, tos) in &self.dependencies {
+            all_nodes.push(from.clone());
+            for to in tos {
+                all_nodes.push(to.clone());
+            }
+        }
+        all_nodes.sort();
+        all_nodes.dedup();
+
+        for node in &all_nodes {
+            if !visited.contains(node) {
+                self.find_cycles_dfs(node, &mut visited, &mut rec_stack, &mut path, &mut cycles);
+            }
+        }
+
+        cycles.sort();
+        cycles
+    }
+
+    fn find_cycles_dfs(
+        &self,
+        node: &str,
+        visited: &mut HashSet<String>,
+        rec_stack: &mut HashSet<String>,
+        path: &mut Vec<String>,
+        cycles: &mut Vec<Vec<String>>,
+    ) {
+        visited.insert(node.to_string());
+        rec_stack.insert(node.to_string());
+        path.push(node.to_string());
+
+        if let Some(deps) = self.dependencies.get(node) {
+            let mut sorted_deps: Vec<&String> = deps.iter().collect();
+            sorted_deps.sort();
+            for dep in sorted_deps {
+                if !visited.contains(dep.as_str()) {
+                    self.find_cycles_dfs(dep, visited, rec_stack, path, cycles);
+                } else if rec_stack.contains(dep.as_str()) {
+                    // Found a cycle — extract it from path
+                    if let Some(start) = path.iter().position(|p| p == dep) {
+                        let mut cycle: Vec<String> = path[start..].to_vec();
+                        cycle.push(dep.clone()); // complete the cycle
+                        cycles.push(cycle);
+                    }
+                }
+            }
+        }
+
+        path.pop();
+        rec_stack.remove(node);
     }
 }
