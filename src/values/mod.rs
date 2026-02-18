@@ -404,7 +404,7 @@ impl<'a> IntoIterator for &'a PatternMatchResults {
 }
 
 /// High-precision numeric value (Phase 13.5)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum BigNum {
     /// 64-bit signed integer
     Int64(i64),
@@ -478,6 +478,21 @@ impl BigNum {
     }
 }
 
+// Manual PartialEq: compare by numeric value, not by variant
+impl PartialEq for BigNum {
+    fn eq(&self, other: &Self) -> bool {
+        // Fast path: same variant
+        match (self, other) {
+            (BigNum::Int64(a), BigNum::Int64(b)) => a == b,
+            (BigNum::UInt64(a), BigNum::UInt64(b)) => a == b,
+            (BigNum::Float128(a), BigNum::Float128(b)) => a == b,
+            (BigNum::BigInt(a), BigNum::BigInt(b)) => a == b,
+            // Cross-variant: normalize to f64 for comparison
+            _ => self.to_f64() == other.to_f64(),
+        }
+    }
+}
+
 /// The actual data/kind of a value
 #[derive(Debug, Clone)]
 pub enum ValueKind {
@@ -527,6 +542,9 @@ impl PartialEq for ValueKind {
         match (self, other) {
             (ValueKind::Number(a), ValueKind::Number(b)) => a == b,
             (ValueKind::BigNumber(a), ValueKind::BigNumber(b)) => a == b,
+            // Cross-type: compare by numeric value
+            (ValueKind::Number(n), ValueKind::BigNumber(bn)) => *n == bn.to_f64(),
+            (ValueKind::BigNumber(bn), ValueKind::Number(n)) => bn.to_f64() == *n,
             (ValueKind::String(a), ValueKind::String(b)) => a == b,
             (ValueKind::Boolean(a), ValueKind::Boolean(b)) => a == b,
             (ValueKind::None, ValueKind::None) => true,
@@ -699,6 +717,7 @@ impl Value {
     pub fn to_number(&self) -> Option<f64> {
         match &self.kind {
             ValueKind::Number(n) => Some(*n),
+            ValueKind::BigNumber(bn) => Some(bn.to_f64()),
             ValueKind::Boolean(true) => Some(1.0),
             ValueKind::Boolean(false) => Some(0.0),
             ValueKind::String(s) => s.parse::<f64>().ok(),

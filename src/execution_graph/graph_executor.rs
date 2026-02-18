@@ -37,8 +37,6 @@ pub struct GraphExecutor {
     pub(crate) output_buffer: String,
     pub(crate) method_context_stack: Vec<String>,
     pub(crate) super_context_stack: Vec<crate::values::Graph>,
-    #[allow(dead_code)]
-    pub(crate) writeback_stack: Vec<Vec<()>>, // Required by method files; mutation writeback not yet needed
     pub(crate) block_self_stack: Vec<Value>,
     pub(crate) graph_method_value_stack: Vec<Value>,
     pub(crate) suppress_self_property_assignment: usize,
@@ -88,7 +86,6 @@ impl GraphExecutor {
             output_buffer: String::new(),
             method_context_stack: Vec::new(),
             super_context_stack: Vec::new(),
-            writeback_stack: Vec::new(),
             block_self_stack: Vec::new(),
             graph_method_value_stack: Vec::new(),
             suppress_self_property_assignment: 0,
@@ -434,16 +431,6 @@ impl GraphExecutor {
                             use f128::f128;
                             Ok(Value::bignum(BigNum::Float128(f128::from(n))))
                         }
-                    }
-                    PrecisionMode::Extended => {
-                        use num_bigint::BigInt;
-                        let big_int = if n.fract() == 0.0 {
-                            BigInt::from(n as i64)
-                        } else {
-                            // Fractional value - truncate to integer for BigInt
-                            BigInt::from(n.trunc() as i64)
-                        };
-                        Ok(Value::bignum(BigNum::BigInt(big_int)))
                     }
                     PrecisionMode::Standard => Ok(Value::number(n)),
                 }
@@ -2919,10 +2906,9 @@ impl GraphExecutor {
         Ok(props)
     }
 
-    /// BigNum methods: to_int, to_bigint
+    /// BigNum methods: to_int, to_string, to_num
     fn eval_bignum_method(&self, bn: &crate::values::BigNum, method: &str, args: &[Value]) -> Result<Value> {
         use crate::values::BigNum;
-        use num_bigint::BigInt;
         match method {
             "to_int" => {
                 if !args.is_empty() {
@@ -2959,23 +2945,6 @@ impl GraphExecutor {
                             )),
                         }
                     }
-                }
-            }
-            "to_bigint" => {
-                if !args.is_empty() {
-                    return Err(GraphoidError::runtime(format!(
-                        "Method 'to_bigint' takes no arguments, but got {}", args.len()
-                    )));
-                }
-                match bn {
-                    BigNum::Int64(i) => Ok(Value::bignum(BigNum::BigInt(BigInt::from(*i)))),
-                    BigNum::UInt64(u) => Ok(Value::bignum(BigNum::BigInt(BigInt::from(*u)))),
-                    BigNum::Float128(f) => {
-                        let f64_val: f64 = (*f).into();
-                        let truncated = f64_val.trunc() as i64;
-                        Ok(Value::bignum(BigNum::BigInt(BigInt::from(truncated))))
-                    }
-                    BigNum::BigInt(bi) => Ok(Value::bignum(BigNum::BigInt(bi.clone()))),
                 }
             }
             "to_string" | "to_str" => {

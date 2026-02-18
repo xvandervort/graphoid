@@ -618,19 +618,15 @@ fn do_stuff() {
 - [x] Exception propagation via caller edges in execution graph
 - [x] Tests for error hierarchy and catch subtypes
 
-### Week 2: Iterators as Graph (Days 11-12)
+### ~~Week 2: Iterators as Graph (Days 11-12)~~ — KILLED
 
-- [ ] Iterator as graph node with `next` edges
-- [ ] Lazy generators as graph nodes
-- [ ] Pipeline combinators as graph transformations
-- [ ] Tests for iterator graph model
+Not needed. Iterators are not in the language spec, and wrapping conventional iteration
+in graph nodes doesn't advance the "everything is a graph" philosophy.
 
-### Week 2: Effects (Days 13-14)
+### ~~Week 2: Effects (Days 13-14)~~ — KILLED
 
-- [ ] Effect nodes in execution graph
-- [ ] Effect type hierarchy
-- [ ] Effect ordering edges
-- [ ] Integration and final tests
+Not needed. Effect tracking is not in the language spec and doesn't aid the
+graph-theoretic re-architecture.
 
 ---
 
@@ -642,12 +638,12 @@ fn do_stuff() {
 - [x] Graph instantiation creates `instantiated_from` edges
 - [x] Graph extension works via `from` edges
 - [x] Type hierarchy is a graph
-- [~] `is_subtype()` and `common_type()` — SKIPPED (not useful to users)
+- [~] `is_subtype()` and `common_type()` — SKIPPED (redundant; graph is already queryable)
 - [x] Pattern reflection via `reflect.pattern()`
 - [x] `g.match()` uses graph pattern matching
 - [x] Exceptions propagate via caller edges
-- [ ] Iterators are graph nodes with `next` edges
-- [ ] Effects are tracked as nodes
+- [~] Iterators as graph nodes — KILLED (not in language spec, doesn't advance graph philosophy)
+- [~] Effects as tracked nodes — KILLED (not in language spec, doesn't advance graph philosophy)
 - [x] All existing tests pass
 - [x] New graph-model tests pass
 

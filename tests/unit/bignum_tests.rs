@@ -689,3 +689,117 @@ fn test_high_precision_power() {
         _ => panic!("Expected BigNumber"),
     }
 }
+
+// ============================================================================
+// Test 13: Cross-Type Equality (num == bignum)
+// ============================================================================
+
+#[test]
+fn test_num_equals_bignum_same_value() {
+    let mut executor = Executor::new();
+
+    let code = r#"
+        configure { precision: :high } {
+            big = 42
+        }
+        small = 42
+        result = small == big
+    "#;
+
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+
+    match &result.kind {
+        ValueKind::Boolean(b) => assert!(*b, "42 (num) should equal 42 (bignum)"),
+        _ => panic!("Expected boolean"),
+    }
+}
+
+#[test]
+fn test_bignum_equals_num_same_value() {
+    let mut executor = Executor::new();
+
+    let code = r#"
+        configure { precision: :high } {
+            big = 42
+        }
+        small = 42
+        result = big == small
+    "#;
+
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+
+    match &result.kind {
+        ValueKind::Boolean(b) => assert!(*b, "42 (bignum) should equal 42 (num)"),
+        _ => panic!("Expected boolean"),
+    }
+}
+
+#[test]
+fn test_num_not_equals_bignum_different_value() {
+    let mut executor = Executor::new();
+
+    let code = r#"
+        configure { precision: :high } {
+            big = 99
+        }
+        small = 42
+        result = small != big
+    "#;
+
+    executor.execute_source(code).unwrap();
+    let result = executor.env().get("result").unwrap();
+
+    match &result.kind {
+        ValueKind::Boolean(b) => assert!(*b, "42 (num) should not equal 99 (bignum)"),
+        _ => panic!("Expected boolean"),
+    }
+}
+
+// ============================================================================
+// Test 14: Cross-Variant BigNum Equality (Int64 == UInt64)
+// ============================================================================
+
+#[test]
+fn test_bignum_int64_equals_uint64_same_value() {
+    // Int64(42) should equal UInt64(42)
+    let a = BigNum::Int64(42);
+    let b = BigNum::UInt64(42);
+    assert_eq!(a, b, "Int64(42) should equal UInt64(42)");
+}
+
+#[test]
+fn test_bignum_int64_not_equals_uint64_different_value() {
+    let a = BigNum::Int64(42);
+    let b = BigNum::UInt64(99);
+    assert_ne!(a, b, "Int64(42) should not equal UInt64(99)");
+}
+
+// ============================================================================
+// Test 15: to_number() handles BigNum
+// ============================================================================
+
+#[test]
+fn test_to_number_handles_bignum() {
+    use graphoid::values::Value;
+
+    let val = Value::bignum(BigNum::Int64(300));
+    assert_eq!(val.to_number(), Some(300.0));
+}
+
+#[test]
+fn test_to_number_handles_bignum_via_executor() {
+    let mut executor = Executor::new();
+
+    let code = r#"
+        configure { precision: :high } {
+            big = 500
+        }
+    "#;
+
+    executor.execute_source(code).unwrap();
+    let big = executor.env().get("big").unwrap();
+    assert!(matches!(&big.kind, ValueKind::BigNumber(_)));
+    assert_eq!(big.to_number(), Some(500.0));
+}
