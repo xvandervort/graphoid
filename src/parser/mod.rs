@@ -1643,8 +1643,9 @@ impl Parser {
                     }
                 };
 
-                // Parse value - could be a lambda
+                // Parse value - could be a lambda or a method with bare block
                 let value = self.lambda_or_expression()?;
+                let value = self.promote_bare_block(value)?;
 
                 return Ok(Stmt::Assignment {
                     target,
@@ -1659,7 +1660,28 @@ impl Parser {
 
         // Parse as expression statement
         let expr = self.expression()?;
+        let expr = self.promote_bare_block(expr)?;
         Ok(Stmt::Expression { expr, position })
+    }
+
+    /// If expr is a PropertyAccess followed by `{` (without `|` pipes), promote it
+    /// to a MethodCall with a bare block argument. This handles DSL-style method calls
+    /// like `runner.before_each { code }` at statement level, without creating
+    /// ambiguity with structural braces in control flow (`if x < obj.prop { body }`).
+    fn promote_bare_block(&mut self, expr: Expr) -> Result<Expr> {
+        if self.check(&TokenType::LeftBrace) && !self.is_trailing_block() {
+            if let Expr::PropertyAccess { object, property, position } = expr {
+                let block_lambda = self.parse_command_block()?;
+                let args = vec![Argument::Positional { expr: block_lambda, mutable: false }];
+                return Ok(Expr::MethodCall {
+                    object,
+                    method: property,
+                    args,
+                    position,
+                });
+            }
+        }
+        Ok(expr)
     }
 
     /// Try to parse a command-style function call: identifier args { block }
@@ -2659,16 +2681,6 @@ impl Parser {
                     // Otherwise, treat as property access: self.name
                     if self.is_trailing_block() {
                         let block_lambda = self.parse_trailing_block()?;
-                        let args = vec![Argument::Positional { expr: block_lambda, mutable: false }];
-                        expr = Expr::MethodCall {
-                            object: Box::new(expr),
-                            method,
-                            args,
-                            position,
-                        };
-                    } else if self.check(&TokenType::LeftBrace) {
-                        // Command-style block without other args: obj.method { block }
-                        let block_lambda = self.parse_command_block()?;
                         let args = vec![Argument::Positional { expr: block_lambda, mutable: false }];
                         expr = Expr::MethodCall {
                             object: Box::new(expr),
