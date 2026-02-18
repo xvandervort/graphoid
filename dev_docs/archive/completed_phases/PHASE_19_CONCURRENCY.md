@@ -1,5 +1,7 @@
 # Phase 19: Concurrency & Parallelism (Graph-Native)
 
+> **SUPERSEDED**: This monolithic spec was replaced in February 2026 with a sub-phase breakdown (19.1-19.6). The concurrency syntax is now defined in `dev_docs/LANGUAGE_SPECIFICATION.md` § Concurrency. See `ROADMAP_INDEX.md` for the current sub-phase structure.
+
 **Duration**: 14-18 days
 **Priority**: Critical
 **Dependencies**: Phase 15 (Namespace Graph), Phase 16 (Execution Graph)

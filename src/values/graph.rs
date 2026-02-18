@@ -3390,7 +3390,7 @@ impl Graph {
     }
 
     // =========================================================================
-    // Phase 19: Setters (Computed Property Assignment)
+    // Setters (Computed Property Assignment)
     // =========================================================================
 
     /// Get the setter method node ID for a property name

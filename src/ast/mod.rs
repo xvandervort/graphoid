@@ -35,7 +35,7 @@ pub enum Stmt {
         body: Vec<Stmt>,
         pattern_clauses: Option<Vec<PatternClause>>,  // Phase 7: Pattern matching
         is_private: bool,  // Phase 10: priv keyword support
-        is_setter: bool,  // Phase 19: True if defined with `set` keyword (computed property assignment)
+        is_setter: bool,  // True if defined with `set` keyword (computed property assignment)
         is_static: bool,  // Phase 20: True if defined with `static` keyword (class method)
         guard: Option<Box<Expr>>,  // Phase 21: Guard clause for structure-based dispatch (`when` clause)
         position: SourcePosition,

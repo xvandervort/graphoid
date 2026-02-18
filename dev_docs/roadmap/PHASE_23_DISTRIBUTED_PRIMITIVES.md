@@ -2,7 +2,7 @@
 
 **Duration**: 12-16 days
 **Priority**: High
-**Dependencies**: Phase 15 (Concurrency), Phase 20 (FFI)
+**Dependencies**: Phase 19 (Concurrency), Phase 20 (FFI)
 **Status**: Planning
 
 ---
@@ -536,7 +536,7 @@ await ref.send(:hello)  # Routes via simple_hash
 
 ## Related Documents
 
-- [PHASE_15_CONCURRENCY.md](PHASE_15_CONCURRENCY.md) - Async foundation
+- [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) - Concurrency foundation (spawn, channels, actors)
 - [PHASE_18_COMPLETE_GRAPH_MODEL.md](PHASE_18_COMPLETE_GRAPH_MODEL.md) - Universe graph structure
 - [PHASE_20_FFI.md](PHASE_20_FFI.md) - Bridge Node pattern
 - [GRAPHOID_PLATFORM.md](platform/GRAPHOID_PLATFORM.md) - Platform built on these primitives (separate project)

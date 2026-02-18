@@ -1,5 +1,7 @@
 # Phase 18.5: Platform Support Features
 
+> **SUPERSEDED**: This phase was split in February 2026. Concurrency-dependent features (timers, signals, file watching, module hot reload) moved to Phase 19 sub-phases. Non-concurrency features (runtime introspection, module listing, error.stack, __MODULE__) moved to Phase 18.7. Server capabilities remain in Phase 18.6.
+
 **Status**: Proposed
 **Priority**: **CRITICAL** (Blocks Platform Development)
 **Dependencies**: None (can start immediately)

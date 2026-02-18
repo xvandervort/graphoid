@@ -1,8 +1,8 @@
 # Graphoid Implementation Roadmap
 
-**Version**: 10.0
-**Last Updated**: February 9, 2026
-**Status**: Phases 0-17 Complete, Phase 18 In Progress (Sections 1-4 Partial)
+**Version**: 11.0
+**Last Updated**: February 18, 2026
+**Status**: Phases 0-18 Complete. Phase 18.6 next, then Phase 19 (Concurrency).
 
 ---
 
@@ -36,59 +36,41 @@ All core language features are complete and working:
 
 ## Remaining Phases (15-33)
 
-### Graph-Centric Foundation (CRITICAL - Must Complete First)
+### Graph-Centric Foundation — ✅ ALL COMPLETE
 
-The claim "everything is a graph" is currently FALSE at two levels:
-- **Namespace**: Variables stored in HashMap, not graph nodes
-- **Runtime**: Traditional tree-walking interpreter, not graph traversal
+Phases 15-18 made "everything is a graph" true at all levels: namespace, execution, modules, and the complete graph model (universe graph, templates, reflect.pattern, exception propagation). Specs archived to `dev_docs/archive/completed_phases/`.
 
-These phases fix this fundamental architectural gap.
+### Pre-Concurrency (Phases 18.6-18.7)
 
-| Phase | Name | Priority | Duration | Dependencies | Status |
-|-------|------|----------|----------|--------------|--------|
-| [15](PHASE_15_NAMESPACE_GRAPH.md) | Namespace as Graph | **BLOCKER** | 7-10 days | None | ✅ Complete |
-| [16](PHASE_16_EXECUTION_GRAPH.md) | Execution as Graph | **BLOCKER** | 14-21 days | Phase 15 | ✅ Complete |
-| [17](PHASE_17_MODULES_GRAPH.md) | Modules as Graph | **BLOCKER** | 7-10 days | Phase 15, 16 | ✅ Complete |
-| [18](PHASE_18_COMPLETE_GRAPH_MODEL.md) | Complete Graph Model | **BLOCKER** | 10-14 days | Phase 15, 16 | Sections 1-4 Partial |
-
-**Total Graph Foundation**: 38-55 days
-
-### Tech Debt: BigNum Precision Cleanup (HIGH PRIORITY — After Graph Foundation)
-
-The BigNum precision system has architectural issues that violate the unified number paradigm:
-- `PrecisionMode::Extended` exists as a broken third mode (should only be Standard and High)
-- `to_bigint()` exposes internal `BigNum::BigInt` variant to users
-- 6 arithmetic operations in Extended mode are stubbed with "not yet implemented" errors
-- `BigNum::BigInt` should remain internal-only (for overflow auto-growth), never user-visible
-
-**Plan saved at**: `/home/irv/.claude/plans/lexical-humming-rocket.md`
-
-### Platform Support (Planned After Graph Foundation)
-
-These features are required by the Graphoid Platform. They will be implemented **in sequence after completing the graph-centric foundation** (Phases 16-18).
+Features that require no concurrency and can be implemented immediately.
 
 | Phase | Name | Priority | Duration | Dependencies | Status |
 |-------|------|----------|----------|--------------|--------|
-| [18.5](PHASE_18_5_PLATFORM_SUPPORT.md) | Platform Support | **CRITICAL** | 5-7 days | None | 📋 Planned |
-| [18.6](PHASE_18_6_SERVER_CAPABILITIES.md) | Server Capabilities | **CRITICAL** | 3-5 days | Phase 18.5 | 📋 Planned |
+| [18.6](PHASE_18_6_SERVER_CAPABILITIES.md) | Server Capabilities | **CRITICAL** | 3-5 days | None | 📋 Planned |
+| [18.7](PHASE_18_7_RUNTIME_INTROSPECTION.md) | Runtime Introspection | **High** | 2-3 days | None | 📋 Planned |
+
+**Phase 18.6**: Adds `net.bind()`, `net.accept()` to enable TCP/HTTP servers. Blocking/sequential — no concurrency needed.
+
+**Phase 18.7**: Runtime introspection features that don't require concurrency: `modules.list()`, `modules.info()`, `runtime.memory()`, `runtime.version()`, `runtime.uptime()`, `error.stack()`, `__MODULE__`.
 
 ### Unlocks
 Once Phase 18.6 is complete, development can begin on **GraphWeb**, a Sinatra-like web framework.
 See: [PLAN_WEB_FRAMEWORK.md](PLAN_WEB_FRAMEWORK.md)
 
-**Features**: Timers, signal handling, module reload, file watching, stack traces, runtime introspection.
+### Concurrency (Phase 19 — Sub-Phases)
 
-**Execution Plan**: Complete graph-centric phases (16-18) first, then implement 18.5 → 18.6 in sequence.
+Built on graph-centric foundation: actors ARE nodes, channels ARE edges. Share-nothing architecture.
 
-**See**: [GRAPH_CENTRIC_ARCHITECTURE_RATIONALE.md](GRAPH_CENTRIC_ARCHITECTURE_RATIONALE.md) for detailed justification.
-
-### Concurrency & Parallelism
-
-Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
+See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 | Phase | Name | Priority | Duration | Dependencies |
 |-------|------|----------|----------|--------------|
-| [19](PHASE_19_CONCURRENCY.md) | Concurrency & Parallelism | **Critical** | 14-18 days | Phase 15, 16 |
+| 19.1 | Spawn + Channels | **Critical** | 5-7 days | Phase 15, 16 |
+| 19.2 | Timers + Signals | **Critical** | 3-5 days | Phase 19.1 |
+| 19.3 | Actors as Graph Nodes | **Critical** | 5-7 days | Phase 19.1 |
+| 19.4 | Module Hot Reload | **High** | 3-5 days | Phase 19.1 |
+| 19.5 | Select + Supervision | **High** | 5-7 days | Phase 19.3 |
+| 19.6 | File Watching + Auto-Reload | **High** | 2-3 days | Phase 19.2, 19.4 |
 
 ### Ecosystem & Interop
 
@@ -131,35 +113,37 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                          GRAPH-CENTRIC FOUNDATION (MUST DO FIRST)                    │
+│                   GRAPH-CENTRIC FOUNDATION — ✅ ALL COMPLETE                         │
 │                                                                                     │
-│   Phase 15 (Namespace) ───► Phase 16 (Execution)                                    │
+│   Phase 15 (Namespace) ✅ → Phase 16 (Execution) ✅                                 │
 │                                      │                                              │
 │                            ┌─────────┴─────────┐                                    │
-│                            │                   │                                    │
 │                            ▼                   ▼                                    │
-│                     Phase 17           Phase 18                                     │
+│                     Phase 17 ✅         Phase 18 ✅                                  │
 │                     (Modules)          (Complete Model)                             │
-│                            │                   │                                    │
-│                            └─────────┬─────────┘                                    │
-│                                      │ (enables concurrency)                        │
-│                                      ▼                                              │
-│                               Phase 19 (Concurrency)                                │
-│                                      │                                              │
-└──────────────────────────────────────┼──────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                    PLATFORM SUPPORT (PARALLEL - NO DEPENDENCIES)                     │
-│                                                                                     │
-│   Phase 18.5 (Platform Support) ───► Graphoid Platform                              │
-│   - Timers                           - Runtime                                      │
-│   - Signals                          - Loader                                       │
-│   - Module reload                    - Logger                                       │
-│   - File watching                    - Reload                                       │
-│   - Introspection                    - Monitor                                      │
-│                                                                                     │
-│   (Can start immediately, enables Platform development)                             │
 └─────────────────────────────────────────────────────────────────────────────────────┘
+                                       │
+         ┌─────────────────────────────┼─────────────────────────────────────┐
+         │              PRE-CONCURRENCY│                                      │
+         │                             │                                      │
+         │   Phase 18.6 (Server) ──────┤                                      │
+         │   Phase 18.7 (Introspect) ──┤                                      │
+         │                             │                                      │
+         └─────────────────────────────┼──────────────────────────────────────┘
+                                       │
+         ┌─────────────────────────────┼─────────────────────────────────────┐
+         │              CONCURRENCY (Phase 19 Sub-Phases)                      │
+         │                             │                                      │
+         │   19.1 (Spawn+Channels) ────┤                                      │
+         │         │                   │                                      │
+         │         ├── 19.2 (Timers+Signals)                                  │
+         │         ├── 19.3 (Actors as Graph Nodes)                           │
+         │         ├── 19.4 (Module Hot Reload)                               │
+         │         │         │                                                │
+         │         │   19.5 (Select+Supervision) ◄── 19.3                     │
+         │         │   19.6 (File Watch+Auto-Reload) ◄── 19.2, 19.4          │
+         │                             │                                      │
+         └─────────────────────────────┼──────────────────────────────────────┘
                                        │
          ┌─────────────────────────────┼─────────────────────────────────────┐
          │              ECOSYSTEM TRACK│                                      │
@@ -182,20 +166,18 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
          │   Phase 29 (Bytecode VM) ◄──┘                                      │
          │         │                                                          │
          │         ├──────────────┬─────────────────┐                         │
-         │         │              │                 │                         │
          │         ▼              ▼                 │                         │
          │   Phase 31        Phase 32              │                          │
          │   (WASM)          (Native) ◄────────────┼── Phase 20 (FFI)        │
          │         │              │                 │                         │
          │         └──────┬───────┘                 │                         │
-         │                │                         │                         │
          │                ▼                         │                         │
          │         Phase 33 (Self-Hosting)          │                         │
          │                                                                    │
          └────────────────────────────────────────────────────────────────────┘
 
          ┌────────────────────────────────────────────────────────────────────┐
-         │              INDEPENDENT (Can start after Phase 16)                 │
+         │              INDEPENDENT (Can start anytime)                        │
          │                                                                    │
          │   Phase 26 (Reflection)                                            │
          │   Phase 27 (Debugger)                                              │
@@ -208,100 +190,49 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 
 ## Recommended Implementation Order
 
-### Immediate (Two Parallel Tracks)
+### Immediate (Pre-Concurrency)
 
-**Track A: Graph-Centric Foundation (BLOCKER for concurrency)**
+1. **Phase 18.6: Server Capabilities** - `net.bind`, `net.accept`, `http.Server` (no concurrency needed)
+2. **Phase 18.7: Runtime Introspection** - `modules.list/info`, `runtime.*`, `error.stack()`, `__MODULE__`
 
-1. **Phase 15: Namespace Graph** - Variables as graph nodes, scopes as subgraphs
-2. **Phase 16: Execution Graph** - AST as graph, functions as subgraphs
-3. **Phase 17: Modules Graph** - Modules as subgraphs, imports as edges (can parallel with 18)
-4. **Phase 18: Complete Graph Model** - Classes, types, patterns, exceptions (can parallel with 17)
+### Near-Term (Concurrency)
 
-**Track B: Platform Support (CRITICAL - unblocks Platform development)**
+3. **Phase 19.1: Spawn + Channels** - Core concurrency foundation (share-nothing)
+4. **Phase 19.2: Timers + Signals** - Timer channels, signal channels
+5. **Phase 19.3: Actors as Graph Nodes** - Actors ARE nodes, graph-native messaging
+6. **Phase 19.4: Module Hot Reload** - Erlang-style per-task reload
+7. **Phase 19.5: Select + Supervision** - Channel multiplexing, restart strategies
+8. **Phase 19.6: File Watching + Auto-Reload** - `fs.watch()` triggers hot reload
 
-1. **Phase 18.5: Platform Support** - Timers, signals, module reload, file watching, introspection
+### Medium-Term (Ecosystem + Compilation)
 
-*Track B has no dependencies and can start immediately. This enables platform development to proceed while graph-centric work continues.*
+9. **Phase 20: FFI** - C interop, Rust plugins, syscalls
+10. **Phase 21: Package Manager** - Ecosystem enablement
+11. **Phase 22: Database** - PostgreSQL, SQLite, Redis
+12. **Phase 23: Distributed Primitives** - Serialization, remote refs, routing hooks
+13. **Phase 29: Bytecode VM** - 5-10x performance
 
-### Near-Term (Concurrency + Ecosystem)
+### Long-Term (Distributed + Self-Hosting)
 
-5. **Phase 19: Concurrency** - Actors as nodes, channels as edges, graph-native messaging
-6. **Phase 20: FFI** - C interop, Rust plugins, syscalls
-7. **Phase 21: Package Manager** - Ecosystem enablement
-8. **Phase 22: Database** - PostgreSQL, SQLite, Redis
-
-### Medium-Term (Distributed + Compilation)
-
-9. **Phase 23: Distributed Primitives** - Serialization, remote refs, routing hooks
-10. **Phase 29: Bytecode VM** - 5-10x performance, foundation for compilation
-11. **Phase 31: WASM Compilation** - Sandboxed execution, browser target
-12. **Phase 24: Distributed Execution** - Safe remote execution (uses WASM)
-
-### Long-Term (Self-Hosting)
-
-13. **Phase 32: Native Compilation** - Maximum performance
-14. **Phase 33: Self-Hosting** - Graphoid compiles itself
+14. **Phase 24: Distributed Execution** - Safe remote execution
 15. **Phase 25: Vector Search** - AI/ML capabilities
-16. **Phases 26-28** - Developer experience polish
-
----
-
-## Three Development Tracks
-
-### Foundation: Graph-Centric Architecture (Phases 15-18)
-**Goal**: Make "everything is a graph" TRUE at all levels
-
-```
-15 (Namespace) → 16 (Execution) → 17 (Modules) + 18 (Complete)
-                                           ↓
-                                    19 (Concurrency)
-```
-
-**This must be completed before starting concurrency or compilation tracks.**
-
-### Track 1: Ecosystem (Phases 19-25)
-**Goal**: Make Graphoid useful for real-world applications
-
-```
-19 (Concurrency) → 20 (FFI) → 21 (Package) → 22 (Database)
-       │
-       └──────────→ 23 (Distributed) → 24 (Distributed Exec) → 25 (Vector)
-```
-
-### Track 2: Compilation (Phases 29, 31-33)
-**Goal**: Self-hosting, independence from Rust
-
-```
-29 (Bytecode VM) → 31 (WASM) ──────┐
-                                   ├──→ 33 (Self-Hosting)
-                 → 32 (Native) ────┘
-```
-
-**Tracks 1 and 2 can be developed in parallel** after the foundation is complete.
+16. **Phase 31: WASM Compilation** - Sandboxed execution, browser target
+17. **Phase 32: Native Compilation** - Maximum performance
+18. **Phase 33: Self-Hosting** - Graphoid compiles itself
+19. **Phases 26-28** - Developer experience polish
 
 ---
 
 ## Timeline Estimates
 
-### Platform Support (Phase 18.5 - 18.6)
-**Estimated**: 2 weeks
-**Can Start**: Immediately (no dependencies)
+### Pre-Concurrency (Phases 18.6-18.7)
+**Estimated**: 1 week
+**Can Start**: Immediately
 
 | Milestone | Features | Duration |
 |-----------|----------|----------|
-| Timers & Signals | `timer.after`, `timer.every`, `signal.on` | 2-3 days |
-| Module Management | `modules.reload`, `modules.unload` | 1-2 days |
 | Server Caps | `net.bind`, `net.accept`, `http.Server` | 3-5 days |
-| Introspection | `error.stack()`, `__MODULE__`, `runtime.memory()` | 1-2 days |
-
-### Foundation: Graph-Centric (Phases 15-18)
-**Estimated**: 5-8 weeks
-
-| Milestone | Phases | Duration |
-|-----------|--------|----------|
-| Namespace is Graph | 15 | 1-2 weeks |
-| Execution is Graph | 16 | 2-3 weeks |
-| Complete Graph Model | 17, 18 | 2-3 weeks |
+| Introspection | `modules.list/info`, `runtime.*`, `error.stack()`, `__MODULE__` | 2-3 days |
 
 ### Track 1: Ecosystem (Phases 19-25)
 **Estimated**: 14-18 weeks
@@ -336,7 +267,7 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 2. **Actors ARE Nodes** - Concurrency built on graph primitives, not bolted on
 3. **Channels ARE Edges** - Message passing is graph traversal
 4. **Functions ARE Subgraphs** - Composition is graph connection
-5. **M:N Green Threads** - Lightweight tasks scheduled across CPU cores
+5. **Share-Nothing Tasks** - Isolated namespaces, communicate via channels
 6. **FFI is Scaffolding** - Every native dependency has a pure Graphoid path
 7. **WASM for Safety** - Sandboxed execution for untrusted code
 8. **Self-Hosting is the Goal** - Graphoid must eventually compile itself
@@ -366,22 +297,16 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 
 ## File Index
 
-### Design Rationale
-- [GRAPH_CENTRIC_ARCHITECTURE_RATIONALE.md](GRAPH_CENTRIC_ARCHITECTURE_RATIONALE.md) - Why graph-centric execution matters
-- [GRAPH_RUNTIME_TEST_SPECIFICATION.md](GRAPH_RUNTIME_TEST_SPECIFICATION.md) - Tests for runtime experiments
-- [CONCURRENCY_MODEL_RATIONALE.md](CONCURRENCY_MODEL_RATIONALE.md) - Why actors-as-nodes
+### Archived (Completed)
+- Phases 15-18, design rationale docs → `dev_docs/archive/completed_phases/`
 
-### Graph-Centric Foundation (BLOCKER)
-- [PHASE_15_NAMESPACE_GRAPH.md](PHASE_15_NAMESPACE_GRAPH.md) - Variables as graph nodes
-- [PHASE_16_EXECUTION_GRAPH.md](PHASE_16_EXECUTION_GRAPH.md) - Execution via graph traversal
-- [PHASE_17_MODULES_GRAPH.md](PHASE_17_MODULES_GRAPH.md) - Modules as subgraphs
-- [PHASE_18_COMPLETE_GRAPH_MODEL.md](PHASE_18_COMPLETE_GRAPH_MODEL.md) - Classes, types, patterns, etc.
+### Pre-Concurrency
+- [PHASE_18_6_SERVER_CAPABILITIES.md](PHASE_18_6_SERVER_CAPABILITIES.md) - TCP/HTTP server (net.bind, net.accept)
+- [PHASE_18_7_RUNTIME_INTROSPECTION.md](PHASE_18_7_RUNTIME_INTROSPECTION.md) - modules.list/info, runtime.*, error.stack(), __MODULE__
 
-### Platform Support (CRITICAL - Can Start Immediately)
-- [PHASE_18_5_PLATFORM_SUPPORT.md](PHASE_18_5_PLATFORM_SUPPORT.md) - Timers, signals, module reload, file watching, introspection
-
-### Concurrency (Built on Graph Foundation)
-- [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) - Actors as nodes, channels as edges
+### Concurrency (Phase 19 Sub-Phases)
+- Concurrency syntax defined in `dev_docs/LANGUAGE_SPECIFICATION.md` § Concurrency
+- Sub-phase breakdown in this file (see Concurrency section above)
 
 ### Ecosystem (High Priority)
 - [PHASE_20_FFI.md](PHASE_20_FFI.md) - C FFI, Rust plugins, syscalls
@@ -411,6 +336,8 @@ Built on graph-centric foundation: actors ARE nodes, channels ARE edges.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 11.0 | 2026-02-18 | Phases 15-18 complete. Phase 18.5 split: concurrency parts into Phase 19 sub-phases, non-concurrency into 18.7. Phase 19 broken into 6 sub-phases (19.1-19.6). Concurrency syntax added to language spec. BigNum cleanup complete. |
+| 10.0 | 2026-02-09 | Phases 15-17 complete. Phase 18 in progress. |
 | 9.2 | 2026-01-28 | Phase 15 (Namespace as Graph) complete. Phases 18.5-18.6 planned for after graph-centric foundation. Phase 16 next. |
 | 9.1 | 2026-01-28 | Added Phase 18.6: Server Capabilities (bind/accept/listen) to enable interactive web simulations immediately, replacing the wait for WASM. |
 | 9.0 | 2026-01-23 | Added Phase 18.5: Platform Support (timers, signals, module reload, file watching, introspection). This phase has no dependencies and unblocks Graphoid Platform development. |

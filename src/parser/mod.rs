@@ -415,7 +415,7 @@ impl Parser {
             });
         }
 
-        // Phase 19: Setters must have exactly one parameter (the value being assigned)
+        // Setters must have exactly one parameter (the value being assigned)
         if is_setter && params.len() != 1 {
             return Err(GraphoidError::SyntaxError {
                 message: "Setters must have exactly one parameter (the value being assigned).".to_string(),
@@ -496,7 +496,7 @@ impl Parser {
             body,
             pattern_clauses,
             is_private,  // Phase 10: priv keyword support
-            is_setter,   // Phase 19: computed property assignment
+            is_setter,   // computed property assignment
             is_static,   // Phase 20: class methods
             guard,       // Phase 21: structure-based dispatch
             position,

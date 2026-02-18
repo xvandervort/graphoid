@@ -2,7 +2,7 @@
 
 **Status**: Design
 **Priority**: 1 (Foundational)
-**Dependencies**: Graphoid interpreter, Phase 19 Concurrency (partial)
+**Dependencies**: Graphoid interpreter, Phase 19 Concurrency (19.1: Spawn + Channels minimum)
 
 ---
 

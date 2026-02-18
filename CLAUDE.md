@@ -194,13 +194,13 @@ This is not aspirational - it is the architectural mandate. Every design decisio
 │   ├── ARCHITECTURE_DESIGN.md              # Internal architecture decisions
 │   ├── roadmap/                            # 📍 Implementation roadmap (modular)
 │   │   ├── ROADMAP_INDEX.md                # Overview and phase summary
-│   │   ├── PHASE_15_CONCURRENCY.md         # Async/await, channels
-│   │   ├── PHASE_16_FFI.md                 # Foreign Function Interface
-│   │   ├── PHASE_17_DATABASE.md            # Database connectivity
-│   │   ├── PHASE_18_DISTRIBUTED_PRIMITIVES.md  # Remote refs, partitioning
-│   │   ├── PHASE_19_DISTRIBUTED_EXECUTION.md   # Distributed computing
-│   │   ├── PHASE_20_METAPROGRAMMING.md     # Macros, code generation
-│   │   └── PHASE_21-23_*.md                # Tooling (debugger, pkg mgr)
+│   │   ├── PHASE_15-18_*.md                # Graph-centric foundation (COMPLETE)
+│   │   ├── PHASE_18_6_SERVER_CAPABILITIES.md   # TCP/HTTP server
+│   │   ├── PHASE_18_7_RUNTIME_INTROSPECTION.md # Runtime info, stack traces
+│   │   ├── PHASE_19_CONCURRENCY.md         # Spawn, channels, actors (sub-phases 19.1-19.6)
+│   │   ├── PHASE_20_FFI.md                 # Foreign Function Interface
+│   │   ├── PHASE_21_PACKAGE_MANAGER.md     # Package management
+│   │   └── PHASE_22-32_*.md                # Database, distributed, compilation
 │   ├── PRODUCTION_TOOLING_SPECIFICATION.md # Testing, debugging, packaging
 │   └── archive/                            # Archived documentation
 └── docs/                        # 📖 USER DOCUMENTATION (future)
@@ -533,7 +533,7 @@ Graphoid includes **professional-grade tooling** from day one:
 - Graph visualization
 - VSCode integration via DAP
 
-### 3. Package Manager (Phase 15)
+### 3. Package Manager (Phase 21)
 - Package manifest: `graphoid.toml`
 - Lock files: `graphoid.lock`
 - SemVer version constraints
@@ -547,30 +547,31 @@ Graphoid includes **professional-grade tooling** from day one:
 
 See `dev_docs/roadmap/ROADMAP_INDEX.md` for the modular roadmap. Each phase has its own detailed file.
 
-### Completed Phases (0-14) ✅
+### Completed Phases (0-18) ✅
 
 | Phase | Focus | Status |
 |-------|-------|--------|
 | 0-6 | Core Language (Lexer, Parser, Values, Collections, Graphs) | ✅ Complete |
 | 7-10 | Advanced Features (Pattern Matching, Behaviors, Modules) | ✅ Complete |
 | 11-13 | Stdlib (Pure Graphoid + Native + Bitwise) | ✅ Complete |
-| 14 | gspec Testing Framework | ✅ Complete (621+ tests) |
+| 14 | gspec Testing Framework | ✅ Complete (709+ tests) |
+| 15-18 | Graph-Centric Foundation (Namespace, Execution, Modules, Complete Model) | ✅ Complete |
 
-### Remaining Phases (15-23)
+### Remaining Phases
 
 | Phase | Focus | Priority | Status |
 |-------|-------|----------|--------|
-| 15 | Concurrency & Async | **Critical** | 🔲 Ready |
-| 16 | FFI (Foreign Function Interface) | **Critical** | 🔲 Ready |
-| 17 | Package Manager | **High** | 🔲 Ready |
-| 18 | Database Connectivity | **High** | 🔲 Blocked on 16, 17 |
-| 19 | Distributed Graph Primitives | **High** | 🔲 Blocked on 15 |
-| 20 | Distributed Execution | **High** | 🔲 Blocked on 19 |
-| 21 | Runtime Reflection | Low | 🔲 Ready |
-| 22 | Debugger | Low | 🔲 Ready |
-| 23 | Stdlib Translation | Low | 🔲 Ready |
+| 18.6 | Server Capabilities (`net.bind`, `net.accept`) | **Critical** | 🔲 Next |
+| 18.7 | Runtime Introspection (`modules.list`, `runtime.*`, `error.stack`) | **High** | 🔲 Ready |
+| 19.1-19.6 | Concurrency (spawn, channels, actors, timers, supervision) | **Critical** | 🔲 Ready |
+| 20 | FFI (Foreign Function Interface) | **Critical** | 🔲 Ready |
+| 21 | Package Manager | **High** | 🔲 Ready |
+| 22 | Database Connectivity | **High** | 🔲 Blocked on 20, 21 |
+| 23-25 | Distributed Primitives, Execution, Vector Search | **High** | 🔲 Blocked on 19 |
+| 26-28 | Reflection, Debugger, Stdlib Translation | Medium | 🔲 Ready |
+| 29-32 | Compilation Strategy, WASM, Native, Self-Hosting | **High** | 🔲 Blocked on 15-18 |
 
-**Critical Path**: Phases 15-20 enable distributed graph computation (the core differentiator)
+**Critical Path**: Phases 19 → 20 → 23 → 24 enable distributed graph computation
 
 ---
 
@@ -595,11 +596,13 @@ See `dev_docs/roadmap/ROADMAP_INDEX.md` for the modular roadmap. Each phase has 
 
 3. **`dev_docs/roadmap/`** (Modular roadmap)
    - `ROADMAP_INDEX.md` - Overview and phase summary
-   - Individual phase files (PHASE_15_*.md through PHASE_23_*.md)
-   - Phases 15-16: Concurrency, FFI (Critical)
-   - Phases 17-18: Package Manager, Database (High)
-   - Phases 19-20: Distributed Computing (High)
-   - Phases 21-23: Reflection, Debugger, Stdlib Translation (Low)
+   - Phases 15-18: Graph-centric foundation (COMPLETE)
+   - Phase 18.6: Server capabilities, Phase 18.7: Runtime introspection
+   - Phase 19: Concurrency (sub-phases 19.1-19.6: spawn, channels, actors, timers, signals, supervision)
+   - Phase 20: FFI, Phase 21: Package Manager, Phase 22: Database
+   - Phases 23-25: Distributed computing, vector search
+   - Phases 26-28: Reflection, debugger, stdlib translation
+   - Phases 29-32: Compilation and self-hosting
 
 4. **`dev_docs/ARCHITECTURE_DESIGN.md`** (detailed architecture)
    - Two-tier value system (Simple vs Graph-backed)
@@ -626,13 +629,15 @@ See `dev_docs/roadmap/ROADMAP_INDEX.md` for the modular roadmap. Each phase has 
 
 ### Quick Reference
 
-- Phases 0-14: ✅ Complete (core language + testing framework)
-- Phase 15+: 🔲 Concurrency, FFI, Distributed (see `dev_docs/roadmap/`)
+- Phases 0-18: ✅ Complete (core language + testing + graph-centric foundation)
+- Phase 18.6: 🔲 Server Capabilities (next)
+- Phase 18.7: 🔲 Runtime Introspection
+- Phase 19: 🔲 Concurrency (6 sub-phases: spawn, channels, actors, timers, signals, supervision)
 - **TLS 1.3: ✅ Working** (pure Graphoid!)
 - **HTTPS: ✅ Working** via `http.get()`
-- **gspec: ✅ Working** (621+ tests)
-- Total Rust tests: **1,218+ passing**
-- Total gspec tests: **621+ passing**
+- **gspec: ✅ Working** (709+ tests)
+- Total Rust tests: **1,345+ passing**
+- Total gspec tests: **709+ passing**
 - Samples: **30/30 working**
 - Install: `make install`
 - Run: `gr file.gr`
@@ -882,33 +887,34 @@ gr samples/01-basics/hello_world.gr
 
 **START HERE**: Read `START_HERE_NEXT_SESSION.md` for detailed guide
 
-**Current Status (January 2026)**:
-- ✅ **Phases 0-14 Complete** - Core language fully functional
-- ✅ **gspec Testing Framework** - 621+ tests, pure Graphoid spec runner
+**Current Status (February 2026)**:
+- ✅ **Phases 0-18 Complete** - Core language + graph-centric foundation
+- ✅ **gspec Testing Framework** - 709+ tests, pure Graphoid spec runner
 - ✅ **HTTPS/TLS Working** - Pure Graphoid implementation
+- ✅ **1,345+ Rust tests, 709+ gspec tests** - All passing
 
-**🚀 Recommended Next Steps (Critical Path to Distributed Graphs):**
+**🚀 Recommended Next Steps:**
 
-1. **Phase 15: Concurrency & Async**
-   - async/await syntax, channels, actors
-   - Prerequisite for distribution
-   - See: `dev_docs/roadmap/PHASE_15_CONCURRENCY.md`
+1. **Phase 18.6: Server Capabilities**
+   - `net.bind()`, `net.accept()`, `http.Server`
+   - No concurrency needed — blocking sequential server
+   - See: `dev_docs/roadmap/PHASE_18_6_SERVER_CAPABILITIES.md`
 
-2. **Phase 16: FFI (Foreign Function Interface)**
-   - Call C/Rust libraries from Graphoid
-   - See: `dev_docs/roadmap/PHASE_16_FFI.md`
+2. **Phase 18.7: Runtime Introspection**
+   - `modules.list/info`, `runtime.*`, `error.stack()`, `__MODULE__`
+   - See: `dev_docs/roadmap/PHASE_18_7_RUNTIME_INTROSPECTION.md`
 
-3. **Phase 17: Package Manager**
-   - Ecosystem enablement, third-party drivers
-   - See: `dev_docs/roadmap/PHASE_17_PACKAGE_MANAGER.md`
+3. **Phase 19: Concurrency (6 sub-phases)**
+   - 19.1: Spawn + Channels (share-nothing foundation)
+   - 19.2: Timers + Signals (channel-based)
+   - 19.3: Actors as Graph Nodes (graph-native messaging)
+   - 19.4: Module Hot Reload (Erlang-style, per-task)
+   - 19.5: Select + Supervision (declarative)
+   - 19.6: File Watching + Auto-Reload
+   - See: `dev_docs/roadmap/PHASE_19_CONCURRENCY.md` and `ROADMAP_INDEX.md`
 
-4. **Phase 18: Database Connectivity**
-   - PostgreSQL, SQLite, Redis + third-party
-   - See: `dev_docs/roadmap/PHASE_18_DATABASE.md`
-
-5. **Phases 19-20: Distributed Graphs**
-   - Remote references, partitioning, distributed execution
-   - See: `dev_docs/roadmap/PHASE_19_*.md` and `PHASE_20_*.md`
+4. **Phase 20: FFI** - C interop, Rust plugins
+5. **Phase 21: Package Manager** - Ecosystem enablement
 
 ---
 
