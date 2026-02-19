@@ -746,6 +746,7 @@ gr samples/02-intermediate/behaviors.gr
 gr samples/04-modules/app_main.gr
 gr samples/01-basics/functions.gr
 gr samples/01-basics/graphs.gr
+gr samples/06-projects/web_server/simple.gr   # Web server!
 ```
 
 See `samples/README.md` for detailed descriptions.

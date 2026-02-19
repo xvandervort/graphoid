@@ -1,0 +1,159 @@
+# http_server_spec.gr - Tests for HTTP server functions (Phase 18.6)
+#
+# Run with: gr spec tests/gspec/http_server_spec.gr
+
+import "http"
+
+describe "HTTP Server" {
+
+    describe "status_text" {
+        it "returns OK for 200" {
+            expect(http.status_text(200)).to_equal("OK")
+        }
+
+        it "returns Not Found for 404" {
+            expect(http.status_text(404)).to_equal("Not Found")
+        }
+
+        it "returns Internal Server Error for 500" {
+            expect(http.status_text(500)).to_equal("Internal Server Error")
+        }
+
+        it "returns Created for 201" {
+            expect(http.status_text(201)).to_equal("Created")
+        }
+
+        it "returns Bad Request for 400" {
+            expect(http.status_text(400)).to_equal("Bad Request")
+        }
+
+        it "returns Unknown for unrecognized codes" {
+            expect(http.status_text(999)).to_equal("Unknown")
+        }
+    }
+
+    describe "content_type_for" {
+        it "detects HTML files" {
+            expect(http.content_type_for("index.html")).to_equal("text/html")
+        }
+
+        it "detects JSON files" {
+            expect(http.content_type_for("data.json")).to_equal("application/json")
+        }
+
+        it "detects CSS files" {
+            expect(http.content_type_for("style.css")).to_equal("text/css")
+        }
+
+        it "detects JS files" {
+            expect(http.content_type_for("app.js")).to_equal("application/javascript")
+        }
+
+        it "detects plain text files" {
+            expect(http.content_type_for("readme.txt")).to_equal("text/plain")
+        }
+
+        it "detects PNG images" {
+            expect(http.content_type_for("logo.png")).to_equal("image/png")
+        }
+
+        it "detects SVG files" {
+            expect(http.content_type_for("icon.svg")).to_equal("image/svg+xml")
+        }
+
+        it "defaults to octet-stream for unknown extensions" {
+            expect(http.content_type_for("file.xyz")).to_equal("application/octet-stream")
+        }
+
+        it "defaults to octet-stream for no extension" {
+            expect(http.content_type_for("Makefile")).to_equal("application/octet-stream")
+        }
+    }
+
+    describe "response" {
+        it "builds a 200 OK response" {
+            resp = http.response(200, "text/html", "<h1>Hi</h1>")
+            expect(resp.contains("HTTP/1.1 200 OK")).to_equal(true)
+        }
+
+        it "includes Content-Type header" {
+            resp = http.response(200, "text/html", "<h1>Hi</h1>")
+            expect(resp.contains("Content-Type: text/html")).to_equal(true)
+        }
+
+        it "includes Content-Length header" {
+            resp = http.response(200, "text/plain", "hello")
+            expect(resp.contains("Content-Length: 5")).to_equal(true)
+        }
+
+        it "includes Connection close header" {
+            resp = http.response(200, "text/plain", "test")
+            expect(resp.contains("Connection: close")).to_equal(true)
+        }
+
+        it "includes the body after headers" {
+            resp = http.response(200, "text/plain", "hello world")
+            expect(resp.contains("hello world")).to_equal(true)
+        }
+
+        it "builds a 404 response" {
+            resp = http.response(404, "text/plain", "Not Found")
+            expect(resp.contains("404 Not Found")).to_equal(true)
+        }
+    }
+
+    describe "parse_request" {
+        it "parses a simple GET request" {
+            raw = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"
+            req = http.parse_request(raw)
+            expect(req["method"]).to_equal("GET")
+            expect(req["path"]).to_equal("/")
+            expect(req["version"]).to_equal("HTTP/1.1")
+        }
+
+        it "parses request headers" {
+            raw = "GET /api HTTP/1.1\r\nHost: example.com\r\nAccept: application/json\r\n\r\n"
+            req = http.parse_request(raw)
+            expect(req["headers"]["host"]).to_equal("example.com")
+            expect(req["headers"]["accept"]).to_equal("application/json")
+        }
+
+        it "parses POST with body" {
+            raw = "POST /data HTTP/1.1\r\nHost: localhost\r\nContent-Length: 13\r\n\r\nHello, World!"
+            req = http.parse_request(raw)
+            expect(req["method"]).to_equal("POST")
+            expect(req["body"]).to_equal("Hello, World!")
+        }
+
+        it "parses path with query string" {
+            raw = "GET /search?q=graphoid HTTP/1.1\r\nHost: localhost\r\n\r\n"
+            req = http.parse_request(raw)
+            expect(req["path"]).to_equal("/search?q=graphoid")
+        }
+
+        it "lowercases header names" {
+            raw = "GET / HTTP/1.1\r\nContent-Type: text/html\r\n\r\n"
+            req = http.parse_request(raw)
+            expect(req["headers"]["content-type"]).to_equal("text/html")
+        }
+
+        it "trims header values" {
+            raw = "GET / HTTP/1.1\r\nHost:  localhost  \r\n\r\n"
+            req = http.parse_request(raw)
+            expect(req["headers"]["host"]).to_equal("localhost")
+        }
+    }
+
+    describe "json_response" {
+        it "sets correct content type" {
+            resp = http.json_response({"key": "value"})
+            expect(resp.contains("application/json")).to_equal(true)
+        }
+
+        it "includes JSON body" {
+            resp = http.json_response({"status": "ok"})
+            expect(resp.contains("status")).to_equal(true)
+            expect(resp.contains("ok")).to_equal(true)
+        }
+    }
+}

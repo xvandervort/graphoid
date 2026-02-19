@@ -54,4 +54,5 @@ mod unit {
     pub mod universe_graph_tests;
     pub mod reflect_pattern_tests;
     pub mod exception_propagation_tests;
+    pub mod net_server_tests;
 }

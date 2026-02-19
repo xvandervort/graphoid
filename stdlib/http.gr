@@ -1,16 +1,28 @@
-# HTTP Module - HTTP/HTTPS client implementation
+# HTTP Module - HTTP/HTTPS client and server implementation
 # Built on net module for TCP sockets and tls module for HTTPS
 #
-# Functions:
+# Client Functions:
 # - get(url) -> response - Perform HTTP/HTTPS GET request
 # - post(url, body, content_type) -> response - Perform HTTP/HTTPS POST request
 # - parse_url(url) -> {host, port, path, is_https} - Parse URL into components
 # - parse_response(response_text) -> {status, headers, body} - Parse HTTP response
 #
+# Server Functions:
+# - create_server(host, port) -> server map
+# - add_route(server, method, path, handler) -> updated server map
+# - serve(server) - Start listening and handling requests
+# - parse_request(raw) -> {method, path, version, headers, body}
+# - response(status, content_type, body) -> HTTP response string
+# - json_response(data) -> JSON response string
+# - file_response(file_path) -> file content response string
+# - status_text(code) -> reason phrase
+# - content_type_for(path) -> MIME type
+#
 # HTTPS is fully supported via the tls module (TLS 1.3 in pure Graphoid)
 
 import "net"
 import "tls"
+import "json"
 
 # Parse URL into components
 # Returns: {host, port, path, is_https}
@@ -465,4 +477,220 @@ fn post(url, body, content_type) {
 
     # Parse and return response
     return parse_response(response)
+}
+
+# ============================================
+# Server-side functions (Phase 18.6)
+# ============================================
+
+# Map HTTP status codes to reason phrases
+fn status_text(code) {
+    if code == 200 { return "OK" }
+    if code == 201 { return "Created" }
+    if code == 204 { return "No Content" }
+    if code == 301 { return "Moved Permanently" }
+    if code == 302 { return "Found" }
+    if code == 304 { return "Not Modified" }
+    if code == 400 { return "Bad Request" }
+    if code == 401 { return "Unauthorized" }
+    if code == 403 { return "Forbidden" }
+    if code == 404 { return "Not Found" }
+    if code == 405 { return "Method Not Allowed" }
+    if code == 500 { return "Internal Server Error" }
+    if code == 502 { return "Bad Gateway" }
+    if code == 503 { return "Service Unavailable" }
+    return "Unknown"
+}
+
+# Detect content type from file extension
+fn content_type_for(file_path) {
+    # Find the last dot
+    dot_pos = 0 - 1
+    i = 0
+    while i < file_path.size() {
+        if file_path[i] == "." {
+            dot_pos = i
+        }
+        i = i + 1
+    }
+
+    if dot_pos < 0 {
+        return "application/octet-stream"
+    }
+
+    ext = file_path.substring(dot_pos + 1, file_path.size()).lower()
+
+    if ext == "html" { return "text/html" }
+    if ext == "htm" { return "text/html" }
+    if ext == "css" { return "text/css" }
+    if ext == "js" { return "application/javascript" }
+    if ext == "json" { return "application/json" }
+    if ext == "txt" { return "text/plain" }
+    if ext == "png" { return "image/png" }
+    if ext == "jpg" { return "image/jpeg" }
+    if ext == "jpeg" { return "image/jpeg" }
+    if ext == "gif" { return "image/gif" }
+    if ext == "svg" { return "image/svg+xml" }
+    if ext == "ico" { return "image/x-icon" }
+    if ext == "xml" { return "application/xml" }
+    if ext == "pdf" { return "application/pdf" }
+
+    return "application/octet-stream"
+}
+
+# Build an HTTP response string
+fn response(status_code, content_type, body) {
+    reason = status_text(status_code)
+    resp = "HTTP/1.1 " + status_code.to_string() + " " + reason + "\r\n"
+    resp = resp + "Content-Type: " + content_type + "\r\n"
+    resp = resp + "Content-Length: " + body.size().to_string() + "\r\n"
+    resp = resp + "Connection: close\r\n"
+    resp = resp + "Server: Graphoid/1.0\r\n"
+    resp = resp + "\r\n"
+    resp = resp + body
+    return resp
+}
+
+# Build a JSON response
+fn json_response(data) {
+    body = json.to_string(data)
+    return response(200, "application/json", body)
+}
+
+# Parse an HTTP request into {method, path, version, headers, body}
+fn parse_request(raw_text) {
+    # Split by \r\n to get lines
+    lines = raw_text.split("\r\n")
+
+    if lines.size() == 0 {
+        return {"method": "", "path": "", "version": "", "headers": {}, "body": ""}
+    }
+
+    # Parse request line: METHOD PATH VERSION
+    request_line = lines[0]
+    parts = request_line.split(" ")
+
+    method = ""
+    path = ""
+    version = ""
+
+    if parts.size() >= 1 { method = parts[0] }
+    if parts.size() >= 2 { path = parts[1] }
+    if parts.size() >= 3 { version = parts[2] }
+
+    # Parse headers (until empty line)
+    headers = {}
+    body_start = 0 - 1
+    i = 1
+    while i < lines.size() {
+        line = lines[i]
+        if line == "" {
+            body_start = i + 1
+            i = lines.size()  # break
+        } else {
+            # Find colon separator
+            colon_pos = line.index_of(":")
+            if colon_pos > 0 {
+                header_name = line.substring(0, colon_pos).lower().trim()
+                header_value = line.substring(colon_pos + 1, line.size()).trim()
+                headers[header_name] = header_value
+            }
+        }
+        i = i + 1
+    }
+
+    # Extract body
+    body = ""
+    if body_start > 0 {
+        i = body_start
+        while i < lines.size() {
+            if i > body_start {
+                body = body + "\r\n"
+            }
+            body = body + lines[i]
+            i = i + 1
+        }
+    }
+
+    return {
+        "method": method,
+        "path": path,
+        "version": version,
+        "headers": headers,
+        "body": body
+    }
+}
+
+# Serve a static file as HTTP response
+fn file_response(file_path) {
+    import "fs"
+    import "io"
+
+    if fs.exists(file_path) == false {
+        return response(404, "text/plain", "File not found: " + file_path)
+    }
+
+    content = io.read_file(file_path)
+    ct = content_type_for(file_path)
+    return response(200, ct, content)
+}
+
+# Create a simple HTTP server configuration
+# Routes are stored flat on the server map as "route:METHOD /path" keys.
+# Usage:
+#   server = http.create_server("127.0.0.1", 8080)
+#   http.add_route(server, "GET", "/", handler_fn)
+#   http.serve(server)
+fn create_server(host, port) {
+    return {
+        "host": host,
+        "port": port
+    }
+}
+
+fn add_route(server, method, path, handler) {
+    route_key = "route:" + method + " " + path
+    server[route_key] = handler
+    return server
+}
+
+fn serve(server) {
+    host = server["host"]
+    port = server["port"]
+
+    listener = net.bind(host, port)
+    actual_port = net.listener_port(listener)
+    print("Server listening on http://" + host + ":" + actual_port.to_string())
+
+    while true {
+        try {
+            socket = net.accept(listener)
+
+            # Read the request
+            raw = net.recv(socket, 8192)
+
+            if raw.size() > 0 {
+                req = parse_request(raw)
+
+                # Look up route handler
+                route_key = "route:" + req["method"] + " " + req["path"]
+
+                resp = ""
+                if server.has_key(route_key) {
+                    handler = server[route_key]
+                    resp = handler(req)
+                } else {
+                    resp = response(404, "text/plain", "Not Found: " + req["path"])
+                }
+
+                net.send(socket, resp)
+            }
+
+            net.close(socket)
+        } catch as e {
+            print("Server error: " + e.to_string())
+        }
+    }
+
+    net.close_listener(listener)
 }
