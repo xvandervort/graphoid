@@ -222,43 +222,52 @@ print(info.modified)
 
 ## Network Modules
 
-### net - Networking
+### net - Networking (TCP)
 
 ```graphoid
 import "net"
 
-# HTTP GET request
-response = net.get("https://api.example.com/data")
-print(response.body)
-print(response.status)
+# TCP client
+socket = net.connect("example.com", 80)
+net.send(socket, "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+response = net.recv(socket, 4096)
+net.close(socket)
 
-# HTTP POST request
-data = {"name": "Alice", "email": "alice@example.com"}
-response = net.post("https://api.example.com/users", data)
-
-# Download file
-net.download("https://example.com/file.zip", "local.zip")
+# TCP server
+listener = net.bind("127.0.0.1", 8080)
+socket = net.accept(listener)       # Blocks until connection
+data = net.recv(socket, 4096)
+net.send(socket, "Hello!\n")
+net.close(socket)
+net.close_listener(listener)
 ```
 
-### http - HTTP Server
+### http - HTTP Client and Server
 
 ```graphoid
 import "http"
 
-# Create server
-server = http.create_server()
+# --- Client ---
+response = http.get("https://api.example.com/data")
+print(response["status"])
+print(response["body"])
 
-# Define route
-server.route("GET", "/", fn(request) {
-    return {
-        "status": 200,
-        "body": "Hello, World!"
-    }
-})
+# --- Server ---
+fn handle_home(req) {
+    return http.response(200, "text/html", "<h1>Hello!</h1>")
+}
 
-# Start server
-server.listen(8080)
+fn handle_api(req) {
+    return http.json_response({"status": "ok"})
+}
+
+server = http.create_server("127.0.0.1", 8080)
+server = http.add_route(server, "GET", "/", handle_home)
+server = http.add_route(server, "GET", "/api", handle_api)
+http.serve(server)
 ```
+
+See `docs/api-reference/stdlib/http.md` for complete API reference.
 
 ## System Modules
 
@@ -424,16 +433,35 @@ if fs.exists("config.json") {
 ### HTTP API Call
 
 ```graphoid
-import "net"
+import "http"
 import "json"
 
-response = net.get("https://api.github.com/users/octocat")
+response = http.get("https://api.github.com/users/octocat")
 
-if response.status == 200 {
-    user = json.parse(response.body)
+if response["status"] == 200 {
+    user = json.parse(response["body"])
     print("Name: " + user["name"])
     print("Repos: " + user["public_repos"].to_string())
 }
+```
+
+### Web Server
+
+```graphoid
+import "http"
+
+fn handle_home(req) {
+    return http.response(200, "text/html", "<h1>Hello!</h1>")
+}
+
+fn handle_api(req) {
+    return http.json_response({"status": "ok"})
+}
+
+server = http.create_server("127.0.0.1", 8080)
+server = http.add_route(server, "GET", "/", handle_home)
+server = http.add_route(server, "GET", "/api", handle_api)
+http.serve(server)
 ```
 
 ### File Processing
@@ -516,7 +544,7 @@ import "optparse"
 
 1. **File Statistics**: Read a text file and compute word frequency using `io`, `string`, and a hash
 
-2. **API Client**: Create a simple REST API client using `net` and `json`
+2. **API Client**: Create a simple REST API client using `http` and `json`
 
 3. **CSV Processor**: Read a CSV file, compute statistics on numeric columns using `statistics`
 
@@ -525,6 +553,8 @@ import "optparse"
 5. **Log Analyzer**: Parse log files using `regex` and compute statistics
 
 6. **Config Manager**: Create a config system that reads JSON/CSV with defaults
+
+7. **Web Server**: Build a web server with HTML and JSON endpoints using `http`
 
 **Solutions** are available in `examples/09-standard-library/exercises.gr`
 

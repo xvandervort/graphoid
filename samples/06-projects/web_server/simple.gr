@@ -1,0 +1,51 @@
+# Simple Web Server Example (Phase 18.6)
+#
+# Demonstrates Graphoid's HTTP server capabilities.
+# The server is built entirely in pure Graphoid on top of
+# minimal native TCP primitives (net.bind, net.accept).
+#
+# Run:   gr samples/06-projects/web_server/simple.gr
+# Test:  curl http://localhost:8080/
+#        curl http://localhost:8080/api/status
+#        curl http://localhost:8080/about
+# Stop:  Ctrl+C
+
+import "http"
+
+# Route handlers
+fn handle_home(req) {
+    html = "<!DOCTYPE html>\r\n<html>\r\n<head><title>Graphoid Server</title></head>\r\n<body>"
+    html = html + "<h1>Graphoid Web Server</h1>"
+    html = html + "<p>Everything is a graph!</p>"
+    html = html + "<ul>"
+    html = html + "<li><a href='/about'>About</a></li>"
+    html = html + "<li><a href='/api/status'>API Status (JSON)</a></li>"
+    html = html + "</ul>"
+    html = html + "</body>\r\n</html>"
+    return http.response(200, "text/html", html)
+}
+
+fn handle_status(req) {
+    data = {
+        "status": "running",
+        "language": "Graphoid",
+        "phase": "18.6",
+        "message": "Everything is a graph!"
+    }
+    return http.json_response(data)
+}
+
+fn handle_about(req) {
+    return http.response(200, "text/plain", "Graphoid - A graph-theoretic programming language where everything is a graph.")
+}
+
+# Create server and register routes (maps are value types, so reassign)
+server = http.create_server("127.0.0.1", 8080)
+server = http.add_route(server, "GET", "/", handle_home)
+server = http.add_route(server, "GET", "/api/status", handle_status)
+server = http.add_route(server, "GET", "/about", handle_about)
+
+print("Starting Graphoid web server...")
+print("Visit http://localhost:8080/ in your browser")
+print("Press Ctrl+C to stop")
+http.serve(server)

@@ -24,7 +24,7 @@ samples/
 ├── 03-advanced/        (5 files)  - Graph pattern matching
 ├── 04-modules/         (6 files)  - Code organization
 ├── 05-stdlib/          (4 files)  - Standard library
-└── 06-projects/        (2 projects) - Full applications
+└── 06-projects/        (3 projects) - Full applications
 ```
 
 ## Learning Path
@@ -517,6 +517,20 @@ Topics:
 
 ```bash
 gr samples/06-projects/elevator/sim_demo.gr
+```
+
+### `web_server/` ⭐⭐⭐
+**HTTP web server**
+
+Topics:
+- HTTP server with routes and handlers
+- HTML, JSON, and plain text responses
+- Request parsing and response building
+- Pure Graphoid server on top of TCP primitives
+
+```bash
+gr samples/06-projects/web_server/simple.gr
+# Then visit http://localhost:8080/ or use curl
 ```
 
 ---

@@ -16,13 +16,15 @@ use crate::stdlib::{NativeFunction, NativeModule};
 use crate::values::{List, Value, ValueKind};
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 lazy_static::lazy_static! {
     /// Global socket handle registry
     static ref SOCKET_HANDLES: Arc<Mutex<HashMap<u64, TcpStream>>> = Arc::new(Mutex::new(HashMap::new()));
+    /// Global listener handle registry (separate from sockets, shares ID counter)
+    static ref LISTENER_HANDLES: Arc<Mutex<HashMap<u64, TcpListener>>> = Arc::new(Mutex::new(HashMap::new()));
     static ref NEXT_SOCKET_ID: Arc<Mutex<u64>> = Arc::new(Mutex::new(1));
 }
 
@@ -47,6 +49,13 @@ impl NativeModule for NetModule {
         functions.insert("recv".to_string(), net_recv as NativeFunction);
         functions.insert("recv_bytes".to_string(), net_recv_bytes as NativeFunction);
         functions.insert("close".to_string(), net_close as NativeFunction);
+
+        // Server primitives
+        functions.insert("bind".to_string(), net_bind as NativeFunction);
+        functions.insert("accept".to_string(), net_accept as NativeFunction);
+        functions.insert("close_listener".to_string(), net_close_listener as NativeFunction);
+        functions.insert("listener_port".to_string(), net_listener_port as NativeFunction);
+        functions.insert("set_timeout".to_string(), net_set_timeout as NativeFunction);
 
         // Fast hex/bytes conversion utilities (used by TLS)
         functions.insert("hex_to_bytes".to_string(), hex_to_bytes as NativeFunction);
@@ -119,6 +128,14 @@ fn get_byte_list_arg(args: &[Value], index: usize, func_name: &str) -> Result<Ve
     }
 }
 
+// Allocate the next unique handle ID (shared by sockets and listeners)
+fn next_handle_id() -> u64 {
+    let mut next_id = NEXT_SOCKET_ID.lock().unwrap();
+    let id = *next_id;
+    *next_id += 1;
+    id
+}
+
 /// Connect to a TCP socket
 /// net.connect(host, port) -> socket_id
 fn net_connect(args: &[Value]) -> Result<Value> {
@@ -149,13 +166,7 @@ fn net_connect(args: &[Value]) -> Result<Value> {
             message: format!("Failed to set write timeout: {}", e),
         })?;
 
-    // Generate socket ID and store handle
-    let socket_id = {
-        let mut next_id = NEXT_SOCKET_ID.lock().unwrap();
-        let id = *next_id;
-        *next_id += 1;
-        id
-    };
+    let socket_id = next_handle_id();
 
     SOCKET_HANDLES.lock().unwrap().insert(socket_id, stream);
 
@@ -364,4 +375,147 @@ fn bytes_to_string(args: &[Value]) -> Result<Value> {
     // Convert to UTF-8 string, replacing invalid sequences
     let s = String::from_utf8_lossy(&bytes).into_owned();
     Ok(Value::string(s))
+}
+
+// ============================================
+// Server primitives (Phase 18.6)
+// ============================================
+
+/// Bind a TCP listener on host:port
+/// net.bind(host, port) -> listener_id
+fn net_bind(args: &[Value]) -> Result<Value> {
+    if args.len() != 2 {
+        return Err(GraphoidError::RuntimeError {
+            message: "bind() requires exactly 2 arguments: host and port".to_string(),
+        });
+    }
+
+    let host = get_string_arg(args, 0, "bind")?;
+    let port = get_number_arg(args, 1, "bind")? as u16;
+
+    let address = format!("{}:{}", host, port);
+    let listener = TcpListener::bind(&address).map_err(|e| GraphoidError::RuntimeError {
+        message: format!("Failed to bind to {}: {}", address, e),
+    })?;
+
+    let listener_id = next_handle_id();
+
+    LISTENER_HANDLES.lock().unwrap().insert(listener_id, listener);
+
+    Ok(Value::number(listener_id as f64))
+}
+
+/// Accept a connection on a listener (blocking)
+/// net.accept(listener_id) -> socket_id
+fn net_accept(args: &[Value]) -> Result<Value> {
+    if args.len() != 1 {
+        return Err(GraphoidError::RuntimeError {
+            message: "accept() requires exactly 1 argument: listener_id".to_string(),
+        });
+    }
+
+    let listener_id = get_number_arg(args, 0, "accept")? as u64;
+
+    // Clone the listener to avoid holding the mutex during blocking accept
+    let listener_clone = {
+        let handles = LISTENER_HANDLES.lock().unwrap();
+        handles.get(&listener_id).ok_or_else(|| GraphoidError::RuntimeError {
+            message: format!("Invalid listener handle: {}", listener_id),
+        })?.try_clone().map_err(|e| GraphoidError::RuntimeError {
+            message: format!("Failed to clone listener: {}", e),
+        })?
+    };
+
+    // Accept (blocking) — outside the lock
+    let (stream, _addr) = listener_clone.accept().map_err(|e| GraphoidError::RuntimeError {
+        message: format!("Failed to accept connection: {}", e),
+    })?;
+
+    // Set reasonable timeouts on accepted connections
+    stream.set_read_timeout(Some(Duration::from_secs(30))).ok();
+    stream.set_write_timeout(Some(Duration::from_secs(30))).ok();
+
+    let socket_id = next_handle_id();
+
+    SOCKET_HANDLES.lock().unwrap().insert(socket_id, stream);
+
+    Ok(Value::number(socket_id as f64))
+}
+
+/// Close a listener
+/// net.close_listener(listener_id) -> bool
+fn net_close_listener(args: &[Value]) -> Result<Value> {
+    if args.len() != 1 {
+        return Err(GraphoidError::RuntimeError {
+            message: "close_listener() requires exactly 1 argument: listener_id".to_string(),
+        });
+    }
+
+    let listener_id = get_number_arg(args, 0, "close_listener")? as u64;
+
+    let removed = LISTENER_HANDLES.lock().unwrap().remove(&listener_id).is_some();
+
+    if !removed {
+        return Err(GraphoidError::RuntimeError {
+            message: format!("Invalid listener handle: {}", listener_id),
+        });
+    }
+
+    Ok(Value::boolean(true))
+}
+
+/// Get the port a listener is bound to (useful when binding to port 0)
+/// net.listener_port(listener_id) -> port
+fn net_listener_port(args: &[Value]) -> Result<Value> {
+    if args.len() != 1 {
+        return Err(GraphoidError::RuntimeError {
+            message: "listener_port() requires exactly 1 argument: listener_id".to_string(),
+        });
+    }
+
+    let listener_id = get_number_arg(args, 0, "listener_port")? as u64;
+
+    let handles = LISTENER_HANDLES.lock().unwrap();
+    let listener = handles.get(&listener_id).ok_or_else(|| GraphoidError::RuntimeError {
+        message: format!("Invalid listener handle: {}", listener_id),
+    })?;
+
+    let port = listener.local_addr().map_err(|e| GraphoidError::RuntimeError {
+        message: format!("Failed to get local address: {}", e),
+    })?.port();
+
+    Ok(Value::number(port as f64))
+}
+
+/// Set read/write timeout on a socket
+/// net.set_timeout(socket_id, seconds) -> bool
+fn net_set_timeout(args: &[Value]) -> Result<Value> {
+    if args.len() != 2 {
+        return Err(GraphoidError::RuntimeError {
+            message: "set_timeout() requires exactly 2 arguments: socket_id and seconds".to_string(),
+        });
+    }
+
+    let socket_id = get_number_arg(args, 0, "set_timeout")? as u64;
+    let seconds = get_number_arg(args, 1, "set_timeout")?;
+
+    let handles = SOCKET_HANDLES.lock().unwrap();
+    let stream = handles.get(&socket_id).ok_or_else(|| GraphoidError::RuntimeError {
+        message: format!("Invalid socket handle: {}", socket_id),
+    })?;
+
+    let duration = if seconds > 0.0 {
+        Some(Duration::from_secs_f64(seconds))
+    } else {
+        None
+    };
+
+    stream.set_read_timeout(duration).map_err(|e| GraphoidError::RuntimeError {
+        message: format!("Failed to set read timeout: {}", e),
+    })?;
+    stream.set_write_timeout(duration).map_err(|e| GraphoidError::RuntimeError {
+        message: format!("Failed to set write timeout: {}", e),
+    })?;
+
+    Ok(Value::boolean(true))
 }
