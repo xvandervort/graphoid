@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::time::Instant;
 
 use crate::ast::{BinaryOp, Expr, Parameter, Program, Stmt};
 use crate::error::{GraphoidError, SourcePosition, Result};
@@ -57,6 +58,10 @@ pub struct GraphExecutor {
     in_priv_block: bool,
     /// Phase 18: persistent universe graph (type hierarchy + modules + import edges)
     universe_graph: Rc<RefCell<crate::values::graph::Graph>>,
+    /// Phase 18.7: timestamp when executor was created (for runtime.uptime())
+    start_time: Instant,
+    /// Phase 18.7: call stack snapshot at raise time (for error.stack())
+    raise_stack: Option<Vec<String>>,
 }
 
 /// A pattern clause stored as graph references (for pattern-matching functions).
@@ -71,7 +76,7 @@ struct GraphPatternClause {
 
 impl GraphExecutor {
     pub fn new() -> Self {
-        GraphExecutor {
+        let mut executor = GraphExecutor {
             env: Environment::new(),
             call_stack: Vec::new(),
             module_manager: ModuleManager::new(),
@@ -98,7 +103,12 @@ impl GraphExecutor {
             func_to_fg_id: HashMap::new(),
             in_priv_block: false,
             universe_graph: Rc::new(RefCell::new(Self::build_initial_universe_graph())),
-        }
+            start_time: Instant::now(),
+            raise_stack: None,
+        };
+        // Phase 18.7: Set __MODULE__ for top-level scripts
+        executor.env.define("__MODULE__".to_string(), Value::string("__main__".to_string()));
+        executor
     }
 
     /// Build the initial universe graph with the built-in type hierarchy.
@@ -2215,6 +2225,8 @@ impl GraphExecutor {
                 "list" => Some("list"),
                 "string" => Some("string"),
                 "reflect" if !self.env.exists("reflect") => Some("reflect"),
+                "runtime" if !self.env.exists("runtime") => Some("runtime"),
+                "modules" if !self.env.exists("modules") => Some("modules"),
                 _ => None,
             };
             if let Some(type_name) = static_dispatch {
@@ -2235,6 +2247,8 @@ impl GraphExecutor {
                     "list" => self.eval_list_static_method(&method_name, &args),
                     "string" => self.eval_string_static_method(&method_name, &args),
                     "reflect" => self.eval_reflect_static_method(&method_name, &args),
+                    "runtime" => self.eval_runtime_static_method(&method_name, &args),
+                    "modules" => self.eval_modules_static_method(&method_name, &args),
                     _ => unreachable!(),
                 };
             }
@@ -2424,6 +2438,25 @@ impl GraphExecutor {
             "column" => Ok(Value::number(err.column as f64)),
             "stack_trace" => {
                 Ok(Value::string(err.formatted_stack_trace()))
+            }
+            "stack" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Error.stack() takes no arguments, got {}", args.len()
+                    )));
+                }
+                // Return list of maps: [{function, file, line}, ...]
+                // Innermost frame first (reverse of call_stack push order)
+                let frames: Vec<Value> = err.stack_trace.iter().rev().map(|func_name| {
+                    let mut hash = crate::values::Hash::new();
+                    let _ = hash.insert("function".to_string(), Value::string(func_name.clone()));
+                    let _ = hash.insert("file".to_string(), Value::string(
+                        err.file.clone().unwrap_or_default()
+                    ));
+                    let _ = hash.insert("line".to_string(), Value::number(0.0));
+                    Value::map(hash)
+                }).collect();
+                Ok(Value::list(crate::values::List::from_vec(frames)))
             }
             "full_chain" => {
                 Ok(Value::string(err.full_chain()))
@@ -2751,6 +2784,128 @@ impl GraphExecutor {
                 "reflect does not have method '{}'", method
             ))),
         }
+    }
+
+    /// Phase 18.7: runtime.* static methods (version, uptime, memory, module_count)
+    fn eval_runtime_static_method(&self, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "version" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "runtime.version() takes no arguments, got {}", args.len()
+                    )));
+                }
+                Ok(Value::string(env!("CARGO_PKG_VERSION").to_string()))
+            }
+            "uptime" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "runtime.uptime() takes no arguments, got {}", args.len()
+                    )));
+                }
+                Ok(Value::number(self.start_time.elapsed().as_secs_f64()))
+            }
+            "memory" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "runtime.memory() takes no arguments, got {}", args.len()
+                    )));
+                }
+                let used = Self::get_memory_usage();
+                let mut hash = crate::values::Hash::new();
+                let _ = hash.insert("used".to_string(), Value::number(used as f64));
+                Ok(Value::map(hash))
+            }
+            "module_count" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "runtime.module_count() takes no arguments, got {}", args.len()
+                    )));
+                }
+                let count = self.module_manager.get_all_modules().len();
+                Ok(Value::number(count as f64))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "runtime does not have method '{}'", method
+            ))),
+        }
+    }
+
+    /// Phase 18.7: modules.* static methods (list, info)
+    fn eval_modules_static_method(&self, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "list" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "modules.list() takes no arguments, got {}", args.len()
+                    )));
+                }
+                let all_modules = self.module_manager.get_all_modules();
+                let mut names: Vec<String> = all_modules.iter()
+                    .map(|m| m.alias.clone().unwrap_or_else(|| m.name.clone()))
+                    .collect();
+                names.sort();
+                names.dedup();
+                let items: Vec<Value> = names.into_iter()
+                    .map(Value::string)
+                    .collect();
+                Ok(Value::list(crate::values::List::from_vec(items)))
+            }
+            "info" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "modules.info() expects 1 argument (module name), got {}", args.len()
+                    )));
+                }
+                let name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::runtime(format!(
+                        "modules.info() expects a string argument, got {}", args[0].type_name()
+                    ))),
+                };
+                match self.module_manager.find_module_by_name(&name) {
+                    Some(m) => {
+                        let mut hash = crate::values::Hash::new();
+                        let _ = hash.insert("name".to_string(), Value::string(m.name.clone()));
+                        let _ = hash.insert("path".to_string(),
+                            Value::string(m.file_path.to_string_lossy().to_string()));
+                        let module_type = if m.file_path.to_string_lossy().contains("<native:") {
+                            "native"
+                        } else {
+                            "stdlib"
+                        };
+                        let _ = hash.insert("type".to_string(), Value::string(module_type.to_string()));
+                        let exports: Vec<Value> = m.exports.iter()
+                            .map(|e| Value::string(e.clone()))
+                            .collect();
+                        let _ = hash.insert("exports".to_string(),
+                            Value::list(crate::values::List::from_vec(exports)));
+                        Ok(Value::map(hash))
+                    }
+                    None => Ok(Value::none()),
+                }
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "modules does not have method '{}'", method
+            ))),
+        }
+    }
+
+    /// Get current process memory usage (RSS) in bytes. Linux only, returns 0 on other platforms.
+    fn get_memory_usage() -> usize {
+        if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
+            for line in status.lines() {
+                if line.starts_with("VmRSS:") {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if parts.len() >= 2 {
+                        if let Ok(kb) = parts[1].parse::<usize>() {
+                            return kb * 1024;
+                        }
+                    }
+                }
+            }
+        }
+        0
     }
 
     /// Phase 18 Section 3: reflect.pattern() — inspect unevaluated expression as pattern graph.
@@ -3580,13 +3735,17 @@ impl GraphExecutor {
                         let parent_env_clone = self.env.clone();
                         self.env = Environment::with_parent(self.env.clone());
 
+                        // Phase 18.7: Consume raise-time stack snapshot (clear even if no variable binding)
+                        let stack = self.raise_stack.take()
+                            .unwrap_or_else(|| self.call_stack.clone());
+
                         // Bind error to variable if specified
                         if let Some(var_name) = variable {
                             let error_obj = crate::values::ErrorObject::with_stack_trace(
                                 error_type_name.clone(),
                                 actual_message.clone(),
                                 self.current_file.as_ref().map(|p| p.to_string_lossy().to_string()),
-                                0, 0, self.call_stack.clone(),
+                                0, 0, stack,
                             );
                             self.env.define(var_name, Value::error(error_obj));
                         }
@@ -3639,6 +3798,9 @@ impl GraphExecutor {
             ValueKind::String(s) => s.clone(),
             _ => value.to_string(),
         };
+
+        // Phase 18.7: Capture call stack at raise time for error.stack()
+        self.raise_stack = Some(self.call_stack.clone());
 
         let graphoid_error = GraphoidError::runtime(message);
 
@@ -3880,6 +4042,10 @@ impl GraphExecutor {
             }
         }
 
+        // Phase 18.7: Set __MODULE__ to this module's import path
+        module_executor.env.define("__MODULE__".to_string(),
+            Value::string(module_path.to_string()));
+
         // Set module executor's func ID counter to avoid collisions with parent
         module_executor.next_func_id = self.next_func_id;
 
@@ -3890,7 +4056,7 @@ impl GraphExecutor {
 
         // Propagate magic variables back
         for (name, value) in module_executor.env.get_all_bindings() {
-            if name.starts_with("__") && name != "__module_name__" && name != "__module_alias__" {
+            if name.starts_with("__") && name != "__module_name__" && name != "__module_alias__" && name != "__MODULE__" {
                 self.env.define(name, value);
             }
         }

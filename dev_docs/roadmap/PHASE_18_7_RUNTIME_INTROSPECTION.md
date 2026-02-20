@@ -1,6 +1,6 @@
 # Phase 18.7: Runtime Introspection
 
-**Status**: Planned
+**Status**: Complete (February 20, 2026)
 **Priority**: **High**
 **Dependencies**: None
 **Estimated Duration**: 2-3 days
@@ -140,12 +140,12 @@ describe "error.stack" {
 
 ## Success Criteria
 
-- [ ] `modules.list()` and `modules.info()` implemented
-- [ ] `runtime.version()`, `runtime.uptime()`, `runtime.memory()`, `runtime.module_count()` implemented
-- [ ] `error.stack()` captures call stack at raise time
-- [ ] `__MODULE__` available in module scope
-- [ ] All features tested in gspec
-- [ ] Sample file demonstrating features
+- [x] `modules.list()` and `modules.info()` implemented
+- [x] `runtime.version()`, `runtime.uptime()`, `runtime.memory()`, `runtime.module_count()` implemented
+- [x] `error.stack()` captures call stack at raise time
+- [x] `__MODULE__` available in module scope
+- [x] All features tested in gspec (18 tests)
+- [x] Sample file demonstrating features
 
 ---
 

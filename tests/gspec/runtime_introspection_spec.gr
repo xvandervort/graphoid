@@ -1,0 +1,151 @@
+# Phase 18.7: Runtime Introspection — gspec tests
+#
+# Run with: gr spec tests/gspec/runtime_introspection_spec.gr
+
+describe "runtime" {
+    describe "version" {
+        it "returns a string" {
+            v = runtime.version()
+            assert(expect(typeof(v)).to_equal("string"))
+        }
+
+        it "returns a non-empty version string" {
+            v = runtime.version()
+            assert(expect(v.length()).to_be_greater_than(0))
+        }
+
+        it "contains a dot (semver format)" {
+            v = runtime.version()
+            assert(expect(v.contains(".")).to_be_truthy())
+        }
+    }
+
+    describe "uptime" {
+        it "returns a number" {
+            t = runtime.uptime()
+            assert(expect(typeof(t)).to_equal("num"))
+        }
+
+        it "returns a non-negative value" {
+            t = runtime.uptime()
+            assert(expect(t).to_be_at_least(0))
+        }
+    }
+
+    describe "memory" {
+        it "returns a map" {
+            m = runtime.memory()
+            assert(expect(typeof(m)).to_equal("map"))
+        }
+
+        it "has a used key with numeric value" {
+            m = runtime.memory()
+            u = m["used"]
+            assert(expect(typeof(u)).to_equal("num"))
+        }
+
+        it "reports non-negative memory usage" {
+            m = runtime.memory()
+            assert(expect(m["used"]).to_be_at_least(0))
+        }
+    }
+
+    describe "module_count" {
+        it "returns a number" {
+            c = runtime.module_count()
+            assert(expect(typeof(c)).to_equal("num"))
+        }
+
+        it "returns a non-negative count" {
+            c = runtime.module_count()
+            assert(expect(c).to_be_at_least(0))
+        }
+    }
+}
+
+describe "modules" {
+    describe "list" {
+        it "returns a list" {
+            m = modules.list()
+            assert(expect(typeof(m)).to_equal("list"))
+        }
+    }
+
+    describe "info" {
+        it "returns none for unknown module" {
+            info = modules.info("nonexistent_xyz_42")
+            assert(expect(info).to_be_none())
+        }
+    }
+}
+
+describe "error.stack" {
+    it "returns a list" {
+        trace = none
+        try {
+            raise("test error")
+        } catch as e {
+            trace = e.stack()
+        }
+        assert(expect(typeof(trace)).to_equal("list"))
+    }
+
+    it "captures function names in nested calls" {
+        fn inner_fn() {
+            raise("boom")
+        }
+        fn outer_fn() {
+            inner_fn()
+        }
+        trace = none
+        try {
+            outer_fn()
+        } catch as e {
+            trace = e.stack()
+        }
+        assert(expect(trace.length()).to_be_at_least(2))
+    }
+
+    it "stack frames are maps with function key" {
+        fn failing_fn() {
+            raise("boom")
+        }
+        frame = none
+        try {
+            failing_fn()
+        } catch as e {
+            trace = e.stack()
+            frame = trace[0]
+        }
+        assert(expect(typeof(frame)).to_equal("map"))
+        assert(expect(frame["function"]).to_equal("failing_fn"))
+    }
+
+    it "orders frames innermost first" {
+        fn a_fn() { raise("boom") }
+        fn b_fn() { a_fn() }
+        fn c_fn() { b_fn() }
+        names = []
+        try {
+            c_fn()
+        } catch as e {
+            trace = e.stack()
+            for fr in trace {
+                names.append!(fr["function"])
+            }
+        }
+        assert(expect(names[0]).to_equal("a_fn"))
+        assert(expect(names[1]).to_equal("b_fn"))
+        assert(expect(names[2]).to_equal("c_fn"))
+    }
+}
+
+describe "__MODULE__" {
+    it "is defined at top level" {
+        assert(expect(typeof(__MODULE__)).to_equal("string"))
+    }
+
+    it "is a non-empty string" {
+        assert(expect(__MODULE__.length()).to_be_greater_than(0))
+    }
+}

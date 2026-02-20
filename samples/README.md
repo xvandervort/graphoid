@@ -23,7 +23,7 @@ samples/
 ├── 02-intermediate/    (13 files) - Core features
 ├── 03-advanced/        (5 files)  - Graph pattern matching
 ├── 04-modules/         (6 files)  - Code organization
-├── 05-stdlib/          (4 files)  - Standard library
+├── 05-stdlib/          (5 files)  - Standard library
 └── 06-projects/        (3 projects) - Full applications
 ```
 
@@ -488,6 +488,19 @@ Topics:
 
 ```bash
 gr samples/05-stdlib/time_type.gr
+```
+
+### `runtime_introspection.gr` ⭐⭐⭐
+**Runtime introspection APIs**
+
+Topics:
+- `runtime.version()`, `runtime.uptime()`, `runtime.memory()`
+- `modules.list()`, `modules.info()`
+- `error.stack()` - structured stack traces
+- `__MODULE__` - current module name
+
+```bash
+gr samples/05-stdlib/runtime_introspection.gr
 ```
 
 ## 06-projects/ - Full Applications

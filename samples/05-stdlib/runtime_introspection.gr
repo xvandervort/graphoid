@@ -1,0 +1,49 @@
+# Runtime Introspection Demo
+# Demonstrates Phase 18.7 features: runtime.*, modules.*, error.stack(), __MODULE__
+
+print("=== Runtime Information ===")
+print("Version: " + runtime.version())
+print("Uptime: " + runtime.uptime().to_string() + " seconds")
+
+mem = runtime.memory()
+print("Memory used: " + mem["used"].to_string() + " bytes")
+
+print("Module count: " + runtime.module_count().to_string())
+
+print("")
+print("=== Current Module ===")
+print("Module name: " + __MODULE__)
+
+print("")
+print("=== Module Listing ===")
+mods = modules.list()
+print("Loaded modules: " + mods.to_string())
+
+print("")
+print("=== Error Stack Trace ===")
+
+fn inner() {
+    raise("something went wrong")
+}
+
+fn middle() {
+    inner()
+}
+
+fn outer() {
+    middle()
+}
+
+try {
+    outer()
+} catch as e {
+    print("Caught: " + e.message())
+    trace = e.stack()
+    print("Stack trace (" + trace.length().to_string() + " frames):")
+    for frame in trace {
+        print("  at " + frame["function"])
+    }
+}
+
+print("")
+print("=== Done ===")
