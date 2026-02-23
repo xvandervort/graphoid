@@ -21,7 +21,7 @@ Then work through the basics in order:
 samples/
 ├── 01-basics/          (4 files)  - Start here!
 ├── 02-intermediate/    (13 files) - Core features
-├── 03-advanced/        (5 files)  - Graph pattern matching
+├── 03-advanced/        (6 files)  - Graph algorithms + concurrency
 ├── 04-modules/         (6 files)  - Code organization
 ├── 05-stdlib/          (5 files)  - Standard library
 └── 06-projects/        (3 projects) - Full applications
@@ -362,6 +362,24 @@ Topics:
 gr samples/03-advanced/variable_length_paths.gr
 ```
 
+### `concurrency.gr` ⭐⭐⭐
+**Spawn + Channels concurrency**
+
+Topics:
+- Creating channels (unbuffered and buffered)
+- Sending and receiving values
+- Spawning concurrent tasks with `spawn { }`
+- Share-nothing semantics
+- Multiple producers pattern
+- Worker pattern (fan-out computation)
+- Channel close and error handling
+
+```bash
+gr samples/03-advanced/concurrency.gr
+```
+
+**Key Concept:** Graphoid uses share-nothing concurrency — spawned tasks get deep copies of captured values, communicating exclusively through channels.
+
 ---
 
 ## 04-modules/ - Code Organization
@@ -676,10 +694,10 @@ Check if the example uses newer features. The language is in alpha, so some exam
 
 ## Example Statistics
 
-- **Total Examples:** 32 files
+- **Total Examples:** 33 files
 - **Basics:** 4 files (~20 minutes)
 - **Intermediate:** 13 files (~2-3 hours)
-- **Advanced:** 5 files (~1-2 hours)
+- **Advanced:** 6 files (~1-2 hours)
 - **Modules:** 6 files (~1 hour)
 - **Stdlib:** 4 files (~1 hour)
 

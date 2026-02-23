@@ -283,6 +283,8 @@ impl AstToGraphConverter {
                 props.insert("is_private".to_string(), AstProperty::Bool(*is_private));
                 props.insert("is_setter".to_string(), AstProperty::Bool(*is_setter));
                 props.insert("is_static".to_string(), AstProperty::Bool(*is_static));
+                // Phase 19: Store original AST body for spawn portability
+                props.insert("body_stmts".to_string(), AstProperty::Stmts(body.clone()));
                 if let Some(recv) = receiver {
                     props.insert("receiver".to_string(), AstProperty::Str(recv.clone()));
                 }
@@ -496,6 +498,11 @@ impl AstToGraphConverter {
                     self.graph.add_edge(node, ExecEdgeType::Element(i as u32), s_ref);
                 }
                 node
+            }
+            Stmt::Spawn { body, position } => {
+                let mut props = HashMap::new();
+                props.insert("body_stmts".to_string(), AstProperty::Stmts(body.clone()));
+                self.add_node(arena, AstNodeType::SpawnStmt, props, position.clone())
             }
         }
     }

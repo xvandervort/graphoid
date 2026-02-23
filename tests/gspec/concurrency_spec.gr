@@ -1,0 +1,234 @@
+# concurrency_spec.gr - Phase 19.1: Spawn + Channels
+#
+# Tests for concurrent task spawning and channel-based communication.
+
+describe "Concurrency" {
+
+    # =====================================================================
+    # Channel creation
+    # =====================================================================
+
+    describe "channel()" {
+
+        it "creates a channel value" {
+            ch = channel()
+            assert(expect(typeof(ch)).to_equal("channel"))
+        }
+
+        it "creates a buffered channel with capacity" {
+            ch = channel(5)
+            assert(expect(typeof(ch)).to_equal("channel"))
+        }
+
+        it "creates a buffered channel with named capacity" {
+            ch = channel(capacity: 3)
+            assert(expect(typeof(ch)).to_equal("channel"))
+        }
+
+        it "channels are truthy" {
+            ch = channel()
+            result = if ch { true } else { false }
+            assert(expect(result).to_equal(true))
+        }
+    }
+
+    # =====================================================================
+    # Buffered channel send/receive
+    # =====================================================================
+
+    describe "buffered send/receive" {
+
+        it "sends and receives a number" {
+            ch = channel(1)
+            ch.send(42)
+            result = ch.receive()
+            assert(expect(result).to_equal(42))
+        }
+
+        it "sends and receives a string" {
+            ch = channel(1)
+            ch.send("hello")
+            result = ch.receive()
+            assert(expect(result).to_equal("hello"))
+        }
+
+        it "sends and receives a list" {
+            ch = channel(1)
+            ch.send([1, 2, 3])
+            result = ch.receive()
+            assert(expect(result).to_equal([1, 2, 3]))
+        }
+
+        it "sends and receives a map" {
+            ch = channel(1)
+            ch.send({"key": "value"})
+            result = ch.receive()
+            assert(expect(result["key"]).to_equal("value"))
+        }
+
+        it "preserves FIFO order" {
+            ch = channel(3)
+            ch.send(1)
+            ch.send(2)
+            ch.send(3)
+            a = ch.receive()
+            b = ch.receive()
+            c = ch.receive()
+            assert(expect(a).to_equal(1))
+            assert(expect(b).to_equal(2))
+            assert(expect(c).to_equal(3))
+        }
+    }
+
+    # =====================================================================
+    # try_receive
+    # =====================================================================
+
+    describe "try_receive" {
+
+        it "returns none on empty channel" {
+            ch = channel()
+            result = ch.try_receive()
+            assert(expect(typeof(result)).to_equal("none"))
+        }
+
+        it "returns value when data available" {
+            ch = channel(1)
+            ch.send(42)
+            result = ch.try_receive()
+            assert(expect(result).to_equal(42))
+        }
+    }
+
+    # =====================================================================
+    # Channel close
+    # =====================================================================
+
+    describe "close" {
+
+        it "allows draining remaining messages" {
+            ch = channel(2)
+            ch.send(1)
+            ch.send(2)
+            ch.close()
+            a = ch.receive()
+            b = ch.receive()
+            assert(expect(a).to_equal(1))
+            assert(expect(b).to_equal(2))
+        }
+
+        it "returns none when closed and empty" {
+            ch = channel(1)
+            ch.close()
+            result = ch.receive()
+            assert(expect(typeof(result)).to_equal("none"))
+        }
+
+        it "raises error on send after close" {
+            ch = channel()
+            ch.close()
+            error_caught = false
+            try {
+                ch.send(42)
+            } catch as e {
+                error_caught = true
+            }
+            assert(expect(error_caught).to_equal(true))
+        }
+    }
+
+    # =====================================================================
+    # Spawn basics
+    # =====================================================================
+
+    describe "spawn" {
+
+        it "runs a block concurrently" {
+            ch = channel()
+            spawn {
+                ch.send("done")
+            }
+            result = ch.receive()
+            assert(expect(result).to_equal("done"))
+        }
+
+        it "has share-nothing semantics" {
+            ch = channel()
+            x = 1
+            spawn {
+                x = 999
+                ch.send(x)
+            }
+            spawned_x = ch.receive()
+            assert(expect(x).to_equal(1))
+            assert(expect(spawned_x).to_equal(999))
+        }
+
+        it "captures parent values by copy" {
+            ch = channel()
+            name = "Alice"
+            age = 30
+            spawn {
+                ch.send(name)
+                ch.send(age)
+            }
+            r_name = ch.receive()
+            r_age = ch.receive()
+            assert(expect(r_name).to_equal("Alice"))
+            assert(expect(r_age).to_equal(30))
+        }
+
+        it "can call functions from parent scope" {
+            ch = channel()
+            fn double(n) { return n * 2 }
+            spawn {
+                ch.send(double(21))
+            }
+            result = ch.receive()
+            assert(expect(result).to_equal(42))
+        }
+
+        it "supports multiple producers" {
+            ch = channel()
+            spawn { ch.send(10) }
+            spawn { ch.send(20) }
+            spawn { ch.send(30) }
+            a = ch.receive()
+            b = ch.receive()
+            c = ch.receive()
+            total = a + b + c
+            assert(expect(total).to_equal(60))
+        }
+
+        it "isolates list mutations" {
+            ch = channel()
+            items = [1, 2, 3]
+            spawn {
+                items = [4, 5, 6]
+                ch.send(items)
+            }
+            spawned_items = ch.receive()
+            assert(expect(items).to_equal([1, 2, 3]))
+            assert(expect(spawned_items).to_equal([4, 5, 6]))
+        }
+    }
+
+    # =====================================================================
+    # Spawn exception handling
+    # =====================================================================
+
+    describe "spawn exceptions" {
+
+        it "does not crash the parent" {
+            ch = channel()
+            spawn {
+                raise("boom")
+            }
+            spawn {
+                ch.send("ok")
+            }
+            result = ch.receive()
+            assert(expect(result).to_equal("ok"))
+        }
+    }
+}

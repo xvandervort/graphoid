@@ -13,6 +13,9 @@ use num_bigint::BigInt;
 pub mod graph;
 pub mod list;
 pub mod hash;
+pub mod channel;
+
+pub use channel::Channel;
 
 /// Layers that can be compared when using graph.equals() with include:/only: options
 ///
@@ -533,6 +536,9 @@ pub enum ValueKind {
     PatternMatchResults(PatternMatchResults),
     /// Time value (Phase 12) - UTC timestamp internally, ISO 8601 display
     Time(f64), // UTC timestamp (seconds since Unix epoch)
+    /// Channel value (Phase 19) - thread-safe communication pipe
+    /// Clone creates a reference to the same channel (via Arc)
+    Channel(Channel),
 }
 
 // Manual PartialEq implementation for ValueKind
@@ -561,6 +567,7 @@ impl PartialEq for ValueKind {
             (ValueKind::PatternPath(a), ValueKind::PatternPath(b)) => a == b,
             (ValueKind::PatternMatchResults(a), ValueKind::PatternMatchResults(b)) => a == b,
             (ValueKind::Time(a), ValueKind::Time(b)) => a == b,
+            (ValueKind::Channel(_), ValueKind::Channel(_)) => false, // Channels not comparable by value
             _ => false, // Different variants are not equal
         }
     }
@@ -612,6 +619,10 @@ impl Value {
 
     pub fn time(timestamp: f64) -> Self {
         Value { kind: ValueKind::Time(timestamp), frozen: false }
+    }
+
+    pub fn channel(ch: Channel) -> Self {
+        Value { kind: ValueKind::Channel(ch), frozen: false }
     }
 
     pub fn symbol(s: String) -> Self {
@@ -709,6 +720,7 @@ impl Value {
             ValueKind::PatternPath(_) => true,
             ValueKind::PatternMatchResults(results) => !results.is_empty(), // Empty results are falsy
             ValueKind::Time(_) => true, // Time values are always truthy
+            ValueKind::Channel(_) => true, // Channels are always truthy
         }
     }
 
@@ -815,6 +827,7 @@ impl Value {
                     "Invalid Time".to_string()
                 }
             }
+            ValueKind::Channel(_) => "<channel>".to_string(),
         }
     }
 
@@ -839,6 +852,7 @@ impl Value {
             ValueKind::PatternPath(_) => "pattern_path",
             ValueKind::PatternMatchResults(_) => "pattern_match_results",
             ValueKind::Time(_) => "time",
+            ValueKind::Channel(_) => "channel",
         }
     }
 
@@ -913,6 +927,66 @@ impl Value {
             }
             ValueKind::Graph(graph) => ValueKind::Graph(Rc::new(RefCell::new(graph.borrow().deep_copy_unfrozen()))),
             // Primitive types just clone
+            other => other.clone(),
+        };
+        Value { kind: new_kind, frozen: false }
+    }
+
+    /// Deep-clone this value for cross-thread transfer.
+    ///
+    /// Creates completely independent Rc handles (share-nothing).
+    /// Channel values are shared (Arc-based), not deep-copied — they are
+    /// the communication link between threads.
+    pub fn deep_clone_for_send(&self) -> channel::SendableValue {
+        channel::SendableValue(self.deep_clone_recursive())
+    }
+
+    /// Recursively deep-clone a value, creating new Rc handles for all
+    /// reference-counted inner data. The resulting Value has no shared Rc
+    /// with the original, making it safe to move to another thread
+    /// (when wrapped in SendableValue).
+    fn deep_clone_recursive(&self) -> Value {
+        use crate::values::list::List;
+        use crate::values::hash::Hash;
+
+        let new_kind = match &self.kind {
+            ValueKind::List(list) => {
+                let items: Vec<Value> = list.to_vec().iter()
+                    .map(|v| v.deep_clone_recursive())
+                    .collect();
+                ValueKind::List(List::from_vec(items))
+            }
+            ValueKind::Map(hash) => {
+                let mut new_hash = Hash::new();
+                for (k, v) in hash.to_hashmap() {
+                    let _ = new_hash.insert(k, v.deep_clone_recursive());
+                }
+                ValueKind::Map(new_hash)
+            }
+            ValueKind::Graph(g) => {
+                ValueKind::Graph(Rc::new(RefCell::new(g.borrow().deep_copy_unfrozen())))
+            }
+            ValueKind::Function(func) => {
+                // Deep clone function: body is Vec<Stmt> (Send), env needs fresh Rc
+                let new_env = func.env.borrow().clone();
+                ValueKind::Function(Function {
+                    name: func.name.clone(),
+                    params: func.params.clone(),
+                    parameters: func.parameters.clone(),
+                    body: func.body.clone(),
+                    pattern_clauses: func.pattern_clauses.clone(),
+                    env: Rc::new(RefCell::new(new_env)),
+                    node_id: None, // Reset — will be re-registered on spawned thread
+                    is_setter: func.is_setter,
+                    is_static: func.is_static,
+                    guard: func.guard.clone(),
+                })
+            }
+            ValueKind::Channel(ch) => {
+                // Channels are SHARED across threads (Arc-based) — intentionally NOT deep-copied
+                ValueKind::Channel(ch.clone())
+            }
+            // Primitives, symbols, errors, etc. — just clone
             other => other.clone(),
         };
         Value { kind: new_kind, frozen: false }

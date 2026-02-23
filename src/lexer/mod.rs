@@ -808,6 +808,7 @@ impl Lexer {
             "set" => TokenType::Set,
             "static" => TokenType::Static,
             "when" => TokenType::When,
+            "spawn" => TokenType::Spawn,
             "configure" => TokenType::Configure,
             "rule" => TokenType::Rule,
             "precision" => TokenType::Precision,

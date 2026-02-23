@@ -77,6 +77,7 @@ pub enum AstNodeType {
     GraphRuleNode,
     ImportItemNode,  // Phase 17: selective import item (name + optional alias)
     PrivBlockStmt,   // Phase 17: priv { } block (children are private declarations)
+    SpawnStmt,       // Phase 19: spawn { } concurrent task
 }
 
 /// Edge types connecting nodes in the execution graph.
@@ -253,4 +254,6 @@ pub enum AstProperty {
     BinaryOp(BinaryOp),
     UnaryOp(UnaryOp),
     None,
+    /// Phase 19: Store AST statements for spawn bodies (sent to spawned threads as raw AST)
+    Stmts(Vec<crate::ast::Stmt>),
 }

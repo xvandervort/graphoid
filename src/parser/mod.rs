@@ -141,6 +141,8 @@ impl Parser {
             self.precision_statement()
         } else if self.match_token(&TokenType::Try) {
             self.try_catch_statement()
+        } else if self.match_token(&TokenType::Spawn) {
+            self.spawn_statement()
         } else {
             // Try to parse as assignment or expression
             self.assignment_or_expression()
@@ -1472,6 +1474,29 @@ impl Parser {
             body,
             position,
         })
+    }
+
+    /// Phase 19: Parse spawn statement — `spawn { block }`
+    fn spawn_statement(&mut self) -> Result<Stmt> {
+        let position = self.previous_position();
+
+        if !self.match_token(&TokenType::LeftBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '{' after 'spawn'".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        let body = self.block()?;
+
+        if !self.match_token(&TokenType::RightBrace) {
+            return Err(GraphoidError::SyntaxError {
+                message: "Expected '}' after spawn body".to_string(),
+                position: self.peek().position(),
+            });
+        }
+
+        Ok(Stmt::Spawn { body, position })
     }
 
     fn try_catch_statement(&mut self) -> Result<Stmt> {

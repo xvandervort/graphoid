@@ -56,4 +56,5 @@ mod unit {
     pub mod exception_propagation_tests;
     pub mod net_server_tests;
     pub mod runtime_introspection_tests;
+    pub mod concurrency_tests;
 }

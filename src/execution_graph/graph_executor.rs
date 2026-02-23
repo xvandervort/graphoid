@@ -346,6 +346,9 @@ impl GraphExecutor {
             // Phase 17: Privacy block
             AstNodeType::PrivBlockStmt => self.exec_priv_block(node_ref),
 
+            // Phase 19: Concurrency
+            AstNodeType::SpawnStmt => self.exec_spawn(node_ref),
+
             _ => Err(GraphoidError::runtime(format!(
                 "Unimplemented node type: {:?}", node_type
             ))),
@@ -1170,13 +1173,19 @@ impl GraphExecutor {
             }
         }
 
+        // Phase 19: Read original AST body for spawn portability
+        let body_stmts = match self.get_property(node_ref, "body_stmts") {
+            Some(AstProperty::Stmts(stmts)) => stmts,
+            _ => Vec::new(),
+        };
+
         // Create the Function value with the current captured env
         let env = Rc::new(RefCell::new(self.env.clone()));
         let func = Function {
             name: Some(name.clone()),
             params: param_names,
             parameters,
-            body: Vec::new(), // Empty — we use graph_function_bodies instead
+            body: body_stmts, // Store AST body for spawn portability
             pattern_clauses: None,
             env: env.clone(),
             node_id: Some(func_id),
@@ -1716,6 +1725,24 @@ impl GraphExecutor {
                 let output = file_executor.get_captured_output();
                 Ok(Some(Value::string(output)))
             }
+            // Phase 19: channel() builtin
+            "channel" => {
+                let capacity = if args.is_empty() {
+                    None // unbuffered
+                } else if args.len() == 1 {
+                    match args[0].to_number() {
+                        Some(n) if n >= 0.0 => Some(n as usize),
+                        _ => return Err(GraphoidError::runtime(
+                            "channel() capacity must be a non-negative number".to_string()
+                        )),
+                    }
+                } else {
+                    return Err(GraphoidError::runtime(
+                        format!("channel() takes 0 or 1 argument, got {}", args.len())
+                    ));
+                };
+                Ok(Some(Value::channel(crate::values::Channel::new(capacity))))
+            }
             _ => Ok(None), // Not a builtin
         }
     }
@@ -1887,20 +1914,15 @@ impl GraphExecutor {
         // Swap environments
         let saved_env = std::mem::replace(&mut self.env, call_env);
 
-        // Execute AST body statements
-        let mut return_value = Value::none();
-        let result: Result<()> = (|| {
-            for stmt in &func.body {
-                match self.eval_stmt(stmt)? {
-                    Some(val) => {
-                        return_value = val;
-                        break;
-                    }
-                    None => {}
-                }
-            }
-            Ok(())
-        })();
+        // Execute AST body by converting all statements to an execution graph at once.
+        // We use execute_source-like pattern: convert to Program, then execute.
+        // exec_program catches ReturnControl and returns Ok(value), which is correct
+        // for function calls — the return value is the function result.
+        let program = Program { statements: func.body.clone() };
+        let mut converter = AstToGraphConverter::new();
+        let root = converter.convert_program(&program);
+        let body_graph = converter.into_graph();
+        let result = self.execute(body_graph, root);
 
         // Restore environment
         self.function_call_depth -= 1;
@@ -1909,7 +1931,7 @@ impl GraphExecutor {
         *func.env.borrow_mut() = call_env_after;
 
         match result {
-            Ok(()) => Ok(return_value),
+            Ok(val) => Ok(val),
             Err(GraphoidError::ReturnControl { value }) => Ok(value),
             Err(e) => Err(e),
         }
@@ -2325,6 +2347,7 @@ impl GraphExecutor {
             ValueKind::Number(_) => self.dispatch_number_method(&object, method, &args),
             ValueKind::Error(ref err) => self.eval_error_method(err, method, &args),
             ValueKind::Time(timestamp) => self.eval_time_method(*timestamp, method, &args),
+            ValueKind::Channel(ref ch) => self.eval_channel_method(ch, method, &args),
             ValueKind::BigNumber(ref bn) => self.eval_bignum_method(bn, method, &args),
             ValueKind::PatternNode(ref pn) => self.eval_pattern_node_method(pn, method, &args),
             ValueKind::PatternEdge(ref pe) => self.eval_pattern_edge_method(pe, method, &args),
@@ -3976,6 +3999,149 @@ impl GraphExecutor {
         };
         self.in_priv_block = prev;
         result
+    }
+
+    // =========================================================================
+    // Phase 19: Concurrency — Channel Methods + Spawn
+    // =========================================================================
+
+    fn eval_channel_method(&mut self, channel: &crate::values::Channel, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "send" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(
+                        "channel.send() requires exactly 1 argument".to_string()
+                    ));
+                }
+                let sendable = args[0].deep_clone_for_send();
+                channel.send(sendable)
+                    .map_err(|e| GraphoidError::runtime(e))?;
+                Ok(Value::none())
+            }
+            "receive" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "channel.receive() takes no arguments".to_string()
+                    ));
+                }
+                match channel.receive() {
+                    Some(sendable_val) => Ok(sendable_val.0),
+                    None => Ok(Value::none()), // closed + empty
+                }
+            }
+            "try_receive" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "channel.try_receive() takes no arguments".to_string()
+                    ));
+                }
+                match channel.try_receive() {
+                    Some(sendable_val) => Ok(sendable_val.0),
+                    None => Ok(Value::none()),
+                }
+            }
+            "close" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "channel.close() takes no arguments".to_string()
+                    ));
+                }
+                channel.close();
+                Ok(Value::none())
+            }
+            _ => Err(GraphoidError::runtime(
+                format!("Channel has no method '{}'", method)
+            )),
+        }
+    }
+
+    /// Phase 19: Execute spawn { block } — fire-and-forget concurrent task
+    fn exec_spawn(&mut self, node_ref: NodeRef) -> Result<Value> {
+        use crate::execution_graph::converter::AstToGraphConverter;
+        use crate::execution_graph::node::AstProperty;
+        use crate::values::channel::SendableValue;
+
+        // 1. Get the body statements from the node property
+        let node = self.get_node(node_ref)?;
+        let body_stmts = match node.properties.get("body_stmts") {
+            Some(AstProperty::Stmts(stmts)) => stmts.clone(),
+            _ => return Err(GraphoidError::runtime("Spawn node missing body_stmts".to_string())),
+        };
+
+        // 2. Capture current environment (share-nothing: deep clone all values)
+        let all_bindings = self.env.get_all_bindings_recursive();
+        let sendable_bindings: Vec<(String, SendableValue)> = all_bindings
+            .into_iter()
+            .map(|(name, val)| (name, val.deep_clone_for_send()))
+            .collect();
+
+        // 3. Capture global functions (deep clone for thread safety)
+        let sendable_globals: Vec<(String, Vec<SendableValue>)> = self.global_functions
+            .iter()
+            .map(|(name, overloads)| {
+                let sendable_overloads: Vec<SendableValue> = overloads.iter()
+                    .map(|f| Value::function(f.clone()).deep_clone_for_send())
+                    .collect();
+                (name.clone(), sendable_overloads)
+            })
+            .collect();
+
+        // Wrapper struct for thread-safe transfer
+        struct SendableState {
+            bindings: Vec<(String, SendableValue)>,
+            globals: Vec<(String, Vec<SendableValue>)>,
+            body: Vec<crate::ast::Stmt>,
+        }
+        // SAFETY: All Values inside have been deep-cloned with fresh Rc handles.
+        // No Rc is shared between the spawning thread and the spawned thread.
+        unsafe impl Send for SendableState {}
+
+        let state = SendableState {
+            bindings: sendable_bindings,
+            globals: sendable_globals,
+            body: body_stmts,
+        };
+
+        // 4. Spawn OS thread
+        std::thread::spawn(move || {
+            let mut task_executor = GraphExecutor::new();
+
+            // Populate environment with deep-cloned captured values
+            for (name, sendable_val) in state.bindings {
+                task_executor.env.define(name, sendable_val.0);
+            }
+
+            // Restore global functions
+            for (name, overloads) in state.globals {
+                let funcs: Vec<crate::values::Function> = overloads.into_iter()
+                    .filter_map(|sv| {
+                        match sv.0.kind {
+                            crate::values::ValueKind::Function(f) => Some(f),
+                            _ => None,
+                        }
+                    })
+                    .collect();
+                if !funcs.is_empty() {
+                    task_executor.global_functions.insert(name, funcs);
+                }
+            }
+
+            // Convert body AST to execution graph and execute
+            let program = crate::ast::Program { statements: state.body };
+            let mut converter = AstToGraphConverter::new();
+            let root = converter.convert_program(&program);
+            let exec_graph = converter.into_graph();
+
+            match task_executor.execute(exec_graph, root) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("[spawn] Unhandled exception: {}", e);
+                }
+            }
+        });
+
+        // Fire-and-forget: return none immediately
+        Ok(Value::none())
     }
 
     fn load_module(&mut self, module_path: &str, _alias: Option<&String>) -> Result<Value> {
