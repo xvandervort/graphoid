@@ -2,7 +2,7 @@
 
 **Version**: 11.0
 **Last Updated**: February 18, 2026
-**Status**: Phases 0-18 Complete. Phase 18.6 next, then Phase 19 (Concurrency).
+**Status**: Phases 0-18.7 Complete. Phase 19 (Concurrency) next.
 
 ---
 
@@ -46,8 +46,8 @@ Features that require no concurrency and can be implemented immediately.
 
 | Phase | Name | Priority | Duration | Dependencies | Status |
 |-------|------|----------|----------|--------------|--------|
-| [18.6](PHASE_18_6_SERVER_CAPABILITIES.md) | Server Capabilities | **CRITICAL** | 3-5 days | None | 📋 Planned |
-| [18.7](PHASE_18_7_RUNTIME_INTROSPECTION.md) | Runtime Introspection | **High** | 2-3 days | None | 📋 Planned |
+| [18.6](PHASE_18_6_SERVER_CAPABILITIES.md) | Server Capabilities | **CRITICAL** | 3-5 days | None | ✅ Complete |
+| [18.7](PHASE_18_7_RUNTIME_INTROSPECTION.md) | Runtime Introspection | **High** | 2-3 days | None | ✅ Complete |
 
 **Phase 18.6**: Adds `net.bind()`, `net.accept()` to enable TCP/HTTP servers. Blocking/sequential — no concurrency needed.
 
@@ -192,8 +192,8 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 ### Immediate (Pre-Concurrency)
 
-1. **Phase 18.6: Server Capabilities** - `net.bind`, `net.accept`, `http.Server` (no concurrency needed)
-2. **Phase 18.7: Runtime Introspection** - `modules.list/info`, `runtime.*`, `error.stack()`, `__MODULE__`
+1. ~~**Phase 18.6: Server Capabilities**~~ ✅ Complete (Feb 19, 2026)
+2. ~~**Phase 18.7: Runtime Introspection**~~ ✅ Complete (Feb 20, 2026)
 
 ### Near-Term (Concurrency)
 
