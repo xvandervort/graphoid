@@ -1,0 +1,80 @@
+# signal_spec.gr - Phase 19.2: Signal module
+#
+# Tests for signal.on() — OS signal handling via channels.
+# Note: Actual signal delivery is tested in sample files,
+# not here, to avoid interfering with the test runner.
+
+describe "Signal" {
+
+    # =====================================================================
+    # signal.on() — channel creation
+    # =====================================================================
+
+    describe "signal.on()" {
+
+        it "returns a channel for :sigint" {
+            ch = signal.on(:sigint)
+            assert(expect(typeof(ch)).to_equal("channel"))
+            ch.close()
+        }
+
+        it "returns a channel for :sigterm" {
+            ch = signal.on(:sigterm)
+            assert(expect(typeof(ch)).to_equal("channel"))
+            ch.close()
+        }
+
+        it "returns a channel for :sighup" {
+            ch = signal.on(:sighup)
+            assert(expect(typeof(ch)).to_equal("channel"))
+            ch.close()
+        }
+
+        it "returns independent channels for same signal" {
+            ch1 = signal.on(:sigterm)
+            ch2 = signal.on(:sigterm)
+            # Both should be channels, but independent
+            assert(expect(typeof(ch1)).to_equal("channel"))
+            assert(expect(typeof(ch2)).to_equal("channel"))
+            ch1.close()
+            ch2.close()
+        }
+    }
+
+    # =====================================================================
+    # signal.on() — error cases
+    # =====================================================================
+
+    describe "error handling" {
+
+        it "raises on unknown signal" {
+            caught = false
+            try {
+                signal.on(:invalid)
+            } catch as e {
+                caught = true
+            }
+            assert(expect(caught).to_equal(true))
+        }
+
+        it "raises on string argument" {
+            caught = false
+            try {
+                signal.on("sigint")
+            } catch as e {
+                caught = true
+            }
+            assert(expect(caught).to_equal(true))
+        }
+
+        it "raises on no arguments" {
+            caught = false
+            try {
+                signal.on()
+            } catch as e {
+                caught = true
+            }
+            assert(expect(caught).to_equal(true))
+        }
+    }
+}

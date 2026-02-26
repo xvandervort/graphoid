@@ -1,0 +1,201 @@
+# timer_spec.gr - Phase 19.2: Timer module
+#
+# Tests for timer.sleep, timer.after, and timer.every.
+
+describe "Timer" {
+
+    # =====================================================================
+    # timer.sleep()
+    # =====================================================================
+
+    describe "timer.sleep()" {
+
+        it "blocks for the specified duration" {
+            import "os"
+            start = os.system_timestamp()
+            timer.sleep(50)
+            elapsed = os.system_timestamp() - start
+            assert(expect(elapsed).to_be_at_least(0.04))
+        }
+
+        it "accepts zero milliseconds" {
+            timer.sleep(0)
+            assert(expect(true).to_equal(true))
+        }
+
+        it "raises on negative milliseconds" {
+            caught = false
+            try {
+                timer.sleep(-1)
+            } catch as e {
+                caught = true
+            }
+            assert(expect(caught).to_equal(true))
+        }
+
+        it "raises on non-number argument" {
+            caught = false
+            try {
+                timer.sleep("abc")
+            } catch as e {
+                caught = true
+            }
+            assert(expect(caught).to_equal(true))
+        }
+    }
+
+    # =====================================================================
+    # timer.after()
+    # =====================================================================
+
+    describe "timer.after()" {
+
+        it "returns a channel" {
+            ch = timer.after(10)
+            assert(expect(typeof(ch)).to_equal("channel"))
+            ch.close()
+        }
+
+        it "sends :tick after delay" {
+            ch = timer.after(10)
+            msg = ch.receive()
+            assert(expect(msg).to_equal(:tick))
+        }
+
+        it "sends custom value when provided" {
+            ch = timer.after(10, "wake up")
+            msg = ch.receive()
+            assert(expect(msg).to_equal("wake up"))
+        }
+
+        it "is one-shot — channel closes after send" {
+            ch = timer.after(10)
+            msg1 = ch.receive()
+            msg2 = ch.receive()
+            assert(expect(msg1).to_equal(:tick))
+            assert(expect(typeof(msg2)).to_equal("none"))
+        }
+
+        it "can be cancelled by closing the channel" {
+            ch = timer.after(5000)
+            ch.close()
+            # Should not block — channel is already closed
+            msg = ch.receive()
+            assert(expect(typeof(msg)).to_equal("none"))
+        }
+    }
+
+    # =====================================================================
+    # timer.every()
+    # =====================================================================
+
+    describe "timer.every()" {
+
+        it "returns a channel" {
+            ch = timer.every(50)
+            assert(expect(typeof(ch)).to_equal("channel"))
+            ch.close()
+        }
+
+        it "sends :tick values" {
+            ch = timer.every(20)
+            msg = ch.receive()
+            ch.close()
+            assert(expect(msg).to_equal(:tick))
+        }
+
+        it "sends multiple ticks" {
+            ch = timer.every(20)
+            t1 = ch.receive()
+            t2 = ch.receive()
+            t3 = ch.receive()
+            ch.close()
+            assert(expect(t1).to_equal(:tick))
+            assert(expect(t2).to_equal(:tick))
+            assert(expect(t3).to_equal(:tick))
+        }
+
+        it "stops when channel is closed" {
+            ch = timer.every(20)
+            ch.receive()
+            ch.close()
+            timer.sleep(60)
+            result = ch.try_receive()
+            assert(expect(typeof(result)).to_equal("none"))
+        }
+    }
+
+    # =====================================================================
+    # for..in channel iteration
+    # =====================================================================
+
+    describe "for..in channel" {
+
+        it "iterates values from a channel until closed" {
+            ch = channel(10)
+            ch.send(1)
+            ch.send(2)
+            ch.send(3)
+            ch.close()
+            total = 0
+            for msg in ch {
+                total = total + msg
+            }
+            assert(expect(total).to_equal(6))
+        }
+
+        it "produces no iterations on empty closed channel" {
+            ch = channel()
+            ch.close()
+            count = 0
+            for msg in ch {
+                count = count + 1
+            }
+            assert(expect(count).to_equal(0))
+        }
+
+        it "supports break inside channel iteration" {
+            ch = channel(10)
+            ch.send(10)
+            ch.send(20)
+            ch.send(30)
+            ch.close()
+            last = 0
+            for msg in ch {
+                last = msg
+                if msg == 20 {
+                    break
+                }
+            }
+            assert(expect(last).to_equal(20))
+        }
+
+        it "works with spawn producer" {
+            ch = channel()
+            spawn {
+                ch.send(10)
+                ch.send(20)
+                ch.send(30)
+                ch.close()
+            }
+            total = 0
+            for msg in ch {
+                total = total + msg
+            }
+            assert(expect(total).to_equal(60))
+        }
+
+        it "works with timer.every and break" {
+            ch = timer.every(10)
+            count = 0
+            for msg in ch {
+                count = count + 1
+                if count == 3 {
+                    break
+                }
+            }
+            ch.close()
+            assert(expect(count).to_equal(3))
+        }
+    }
+}

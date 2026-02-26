@@ -21,7 +21,7 @@ Then work through the basics in order:
 samples/
 ├── 01-basics/          (4 files)  - Start here!
 ├── 02-intermediate/    (13 files) - Core features
-├── 03-advanced/        (6 files)  - Graph algorithms + concurrency
+├── 03-advanced/        (8 files)  - Graph algorithms + concurrency
 ├── 04-modules/         (6 files)  - Code organization
 ├── 05-stdlib/          (5 files)  - Standard library
 └── 06-projects/        (3 projects) - Full applications
@@ -380,6 +380,37 @@ gr samples/03-advanced/concurrency.gr
 
 **Key Concept:** Graphoid uses share-nothing concurrency — spawned tasks get deep copies of captured values, communicating exclusively through channels.
 
+### `timers.gr` ⭐⭐⭐
+**Timer module — sleep, one-shot, and recurring timers**
+
+Topics:
+- `timer.sleep()` - blocking delay
+- `timer.after()` - one-shot timer returning a channel
+- `timer.every()` - recurring timer returning a channel
+- Timer cancellation via `channel.close()`
+- `for..in` channel iteration
+- Spawn + timer patterns
+
+```bash
+gr samples/03-advanced/timers.gr
+```
+
+**Key Concept:** All timer functions return channels — the same primitive used for spawn communication. No callbacks, no promises.
+
+### `signals.gr` ⭐⭐
+**OS signal handling via channels**
+
+Topics:
+- `signal.on(:sigint)` - register signal handler
+- Graceful shutdown pattern
+- Racing signals against timeouts
+
+```bash
+gr samples/03-advanced/signals.gr
+```
+
+**Key Concept:** Signals are channels too — `signal.on(:sigint)` returns a channel that receives when Ctrl+C is pressed.
+
 ---
 
 ## 04-modules/ - Code Organization
@@ -694,10 +725,10 @@ Check if the example uses newer features. The language is in alpha, so some exam
 
 ## Example Statistics
 
-- **Total Examples:** 33 files
+- **Total Examples:** 35 files
 - **Basics:** 4 files (~20 minutes)
 - **Intermediate:** 13 files (~2-3 hours)
-- **Advanced:** 6 files (~1-2 hours)
+- **Advanced:** 8 files (~1-2 hours)
 - **Modules:** 6 files (~1 hour)
 - **Stdlib:** 4 files (~1 hour)
 

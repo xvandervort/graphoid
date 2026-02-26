@@ -2,11 +2,20 @@
 //!
 //! Phase 16: Replaces the tree-walking interpreter with graph traversal.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::sync::Mutex;
 use std::time::Instant;
+
+// Phase 19.2: Global signal registry — signals are process-global
+lazy_static::lazy_static! {
+    static ref SIGNAL_REGISTRY: Mutex<HashMap<i32, Vec<crate::values::Channel>>> =
+        Mutex::new(HashMap::new());
+    static ref SIGNAL_LISTENERS: Mutex<HashSet<i32>> =
+        Mutex::new(HashSet::new());
+}
 
 use crate::ast::{BinaryOp, Expr, Parameter, Program, Stmt};
 use crate::error::{GraphoidError, SourcePosition, Result};
@@ -1039,7 +1048,35 @@ impl GraphExecutor {
 
         let iterable_value = self.execute_node(iter_ref)?;
 
-        // Get values to iterate over
+        // Phase 19.2: Channel iteration — lazy receive loop until channel closed
+        if let ValueKind::Channel(ref channel) = iterable_value.kind {
+            loop {
+                match channel.receive() {
+                    Some(sendable_val) => {
+                        let value = sendable_val.0;
+                        if self.env.exists(&var_name) {
+                            self.env.set(&var_name, value)?;
+                        } else {
+                            self.env.define(var_name.clone(), value);
+                        }
+                        match self.execute_node(body_ref) {
+                            Ok(_) => {}
+                            Err(GraphoidError::LoopControl { control }) => {
+                                match control {
+                                    crate::error::LoopControlType::Break => break,
+                                    crate::error::LoopControlType::Continue => continue,
+                                }
+                            }
+                            Err(e) => return Err(e),
+                        }
+                    }
+                    None => break, // channel closed + empty
+                }
+            }
+            return Ok(Value::none());
+        }
+
+        // Get values to iterate over (eager collection for lists and strings)
         let values: Vec<Value> = match &iterable_value.kind {
             ValueKind::List(items) => items.to_vec(),
             ValueKind::String(s) => {
@@ -1047,7 +1084,7 @@ impl GraphExecutor {
             }
             _ => {
                 return Err(GraphoidError::type_error(
-                    "list or string",
+                    "list, string, or channel",
                     iterable_value.type_name(),
                 ));
             }
@@ -2249,6 +2286,8 @@ impl GraphExecutor {
                 "reflect" if !self.env.exists("reflect") => Some("reflect"),
                 "runtime" if !self.env.exists("runtime") => Some("runtime"),
                 "modules" if !self.env.exists("modules") => Some("modules"),
+                "timer" if !self.env.exists("timer") => Some("timer"),
+                "signal" if !self.env.exists("signal") => Some("signal"),
                 _ => None,
             };
             if let Some(type_name) = static_dispatch {
@@ -2271,6 +2310,8 @@ impl GraphExecutor {
                     "reflect" => self.eval_reflect_static_method(&method_name, &args),
                     "runtime" => self.eval_runtime_static_method(&method_name, &args),
                     "modules" => self.eval_modules_static_method(&method_name, &args),
+                    "timer" => self.eval_timer_static_method(&method_name, &args),
+                    "signal" => self.eval_signal_static_method(&method_name, &args),
                     _ => unreachable!(),
                 };
             }
@@ -2910,6 +2951,167 @@ impl GraphExecutor {
             }
             _ => Err(GraphoidError::runtime(format!(
                 "modules does not have method '{}'", method
+            ))),
+        }
+    }
+
+    // =========================================================================
+    // Phase 19.2: Timer static methods — timer.sleep, timer.after, timer.every
+    // =========================================================================
+
+    /// Extract milliseconds from the first argument, validating type and non-negative.
+    fn extract_timer_ms(args: &[Value], method: &str) -> Result<u64> {
+        match &args[0].kind {
+            ValueKind::Number(n) => {
+                if *n < 0.0 {
+                    return Err(GraphoidError::runtime(format!(
+                        "timer.{}() milliseconds must be non-negative", method
+                    )));
+                }
+                Ok(*n as u64)
+            }
+            _ => Err(GraphoidError::type_error("number", args[0].type_name())),
+        }
+    }
+
+    fn eval_timer_static_method(&self, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "sleep" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "timer.sleep() requires 1 argument (milliseconds), got {}", args.len()
+                    )));
+                }
+                let ms = Self::extract_timer_ms(args, "sleep")?;
+                std::thread::sleep(std::time::Duration::from_millis(ms));
+                Ok(Value::none())
+            }
+            "after" => {
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "timer.after() requires 1-2 arguments (ms [, value]), got {}", args.len()
+                    )));
+                }
+                let ms = Self::extract_timer_ms(args, "after")?;
+                let send_value = if args.len() == 2 {
+                    args[1].deep_clone_for_send()
+                } else {
+                    Value::symbol("tick".to_string()).deep_clone_for_send()
+                };
+
+                let channel = crate::values::Channel::new(Some(1));
+                let ch_clone = channel.clone();
+
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(ms));
+                    if !ch_clone.is_closed() {
+                        let _ = ch_clone.send(send_value);
+                    }
+                    ch_clone.close();
+                });
+
+                Ok(Value::channel(channel))
+            }
+            "every" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "timer.every() requires 1 argument (milliseconds), got {}", args.len()
+                    )));
+                }
+                let ms = Self::extract_timer_ms(args, "every")?;
+
+                let channel = crate::values::Channel::new(Some(1));
+                let ch_clone = channel.clone();
+
+                std::thread::spawn(move || {
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_millis(ms));
+                        if ch_clone.is_closed() {
+                            break;
+                        }
+                        let tick = Value::symbol("tick".to_string()).deep_clone_for_send();
+                        if ch_clone.send(tick).is_err() {
+                            break;
+                        }
+                    }
+                });
+
+                Ok(Value::channel(channel))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "timer has no method '{}'", method
+            ))),
+        }
+    }
+
+    // =========================================================================
+    // Phase 19.2: Signal static methods — signal.on
+    // =========================================================================
+
+    fn eval_signal_static_method(&self, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "on" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "signal.on() requires 1 argument (signal name), got {}", args.len()
+                    )));
+                }
+                let signal_name = match &args[0].kind {
+                    ValueKind::Symbol(s) => s.clone(),
+                    _ => return Err(GraphoidError::type_error("symbol", args[0].type_name())),
+                };
+                let sig_num = match signal_name.as_str() {
+                    "sigint" => signal_hook::consts::SIGINT,
+                    "sigterm" => signal_hook::consts::SIGTERM,
+                    "sighup" => signal_hook::consts::SIGHUP,
+                    _ => return Err(GraphoidError::runtime(format!(
+                        "Unknown signal: :{}", signal_name
+                    ))),
+                };
+
+                let channel = crate::values::Channel::new(Some(1));
+                let ch_clone = channel.clone();
+                let sig_name_for_thread = signal_name.clone();
+
+                // Register in global signal registry and start listener if needed
+                {
+                    let mut registry = SIGNAL_REGISTRY.lock().unwrap();
+                    let entry = registry.entry(sig_num).or_insert_with(Vec::new);
+                    entry.push(ch_clone);
+                }
+
+                // Start listener thread for this signal if not already running
+                {
+                    let mut listeners = SIGNAL_LISTENERS.lock().unwrap();
+                    if !listeners.contains(&sig_num) {
+                        listeners.insert(sig_num);
+
+                        let mut signals = signal_hook::iterator::Signals::new(&[sig_num])
+                            .map_err(|e| GraphoidError::runtime(format!(
+                                "Failed to register signal handler: {}", e
+                            )))?;
+
+                        std::thread::spawn(move || {
+                            for _sig in signals.forever() {
+                                let mut registry = SIGNAL_REGISTRY.lock().unwrap();
+                                if let Some(channels) = registry.get_mut(&sig_num) {
+                                    // Clean up closed channels to prevent accumulation
+                                    channels.retain(|ch| !ch.is_closed());
+                                    for ch in channels.iter() {
+                                        let sym = Value::symbol(sig_name_for_thread.clone())
+                                            .deep_clone_for_send();
+                                        let _ = ch.send(sym);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+
+                Ok(Value::channel(channel))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "signal has no method '{}'", method
             ))),
         }
     }

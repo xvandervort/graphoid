@@ -57,4 +57,6 @@ mod unit {
     pub mod net_server_tests;
     pub mod runtime_introspection_tests;
     pub mod concurrency_tests;
+    pub mod timer_tests;
+    pub mod signal_tests;
 }
