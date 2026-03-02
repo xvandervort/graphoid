@@ -357,6 +357,8 @@ impl GraphExecutor {
 
             // Phase 19: Concurrency
             AstNodeType::SpawnStmt => self.exec_spawn(node_ref),
+            // Phase 19.3: Actor spawn expression
+            AstNodeType::SpawnActorExpr => self.exec_spawn_actor(node_ref),
 
             _ => Err(GraphoidError::runtime(format!(
                 "Unimplemented node type: {:?}", node_type
@@ -2319,6 +2321,17 @@ impl GraphExecutor {
 
         let object = self.execute_node(obj_ref)?;
 
+        // Phase 19.3: Graph-native messaging — intercept send/broadcast/request on Graph values
+        // Named arguments (to:, where:) need extraction before they're flattened to positional
+        if matches!(&object.kind, ValueKind::Graph(_)) {
+            match method_name.as_str() {
+                "send" | "request" | "broadcast" => {
+                    return self.eval_graph_messaging(object, &method_name, node_ref);
+                }
+                _ => {}
+            }
+        }
+
         // Evaluate arguments
         let arg_refs = self.get_ordered_edges(node_ref, "Argument");
         let mut args = Vec::new();
@@ -2389,6 +2402,7 @@ impl GraphExecutor {
             ValueKind::Error(ref err) => self.eval_error_method(err, method, &args),
             ValueKind::Time(timestamp) => self.eval_time_method(*timestamp, method, &args),
             ValueKind::Channel(ref ch) => self.eval_channel_method(ch, method, &args),
+            ValueKind::Actor(ref actor_ref) => self.eval_actor_method(actor_ref, method, &args),
             ValueKind::BigNumber(ref bn) => self.eval_bignum_method(bn, method, &args),
             ValueKind::PatternNode(ref pn) => self.eval_pattern_node_method(pn, method, &args),
             ValueKind::PatternEdge(ref pe) => self.eval_pattern_edge_method(pe, method, &args),
@@ -4257,6 +4271,146 @@ impl GraphExecutor {
         }
     }
 
+    /// Phase 19.3: Graph-native messaging — g.send(msg, to: id), g.broadcast(msg), g.request(msg, to: id)
+    fn eval_graph_messaging(&mut self, object: Value, method: &str, node_ref: NodeRef) -> Result<Value> {
+        // Extract positional and named arguments from argument nodes
+        let arg_refs = self.get_ordered_edges(node_ref, "Argument");
+        let mut positional_args = Vec::new();
+        let mut named_args: HashMap<String, Value> = HashMap::new();
+
+        for arg_ref in &arg_refs {
+            let arg_node = self.get_node(*arg_ref)?;
+            let arg_name = arg_node.get_str("arg_name");
+
+            // Evaluate the value (may be wrapped in ExpressionStmt with ValueEdge)
+            let val = if let Some(val_ref) = self.get_edge_target(*arg_ref, &ExecEdgeType::ValueEdge) {
+                self.execute_node(val_ref)?
+            } else {
+                self.execute_node(*arg_ref)?
+            };
+
+            if let Some(name) = arg_name {
+                named_args.insert(name, val);
+            } else {
+                positional_args.push(val);
+            }
+        }
+
+        let graph = match &object.kind {
+            ValueKind::Graph(g) => g.borrow(),
+            _ => unreachable!(),
+        };
+
+        match method {
+            "send" => {
+                let msg = positional_args.first()
+                    .ok_or_else(|| GraphoidError::runtime("g.send() requires a message argument".to_string()))?;
+
+                if let Some(target_id) = named_args.get("to") {
+                    // g.send(msg, to: "alice") — send to specific node
+                    let node_id = target_id.to_string_value();
+                    if let Some(node_val) = graph.get_node(&node_id) {
+                        if let ValueKind::Actor(ref actor_ref) = node_val.kind {
+                            actor_ref.mailbox.send(msg.deep_clone_for_send())
+                                .map_err(|e| GraphoidError::runtime(e))?;
+                        }
+                        // Non-actor nodes silently skipped
+                    } else {
+                        return Err(GraphoidError::runtime(format!("Node '{}' not found in graph", node_id)));
+                    }
+                } else {
+                    return Err(GraphoidError::runtime("g.send() requires 'to:' argument".to_string()));
+                }
+                Ok(Value::none())
+            }
+            "broadcast" => {
+                let msg = positional_args.first()
+                    .ok_or_else(|| GraphoidError::runtime("g.broadcast() requires a message argument".to_string()))?;
+
+                // Send to all actor-valued nodes
+                for node_id in graph.all_node_ids() {
+                    if let Some(node_val) = graph.get_node(&node_id) {
+                        if let ValueKind::Actor(ref actor_ref) = node_val.kind {
+                            let _ = actor_ref.mailbox.send(msg.deep_clone_for_send());
+                        }
+                    }
+                    // Non-actor nodes silently skipped
+                }
+                Ok(Value::none())
+            }
+            "request" => {
+                let msg = positional_args.first()
+                    .ok_or_else(|| GraphoidError::runtime("g.request() requires a message argument".to_string()))?;
+
+                if let Some(target_id) = named_args.get("to") {
+                    let node_id = target_id.to_string_value();
+                    if let Some(node_val) = graph.get_node(&node_id) {
+                        if let ValueKind::Actor(ref actor_ref) = node_val.kind {
+                            let actor_ref = actor_ref.clone();
+                            // Drop graph borrow before blocking on receive
+                            drop(graph);
+                            return actor_ref.send_request(msg);
+                        }
+                        return Err(GraphoidError::runtime(format!("Node '{}' is not an actor", node_id)));
+                    } else {
+                        return Err(GraphoidError::runtime(format!("Node '{}' not found in graph", node_id)));
+                    }
+                } else {
+                    return Err(GraphoidError::runtime("g.request() requires 'to:' argument".to_string()));
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    /// Phase 19.3: Actor method dispatch (.send, .request, .close, .is_closed)
+    fn eval_actor_method(&mut self, actor_ref: &crate::values::actor::ActorRef, method: &str, args: &[Value]) -> Result<Value> {
+
+        match method {
+            "send" => {
+                // Fire-and-forget: deep clone message and send to mailbox
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(
+                        "actor.send() requires exactly 1 argument".to_string()
+                    ));
+                }
+                let sendable = args[0].deep_clone_for_send();
+                actor_ref.mailbox.send(sendable)
+                    .map_err(|e| GraphoidError::runtime(e))?;
+                Ok(Value::none())
+            }
+            "request" => {
+                // Request-response: wrap message with reply channel, block for response
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(
+                        "actor.request() requires exactly 1 argument".to_string()
+                    ));
+                }
+                actor_ref.send_request(&args[0])
+            }
+            "close" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "actor.close() takes no arguments".to_string()
+                    ));
+                }
+                actor_ref.mailbox.close();
+                Ok(Value::none())
+            }
+            "is_closed" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "actor.is_closed() takes no arguments".to_string()
+                    ));
+                }
+                Ok(Value::boolean(actor_ref.mailbox.is_closed()))
+            }
+            _ => Err(GraphoidError::runtime(
+                format!("Actor has no method '{}'", method)
+            )),
+        }
+    }
+
     /// Phase 19: Execute spawn { block } — fire-and-forget concurrent task
     fn exec_spawn(&mut self, node_ref: NodeRef) -> Result<Value> {
         use crate::execution_graph::converter::AstToGraphConverter;
@@ -4344,6 +4498,162 @@ impl GraphExecutor {
 
         // Fire-and-forget: return none immediately
         Ok(Value::none())
+    }
+
+    /// Phase 19.3: Execute spawn actor expression — `spawn Counter{}`
+    fn exec_spawn_actor(&mut self, node_ref: NodeRef) -> Result<Value> {
+        use crate::values::channel::SendableValue;
+        use crate::values::actor::ActorRef;
+
+        // 1. Evaluate the instantiation expression to get the graph
+        let expr_ref = self.get_edge_target(node_ref, &ExecEdgeType::ValueEdge)
+            .ok_or_else(|| GraphoidError::runtime("Spawn actor missing expression".to_string()))?;
+        let graph_value = self.execute_node(expr_ref)?;
+
+        let mut graph = match &graph_value.kind {
+            ValueKind::Graph(g) => g.borrow().clone(),
+            _ => return Err(GraphoidError::runtime(
+                "spawn requires a graph type (e.g., spawn Counter{})".to_string()
+            )),
+        };
+
+        // 2. Verify on_message method exists (check instance methods + template)
+        let has_on_message = !graph.get_method_variants("on_message").is_empty();
+        if !has_on_message {
+            return Err(GraphoidError::runtime(
+                "Cannot spawn actor: graph has no on_message method".to_string()
+            ));
+        }
+
+        // 2b. Flatten template methods onto instance for thread safety.
+        // Instance graphs use Rc<RefCell<Graph>> templates which aren't Send.
+        // Copy all methods from the template chain directly onto the instance.
+        if let Some(tmpl) = graph.template.take() {
+            let tmpl_graph = tmpl.borrow();
+            graph.include_methods_from(&tmpl_graph);
+        }
+
+        // 3. Create mailbox channel (buffered for non-blocking send)
+        let mailbox = crate::values::Channel::new(Some(256));
+
+        // 4. Create ActorRef
+        let type_name = graph.type_name.clone();
+        let actor_ref = ActorRef::new(mailbox.clone(), type_name);
+
+        // 5. Deep-clone graph + env + globals for actor thread (share-nothing)
+        // Use the flattened graph (template methods copied, template cleared)
+        let sendable_graph = Value::graph(graph).deep_clone_for_send();
+
+        let all_bindings = self.env.get_all_bindings_recursive();
+        let sendable_bindings: Vec<(String, SendableValue)> = all_bindings
+            .into_iter()
+            .map(|(name, val)| (name, val.deep_clone_for_send()))
+            .collect();
+
+        let sendable_globals: Vec<(String, Vec<SendableValue>)> = self.global_functions
+            .iter()
+            .map(|(name, overloads)| {
+                let sendable_overloads: Vec<SendableValue> = overloads.iter()
+                    .map(|f| Value::function(f.clone()).deep_clone_for_send())
+                    .collect();
+                (name.clone(), sendable_overloads)
+            })
+            .collect();
+
+        // 6. Spawn OS thread with message loop
+        // Reuse the same SendableState pattern from exec_spawn (proven working)
+        struct SendableActorState {
+            graph: SendableValue,
+            bindings: Vec<(String, SendableValue)>,
+            globals: Vec<(String, Vec<SendableValue>)>,
+        }
+        // SAFETY: All Values inside have been deep-cloned with fresh Rc handles.
+        unsafe impl Send for SendableActorState {}
+
+        let state = SendableActorState {
+            graph: sendable_graph,
+            bindings: sendable_bindings,
+            globals: sendable_globals,
+        };
+
+        // Channel uses Arc internally and is Send-safe
+        let actor_mailbox = mailbox.clone();
+
+        std::thread::spawn(move || {
+            let _ = &state;
+            let _ = &actor_mailbox;
+            let mut task_executor = GraphExecutor::new();
+
+            // Populate environment with captured values
+            for (name, sendable_val) in state.bindings {
+                task_executor.env.define(name, sendable_val.0);
+            }
+
+            // Restore global functions
+            for (name, overloads) in state.globals {
+                let funcs: Vec<crate::values::Function> = overloads.into_iter()
+                    .filter_map(|sv| {
+                        match sv.0.kind {
+                            crate::values::ValueKind::Function(f) => Some(f),
+                            _ => None,
+                        }
+                    })
+                    .collect();
+                if !funcs.is_empty() {
+                    task_executor.global_functions.insert(name, funcs);
+                }
+            }
+
+            // Store actor graph in environment
+            task_executor.env.define(crate::values::actor::ACTOR_GRAPH_VAR.to_string(), state.graph.0);
+
+            let object_expr = crate::ast::Expr::Variable {
+                name: crate::values::actor::ACTOR_GRAPH_VAR.to_string(),
+                position: crate::error::SourcePosition::unknown(),
+            };
+
+            // Message loop
+            loop {
+                let msg = match actor_mailbox.receive() {
+                    Some(sendable_val) => sendable_val.0,
+                    None => break, // Channel closed, actor terminates
+                };
+
+                // Extract reply channel if this is a request
+                let (actual_msg, reply_ch) = crate::values::actor::extract_request_info(&msg);
+
+                // Get current graph from env (may have been mutated by previous messages)
+                let graph_val = match task_executor.env.get(crate::values::actor::ACTOR_GRAPH_VAR) {
+                    Ok(val) => val,
+                    Err(_) => break,
+                };
+
+                // Call on_message on the actor graph
+                let result = task_executor.dispatch_method(
+                    graph_val,
+                    "on_message",
+                    vec![actual_msg],
+                    &object_expr,
+                );
+
+                match result {
+                    Ok(return_value) => {
+                        if let Some(reply) = reply_ch {
+                            let _ = reply.send(return_value.deep_clone_for_send());
+                            reply.close();
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[actor] Unhandled exception: {}", e);
+                        // Actor terminates on unhandled exception
+                        break;
+                    }
+                }
+            }
+        });
+
+        // 7. Return actor reference
+        Ok(Value::actor(actor_ref))
     }
 
     fn load_module(&mut self, module_path: &str, _alias: Option<&String>) -> Result<Value> {
@@ -4655,6 +4965,7 @@ impl GraphExecutor {
             param_names: Vec<String>,
             parameters: Vec<Parameter>,
             guard_ref: Option<NodeRef>,
+            body_stmts: Vec<crate::ast::Stmt>,  // Phase 19.3: AST body for actor threads
         }
         let mut method_infos = Vec::new();
         for method_ref in &method_refs {
@@ -4687,7 +4998,12 @@ impl GraphExecutor {
                         is_variadic,
                     });
                 }
-                method_infos.push(MethodInfo { method_name, is_static, is_private, body_ref, param_names, parameters, guard_ref });
+                // Phase 19.3: Extract AST body for cross-thread execution
+                let body_stmts = match method_node.properties.get("body_stmts") {
+                    Some(AstProperty::Stmts(stmts)) => stmts.clone(),
+                    _ => Vec::new(),
+                };
+                method_infos.push(MethodInfo { method_name, is_static, is_private, body_ref, param_names, parameters, guard_ref, body_stmts });
             }
         }
         // Now register methods (mutable borrow is safe here)
@@ -4719,7 +5035,7 @@ impl GraphExecutor {
                     name: Some(registered_name.clone()),
                     params: mi.param_names,
                     parameters: mi.parameters,
-                    body: Vec::new(),
+                    body: mi.body_stmts,  // Phase 19.3: AST body for actor thread fallback
                     pattern_clauses: None,
                     env,
                     node_id: Some(func_id),
@@ -5662,27 +5978,36 @@ impl GraphExecutor {
         }
 
         // Execute function body
+        // Phase 19.3: Prefer graph-based execution, fallback to AST body (for actor threads)
         let mut return_value = Value::none();
         let execution_result: Result<()> = (|| {
-            if func.body.is_empty() {
-                // Graph-based function body: use stored node_id to find body
-                if let Some(ref func_id) = func.node_id {
-                    if let Some(&body_ref) = self.graph_function_bodies.get(func_id) {
-                        match self.execute_node(body_ref) {
-                            Ok(val) => { return_value = val; }
-                            Err(GraphoidError::ReturnControl { value }) => {
-                                return_value = value;
-                            }
-                            Err(e) => return Err(e),
+            // Try graph-based execution first (main thread has graph_function_bodies populated)
+            let mut executed = false;
+            if let Some(ref func_id) = func.node_id {
+                if let Some(&body_ref) = self.graph_function_bodies.get(func_id) {
+                    executed = true;
+                    match self.execute_node(body_ref) {
+                        Ok(val) => { return_value = val; }
+                        Err(GraphoidError::ReturnControl { value }) => {
+                            return_value = value;
                         }
+                        Err(e) => return Err(e),
                     }
                 }
-            } else {
-                for stmt in &func.body {
-                    if let Some(ret_val) = self.eval_stmt(stmt)? {
-                        return_value = ret_val;
-                        return Ok(());
+            }
+            // Fallback to AST-based execution (actor threads, or functions with AST body only)
+            // Convert ALL stmts as a single Program to preserve control flow (return, break, etc.)
+            if !executed && !func.body.is_empty() {
+                let program = Program { statements: func.body.clone() };
+                let mut converter = AstToGraphConverter::new();
+                let root = converter.convert_program(&program);
+                let exec_graph = converter.into_graph();
+                match self.execute(exec_graph, root) {
+                    Ok(val) => { return_value = val; }
+                    Err(GraphoidError::ReturnControl { value }) => {
+                        return_value = value;
                     }
+                    Err(e) => return Err(e),
                 }
             }
             Ok(())

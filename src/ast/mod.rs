@@ -267,6 +267,11 @@ pub enum Expr {
         error: Box<Expr>,  // Error value/message to raise
         position: SourcePosition,
     },
+    /// Phase 19.3: Spawn actor expression — returns an actor reference
+    SpawnActor {
+        expr: Box<Expr>,  // The graph instantiation expression
+        position: SourcePosition,
+    },
     Match {
         value: Box<Expr>,
         arms: Vec<MatchArm>,
@@ -325,6 +330,7 @@ impl Expr {
             Expr::Match { position, .. } => position,
             Expr::SuperMethodCall { position, .. } => position,
             Expr::Instantiate { position, .. } => position,
+            Expr::SpawnActor { position, .. } => position,
         }
     }
 }

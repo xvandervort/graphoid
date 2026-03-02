@@ -59,4 +59,5 @@ mod unit {
     pub mod concurrency_tests;
     pub mod timer_tests;
     pub mod signal_tests;
+    pub mod actor_tests;
 }

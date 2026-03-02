@@ -14,8 +14,10 @@ pub mod graph;
 pub mod list;
 pub mod hash;
 pub mod channel;
+pub mod actor;
 
 pub use channel::Channel;
+pub use actor::ActorRef;
 
 /// Layers that can be compared when using graph.equals() with include:/only: options
 ///
@@ -539,6 +541,9 @@ pub enum ValueKind {
     /// Channel value (Phase 19) - thread-safe communication pipe
     /// Clone creates a reference to the same channel (via Arc)
     Channel(Channel),
+    /// Actor reference (Phase 19.3) - handle to a running actor
+    /// Clone creates a reference to the same actor (via Arc-based channel)
+    Actor(ActorRef),
 }
 
 // Manual PartialEq implementation for ValueKind
@@ -568,6 +573,7 @@ impl PartialEq for ValueKind {
             (ValueKind::PatternMatchResults(a), ValueKind::PatternMatchResults(b)) => a == b,
             (ValueKind::Time(a), ValueKind::Time(b)) => a == b,
             (ValueKind::Channel(_), ValueKind::Channel(_)) => false, // Channels not comparable by value
+            (ValueKind::Actor(a), ValueKind::Actor(b)) => a == b,
             _ => false, // Different variants are not equal
         }
     }
@@ -623,6 +629,10 @@ impl Value {
 
     pub fn channel(ch: Channel) -> Self {
         Value { kind: ValueKind::Channel(ch), frozen: false }
+    }
+
+    pub fn actor(a: ActorRef) -> Self {
+        Value { kind: ValueKind::Actor(a), frozen: false }
     }
 
     pub fn symbol(s: String) -> Self {
@@ -721,6 +731,7 @@ impl Value {
             ValueKind::PatternMatchResults(results) => !results.is_empty(), // Empty results are falsy
             ValueKind::Time(_) => true, // Time values are always truthy
             ValueKind::Channel(_) => true, // Channels are always truthy
+            ValueKind::Actor(_) => true, // Actor references are always truthy
         }
     }
 
@@ -828,6 +839,7 @@ impl Value {
                 }
             }
             ValueKind::Channel(_) => "<channel>".to_string(),
+            ValueKind::Actor(ref a) => a.to_string(),
         }
     }
 
@@ -853,6 +865,7 @@ impl Value {
             ValueKind::PatternMatchResults(_) => "pattern_match_results",
             ValueKind::Time(_) => "time",
             ValueKind::Channel(_) => "channel",
+            ValueKind::Actor(_) => "actor",
         }
     }
 
@@ -985,6 +998,10 @@ impl Value {
             ValueKind::Channel(ch) => {
                 // Channels are SHARED across threads (Arc-based) — intentionally NOT deep-copied
                 ValueKind::Channel(ch.clone())
+            }
+            ValueKind::Actor(actor) => {
+                // Actors are SHARED across threads (Arc-based channel) — intentionally NOT deep-copied
+                ValueKind::Actor(actor.clone())
             }
             // Primitives, symbols, errors, etc. — just clone
             other => other.clone(),

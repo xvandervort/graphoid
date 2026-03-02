@@ -362,6 +362,25 @@ Topics:
 gr samples/03-advanced/variable_length_paths.gr
 ```
 
+### `actors.gr` ⭐⭐⭐
+**Actor-style concurrency with graph-native messaging**
+
+Topics:
+- Defining actor graphs (graph with `on_message`)
+- Spawning actors with `spawn Actor{}`
+- Fire-and-forget messaging (`.send()`)
+- Request-response messaging (`.request()`)
+- State persistence across messages
+- Initial state overrides
+- Graph-native messaging (`g.send(to:)`, `g.broadcast()`, `g.request(to:)`)
+- Actor lifecycle (`.close()`, `.is_closed()`)
+
+```bash
+gr samples/03-advanced/actors.gr
+```
+
+**Key Concept:** A graph with `fn on_message(msg)` IS an actor — no separate `actor` keyword. Actors process messages one at a time with isolated state, and can be stored as graph nodes for graph-native messaging.
+
 ### `concurrency.gr` ⭐⭐⭐
 **Spawn + Channels concurrency**
 

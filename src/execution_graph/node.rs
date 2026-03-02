@@ -78,6 +78,7 @@ pub enum AstNodeType {
     ImportItemNode,  // Phase 17: selective import item (name + optional alias)
     PrivBlockStmt,   // Phase 17: priv { } block (children are private declarations)
     SpawnStmt,       // Phase 19: spawn { } concurrent task
+    SpawnActorExpr,  // Phase 19.3: spawn Counter{} actor expression
 }
 
 /// Edge types connecting nodes in the execution graph.

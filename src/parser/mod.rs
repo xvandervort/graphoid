@@ -2901,6 +2901,15 @@ impl Parser {
     fn primary(&mut self) -> Result<Expr> {
         let position = self.peek().position();
 
+        // Phase 19.3: Spawn actor expression — `spawn Counter{}` in expression context
+        if self.match_token(&TokenType::Spawn) {
+            let actor_expr = self.expression()?;
+            return Ok(Expr::SpawnActor {
+                expr: Box::new(actor_expr),
+                position,
+            });
+        }
+
         // Raise expressions
         if self.match_token(&TokenType::Raise) {
             let error_expr = Box::new(self.expression()?);
