@@ -572,7 +572,7 @@ impl PartialEq for ValueKind {
             (ValueKind::PatternPath(a), ValueKind::PatternPath(b)) => a == b,
             (ValueKind::PatternMatchResults(a), ValueKind::PatternMatchResults(b)) => a == b,
             (ValueKind::Time(a), ValueKind::Time(b)) => a == b,
-            (ValueKind::Channel(_), ValueKind::Channel(_)) => false, // Channels not comparable by value
+            (ValueKind::Channel(a), ValueKind::Channel(b)) => a == b, // Identity comparison via Arc
             (ValueKind::Actor(a), ValueKind::Actor(b)) => a == b,
             _ => false, // Different variants are not equal
         }

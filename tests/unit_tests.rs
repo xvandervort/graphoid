@@ -60,4 +60,6 @@ mod unit {
     pub mod timer_tests;
     pub mod signal_tests;
     pub mod actor_tests;
+    pub mod select_tests;
+    pub mod supervision_tests;
 }

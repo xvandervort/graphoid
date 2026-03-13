@@ -1,8 +1,8 @@
 # Graphoid Implementation Roadmap
 
-**Version**: 11.0
-**Last Updated**: February 18, 2026
-**Status**: Phases 0-19.3 Complete. Phase 19.4 (Module Hot Reload) next.
+**Version**: 12.1
+**Last Updated**: March 12, 2026
+**Status**: Phases 0-19.5 Complete. Actor lifecycle bug fixed (Drop cleanup). Phase 19.4 (Module Hot Reload) deferred for planning.
 
 ---
 
@@ -68,8 +68,8 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 | 19.1 | Spawn + Channels | **Critical** | 5-7 days | Phase 15, 16 | ✅ Complete |
 | 19.2 | Timers + Signals | **Critical** | 3-5 days | Phase 19.1 | ✅ Complete |
 | 19.3 | Actors as Graph Nodes | **Critical** | 5-7 days | Phase 19.1 | ✅ Complete |
-| 19.4 | Module Hot Reload | **High** | 3-5 days | Phase 19.1 | |
-| 19.5 | Select + Supervision | **High** | 5-7 days | Phase 19.3 | |
+| 19.4 | Module Hot Reload | **High** | 3-5 days | Phase 19.1 | ⏸ Deferred (needs spec design; enables Platform) |
+| 19.5 | Select + Supervision | **High** | 5-7 days | Phase 19.3 | ✅ Complete |
 | 19.6 | File Watching + Auto-Reload | **High** | 2-3 days | Phase 19.2, 19.4 | |
 
 ### Ecosystem & Interop
@@ -195,14 +195,14 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 1. ~~**Phase 18.6: Server Capabilities**~~ ✅ Complete (Feb 19, 2026)
 2. ~~**Phase 18.7: Runtime Introspection**~~ ✅ Complete (Feb 20, 2026)
 
-### Near-Term (Concurrency)
+### Near-Term (Concurrency) — ✅ CORE COMPLETE
 
-3. **Phase 19.1: Spawn + Channels** - Core concurrency foundation (share-nothing)
-4. **Phase 19.2: Timers + Signals** - Timer channels, signal channels
-5. **Phase 19.3: Actors as Graph Nodes** - Actors ARE nodes, graph-native messaging
-6. **Phase 19.4: Module Hot Reload** - Erlang-style per-task reload
-7. **Phase 19.5: Select + Supervision** - Channel multiplexing, restart strategies
-8. **Phase 19.6: File Watching + Auto-Reload** - `fs.watch()` triggers hot reload
+3. ~~**Phase 19.1: Spawn + Channels**~~ ✅ Complete (Feb 23, 2026)
+4. ~~**Phase 19.2: Timers + Signals**~~ ✅ Complete (Feb 26, 2026)
+5. ~~**Phase 19.3: Actors as Graph Nodes**~~ ✅ Complete (Feb 27, 2026)
+6. **Phase 19.4: Module Hot Reload** - ⏸ Deferred (needs spec design)
+7. ~~**Phase 19.5: Select + Supervision**~~ ✅ Complete (Mar 2, 2026)
+8. **Phase 19.6: File Watching + Auto-Reload** - Blocked on 19.4
 
 ### Medium-Term (Ecosystem + Compilation)
 
@@ -336,6 +336,7 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 12.1 | 2026-03-12 | Actor lifecycle bug fixed (Drop cleanup, liveness checks). Concurrency near-term marked complete. |
 | 11.0 | 2026-02-18 | Phases 15-18 complete. Phase 18.5 split: concurrency parts into Phase 19 sub-phases, non-concurrency into 18.7. Phase 19 broken into 6 sub-phases (19.1-19.6). Concurrency syntax added to language spec. BigNum cleanup complete. |
 | 10.0 | 2026-02-09 | Phases 15-17 complete. Phase 18 in progress. |
 | 9.2 | 2026-01-28 | Phase 15 (Namespace as Graph) complete. Phases 18.5-18.6 planned for after graph-centric foundation. Phase 16 next. |

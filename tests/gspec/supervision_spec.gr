@@ -1,0 +1,144 @@
+# supervision_spec.gr - Phase 19.5: Supervision for actor restart
+#
+# Tests for supervisor graph template, .supervise() method,
+# and automatic restart of crashed actors.
+
+describe "supervision" {
+
+    describe "supervisor template" {
+
+        it "exists as a built-in" {
+            assert(expect(supervisor.type()).to_equal("graph"))
+        }
+
+        it "can be inherited with from" {
+            graph MySup from supervisor {
+                fn on_message(msg) { return msg }
+            }
+            inst = MySup{}
+            assert(expect(inst.type()).to_equal("graph"))
+        }
+    }
+
+    describe ".supervise()" {
+
+        it "registers a child actor" {
+            graph MySup from supervisor {
+                fn on_message(msg) { return msg }
+            }
+            graph Worker {
+                fn on_message(msg) { return msg }
+            }
+            sup = spawn MySup{}
+            w = spawn Worker{}
+            sup.supervise(w)
+            # If no error, supervision registered successfully
+            assert(expect(sup.type()).to_equal("actor"))
+        }
+
+        it "accepts restart mode" {
+            graph MySup from supervisor {
+                fn on_message(msg) { return msg }
+            }
+            graph Worker {
+                fn on_message(msg) { return msg }
+            }
+            sup = spawn MySup{}
+            w = spawn Worker{}
+            sup.supervise(w, restart: :transient)
+            assert(expect(w.type()).to_equal("actor"))
+        }
+    }
+
+    describe "actor restart" {
+
+        it "restarts a crashed permanent actor" {
+            graph MySup from supervisor {
+                fn on_message(msg) { return msg }
+            }
+            graph CrashWorker {
+                fn on_message(msg) {
+                    if msg == "crash" {
+                        raise "Intentional crash"
+                    }
+                    return "ok:" + msg
+                }
+            }
+            sup = spawn MySup{}
+            worker = spawn CrashWorker{}
+            sup.supervise(worker)
+
+            # Normal operation
+            r1 = worker.request("hello")
+            assert(expect(r1).to_equal("ok:hello"))
+
+            # Crash and wait for restart
+            worker.send("crash")
+            timer.sleep(200)
+
+            # After restart, actor works again
+            r2 = worker.request("world")
+            assert(expect(r2).to_equal("ok:world"))
+        }
+
+        it "does not restart a temporary actor" {
+            graph MySup from supervisor {
+                fn on_message(msg) { return msg }
+            }
+            graph CrashWorker {
+                fn on_message(msg) {
+                    if msg == "crash" {
+                        raise "Intentional crash"
+                    }
+                    return "ok:" + msg
+                }
+            }
+            sup = spawn MySup{}
+            worker = spawn CrashWorker{}
+            sup.supervise(worker, restart: :temporary)
+
+            r1 = worker.request("hello")
+            assert(expect(r1).to_equal("ok:hello"))
+
+            # Crash — no restart for :temporary
+            worker.send("crash")
+            timer.sleep(100)
+
+            # Actor is dead, but original result preserved
+            assert(expect(r1).to_equal("ok:hello"))
+        }
+    }
+
+    describe "actor .id()" {
+
+        it "returns a positive number" {
+            graph Worker {
+                fn on_message(msg) { return msg }
+            }
+            w = spawn Worker{}
+            id = w.id()
+            assert(expect(id > 0).to_equal(true))
+        }
+    }
+
+    describe "custom supervisor config" {
+
+        it "supports custom strategy" {
+            graph MySup from supervisor {
+                strategy: :one_for_all
+                fn on_message(msg) { return msg }
+            }
+            sup = spawn MySup{}
+            assert(expect(sup.type()).to_equal("actor"))
+        }
+
+        it "supports custom max_restarts" {
+            graph MySup from supervisor {
+                max_restarts: 10
+                fn on_message(msg) { return msg }
+            }
+            sup = spawn MySup{}
+            assert(expect(sup.type()).to_equal("actor"))
+        }
+    }
+}

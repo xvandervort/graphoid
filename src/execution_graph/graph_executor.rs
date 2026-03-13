@@ -71,6 +71,8 @@ pub struct GraphExecutor {
     start_time: Instant,
     /// Phase 18.7: call stack snapshot at raise time (for error.stack())
     raise_stack: Option<Vec<String>>,
+    /// Phase 19: IDs of actors spawned by this executor (for cleanup on drop)
+    spawned_actor_ids: Vec<u64>,
 }
 
 /// A pattern clause stored as graph references (for pattern-matching functions).
@@ -114,10 +116,31 @@ impl GraphExecutor {
             universe_graph: Rc::new(RefCell::new(Self::build_initial_universe_graph())),
             start_time: Instant::now(),
             raise_stack: None,
+            spawned_actor_ids: Vec::new(),
         };
         // Phase 18.7: Set __MODULE__ for top-level scripts
         executor.env.define("__MODULE__".to_string(), Value::string("__main__".to_string()));
+
+        // Phase 19.5: Register built-in supervisor graph template
+        if !executor.env.exists("supervisor") {
+            let supervisor_graph = Self::build_supervisor_template();
+            executor.env.define("supervisor".to_string(), Value::graph(supervisor_graph));
+        }
+
         executor
+    }
+
+    /// Build the built-in supervisor graph template with default properties.
+    fn build_supervisor_template() -> crate::values::graph::Graph {
+        use crate::values::graph::{Graph, GraphType};
+        let mut g = Graph::new(GraphType::Directed);
+        g.type_name = Some("supervisor".to_string());
+        // Default properties
+        let strategy_id = Graph::property_node_id("strategy");
+        let _ = g.add_node(strategy_id, Value::symbol("one_for_one".to_string()));
+        let max_id = Graph::property_node_id("max_restarts");
+        let _ = g.add_node(max_id, Value::number(3.0));
+        g
     }
 
     /// Build the initial universe graph with the built-in type hierarchy.
@@ -1625,6 +1648,116 @@ impl GraphExecutor {
                 let edge_type_str = edge_type.unwrap_or_default();
                 Ok(Some(Value::pattern_path(edge_type_str, min_val, max_val, direction)))
             }
+            // Phase 19.5: select() — channel multiplexing
+            "select" => {
+                // Separate positional (channels) from named (timeout, default) args
+                let mut channels: Vec<(Value, crate::values::Channel)> = Vec::new();
+                let mut timeout_ms: Option<u64> = None;
+                let mut use_default = false;
+
+                for (i, val) in args.iter().enumerate() {
+                    let arg_name = arg_names.get(i).and_then(|n| n.as_ref());
+                    if let Some(name) = arg_name {
+                        match name.as_str() {
+                            "timeout" => {
+                                match &val.kind {
+                                    ValueKind::Number(n) => {
+                                        if *n < 0.0 {
+                                            return Err(GraphoidError::runtime(
+                                                "select() timeout must be non-negative".to_string()
+                                            ));
+                                        }
+                                        timeout_ms = Some(*n as u64);
+                                    }
+                                    _ => return Err(GraphoidError::type_error("number", val.type_name())),
+                                }
+                            }
+                            "default" => {
+                                use_default = val.is_truthy();
+                            }
+                            _ => return Err(GraphoidError::runtime(
+                                format!("select() does not accept parameter '{}'", name)
+                            )),
+                        }
+                    } else {
+                        match &val.kind {
+                            ValueKind::Channel(ch) => {
+                                channels.push((val.clone(), ch.clone()));
+                            }
+                            _ => return Err(GraphoidError::runtime(
+                                format!("select() argument {} must be a channel, got {}", i + 1, val.type_name())
+                            )),
+                        }
+                    }
+                }
+
+                if channels.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "select() requires at least one channel argument".to_string()
+                    ));
+                }
+
+                // Non-blocking mode: single pass
+                if use_default {
+                    // Randomize start for fairness
+                    let start = if channels.len() > 1 {
+                        (std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .subsec_nanos() as usize) % channels.len()
+                    } else { 0 };
+
+                    for offset in 0..channels.len() {
+                        let idx = (start + offset) % channels.len();
+                        if let Some(sendable) = channels[idx].1.try_receive() {
+                            let result = vec![channels[idx].0.clone(), sendable.0];
+                            return Ok(Some(Value::list(crate::values::List::from_vec(result))));
+                        }
+                    }
+                    let result = vec![Value::symbol("default".to_string()), Value::none()];
+                    return Ok(Some(Value::list(crate::values::List::from_vec(result))));
+                }
+
+                // Blocking mode: poll with backoff
+                let start_time = std::time::Instant::now();
+                loop {
+                    // Check if all channels are closed
+                    let all_closed = channels.iter().all(|(_, ch)| ch.is_closed());
+
+                    // Randomize start for fairness
+                    let start = if channels.len() > 1 {
+                        (std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .subsec_nanos() as usize) % channels.len()
+                    } else { 0 };
+
+                    for offset in 0..channels.len() {
+                        let idx = (start + offset) % channels.len();
+                        if let Some(sendable) = channels[idx].1.try_receive() {
+                            let result = vec![channels[idx].0.clone(), sendable.0];
+                            return Ok(Some(Value::list(crate::values::List::from_vec(result))));
+                        }
+                    }
+
+                    // All closed and empty — no more data possible
+                    if all_closed {
+                        return Err(GraphoidError::runtime(
+                            "select(): all channels are closed".to_string()
+                        ));
+                    }
+
+                    // Check timeout
+                    if let Some(ms) = timeout_ms {
+                        if start_time.elapsed() >= std::time::Duration::from_millis(ms) {
+                            let result = vec![Value::symbol("timeout".to_string()), Value::none()];
+                            return Ok(Some(Value::list(crate::values::List::from_vec(result))));
+                        }
+                    }
+
+                    std::thread::sleep(std::time::Duration::from_millis(1));
+                }
+            }
             _ => Ok(None),
         }
     }
@@ -2330,6 +2463,11 @@ impl GraphExecutor {
                 }
                 _ => {}
             }
+        }
+
+        // Phase 19.5: Intercept .supervise() on Actor values (needs named arg `restart:`)
+        if matches!(&object.kind, ValueKind::Actor(_)) && method_name == "supervise" {
+            return self.eval_actor_supervise(object, node_ref);
         }
 
         // Evaluate arguments
@@ -4311,7 +4449,7 @@ impl GraphExecutor {
                     let node_id = target_id.to_string_value();
                     if let Some(node_val) = graph.get_node(&node_id) {
                         if let ValueKind::Actor(ref actor_ref) = node_val.kind {
-                            actor_ref.mailbox.send(msg.deep_clone_for_send())
+                            actor_ref.effective_mailbox().send(msg.deep_clone_for_send())
                                 .map_err(|e| GraphoidError::runtime(e))?;
                         }
                         // Non-actor nodes silently skipped
@@ -4331,7 +4469,7 @@ impl GraphExecutor {
                 for node_id in graph.all_node_ids() {
                     if let Some(node_val) = graph.get_node(&node_id) {
                         if let ValueKind::Actor(ref actor_ref) = node_val.kind {
-                            let _ = actor_ref.mailbox.send(msg.deep_clone_for_send());
+                            let _ = actor_ref.effective_mailbox().send(msg.deep_clone_for_send());
                         }
                     }
                     // Non-actor nodes silently skipped
@@ -4375,8 +4513,18 @@ impl GraphExecutor {
                     ));
                 }
                 let sendable = args[0].deep_clone_for_send();
-                actor_ref.mailbox.send(sendable)
-                    .map_err(|e| GraphoidError::runtime(e))?;
+                // Retry if mailbox was closed during restart (redirect in progress)
+                let mut attempts = 0;
+                loop {
+                    match actor_ref.effective_mailbox().send(sendable.0.deep_clone_for_send()) {
+                        Ok(()) => break,
+                        Err(_) if attempts < 10 => {
+                            attempts += 1;
+                            std::thread::sleep(std::time::Duration::from_millis(50));
+                        }
+                        Err(e) => return Err(GraphoidError::runtime(e)),
+                    }
+                }
                 Ok(Value::none())
             }
             "request" => {
@@ -4405,10 +4553,107 @@ impl GraphExecutor {
                 }
                 Ok(Value::boolean(actor_ref.mailbox.is_closed()))
             }
+            "id" => {
+                Ok(Value::number(actor_ref.id as f64))
+            }
             _ => Err(GraphoidError::runtime(
                 format!("Actor has no method '{}'", method)
             )),
         }
+    }
+
+    /// Phase 19.5: Supervisor .supervise(child_actor, restart: :permanent)
+    fn eval_actor_supervise(&mut self, supervisor_value: Value, node_ref: NodeRef) -> Result<Value> {
+        use crate::values::actor::{RestartMode, SupervisionEntry, SUPERVISION_REGISTRY};
+
+        let supervisor_ref = match &supervisor_value.kind {
+            ValueKind::Actor(ref a) => a.clone(),
+            _ => unreachable!(),
+        };
+
+        // Verify this actor has supervisor config
+        if supervisor_ref.supervisor_config.is_none() {
+            return Err(GraphoidError::runtime(
+                "Only supervisors can call .supervise(). Use `graph X from supervisor {}` to create one.".to_string()
+            ));
+        }
+
+        // Extract positional and named arguments (same pattern as eval_graph_messaging)
+        let arg_refs = self.get_ordered_edges(node_ref, "Argument");
+        let mut positional_args = Vec::new();
+        let mut named_args: HashMap<String, Value> = HashMap::new();
+
+        for arg_ref in &arg_refs {
+            let arg_node = self.get_node(*arg_ref)?;
+            let arg_name = arg_node.get_str("arg_name");
+
+            let val = if let Some(val_ref) = self.get_edge_target(*arg_ref, &ExecEdgeType::ValueEdge) {
+                self.execute_node(val_ref)?
+            } else {
+                self.execute_node(*arg_ref)?
+            };
+
+            if let Some(name) = arg_name {
+                named_args.insert(name, val);
+            } else {
+                positional_args.push(val);
+            }
+        }
+
+        // First positional = child actor
+        let child_val = positional_args.first().ok_or_else(|| {
+            GraphoidError::runtime(".supervise() requires a child actor argument".to_string())
+        })?;
+
+        let child_ref = match &child_val.kind {
+            ValueKind::Actor(ref a) => a.clone(),
+            _ => return Err(GraphoidError::runtime(
+                ".supervise() argument must be an actor".to_string()
+            )),
+        };
+
+        // Named arg: restart: (default :permanent)
+        let restart_mode = if let Some(restart_val) = named_args.get("restart") {
+            match &restart_val.kind {
+                ValueKind::Symbol(s) => RestartMode::from_symbol(s).ok_or_else(|| {
+                    GraphoidError::runtime(format!(
+                        "Invalid restart mode ':{}'. Use :permanent, :transient, or :temporary.", s
+                    ))
+                })?,
+                _ => return Err(GraphoidError::runtime(
+                    "restart: argument must be a symbol (:permanent, :transient, :temporary)".to_string()
+                )),
+            }
+        } else {
+            RestartMode::Permanent
+        };
+
+        let child_id = child_ref.id;
+
+        // Determine child's order (position in supervisor's children list)
+        let order = {
+            let config = supervisor_ref.supervisor_config.as_ref().unwrap();
+            let mut children = config.children.lock().map_err(|_| {
+                GraphoidError::runtime("Failed to lock supervisor children list".to_string())
+            })?;
+            let ord = children.len();
+            children.push(child_id);
+            ord
+        };
+
+        // Register in supervision registry
+        {
+            let mut registry = SUPERVISION_REGISTRY.lock().map_err(|_| {
+                GraphoidError::runtime("Failed to lock supervision registry".to_string())
+            })?;
+            registry.insert(child_id, SupervisionEntry {
+                supervisor: supervisor_ref,
+                restart_mode,
+                order,
+            });
+        }
+
+        Ok(Value::none())
     }
 
     /// Phase 19: Execute spawn { block } — fire-and-forget concurrent task
@@ -4538,7 +4783,32 @@ impl GraphExecutor {
 
         // 4. Create ActorRef
         let type_name = graph.type_name.clone();
-        let actor_ref = ActorRef::new(mailbox.clone(), type_name);
+
+        // Check if this graph inherits from supervisor
+        let is_supervisor = graph.ancestors().iter().any(|a| a == "supervisor");
+        let supervisor_config = if is_supervisor {
+            use crate::values::actor::SupervisorConfig;
+            use crate::values::graph::Graph;
+            // Read strategy and max_restarts from graph properties
+            let strategy = graph.get_node(&Graph::property_node_id("strategy"))
+                .and_then(|n| match &n.kind {
+                    ValueKind::Symbol(s) => Some(s.clone()),
+                    _ => None,
+                })
+                .unwrap_or_else(|| "one_for_one".to_string());
+            let max_restarts = graph.get_node(&Graph::property_node_id("max_restarts"))
+                .and_then(|n| match &n.kind {
+                    ValueKind::Number(v) => Some(*v as u32),
+                    _ => None,
+                })
+                .unwrap_or(3);
+            Some(std::sync::Arc::new(SupervisorConfig::new(strategy, max_restarts)))
+        } else {
+            None
+        };
+
+        let mut actor_ref = ActorRef::new(mailbox.clone(), type_name);
+        actor_ref.supervisor_config = supervisor_config;
 
         // 5. Deep-clone graph + env + globals for actor thread (share-nothing)
         // Use the flattened graph (template methods copied, template cleared)
@@ -4570,6 +4840,23 @@ impl GraphExecutor {
         // SAFETY: All Values inside have been deep-cloned with fresh Rc handles.
         unsafe impl Send for SendableActorState {}
 
+        // Store spawn template for restart capability (deep-clone again)
+        {
+            use crate::values::actor::SpawnTemplate;
+            let template = SpawnTemplate {
+                graph: sendable_graph.0.deep_clone_for_send(),
+                bindings: sendable_bindings.iter()
+                    .map(|(n, sv)| (n.clone(), sv.0.deep_clone_for_send()))
+                    .collect(),
+                globals: sendable_globals.iter()
+                    .map(|(n, ovs)| (n.clone(), ovs.iter().map(|sv| sv.0.deep_clone_for_send()).collect()))
+                    .collect(),
+            };
+            if let Ok(mut guard) = actor_ref.spawn_template.lock() {
+                *guard = Some(template);
+            }
+        }
+
         let state = SendableActorState {
             graph: sendable_graph,
             bindings: sendable_bindings,
@@ -4578,10 +4865,12 @@ impl GraphExecutor {
 
         // Channel uses Arc internally and is Send-safe
         let actor_mailbox = mailbox.clone();
+        let actor_id = actor_ref.id;
 
         std::thread::spawn(move || {
             let _ = &state;
             let _ = &actor_mailbox;
+            let _ = actor_id;
             let mut task_executor = GraphExecutor::new();
 
             // Populate environment with captured values
@@ -4644,16 +4933,337 @@ impl GraphExecutor {
                         }
                     }
                     Err(e) => {
-                        eprintln!("[actor] Unhandled exception: {}", e);
-                        // Actor terminates on unhandled exception
-                        break;
+                        // Check supervision registry for crash handling.
+                        // First verify this actor is still in the ACTOR_REGISTRY —
+                        // if the owning executor was dropped, it cleaned up registries
+                        // and we must not attempt restart with stale entries.
+                        let still_registered = {
+                            crate::values::actor::ACTOR_REGISTRY.lock().ok()
+                                .map(|r| r.contains_key(&actor_id))
+                                .unwrap_or(false)
+                        };
+                        if !still_registered {
+                            break; // Executor dropped, actor is orphaned — exit silently
+                        }
+                        let supervised = {
+                            let registry = crate::values::actor::SUPERVISION_REGISTRY.lock().ok();
+                            registry.and_then(|r| r.get(&actor_id).cloned())
+                        };
+                        if let Some(entry) = supervised {
+                            // Verify supervisor is still alive
+                            if entry.supervisor.effective_mailbox().is_closed() {
+                                break; // Supervisor is dead, don't restart
+                            }
+                            let should_restart = match entry.restart_mode {
+                                crate::values::actor::RestartMode::Permanent => true,
+                                crate::values::actor::RestartMode::Transient => true, // crashed = abnormal
+                                crate::values::actor::RestartMode::Temporary => false,
+                            };
+                            if should_restart {
+                                if Self::attempt_supervised_restart(actor_id, &entry) {
+                                    eprintln!("[actor] Supervised actor {} crashed: {}. Restarting.", actor_id, e);
+                                    break; // Old thread exits; new thread spawned by restart
+                                } else {
+                                    eprintln!("[actor] Supervised actor {} crashed: {}. Max restarts exceeded.", actor_id, e);
+                                    break;
+                                }
+                            } else {
+                                break; // Temporary actor, no restart
+                            }
+                        } else {
+                            break; // Unsupervised, just exit
+                        }
                     }
                 }
             }
         });
 
-        // 7. Return actor reference
+        // 7. Register in global actor registry for supervision lookup
+        {
+            if let Ok(mut registry) = crate::values::actor::ACTOR_REGISTRY.lock() {
+                registry.insert(actor_ref.id, actor_ref.clone());
+            }
+        }
+
+        // 8. Track this actor for cleanup on executor drop
+        self.spawned_actor_ids.push(actor_ref.id);
+
+        // 9. Return actor reference
         Ok(Value::actor(actor_ref))
+    }
+
+    /// Attempt to restart a supervised actor. Returns true if restart succeeded.
+    /// Called from within the crashing actor's thread.
+    fn attempt_supervised_restart(
+        actor_id: u64,
+        entry: &crate::values::actor::SupervisionEntry,
+    ) -> bool {
+        // Check max_restarts (60-second window)
+        if let Some(ref config) = entry.supervisor.supervisor_config {
+            let mut tracking = match config.restart_tracking.lock() {
+                Ok(t) => t,
+                Err(_) => return false,
+            };
+            let elapsed = tracking.1.elapsed();
+            if elapsed.as_secs() > 60 {
+                // Reset window
+                tracking.0 = 0;
+                tracking.1 = std::time::Instant::now();
+            }
+            tracking.0 += 1;
+            if tracking.0 > config.max_restarts {
+                return false;
+            }
+        }
+
+        // Execute strategy-based restart (may restart other children too)
+        let strategy = entry.supervisor.supervisor_config.as_ref()
+            .map(|c| c.strategy.clone())
+            .unwrap_or_else(|| "one_for_one".to_string());
+
+        if strategy != "one_for_one" {
+            Self::execute_supervisor_strategy(&entry.supervisor, actor_id, &strategy);
+        }
+
+        // Restart the crashed actor itself
+        Self::restart_single_actor(actor_id)
+    }
+
+    /// Execute strategy-based restart for all affected children.
+    fn execute_supervisor_strategy(
+        supervisor: &crate::values::actor::ActorRef,
+        crashed_id: u64,
+        strategy: &str,
+    ) {
+        let children = match supervisor.supervisor_config.as_ref() {
+            Some(config) => match config.children.lock() {
+                Ok(c) => c.clone(),
+                Err(_) => return,
+            },
+            None => return,
+        };
+
+        match strategy {
+            "one_for_one" => {
+                // Only restart the crashed child (handled by caller)
+            }
+            "one_for_all" => {
+                // Restart ALL children except the crashed one (it's restarted by caller)
+                for &child_id in &children {
+                    if child_id != crashed_id {
+                        // Close the child's mailbox to terminate its message loop
+                        if let Ok(registry) = crate::values::actor::ACTOR_REGISTRY.lock() {
+                            if let Some(child_ref) = registry.get(&child_id) {
+                                child_ref.effective_mailbox().close();
+                            }
+                        }
+                        Self::restart_single_actor(child_id);
+                    }
+                }
+            }
+            "rest_for_one" => {
+                // Restart crashed child + all children registered after it
+                let crashed_order = {
+                    let registry = crate::values::actor::SUPERVISION_REGISTRY.lock().ok();
+                    registry.and_then(|r| r.get(&crashed_id).map(|e| e.order))
+                };
+                if let Some(order) = crashed_order {
+                    for &child_id in &children {
+                        if child_id == crashed_id { continue; }
+                        let child_order = {
+                            let registry = crate::values::actor::SUPERVISION_REGISTRY.lock().ok();
+                            registry.and_then(|r| r.get(&child_id).map(|e| e.order))
+                        };
+                        if let Some(co) = child_order {
+                            if co > order {
+                                if let Ok(registry) = crate::values::actor::ACTOR_REGISTRY.lock() {
+                                    if let Some(child_ref) = registry.get(&child_id) {
+                                        child_ref.effective_mailbox().close();
+                                    }
+                                }
+                                Self::restart_single_actor(child_id);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Restart a single actor by ID using its stored spawn template.
+    /// Creates a new mailbox, redirects the old one, and spawns a new message loop thread.
+    fn restart_single_actor(actor_id: u64) -> bool {
+        use crate::values::channel::SendableValue;
+
+        // Get actor ref and spawn template from registries
+        let actor_ref = {
+            let registry = match crate::values::actor::ACTOR_REGISTRY.lock() {
+                Ok(r) => r,
+                Err(_) => return false,
+            };
+            match registry.get(&actor_id) {
+                Some(r) => r.clone(),
+                None => return false,
+            }
+        };
+
+        let template = {
+            let guard = match actor_ref.spawn_template.lock() {
+                Ok(g) => g,
+                Err(_) => return false,
+            };
+            match guard.as_ref() {
+                Some(t) => t.clone(),
+                None => return false,
+            }
+        };
+
+        // Create new mailbox and redirect old one
+        let new_mailbox = crate::values::Channel::new(Some(256));
+        actor_ref.redirect_to(new_mailbox.clone());
+
+        // Deep-clone template for the new thread
+        let sendable_graph = template.graph.0.deep_clone_for_send();
+        let sendable_bindings: Vec<(String, SendableValue)> = template.bindings.iter()
+            .map(|(n, sv)| (n.clone(), sv.0.deep_clone_for_send()))
+            .collect();
+        let sendable_globals: Vec<(String, Vec<SendableValue>)> = template.globals.iter()
+            .map(|(n, ovs)| (n.clone(), ovs.iter().map(|sv| sv.0.deep_clone_for_send()).collect()))
+            .collect();
+
+        struct SendableRestartState {
+            graph: SendableValue,
+            bindings: Vec<(String, SendableValue)>,
+            globals: Vec<(String, Vec<SendableValue>)>,
+        }
+        unsafe impl Send for SendableRestartState {}
+
+        let state = SendableRestartState {
+            graph: sendable_graph,
+            bindings: sendable_bindings,
+            globals: sendable_globals,
+        };
+
+        let actor_mailbox = new_mailbox;
+
+        std::thread::spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = &state;
+            let _ = &actor_mailbox;
+            let _ = actor_id;
+            let mut task_executor = GraphExecutor::new();
+
+            // Populate environment
+            for (name, sendable_val) in state.bindings {
+                task_executor.env.define(name, sendable_val.0);
+            }
+
+            // Restore global functions
+            for (name, overloads) in state.globals {
+                let funcs: Vec<crate::values::Function> = overloads.into_iter()
+                    .filter_map(|sv| {
+                        match sv.0.kind {
+                            crate::values::ValueKind::Function(f) => Some(f),
+                            _ => None,
+                        }
+                    })
+                    .collect();
+                if !funcs.is_empty() {
+                    task_executor.global_functions.insert(name, funcs);
+                }
+            }
+
+            // Store actor graph in environment
+            task_executor.env.define(crate::values::actor::ACTOR_GRAPH_VAR.to_string(), state.graph.0);
+
+            let object_expr = crate::ast::Expr::Variable {
+                name: crate::values::actor::ACTOR_GRAPH_VAR.to_string(),
+                position: crate::error::SourcePosition::unknown(),
+            };
+
+            // Message loop (same as original actor thread)
+            loop {
+                let msg = match actor_mailbox.receive() {
+                    Some(sendable_val) => sendable_val.0,
+                    None => break, // Channel closed, actor terminates
+                };
+
+                let (actual_msg, reply_ch) = crate::values::actor::extract_request_info(&msg);
+
+                let graph_val = match task_executor.env.get(crate::values::actor::ACTOR_GRAPH_VAR) {
+                    Ok(val) => val,
+                    Err(_) => break,
+                };
+
+                let result = task_executor.dispatch_method(
+                    graph_val,
+                    "on_message",
+                    vec![actual_msg],
+                    &object_expr,
+                );
+
+                match result {
+                    Ok(return_value) => {
+                        if let Some(reply) = reply_ch {
+                            let _ = reply.send(return_value.deep_clone_for_send());
+                            reply.close();
+                        }
+                    }
+                    Err(e) => {
+                        // Check actor is still registered (executor may have been dropped)
+                        let still_registered = {
+                            crate::values::actor::ACTOR_REGISTRY.lock().ok()
+                                .map(|r| r.contains_key(&actor_id))
+                                .unwrap_or(false)
+                        };
+                        if !still_registered {
+                            break;
+                        }
+                        let supervised = {
+                            let registry = crate::values::actor::SUPERVISION_REGISTRY.lock().ok();
+                            registry.and_then(|r| r.get(&actor_id).cloned())
+                        };
+                        if let Some(entry) = supervised {
+                            if entry.supervisor.effective_mailbox().is_closed() {
+                                break;
+                            }
+                            let should_restart = match entry.restart_mode {
+                                crate::values::actor::RestartMode::Permanent => true,
+                                crate::values::actor::RestartMode::Transient => true,
+                                crate::values::actor::RestartMode::Temporary => false,
+                            };
+                            if should_restart {
+                                if Self::attempt_supervised_restart(actor_id, &entry) {
+                                    eprintln!("[actor] Supervised actor {} crashed: {}. Restarting.", actor_id, e);
+                                    break;
+                                } else {
+                                    eprintln!("[actor] Supervised actor {} crashed: {}. Max restarts exceeded.", actor_id, e);
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+            }));
+            if let Err(panic_info) = result {
+                let msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "unknown panic".to_string()
+                };
+                eprintln!("[actor] PANIC in restarted actor {}: {}", actor_id, msg);
+            }
+        });
+
+        true
     }
 
     fn load_module(&mut self, module_path: &str, _alias: Option<&String>) -> Result<Value> {
@@ -4770,7 +5380,7 @@ impl GraphExecutor {
 
         // Merge the module's execution graph into the parent's graph
         // Must happen BEFORE transferring body refs so we can remap NodeRefs
-        let remap_offset = if let Some(module_graph) = module_executor.graph {
+        let remap_offset = if let Some(module_graph) = module_executor.graph.take() {
             if let Some(ref mut existing) = self.graph {
                 let offset = existing.nodes.next_arena_id();
                 existing.merge(module_graph);
@@ -5609,6 +6219,11 @@ impl GraphExecutor {
     pub fn with_env(env: Environment) -> Self {
         let mut executor = Self::new();
         executor.env = env;
+        // Re-register built-in templates that new() placed in the original env
+        if !executor.env.exists("supervisor") {
+            let supervisor_graph = Self::build_supervisor_template();
+            executor.env.define("supervisor".to_string(), Value::graph(supervisor_graph));
+        }
         executor
     }
 
@@ -6364,5 +6979,31 @@ impl GraphExecutor {
         }
 
         Ok(())
+    }
+}
+
+impl Drop for GraphExecutor {
+    fn drop(&mut self) {
+        // Close mailboxes of all actors spawned by this executor,
+        // causing their message-loop threads to exit gracefully.
+        // Then remove their entries from the global registries to
+        // prevent stale supervision entries from triggering restarts
+        // in unrelated tests or executor instances.
+        for &actor_id in &self.spawned_actor_ids {
+            if let Ok(registry) = crate::values::actor::ACTOR_REGISTRY.lock() {
+                if let Some(actor_ref) = registry.get(&actor_id) {
+                    actor_ref.effective_mailbox().close();
+                }
+            }
+        }
+        // Remove from registries after closing mailboxes
+        for &actor_id in &self.spawned_actor_ids {
+            if let Ok(mut registry) = crate::values::actor::ACTOR_REGISTRY.lock() {
+                registry.remove(&actor_id);
+            }
+            if let Ok(mut registry) = crate::values::actor::SUPERVISION_REGISTRY.lock() {
+                registry.remove(&actor_id);
+            }
+        }
     }
 }

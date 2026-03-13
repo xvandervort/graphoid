@@ -147,3 +147,10 @@ impl Channel {
         self.inner.closed.load(Ordering::SeqCst)
     }
 }
+
+impl PartialEq for Channel {
+    /// Channels are equal if they refer to the same underlying channel (Arc identity).
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}

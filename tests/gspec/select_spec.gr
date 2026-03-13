@@ -1,0 +1,109 @@
+# select_spec.gr - Phase 19.5: select() channel multiplexing
+#
+# Tests for select() built-in function that waits on
+# multiple channels and returns [source, msg].
+
+describe "select()" {
+
+    describe "basic" {
+
+        it "returns a list" {
+            ch = channel(1)
+            ch.send(42)
+            result = select(ch)
+            assert(expect(result.type()).to_equal("list"))
+        }
+
+        it "returns two elements" {
+            ch = channel(1)
+            ch.send(42)
+            result = select(ch)
+            assert(expect(result.length()).to_equal(2))
+        }
+
+        it "returns the message" {
+            ch = channel(1)
+            ch.send("hello")
+            result = select(ch)
+            assert(expect(result[1]).to_equal("hello"))
+        }
+
+        it "returns the source channel" {
+            ch = channel(1)
+            ch.send(99)
+            result = select(ch)
+            assert(expect(result[0] == ch).to_equal(true))
+        }
+    }
+
+    describe "multiple channels" {
+
+        it "picks the ready channel" {
+            ch1 = channel(1)
+            ch2 = channel(1)
+            ch2.send("from_ch2")
+            result = select(ch1, ch2)
+            assert(expect(result[0] == ch2).to_equal(true))
+            assert(expect(result[1]).to_equal("from_ch2"))
+        }
+
+        it "source identity distinguishes channels" {
+            ch1 = channel(1)
+            ch2 = channel(1)
+            ch1.send(42)
+            result = select(ch1, ch2)
+            assert(expect(result[0] == ch1).to_equal(true))
+            assert(expect(result[0] == ch2).to_equal(false))
+        }
+    }
+
+    describe "channel equality" {
+
+        it "same channel is equal" {
+            ch = channel(1)
+            assert(expect(ch == ch).to_equal(true))
+        }
+
+        it "different channels are not equal" {
+            ch1 = channel(1)
+            ch2 = channel(1)
+            assert(expect(ch1 == ch2).to_equal(false))
+        }
+    }
+
+    describe "default mode" {
+
+        it "returns :default when nothing ready" {
+            ch = channel(1)
+            result = select(ch, default: true)
+            assert(expect(result[0] == :default).to_equal(true))
+            assert(expect(result[1]).to_equal(none))
+        }
+
+        it "returns data when available" {
+            ch = channel(1)
+            ch.send("ready")
+            result = select(ch, default: true)
+            assert(expect(result[0] == ch).to_equal(true))
+            assert(expect(result[1]).to_equal("ready"))
+        }
+    }
+
+    describe "timeout mode" {
+
+        it "returns :timeout when expired" {
+            ch = channel(1)
+            result = select(ch, timeout: 10)
+            assert(expect(result[0] == :timeout).to_equal(true))
+            assert(expect(result[1]).to_equal(none))
+        }
+
+        it "returns data when available before timeout" {
+            ch = channel(1)
+            ch.send("fast")
+            result = select(ch, timeout: 5000)
+            assert(expect(result[0] == ch).to_equal(true))
+            assert(expect(result[1]).to_equal("fast"))
+        }
+    }
+}

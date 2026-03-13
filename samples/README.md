@@ -21,7 +21,7 @@ Then work through the basics in order:
 samples/
 ├── 01-basics/          (4 files)  - Start here!
 ├── 02-intermediate/    (13 files) - Core features
-├── 03-advanced/        (8 files)  - Graph algorithms + concurrency
+├── 03-advanced/        (9 files)  - Graph algorithms + concurrency
 ├── 04-modules/         (6 files)  - Code organization
 ├── 05-stdlib/          (5 files)  - Standard library
 └── 06-projects/        (3 projects) - Full applications
@@ -362,6 +362,22 @@ Topics:
 gr samples/03-advanced/variable_length_paths.gr
 ```
 
+### `select.gr` ⭐⭐⭐
+**Channel multiplexing with select()**
+
+Topics:
+- Basic `select()` usage
+- Channel identity comparison (`==`)
+- Timeout handling (`timeout:`)
+- Non-blocking polling (`default: true`)
+- Multi-producer pattern with `spawn`
+
+```bash
+gr samples/03-advanced/select.gr
+```
+
+**Key Concept:** `select(ch1, ch2, ...)` blocks until any channel has data, returning `[source, msg]`. Compare `source == ch1` to identify which channel fired. Use `timeout:` for time-limited waits and `default: true` for non-blocking polls.
+
 ### `actors.gr` ⭐⭐⭐
 **Actor-style concurrency with graph-native messaging**
 
@@ -380,6 +396,23 @@ gr samples/03-advanced/actors.gr
 ```
 
 **Key Concept:** A graph with `fn on_message(msg)` IS an actor — no separate `actor` keyword. Actors process messages one at a time with isolated state, and can be stored as graph nodes for graph-native messaging.
+
+### `supervision.gr` ⭐⭐⭐
+**Actor supervision with automatic restart**
+
+Topics:
+- Supervisor template (`graph X from supervisor {}`)
+- Supervising child actors (`.supervise()`)
+- Automatic restart on crash
+- Restart modes (`:permanent`, `:transient`, `:temporary`)
+- Custom strategy and `max_restarts`
+- Actor `.id()` method
+
+```bash
+gr samples/03-advanced/supervision.gr
+```
+
+**Key Concept:** Supervisors monitor child actors and automatically restart them on failure. Use `graph X from supervisor {}` to inherit supervisor behavior, then `.supervise(child, restart: :permanent)` to register children.
 
 ### `concurrency.gr` ⭐⭐⭐
 **Spawn + Channels concurrency**
