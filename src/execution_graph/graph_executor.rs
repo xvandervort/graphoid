@@ -2,11 +2,20 @@
 //!
 //! Phase 16: Replaces the tree-walking interpreter with graph traversal.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::sync::Mutex;
 use std::time::Instant;
+
+// Phase 19.2: Global signal registry — signals are process-global
+lazy_static::lazy_static! {
+    static ref SIGNAL_REGISTRY: Mutex<HashMap<i32, Vec<crate::values::Channel>>> =
+        Mutex::new(HashMap::new());
+    static ref SIGNAL_LISTENERS: Mutex<HashSet<i32>> =
+        Mutex::new(HashSet::new());
+}
 
 use crate::ast::{BinaryOp, Expr, Parameter, Program, Stmt};
 use crate::error::{GraphoidError, SourcePosition, Result};
@@ -62,6 +71,8 @@ pub struct GraphExecutor {
     start_time: Instant,
     /// Phase 18.7: call stack snapshot at raise time (for error.stack())
     raise_stack: Option<Vec<String>>,
+    /// Phase 19: IDs of actors spawned by this executor (for cleanup on drop)
+    spawned_actor_ids: Vec<u64>,
 }
 
 /// A pattern clause stored as graph references (for pattern-matching functions).
@@ -105,10 +116,31 @@ impl GraphExecutor {
             universe_graph: Rc::new(RefCell::new(Self::build_initial_universe_graph())),
             start_time: Instant::now(),
             raise_stack: None,
+            spawned_actor_ids: Vec::new(),
         };
         // Phase 18.7: Set __MODULE__ for top-level scripts
         executor.env.define("__MODULE__".to_string(), Value::string("__main__".to_string()));
+
+        // Phase 19.5: Register built-in supervisor graph template
+        if !executor.env.exists("supervisor") {
+            let supervisor_graph = Self::build_supervisor_template();
+            executor.env.define("supervisor".to_string(), Value::graph(supervisor_graph));
+        }
+
         executor
+    }
+
+    /// Build the built-in supervisor graph template with default properties.
+    fn build_supervisor_template() -> crate::values::graph::Graph {
+        use crate::values::graph::{Graph, GraphType};
+        let mut g = Graph::new(GraphType::Directed);
+        g.type_name = Some("supervisor".to_string());
+        // Default properties
+        let strategy_id = Graph::property_node_id("strategy");
+        let _ = g.add_node(strategy_id, Value::symbol("one_for_one".to_string()));
+        let max_id = Graph::property_node_id("max_restarts");
+        let _ = g.add_node(max_id, Value::number(3.0));
+        g
     }
 
     /// Build the initial universe graph with the built-in type hierarchy.
@@ -345,6 +377,11 @@ impl GraphExecutor {
 
             // Phase 17: Privacy block
             AstNodeType::PrivBlockStmt => self.exec_priv_block(node_ref),
+
+            // Phase 19: Concurrency
+            AstNodeType::SpawnStmt => self.exec_spawn(node_ref),
+            // Phase 19.3: Actor spawn expression
+            AstNodeType::SpawnActorExpr => self.exec_spawn_actor(node_ref),
 
             _ => Err(GraphoidError::runtime(format!(
                 "Unimplemented node type: {:?}", node_type
@@ -1036,7 +1073,35 @@ impl GraphExecutor {
 
         let iterable_value = self.execute_node(iter_ref)?;
 
-        // Get values to iterate over
+        // Phase 19.2: Channel iteration — lazy receive loop until channel closed
+        if let ValueKind::Channel(ref channel) = iterable_value.kind {
+            loop {
+                match channel.receive() {
+                    Some(sendable_val) => {
+                        let value = sendable_val.0;
+                        if self.env.exists(&var_name) {
+                            self.env.set(&var_name, value)?;
+                        } else {
+                            self.env.define(var_name.clone(), value);
+                        }
+                        match self.execute_node(body_ref) {
+                            Ok(_) => {}
+                            Err(GraphoidError::LoopControl { control }) => {
+                                match control {
+                                    crate::error::LoopControlType::Break => break,
+                                    crate::error::LoopControlType::Continue => continue,
+                                }
+                            }
+                            Err(e) => return Err(e),
+                        }
+                    }
+                    None => break, // channel closed + empty
+                }
+            }
+            return Ok(Value::none());
+        }
+
+        // Get values to iterate over (eager collection for lists and strings)
         let values: Vec<Value> = match &iterable_value.kind {
             ValueKind::List(items) => items.to_vec(),
             ValueKind::String(s) => {
@@ -1044,7 +1109,7 @@ impl GraphExecutor {
             }
             _ => {
                 return Err(GraphoidError::type_error(
-                    "list or string",
+                    "list, string, or channel",
                     iterable_value.type_name(),
                 ));
             }
@@ -1170,13 +1235,19 @@ impl GraphExecutor {
             }
         }
 
+        // Phase 19: Read original AST body for spawn portability
+        let body_stmts = match self.get_property(node_ref, "body_stmts") {
+            Some(AstProperty::Stmts(stmts)) => stmts,
+            _ => Vec::new(),
+        };
+
         // Create the Function value with the current captured env
         let env = Rc::new(RefCell::new(self.env.clone()));
         let func = Function {
             name: Some(name.clone()),
             params: param_names,
             parameters,
-            body: Vec::new(), // Empty — we use graph_function_bodies instead
+            body: body_stmts, // Store AST body for spawn portability
             pattern_clauses: None,
             env: env.clone(),
             node_id: Some(func_id),
@@ -1577,6 +1648,116 @@ impl GraphExecutor {
                 let edge_type_str = edge_type.unwrap_or_default();
                 Ok(Some(Value::pattern_path(edge_type_str, min_val, max_val, direction)))
             }
+            // Phase 19.5: select() — channel multiplexing
+            "select" => {
+                // Separate positional (channels) from named (timeout, default) args
+                let mut channels: Vec<(Value, crate::values::Channel)> = Vec::new();
+                let mut timeout_ms: Option<u64> = None;
+                let mut use_default = false;
+
+                for (i, val) in args.iter().enumerate() {
+                    let arg_name = arg_names.get(i).and_then(|n| n.as_ref());
+                    if let Some(name) = arg_name {
+                        match name.as_str() {
+                            "timeout" => {
+                                match &val.kind {
+                                    ValueKind::Number(n) => {
+                                        if *n < 0.0 {
+                                            return Err(GraphoidError::runtime(
+                                                "select() timeout must be non-negative".to_string()
+                                            ));
+                                        }
+                                        timeout_ms = Some(*n as u64);
+                                    }
+                                    _ => return Err(GraphoidError::type_error("number", val.type_name())),
+                                }
+                            }
+                            "default" => {
+                                use_default = val.is_truthy();
+                            }
+                            _ => return Err(GraphoidError::runtime(
+                                format!("select() does not accept parameter '{}'", name)
+                            )),
+                        }
+                    } else {
+                        match &val.kind {
+                            ValueKind::Channel(ch) => {
+                                channels.push((val.clone(), ch.clone()));
+                            }
+                            _ => return Err(GraphoidError::runtime(
+                                format!("select() argument {} must be a channel, got {}", i + 1, val.type_name())
+                            )),
+                        }
+                    }
+                }
+
+                if channels.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "select() requires at least one channel argument".to_string()
+                    ));
+                }
+
+                // Non-blocking mode: single pass
+                if use_default {
+                    // Randomize start for fairness
+                    let start = if channels.len() > 1 {
+                        (std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .subsec_nanos() as usize) % channels.len()
+                    } else { 0 };
+
+                    for offset in 0..channels.len() {
+                        let idx = (start + offset) % channels.len();
+                        if let Some(sendable) = channels[idx].1.try_receive() {
+                            let result = vec![channels[idx].0.clone(), sendable.0];
+                            return Ok(Some(Value::list(crate::values::List::from_vec(result))));
+                        }
+                    }
+                    let result = vec![Value::symbol("default".to_string()), Value::none()];
+                    return Ok(Some(Value::list(crate::values::List::from_vec(result))));
+                }
+
+                // Blocking mode: poll with backoff
+                let start_time = std::time::Instant::now();
+                loop {
+                    // Check if all channels are closed
+                    let all_closed = channels.iter().all(|(_, ch)| ch.is_closed());
+
+                    // Randomize start for fairness
+                    let start = if channels.len() > 1 {
+                        (std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .subsec_nanos() as usize) % channels.len()
+                    } else { 0 };
+
+                    for offset in 0..channels.len() {
+                        let idx = (start + offset) % channels.len();
+                        if let Some(sendable) = channels[idx].1.try_receive() {
+                            let result = vec![channels[idx].0.clone(), sendable.0];
+                            return Ok(Some(Value::list(crate::values::List::from_vec(result))));
+                        }
+                    }
+
+                    // All closed and empty — no more data possible
+                    if all_closed {
+                        return Err(GraphoidError::runtime(
+                            "select(): all channels are closed".to_string()
+                        ));
+                    }
+
+                    // Check timeout
+                    if let Some(ms) = timeout_ms {
+                        if start_time.elapsed() >= std::time::Duration::from_millis(ms) {
+                            let result = vec![Value::symbol("timeout".to_string()), Value::none()];
+                            return Ok(Some(Value::list(crate::values::List::from_vec(result))));
+                        }
+                    }
+
+                    std::thread::sleep(std::time::Duration::from_millis(1));
+                }
+            }
             _ => Ok(None),
         }
     }
@@ -1594,12 +1775,6 @@ impl GraphExecutor {
                     println!("{}", text);
                 }
                 Ok(Some(Value::none()))
-            }
-            "typeof" => {
-                if args.len() != 1 {
-                    return Err(GraphoidError::runtime("typeof() requires exactly 1 argument".to_string()));
-                }
-                Ok(Some(Value::string(args[0].type_name().to_string())))
             }
             "length" => {
                 if args.len() != 1 {
@@ -1715,6 +1890,24 @@ impl GraphExecutor {
                 file_executor.execute_source(&source)?;
                 let output = file_executor.get_captured_output();
                 Ok(Some(Value::string(output)))
+            }
+            // Phase 19: channel() builtin
+            "channel" => {
+                let capacity = if args.is_empty() {
+                    None // unbuffered
+                } else if args.len() == 1 {
+                    match args[0].to_number() {
+                        Some(n) if n >= 0.0 => Some(n as usize),
+                        _ => return Err(GraphoidError::runtime(
+                            "channel() capacity must be a non-negative number".to_string()
+                        )),
+                    }
+                } else {
+                    return Err(GraphoidError::runtime(
+                        format!("channel() takes 0 or 1 argument, got {}", args.len())
+                    ));
+                };
+                Ok(Some(Value::channel(crate::values::Channel::new(capacity))))
             }
             _ => Ok(None), // Not a builtin
         }
@@ -1887,20 +2080,15 @@ impl GraphExecutor {
         // Swap environments
         let saved_env = std::mem::replace(&mut self.env, call_env);
 
-        // Execute AST body statements
-        let mut return_value = Value::none();
-        let result: Result<()> = (|| {
-            for stmt in &func.body {
-                match self.eval_stmt(stmt)? {
-                    Some(val) => {
-                        return_value = val;
-                        break;
-                    }
-                    None => {}
-                }
-            }
-            Ok(())
-        })();
+        // Execute AST body by converting all statements to an execution graph at once.
+        // We use execute_source-like pattern: convert to Program, then execute.
+        // exec_program catches ReturnControl and returns Ok(value), which is correct
+        // for function calls — the return value is the function result.
+        let program = Program { statements: func.body.clone() };
+        let mut converter = AstToGraphConverter::new();
+        let root = converter.convert_program(&program);
+        let body_graph = converter.into_graph();
+        let result = self.execute(body_graph, root);
 
         // Restore environment
         self.function_call_depth -= 1;
@@ -1909,7 +2097,7 @@ impl GraphExecutor {
         *func.env.borrow_mut() = call_env_after;
 
         match result {
-            Ok(()) => Ok(return_value),
+            Ok(val) => Ok(val),
             Err(GraphoidError::ReturnControl { value }) => Ok(value),
             Err(e) => Err(e),
         }
@@ -2227,6 +2415,8 @@ impl GraphExecutor {
                 "reflect" if !self.env.exists("reflect") => Some("reflect"),
                 "runtime" if !self.env.exists("runtime") => Some("runtime"),
                 "modules" if !self.env.exists("modules") => Some("modules"),
+                "timer" if !self.env.exists("timer") => Some("timer"),
+                "signal" if !self.env.exists("signal") => Some("signal"),
                 _ => None,
             };
             if let Some(type_name) = static_dispatch {
@@ -2249,12 +2439,30 @@ impl GraphExecutor {
                     "reflect" => self.eval_reflect_static_method(&method_name, &args),
                     "runtime" => self.eval_runtime_static_method(&method_name, &args),
                     "modules" => self.eval_modules_static_method(&method_name, &args),
+                    "timer" => self.eval_timer_static_method(&method_name, &args),
+                    "signal" => self.eval_signal_static_method(&method_name, &args),
                     _ => unreachable!(),
                 };
             }
         }
 
         let object = self.execute_node(obj_ref)?;
+
+        // Phase 19.3: Graph-native messaging — intercept send/broadcast/request on Graph values
+        // Named arguments (to:, where:) need extraction before they're flattened to positional
+        if matches!(&object.kind, ValueKind::Graph(_)) {
+            match method_name.as_str() {
+                "send" | "request" | "broadcast" => {
+                    return self.eval_graph_messaging(object, &method_name, node_ref);
+                }
+                _ => {}
+            }
+        }
+
+        // Phase 19.5: Intercept .supervise() on Actor values (needs named arg `restart:`)
+        if matches!(&object.kind, ValueKind::Actor(_)) && method_name == "supervise" {
+            return self.eval_actor_supervise(object, node_ref);
+        }
 
         // Evaluate arguments
         let arg_refs = self.get_ordered_edges(node_ref, "Argument");
@@ -2325,6 +2533,8 @@ impl GraphExecutor {
             ValueKind::Number(_) => self.dispatch_number_method(&object, method, &args),
             ValueKind::Error(ref err) => self.eval_error_method(err, method, &args),
             ValueKind::Time(timestamp) => self.eval_time_method(*timestamp, method, &args),
+            ValueKind::Channel(ref ch) => self.eval_channel_method(ch, method, &args),
+            ValueKind::Actor(ref actor_ref) => self.eval_actor_method(actor_ref, method, &args),
             ValueKind::BigNumber(ref bn) => self.eval_bignum_method(bn, method, &args),
             ValueKind::PatternNode(ref pn) => self.eval_pattern_node_method(pn, method, &args),
             ValueKind::PatternEdge(ref pe) => self.eval_pattern_edge_method(pe, method, &args),
@@ -2887,6 +3097,167 @@ impl GraphExecutor {
             }
             _ => Err(GraphoidError::runtime(format!(
                 "modules does not have method '{}'", method
+            ))),
+        }
+    }
+
+    // =========================================================================
+    // Phase 19.2: Timer static methods — timer.sleep, timer.after, timer.every
+    // =========================================================================
+
+    /// Extract milliseconds from the first argument, validating type and non-negative.
+    fn extract_timer_ms(args: &[Value], method: &str) -> Result<u64> {
+        match &args[0].kind {
+            ValueKind::Number(n) => {
+                if *n < 0.0 {
+                    return Err(GraphoidError::runtime(format!(
+                        "timer.{}() milliseconds must be non-negative", method
+                    )));
+                }
+                Ok(*n as u64)
+            }
+            _ => Err(GraphoidError::type_error("number", args[0].type_name())),
+        }
+    }
+
+    fn eval_timer_static_method(&self, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "sleep" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "timer.sleep() requires 1 argument (milliseconds), got {}", args.len()
+                    )));
+                }
+                let ms = Self::extract_timer_ms(args, "sleep")?;
+                std::thread::sleep(std::time::Duration::from_millis(ms));
+                Ok(Value::none())
+            }
+            "after" => {
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "timer.after() requires 1-2 arguments (ms [, value]), got {}", args.len()
+                    )));
+                }
+                let ms = Self::extract_timer_ms(args, "after")?;
+                let send_value = if args.len() == 2 {
+                    args[1].deep_clone_for_send()
+                } else {
+                    Value::symbol("tick".to_string()).deep_clone_for_send()
+                };
+
+                let channel = crate::values::Channel::new(Some(1));
+                let ch_clone = channel.clone();
+
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(ms));
+                    if !ch_clone.is_closed() {
+                        let _ = ch_clone.send(send_value);
+                    }
+                    ch_clone.close();
+                });
+
+                Ok(Value::channel(channel))
+            }
+            "every" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "timer.every() requires 1 argument (milliseconds), got {}", args.len()
+                    )));
+                }
+                let ms = Self::extract_timer_ms(args, "every")?;
+
+                let channel = crate::values::Channel::new(Some(1));
+                let ch_clone = channel.clone();
+
+                std::thread::spawn(move || {
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_millis(ms));
+                        if ch_clone.is_closed() {
+                            break;
+                        }
+                        let tick = Value::symbol("tick".to_string()).deep_clone_for_send();
+                        if ch_clone.send(tick).is_err() {
+                            break;
+                        }
+                    }
+                });
+
+                Ok(Value::channel(channel))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "timer has no method '{}'", method
+            ))),
+        }
+    }
+
+    // =========================================================================
+    // Phase 19.2: Signal static methods — signal.on
+    // =========================================================================
+
+    fn eval_signal_static_method(&self, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "on" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "signal.on() requires 1 argument (signal name), got {}", args.len()
+                    )));
+                }
+                let signal_name = match &args[0].kind {
+                    ValueKind::Symbol(s) => s.clone(),
+                    _ => return Err(GraphoidError::type_error("symbol", args[0].type_name())),
+                };
+                let sig_num = match signal_name.as_str() {
+                    "sigint" => signal_hook::consts::SIGINT,
+                    "sigterm" => signal_hook::consts::SIGTERM,
+                    "sighup" => signal_hook::consts::SIGHUP,
+                    _ => return Err(GraphoidError::runtime(format!(
+                        "Unknown signal: :{}", signal_name
+                    ))),
+                };
+
+                let channel = crate::values::Channel::new(Some(1));
+                let ch_clone = channel.clone();
+                let sig_name_for_thread = signal_name.clone();
+
+                // Register in global signal registry and start listener if needed
+                {
+                    let mut registry = SIGNAL_REGISTRY.lock().unwrap();
+                    let entry = registry.entry(sig_num).or_insert_with(Vec::new);
+                    entry.push(ch_clone);
+                }
+
+                // Start listener thread for this signal if not already running
+                {
+                    let mut listeners = SIGNAL_LISTENERS.lock().unwrap();
+                    if !listeners.contains(&sig_num) {
+                        listeners.insert(sig_num);
+
+                        let mut signals = signal_hook::iterator::Signals::new(&[sig_num])
+                            .map_err(|e| GraphoidError::runtime(format!(
+                                "Failed to register signal handler: {}", e
+                            )))?;
+
+                        std::thread::spawn(move || {
+                            for _sig in signals.forever() {
+                                let mut registry = SIGNAL_REGISTRY.lock().unwrap();
+                                if let Some(channels) = registry.get_mut(&sig_num) {
+                                    // Clean up closed channels to prevent accumulation
+                                    channels.retain(|ch| !ch.is_closed());
+                                    for ch in channels.iter() {
+                                        let sym = Value::symbol(sig_name_for_thread.clone())
+                                            .deep_clone_for_send();
+                                        let _ = ch.send(sym);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+
+                Ok(Value::channel(channel))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "signal has no method '{}'", method
             ))),
         }
     }
@@ -3978,6 +4349,917 @@ impl GraphExecutor {
         result
     }
 
+    // =========================================================================
+    // Phase 19: Concurrency — Channel Methods + Spawn
+    // =========================================================================
+
+    fn eval_channel_method(&mut self, channel: &crate::values::Channel, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "send" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(
+                        "channel.send() requires exactly 1 argument".to_string()
+                    ));
+                }
+                let sendable = args[0].deep_clone_for_send();
+                channel.send(sendable)
+                    .map_err(|e| GraphoidError::runtime(e))?;
+                Ok(Value::none())
+            }
+            "receive" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "channel.receive() takes no arguments".to_string()
+                    ));
+                }
+                match channel.receive() {
+                    Some(sendable_val) => Ok(sendable_val.0),
+                    None => Ok(Value::none()), // closed + empty
+                }
+            }
+            "try_receive" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "channel.try_receive() takes no arguments".to_string()
+                    ));
+                }
+                match channel.try_receive() {
+                    Some(sendable_val) => Ok(sendable_val.0),
+                    None => Ok(Value::none()),
+                }
+            }
+            "close" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "channel.close() takes no arguments".to_string()
+                    ));
+                }
+                channel.close();
+                Ok(Value::none())
+            }
+            _ => Err(GraphoidError::runtime(
+                format!("Channel has no method '{}'", method)
+            )),
+        }
+    }
+
+    /// Phase 19.3: Graph-native messaging — g.send(msg, to: id), g.broadcast(msg), g.request(msg, to: id)
+    fn eval_graph_messaging(&mut self, object: Value, method: &str, node_ref: NodeRef) -> Result<Value> {
+        // Extract positional and named arguments from argument nodes
+        let arg_refs = self.get_ordered_edges(node_ref, "Argument");
+        let mut positional_args = Vec::new();
+        let mut named_args: HashMap<String, Value> = HashMap::new();
+
+        for arg_ref in &arg_refs {
+            let arg_node = self.get_node(*arg_ref)?;
+            let arg_name = arg_node.get_str("arg_name");
+
+            // Evaluate the value (may be wrapped in ExpressionStmt with ValueEdge)
+            let val = if let Some(val_ref) = self.get_edge_target(*arg_ref, &ExecEdgeType::ValueEdge) {
+                self.execute_node(val_ref)?
+            } else {
+                self.execute_node(*arg_ref)?
+            };
+
+            if let Some(name) = arg_name {
+                named_args.insert(name, val);
+            } else {
+                positional_args.push(val);
+            }
+        }
+
+        let graph = match &object.kind {
+            ValueKind::Graph(g) => g.borrow(),
+            _ => unreachable!(),
+        };
+
+        match method {
+            "send" => {
+                let msg = positional_args.first()
+                    .ok_or_else(|| GraphoidError::runtime("g.send() requires a message argument".to_string()))?;
+
+                if let Some(target_id) = named_args.get("to") {
+                    // g.send(msg, to: "alice") — send to specific node
+                    let node_id = target_id.to_string_value();
+                    if let Some(node_val) = graph.get_node(&node_id) {
+                        if let ValueKind::Actor(ref actor_ref) = node_val.kind {
+                            actor_ref.effective_mailbox().send(msg.deep_clone_for_send())
+                                .map_err(|e| GraphoidError::runtime(e))?;
+                        }
+                        // Non-actor nodes silently skipped
+                    } else {
+                        return Err(GraphoidError::runtime(format!("Node '{}' not found in graph", node_id)));
+                    }
+                } else {
+                    return Err(GraphoidError::runtime("g.send() requires 'to:' argument".to_string()));
+                }
+                Ok(Value::none())
+            }
+            "broadcast" => {
+                let msg = positional_args.first()
+                    .ok_or_else(|| GraphoidError::runtime("g.broadcast() requires a message argument".to_string()))?;
+
+                // Send to all actor-valued nodes
+                for node_id in graph.all_node_ids() {
+                    if let Some(node_val) = graph.get_node(&node_id) {
+                        if let ValueKind::Actor(ref actor_ref) = node_val.kind {
+                            let _ = actor_ref.effective_mailbox().send(msg.deep_clone_for_send());
+                        }
+                    }
+                    // Non-actor nodes silently skipped
+                }
+                Ok(Value::none())
+            }
+            "request" => {
+                let msg = positional_args.first()
+                    .ok_or_else(|| GraphoidError::runtime("g.request() requires a message argument".to_string()))?;
+
+                if let Some(target_id) = named_args.get("to") {
+                    let node_id = target_id.to_string_value();
+                    if let Some(node_val) = graph.get_node(&node_id) {
+                        if let ValueKind::Actor(ref actor_ref) = node_val.kind {
+                            let actor_ref = actor_ref.clone();
+                            // Drop graph borrow before blocking on receive
+                            drop(graph);
+                            return actor_ref.send_request(msg);
+                        }
+                        return Err(GraphoidError::runtime(format!("Node '{}' is not an actor", node_id)));
+                    } else {
+                        return Err(GraphoidError::runtime(format!("Node '{}' not found in graph", node_id)));
+                    }
+                } else {
+                    return Err(GraphoidError::runtime("g.request() requires 'to:' argument".to_string()));
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    /// Phase 19.3: Actor method dispatch (.send, .request, .close, .is_closed)
+    fn eval_actor_method(&mut self, actor_ref: &crate::values::actor::ActorRef, method: &str, args: &[Value]) -> Result<Value> {
+
+        match method {
+            "send" => {
+                // Fire-and-forget: deep clone message and send to mailbox
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(
+                        "actor.send() requires exactly 1 argument".to_string()
+                    ));
+                }
+                let sendable = args[0].deep_clone_for_send();
+                // Retry if mailbox was closed during restart (redirect in progress)
+                let mut attempts = 0;
+                loop {
+                    match actor_ref.effective_mailbox().send(sendable.0.deep_clone_for_send()) {
+                        Ok(()) => break,
+                        Err(_) if attempts < 10 => {
+                            attempts += 1;
+                            std::thread::sleep(std::time::Duration::from_millis(50));
+                        }
+                        Err(e) => return Err(GraphoidError::runtime(e)),
+                    }
+                }
+                Ok(Value::none())
+            }
+            "request" => {
+                // Request-response: wrap message with reply channel, block for response
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(
+                        "actor.request() requires exactly 1 argument".to_string()
+                    ));
+                }
+                actor_ref.send_request(&args[0])
+            }
+            "close" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "actor.close() takes no arguments".to_string()
+                    ));
+                }
+                actor_ref.mailbox.close();
+                Ok(Value::none())
+            }
+            "is_closed" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "actor.is_closed() takes no arguments".to_string()
+                    ));
+                }
+                Ok(Value::boolean(actor_ref.mailbox.is_closed()))
+            }
+            "id" => {
+                Ok(Value::number(actor_ref.id as f64))
+            }
+            _ => Err(GraphoidError::runtime(
+                format!("Actor has no method '{}'", method)
+            )),
+        }
+    }
+
+    /// Phase 19.5: Supervisor .supervise(child_actor, restart: :permanent)
+    fn eval_actor_supervise(&mut self, supervisor_value: Value, node_ref: NodeRef) -> Result<Value> {
+        use crate::values::actor::{RestartMode, SupervisionEntry, SUPERVISION_REGISTRY};
+
+        let supervisor_ref = match &supervisor_value.kind {
+            ValueKind::Actor(ref a) => a.clone(),
+            _ => unreachable!(),
+        };
+
+        // Verify this actor has supervisor config
+        if supervisor_ref.supervisor_config.is_none() {
+            return Err(GraphoidError::runtime(
+                "Only supervisors can call .supervise(). Use `graph X from supervisor {}` to create one.".to_string()
+            ));
+        }
+
+        // Extract positional and named arguments (same pattern as eval_graph_messaging)
+        let arg_refs = self.get_ordered_edges(node_ref, "Argument");
+        let mut positional_args = Vec::new();
+        let mut named_args: HashMap<String, Value> = HashMap::new();
+
+        for arg_ref in &arg_refs {
+            let arg_node = self.get_node(*arg_ref)?;
+            let arg_name = arg_node.get_str("arg_name");
+
+            let val = if let Some(val_ref) = self.get_edge_target(*arg_ref, &ExecEdgeType::ValueEdge) {
+                self.execute_node(val_ref)?
+            } else {
+                self.execute_node(*arg_ref)?
+            };
+
+            if let Some(name) = arg_name {
+                named_args.insert(name, val);
+            } else {
+                positional_args.push(val);
+            }
+        }
+
+        // First positional = child actor
+        let child_val = positional_args.first().ok_or_else(|| {
+            GraphoidError::runtime(".supervise() requires a child actor argument".to_string())
+        })?;
+
+        let child_ref = match &child_val.kind {
+            ValueKind::Actor(ref a) => a.clone(),
+            _ => return Err(GraphoidError::runtime(
+                ".supervise() argument must be an actor".to_string()
+            )),
+        };
+
+        // Named arg: restart: (default :permanent)
+        let restart_mode = if let Some(restart_val) = named_args.get("restart") {
+            match &restart_val.kind {
+                ValueKind::Symbol(s) => RestartMode::from_symbol(s).ok_or_else(|| {
+                    GraphoidError::runtime(format!(
+                        "Invalid restart mode ':{}'. Use :permanent, :transient, or :temporary.", s
+                    ))
+                })?,
+                _ => return Err(GraphoidError::runtime(
+                    "restart: argument must be a symbol (:permanent, :transient, :temporary)".to_string()
+                )),
+            }
+        } else {
+            RestartMode::Permanent
+        };
+
+        let child_id = child_ref.id;
+
+        // Determine child's order (position in supervisor's children list)
+        let order = {
+            let config = supervisor_ref.supervisor_config.as_ref().unwrap();
+            let mut children = config.children.lock().map_err(|_| {
+                GraphoidError::runtime("Failed to lock supervisor children list".to_string())
+            })?;
+            let ord = children.len();
+            children.push(child_id);
+            ord
+        };
+
+        // Register in supervision registry
+        {
+            let mut registry = SUPERVISION_REGISTRY.lock().map_err(|_| {
+                GraphoidError::runtime("Failed to lock supervision registry".to_string())
+            })?;
+            registry.insert(child_id, SupervisionEntry {
+                supervisor: supervisor_ref,
+                restart_mode,
+                order,
+            });
+        }
+
+        Ok(Value::none())
+    }
+
+    /// Phase 19: Execute spawn { block } — fire-and-forget concurrent task
+    fn exec_spawn(&mut self, node_ref: NodeRef) -> Result<Value> {
+        use crate::execution_graph::converter::AstToGraphConverter;
+        use crate::execution_graph::node::AstProperty;
+        use crate::values::channel::SendableValue;
+
+        // 1. Get the body statements from the node property
+        let node = self.get_node(node_ref)?;
+        let body_stmts = match node.properties.get("body_stmts") {
+            Some(AstProperty::Stmts(stmts)) => stmts.clone(),
+            _ => return Err(GraphoidError::runtime("Spawn node missing body_stmts".to_string())),
+        };
+
+        // 2. Capture current environment (share-nothing: deep clone all values)
+        let all_bindings = self.env.get_all_bindings_recursive();
+        let sendable_bindings: Vec<(String, SendableValue)> = all_bindings
+            .into_iter()
+            .map(|(name, val)| (name, val.deep_clone_for_send()))
+            .collect();
+
+        // 3. Capture global functions (deep clone for thread safety)
+        let sendable_globals: Vec<(String, Vec<SendableValue>)> = self.global_functions
+            .iter()
+            .map(|(name, overloads)| {
+                let sendable_overloads: Vec<SendableValue> = overloads.iter()
+                    .map(|f| Value::function(f.clone()).deep_clone_for_send())
+                    .collect();
+                (name.clone(), sendable_overloads)
+            })
+            .collect();
+
+        // Wrapper struct for thread-safe transfer
+        struct SendableState {
+            bindings: Vec<(String, SendableValue)>,
+            globals: Vec<(String, Vec<SendableValue>)>,
+            body: Vec<crate::ast::Stmt>,
+        }
+        // SAFETY: All Values inside have been deep-cloned with fresh Rc handles.
+        // No Rc is shared between the spawning thread and the spawned thread.
+        unsafe impl Send for SendableState {}
+
+        let state = SendableState {
+            bindings: sendable_bindings,
+            globals: sendable_globals,
+            body: body_stmts,
+        };
+
+        // 4. Spawn OS thread
+        std::thread::spawn(move || {
+            let mut task_executor = GraphExecutor::new();
+
+            // Populate environment with deep-cloned captured values
+            for (name, sendable_val) in state.bindings {
+                task_executor.env.define(name, sendable_val.0);
+            }
+
+            // Restore global functions
+            for (name, overloads) in state.globals {
+                let funcs: Vec<crate::values::Function> = overloads.into_iter()
+                    .filter_map(|sv| {
+                        match sv.0.kind {
+                            crate::values::ValueKind::Function(f) => Some(f),
+                            _ => None,
+                        }
+                    })
+                    .collect();
+                if !funcs.is_empty() {
+                    task_executor.global_functions.insert(name, funcs);
+                }
+            }
+
+            // Convert body AST to execution graph and execute
+            let program = crate::ast::Program { statements: state.body };
+            let mut converter = AstToGraphConverter::new();
+            let root = converter.convert_program(&program);
+            let exec_graph = converter.into_graph();
+
+            match task_executor.execute(exec_graph, root) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("[spawn] Unhandled exception: {}", e);
+                }
+            }
+        });
+
+        // Fire-and-forget: return none immediately
+        Ok(Value::none())
+    }
+
+    /// Phase 19.3: Execute spawn actor expression — `spawn Counter{}`
+    fn exec_spawn_actor(&mut self, node_ref: NodeRef) -> Result<Value> {
+        use crate::values::channel::SendableValue;
+        use crate::values::actor::ActorRef;
+
+        // 1. Evaluate the instantiation expression to get the graph
+        let expr_ref = self.get_edge_target(node_ref, &ExecEdgeType::ValueEdge)
+            .ok_or_else(|| GraphoidError::runtime("Spawn actor missing expression".to_string()))?;
+        let graph_value = self.execute_node(expr_ref)?;
+
+        let mut graph = match &graph_value.kind {
+            ValueKind::Graph(g) => g.borrow().clone(),
+            _ => return Err(GraphoidError::runtime(
+                "spawn requires a graph type (e.g., spawn Counter{})".to_string()
+            )),
+        };
+
+        // 2. Verify on_message method exists (check instance methods + template)
+        let has_on_message = !graph.get_method_variants("on_message").is_empty();
+        if !has_on_message {
+            return Err(GraphoidError::runtime(
+                "Cannot spawn actor: graph has no on_message method".to_string()
+            ));
+        }
+
+        // 2b. Flatten template methods onto instance for thread safety.
+        // Instance graphs use Rc<RefCell<Graph>> templates which aren't Send.
+        // Copy all methods from the template chain directly onto the instance.
+        if let Some(tmpl) = graph.template.take() {
+            let tmpl_graph = tmpl.borrow();
+            graph.include_methods_from(&tmpl_graph);
+        }
+
+        // 3. Create mailbox channel (buffered for non-blocking send)
+        let mailbox = crate::values::Channel::new(Some(256));
+
+        // 4. Create ActorRef
+        let type_name = graph.type_name.clone();
+
+        // Check if this graph inherits from supervisor
+        let is_supervisor = graph.ancestors().iter().any(|a| a == "supervisor");
+        let supervisor_config = if is_supervisor {
+            use crate::values::actor::SupervisorConfig;
+            use crate::values::graph::Graph;
+            // Read strategy and max_restarts from graph properties
+            let strategy = graph.get_node(&Graph::property_node_id("strategy"))
+                .and_then(|n| match &n.kind {
+                    ValueKind::Symbol(s) => Some(s.clone()),
+                    _ => None,
+                })
+                .unwrap_or_else(|| "one_for_one".to_string());
+            let max_restarts = graph.get_node(&Graph::property_node_id("max_restarts"))
+                .and_then(|n| match &n.kind {
+                    ValueKind::Number(v) => Some(*v as u32),
+                    _ => None,
+                })
+                .unwrap_or(3);
+            Some(std::sync::Arc::new(SupervisorConfig::new(strategy, max_restarts)))
+        } else {
+            None
+        };
+
+        let mut actor_ref = ActorRef::new(mailbox.clone(), type_name);
+        actor_ref.supervisor_config = supervisor_config;
+
+        // 5. Deep-clone graph + env + globals for actor thread (share-nothing)
+        // Use the flattened graph (template methods copied, template cleared)
+        let sendable_graph = Value::graph(graph).deep_clone_for_send();
+
+        let all_bindings = self.env.get_all_bindings_recursive();
+        let sendable_bindings: Vec<(String, SendableValue)> = all_bindings
+            .into_iter()
+            .map(|(name, val)| (name, val.deep_clone_for_send()))
+            .collect();
+
+        let sendable_globals: Vec<(String, Vec<SendableValue>)> = self.global_functions
+            .iter()
+            .map(|(name, overloads)| {
+                let sendable_overloads: Vec<SendableValue> = overloads.iter()
+                    .map(|f| Value::function(f.clone()).deep_clone_for_send())
+                    .collect();
+                (name.clone(), sendable_overloads)
+            })
+            .collect();
+
+        // 6. Spawn OS thread with message loop
+        // Reuse the same SendableState pattern from exec_spawn (proven working)
+        struct SendableActorState {
+            graph: SendableValue,
+            bindings: Vec<(String, SendableValue)>,
+            globals: Vec<(String, Vec<SendableValue>)>,
+        }
+        // SAFETY: All Values inside have been deep-cloned with fresh Rc handles.
+        unsafe impl Send for SendableActorState {}
+
+        // Store spawn template for restart capability (deep-clone again)
+        {
+            use crate::values::actor::SpawnTemplate;
+            let template = SpawnTemplate {
+                graph: sendable_graph.0.deep_clone_for_send(),
+                bindings: sendable_bindings.iter()
+                    .map(|(n, sv)| (n.clone(), sv.0.deep_clone_for_send()))
+                    .collect(),
+                globals: sendable_globals.iter()
+                    .map(|(n, ovs)| (n.clone(), ovs.iter().map(|sv| sv.0.deep_clone_for_send()).collect()))
+                    .collect(),
+            };
+            if let Ok(mut guard) = actor_ref.spawn_template.lock() {
+                *guard = Some(template);
+            }
+        }
+
+        let state = SendableActorState {
+            graph: sendable_graph,
+            bindings: sendable_bindings,
+            globals: sendable_globals,
+        };
+
+        // Channel uses Arc internally and is Send-safe
+        let actor_mailbox = mailbox.clone();
+        let actor_id = actor_ref.id;
+
+        std::thread::spawn(move || {
+            let _ = &state;
+            let _ = &actor_mailbox;
+            let _ = actor_id;
+            let mut task_executor = GraphExecutor::new();
+
+            // Populate environment with captured values
+            for (name, sendable_val) in state.bindings {
+                task_executor.env.define(name, sendable_val.0);
+            }
+
+            // Restore global functions
+            for (name, overloads) in state.globals {
+                let funcs: Vec<crate::values::Function> = overloads.into_iter()
+                    .filter_map(|sv| {
+                        match sv.0.kind {
+                            crate::values::ValueKind::Function(f) => Some(f),
+                            _ => None,
+                        }
+                    })
+                    .collect();
+                if !funcs.is_empty() {
+                    task_executor.global_functions.insert(name, funcs);
+                }
+            }
+
+            // Store actor graph in environment
+            task_executor.env.define(crate::values::actor::ACTOR_GRAPH_VAR.to_string(), state.graph.0);
+
+            let object_expr = crate::ast::Expr::Variable {
+                name: crate::values::actor::ACTOR_GRAPH_VAR.to_string(),
+                position: crate::error::SourcePosition::unknown(),
+            };
+
+            // Message loop
+            loop {
+                let msg = match actor_mailbox.receive() {
+                    Some(sendable_val) => sendable_val.0,
+                    None => break, // Channel closed, actor terminates
+                };
+
+                // Extract reply channel if this is a request
+                let (actual_msg, reply_ch) = crate::values::actor::extract_request_info(&msg);
+
+                // Get current graph from env (may have been mutated by previous messages)
+                let graph_val = match task_executor.env.get(crate::values::actor::ACTOR_GRAPH_VAR) {
+                    Ok(val) => val,
+                    Err(_) => break,
+                };
+
+                // Call on_message on the actor graph
+                let result = task_executor.dispatch_method(
+                    graph_val,
+                    "on_message",
+                    vec![actual_msg],
+                    &object_expr,
+                );
+
+                match result {
+                    Ok(return_value) => {
+                        if let Some(reply) = reply_ch {
+                            let _ = reply.send(return_value.deep_clone_for_send());
+                            reply.close();
+                        }
+                    }
+                    Err(e) => {
+                        // Check supervision registry for crash handling.
+                        // First verify this actor is still in the ACTOR_REGISTRY —
+                        // if the owning executor was dropped, it cleaned up registries
+                        // and we must not attempt restart with stale entries.
+                        let still_registered = {
+                            crate::values::actor::ACTOR_REGISTRY.lock().ok()
+                                .map(|r| r.contains_key(&actor_id))
+                                .unwrap_or(false)
+                        };
+                        if !still_registered {
+                            break; // Executor dropped, actor is orphaned — exit silently
+                        }
+                        let supervised = {
+                            let registry = crate::values::actor::SUPERVISION_REGISTRY.lock().ok();
+                            registry.and_then(|r| r.get(&actor_id).cloned())
+                        };
+                        if let Some(entry) = supervised {
+                            // Verify supervisor is still alive
+                            if entry.supervisor.effective_mailbox().is_closed() {
+                                break; // Supervisor is dead, don't restart
+                            }
+                            let should_restart = match entry.restart_mode {
+                                crate::values::actor::RestartMode::Permanent => true,
+                                crate::values::actor::RestartMode::Transient => true, // crashed = abnormal
+                                crate::values::actor::RestartMode::Temporary => false,
+                            };
+                            if should_restart {
+                                if Self::attempt_supervised_restart(actor_id, &entry) {
+                                    eprintln!("[actor] Supervised actor {} crashed: {}. Restarting.", actor_id, e);
+                                    break; // Old thread exits; new thread spawned by restart
+                                } else {
+                                    eprintln!("[actor] Supervised actor {} crashed: {}. Max restarts exceeded.", actor_id, e);
+                                    break;
+                                }
+                            } else {
+                                break; // Temporary actor, no restart
+                            }
+                        } else {
+                            break; // Unsupervised, just exit
+                        }
+                    }
+                }
+            }
+        });
+
+        // 7. Register in global actor registry for supervision lookup
+        {
+            if let Ok(mut registry) = crate::values::actor::ACTOR_REGISTRY.lock() {
+                registry.insert(actor_ref.id, actor_ref.clone());
+            }
+        }
+
+        // 8. Track this actor for cleanup on executor drop
+        self.spawned_actor_ids.push(actor_ref.id);
+
+        // 9. Return actor reference
+        Ok(Value::actor(actor_ref))
+    }
+
+    /// Attempt to restart a supervised actor. Returns true if restart succeeded.
+    /// Called from within the crashing actor's thread.
+    fn attempt_supervised_restart(
+        actor_id: u64,
+        entry: &crate::values::actor::SupervisionEntry,
+    ) -> bool {
+        // Check max_restarts (60-second window)
+        if let Some(ref config) = entry.supervisor.supervisor_config {
+            let mut tracking = match config.restart_tracking.lock() {
+                Ok(t) => t,
+                Err(_) => return false,
+            };
+            let elapsed = tracking.1.elapsed();
+            if elapsed.as_secs() > 60 {
+                // Reset window
+                tracking.0 = 0;
+                tracking.1 = std::time::Instant::now();
+            }
+            tracking.0 += 1;
+            if tracking.0 > config.max_restarts {
+                return false;
+            }
+        }
+
+        // Execute strategy-based restart (may restart other children too)
+        let strategy = entry.supervisor.supervisor_config.as_ref()
+            .map(|c| c.strategy.clone())
+            .unwrap_or_else(|| "one_for_one".to_string());
+
+        if strategy != "one_for_one" {
+            Self::execute_supervisor_strategy(&entry.supervisor, actor_id, &strategy);
+        }
+
+        // Restart the crashed actor itself
+        Self::restart_single_actor(actor_id)
+    }
+
+    /// Execute strategy-based restart for all affected children.
+    fn execute_supervisor_strategy(
+        supervisor: &crate::values::actor::ActorRef,
+        crashed_id: u64,
+        strategy: &str,
+    ) {
+        let children = match supervisor.supervisor_config.as_ref() {
+            Some(config) => match config.children.lock() {
+                Ok(c) => c.clone(),
+                Err(_) => return,
+            },
+            None => return,
+        };
+
+        match strategy {
+            "one_for_one" => {
+                // Only restart the crashed child (handled by caller)
+            }
+            "one_for_all" => {
+                // Restart ALL children except the crashed one (it's restarted by caller)
+                for &child_id in &children {
+                    if child_id != crashed_id {
+                        // Close the child's mailbox to terminate its message loop
+                        if let Ok(registry) = crate::values::actor::ACTOR_REGISTRY.lock() {
+                            if let Some(child_ref) = registry.get(&child_id) {
+                                child_ref.effective_mailbox().close();
+                            }
+                        }
+                        Self::restart_single_actor(child_id);
+                    }
+                }
+            }
+            "rest_for_one" => {
+                // Restart crashed child + all children registered after it
+                let crashed_order = {
+                    let registry = crate::values::actor::SUPERVISION_REGISTRY.lock().ok();
+                    registry.and_then(|r| r.get(&crashed_id).map(|e| e.order))
+                };
+                if let Some(order) = crashed_order {
+                    for &child_id in &children {
+                        if child_id == crashed_id { continue; }
+                        let child_order = {
+                            let registry = crate::values::actor::SUPERVISION_REGISTRY.lock().ok();
+                            registry.and_then(|r| r.get(&child_id).map(|e| e.order))
+                        };
+                        if let Some(co) = child_order {
+                            if co > order {
+                                if let Ok(registry) = crate::values::actor::ACTOR_REGISTRY.lock() {
+                                    if let Some(child_ref) = registry.get(&child_id) {
+                                        child_ref.effective_mailbox().close();
+                                    }
+                                }
+                                Self::restart_single_actor(child_id);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Restart a single actor by ID using its stored spawn template.
+    /// Creates a new mailbox, redirects the old one, and spawns a new message loop thread.
+    fn restart_single_actor(actor_id: u64) -> bool {
+        use crate::values::channel::SendableValue;
+
+        // Get actor ref and spawn template from registries
+        let actor_ref = {
+            let registry = match crate::values::actor::ACTOR_REGISTRY.lock() {
+                Ok(r) => r,
+                Err(_) => return false,
+            };
+            match registry.get(&actor_id) {
+                Some(r) => r.clone(),
+                None => return false,
+            }
+        };
+
+        let template = {
+            let guard = match actor_ref.spawn_template.lock() {
+                Ok(g) => g,
+                Err(_) => return false,
+            };
+            match guard.as_ref() {
+                Some(t) => t.clone(),
+                None => return false,
+            }
+        };
+
+        // Create new mailbox and redirect old one
+        let new_mailbox = crate::values::Channel::new(Some(256));
+        actor_ref.redirect_to(new_mailbox.clone());
+
+        // Deep-clone template for the new thread
+        let sendable_graph = template.graph.0.deep_clone_for_send();
+        let sendable_bindings: Vec<(String, SendableValue)> = template.bindings.iter()
+            .map(|(n, sv)| (n.clone(), sv.0.deep_clone_for_send()))
+            .collect();
+        let sendable_globals: Vec<(String, Vec<SendableValue>)> = template.globals.iter()
+            .map(|(n, ovs)| (n.clone(), ovs.iter().map(|sv| sv.0.deep_clone_for_send()).collect()))
+            .collect();
+
+        struct SendableRestartState {
+            graph: SendableValue,
+            bindings: Vec<(String, SendableValue)>,
+            globals: Vec<(String, Vec<SendableValue>)>,
+        }
+        unsafe impl Send for SendableRestartState {}
+
+        let state = SendableRestartState {
+            graph: sendable_graph,
+            bindings: sendable_bindings,
+            globals: sendable_globals,
+        };
+
+        let actor_mailbox = new_mailbox;
+
+        std::thread::spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = &state;
+            let _ = &actor_mailbox;
+            let _ = actor_id;
+            let mut task_executor = GraphExecutor::new();
+
+            // Populate environment
+            for (name, sendable_val) in state.bindings {
+                task_executor.env.define(name, sendable_val.0);
+            }
+
+            // Restore global functions
+            for (name, overloads) in state.globals {
+                let funcs: Vec<crate::values::Function> = overloads.into_iter()
+                    .filter_map(|sv| {
+                        match sv.0.kind {
+                            crate::values::ValueKind::Function(f) => Some(f),
+                            _ => None,
+                        }
+                    })
+                    .collect();
+                if !funcs.is_empty() {
+                    task_executor.global_functions.insert(name, funcs);
+                }
+            }
+
+            // Store actor graph in environment
+            task_executor.env.define(crate::values::actor::ACTOR_GRAPH_VAR.to_string(), state.graph.0);
+
+            let object_expr = crate::ast::Expr::Variable {
+                name: crate::values::actor::ACTOR_GRAPH_VAR.to_string(),
+                position: crate::error::SourcePosition::unknown(),
+            };
+
+            // Message loop (same as original actor thread)
+            loop {
+                let msg = match actor_mailbox.receive() {
+                    Some(sendable_val) => sendable_val.0,
+                    None => break, // Channel closed, actor terminates
+                };
+
+                let (actual_msg, reply_ch) = crate::values::actor::extract_request_info(&msg);
+
+                let graph_val = match task_executor.env.get(crate::values::actor::ACTOR_GRAPH_VAR) {
+                    Ok(val) => val,
+                    Err(_) => break,
+                };
+
+                let result = task_executor.dispatch_method(
+                    graph_val,
+                    "on_message",
+                    vec![actual_msg],
+                    &object_expr,
+                );
+
+                match result {
+                    Ok(return_value) => {
+                        if let Some(reply) = reply_ch {
+                            let _ = reply.send(return_value.deep_clone_for_send());
+                            reply.close();
+                        }
+                    }
+                    Err(e) => {
+                        // Check actor is still registered (executor may have been dropped)
+                        let still_registered = {
+                            crate::values::actor::ACTOR_REGISTRY.lock().ok()
+                                .map(|r| r.contains_key(&actor_id))
+                                .unwrap_or(false)
+                        };
+                        if !still_registered {
+                            break;
+                        }
+                        let supervised = {
+                            let registry = crate::values::actor::SUPERVISION_REGISTRY.lock().ok();
+                            registry.and_then(|r| r.get(&actor_id).cloned())
+                        };
+                        if let Some(entry) = supervised {
+                            if entry.supervisor.effective_mailbox().is_closed() {
+                                break;
+                            }
+                            let should_restart = match entry.restart_mode {
+                                crate::values::actor::RestartMode::Permanent => true,
+                                crate::values::actor::RestartMode::Transient => true,
+                                crate::values::actor::RestartMode::Temporary => false,
+                            };
+                            if should_restart {
+                                if Self::attempt_supervised_restart(actor_id, &entry) {
+                                    eprintln!("[actor] Supervised actor {} crashed: {}. Restarting.", actor_id, e);
+                                    break;
+                                } else {
+                                    eprintln!("[actor] Supervised actor {} crashed: {}. Max restarts exceeded.", actor_id, e);
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+            }));
+            if let Err(panic_info) = result {
+                let msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "unknown panic".to_string()
+                };
+                eprintln!("[actor] PANIC in restarted actor {}: {}", actor_id, msg);
+            }
+        });
+
+        true
+    }
+
     fn load_module(&mut self, module_path: &str, _alias: Option<&String>) -> Result<Value> {
         use std::fs;
         use crate::execution::module_manager::Module;
@@ -4092,7 +5374,7 @@ impl GraphExecutor {
 
         // Merge the module's execution graph into the parent's graph
         // Must happen BEFORE transferring body refs so we can remap NodeRefs
-        let remap_offset = if let Some(module_graph) = module_executor.graph {
+        let remap_offset = if let Some(module_graph) = module_executor.graph.take() {
             if let Some(ref mut existing) = self.graph {
                 let offset = existing.nodes.next_arena_id();
                 existing.merge(module_graph);
@@ -4287,6 +5569,7 @@ impl GraphExecutor {
             param_names: Vec<String>,
             parameters: Vec<Parameter>,
             guard_ref: Option<NodeRef>,
+            body_stmts: Vec<crate::ast::Stmt>,  // Phase 19.3: AST body for actor threads
         }
         let mut method_infos = Vec::new();
         for method_ref in &method_refs {
@@ -4319,7 +5602,12 @@ impl GraphExecutor {
                         is_variadic,
                     });
                 }
-                method_infos.push(MethodInfo { method_name, is_static, is_private, body_ref, param_names, parameters, guard_ref });
+                // Phase 19.3: Extract AST body for cross-thread execution
+                let body_stmts = match method_node.properties.get("body_stmts") {
+                    Some(AstProperty::Stmts(stmts)) => stmts.clone(),
+                    _ => Vec::new(),
+                };
+                method_infos.push(MethodInfo { method_name, is_static, is_private, body_ref, param_names, parameters, guard_ref, body_stmts });
             }
         }
         // Now register methods (mutable borrow is safe here)
@@ -4351,7 +5639,7 @@ impl GraphExecutor {
                     name: Some(registered_name.clone()),
                     params: mi.param_names,
                     parameters: mi.parameters,
-                    body: Vec::new(),
+                    body: mi.body_stmts,  // Phase 19.3: AST body for actor thread fallback
                     pattern_clauses: None,
                     env,
                     node_id: Some(func_id),
@@ -4925,6 +6213,11 @@ impl GraphExecutor {
     pub fn with_env(env: Environment) -> Self {
         let mut executor = Self::new();
         executor.env = env;
+        // Re-register built-in templates that new() placed in the original env
+        if !executor.env.exists("supervisor") {
+            let supervisor_graph = Self::build_supervisor_template();
+            executor.env.define("supervisor".to_string(), Value::graph(supervisor_graph));
+        }
         executor
     }
 
@@ -5294,27 +6587,36 @@ impl GraphExecutor {
         }
 
         // Execute function body
+        // Phase 19.3: Prefer graph-based execution, fallback to AST body (for actor threads)
         let mut return_value = Value::none();
         let execution_result: Result<()> = (|| {
-            if func.body.is_empty() {
-                // Graph-based function body: use stored node_id to find body
-                if let Some(ref func_id) = func.node_id {
-                    if let Some(&body_ref) = self.graph_function_bodies.get(func_id) {
-                        match self.execute_node(body_ref) {
-                            Ok(val) => { return_value = val; }
-                            Err(GraphoidError::ReturnControl { value }) => {
-                                return_value = value;
-                            }
-                            Err(e) => return Err(e),
+            // Try graph-based execution first (main thread has graph_function_bodies populated)
+            let mut executed = false;
+            if let Some(ref func_id) = func.node_id {
+                if let Some(&body_ref) = self.graph_function_bodies.get(func_id) {
+                    executed = true;
+                    match self.execute_node(body_ref) {
+                        Ok(val) => { return_value = val; }
+                        Err(GraphoidError::ReturnControl { value }) => {
+                            return_value = value;
                         }
+                        Err(e) => return Err(e),
                     }
                 }
-            } else {
-                for stmt in &func.body {
-                    if let Some(ret_val) = self.eval_stmt(stmt)? {
-                        return_value = ret_val;
-                        return Ok(());
+            }
+            // Fallback to AST-based execution (actor threads, or functions with AST body only)
+            // Convert ALL stmts as a single Program to preserve control flow (return, break, etc.)
+            if !executed && !func.body.is_empty() {
+                let program = Program { statements: func.body.clone() };
+                let mut converter = AstToGraphConverter::new();
+                let root = converter.convert_program(&program);
+                let exec_graph = converter.into_graph();
+                match self.execute(exec_graph, root) {
+                    Ok(val) => { return_value = val; }
+                    Err(GraphoidError::ReturnControl { value }) => {
+                        return_value = value;
                     }
+                    Err(e) => return Err(e),
                 }
             }
             Ok(())
@@ -5671,5 +6973,31 @@ impl GraphExecutor {
         }
 
         Ok(())
+    }
+}
+
+impl Drop for GraphExecutor {
+    fn drop(&mut self) {
+        // Close mailboxes of all actors spawned by this executor,
+        // causing their message-loop threads to exit gracefully.
+        // Then remove their entries from the global registries to
+        // prevent stale supervision entries from triggering restarts
+        // in unrelated tests or executor instances.
+        for &actor_id in &self.spawned_actor_ids {
+            if let Ok(registry) = crate::values::actor::ACTOR_REGISTRY.lock() {
+                if let Some(actor_ref) = registry.get(&actor_id) {
+                    actor_ref.effective_mailbox().close();
+                }
+            }
+        }
+        // Remove from registries after closing mailboxes
+        for &actor_id in &self.spawned_actor_ids {
+            if let Ok(mut registry) = crate::values::actor::ACTOR_REGISTRY.lock() {
+                registry.remove(&actor_id);
+            }
+            if let Ok(mut registry) = crate::values::actor::SUPERVISION_REGISTRY.lock() {
+                registry.remove(&actor_id);
+            }
+        }
     }
 }

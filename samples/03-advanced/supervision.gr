@@ -1,0 +1,119 @@
+# supervision.gr - Actor Supervision with Automatic Restart
+#
+# This example demonstrates Graphoid's supervision system for
+# building fault-tolerant actor systems.
+# Topics covered:
+# - Supervisor template (graph from supervisor)
+# - Supervising child actors (.supervise)
+# - Automatic restart on crash
+# - Restart modes (:permanent, :transient, :temporary)
+# - Custom strategy and max_restarts
+
+print("=== Actor Supervision ===")
+print()
+
+# -----------------------------------------------------------------
+# 1. Basic supervisor — one_for_one, permanent restart
+# -----------------------------------------------------------------
+
+print("--- 1. Basic Supervisor ---")
+
+graph MySupervisor from supervisor {
+    fn on_message(msg) {
+        return "supervisor got: " + msg
+    }
+}
+
+graph Counter {
+    count: 0
+    fn on_message(msg) {
+        if msg == "crash" {
+            raise "Intentional crash!"
+        }
+        if msg == "inc" {
+            count = count + 1
+            return count
+        }
+        return "unknown: " + msg
+    }
+}
+
+sup = spawn MySupervisor{}
+worker = spawn Counter{}
+sup.supervise(worker)
+
+# Normal operation
+r1 = worker.request("inc")
+r2 = worker.request("inc")
+print("After 2 increments: " + r2.to_string())
+
+# Crash the worker
+print("Crashing the worker...")
+worker.send("crash")
+timer.sleep(200)
+
+# After restart, state is reset (fresh actor)
+r3 = worker.request("inc")
+print("After restart + 1 increment: " + r3.to_string())
+
+print()
+
+# -----------------------------------------------------------------
+# 2. Temporary restart mode — no restart
+# -----------------------------------------------------------------
+
+print("--- 2. Temporary Mode (No Restart) ---")
+
+graph EchoWorker {
+    fn on_message(msg) {
+        if msg == "crash" {
+            raise "Crash!"
+        }
+        return "echo:" + msg
+    }
+}
+
+sup2 = spawn MySupervisor{}
+temp_worker = spawn EchoWorker{}
+sup2.supervise(temp_worker, restart: :temporary)
+
+echo = temp_worker.request("hello")
+print("Before crash: " + echo)
+
+temp_worker.send("crash")
+timer.sleep(100)
+print("Temporary worker crashed and was NOT restarted")
+
+print()
+
+# -----------------------------------------------------------------
+# 3. Custom supervisor configuration
+# -----------------------------------------------------------------
+
+print("--- 3. Custom Config ---")
+
+graph StrictSupervisor from supervisor {
+    strategy: :one_for_all
+    max_restarts: 5
+    fn on_message(msg) { return msg }
+}
+
+strict = spawn StrictSupervisor{}
+print("Strict supervisor spawned (strategy: one_for_all, max: 5)")
+
+print()
+
+# -----------------------------------------------------------------
+# 4. Actor .id() method
+# -----------------------------------------------------------------
+
+print("--- 4. Actor Identity ---")
+
+w1 = spawn EchoWorker{}
+w2 = spawn EchoWorker{}
+print("Worker 1 ID: " + w1.id().to_string())
+print("Worker 2 ID: " + w2.id().to_string())
+print("Same actor: " + (w1.id() == w2.id()).to_string())
+
+print()
+print("=== Supervision Demo Complete ===")

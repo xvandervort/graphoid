@@ -1,0 +1,49 @@
+# signals.gr - Phase 19.2: Signal handling demonstration
+#
+# Shows signal.on() for graceful shutdown.
+# Run this program and press Ctrl+C to see signal handling in action.
+
+print("=== Signal Handling Demo ===")
+print("")
+print("This demo registers a SIGINT handler.")
+print("Press Ctrl+C to trigger it (or wait 2 seconds for auto-exit).")
+print("")
+
+# Register signal handler — returns a channel
+sigint = signal.on(:sigint)
+
+# Also demonstrate that multiple registrations work
+sigint2 = signal.on(:sigint)
+
+# Use a timeout to auto-exit so this sample doesn't hang in CI
+timeout = timer.after(2000, "timeout")
+
+# Race between signal and timeout using spawn
+result = channel()
+
+spawn {
+    msg = sigint.receive()
+    result.send("signal: " + msg.to_string())
+}
+
+spawn {
+    msg = timeout.receive()
+    result.send(msg)
+}
+
+# Wait for whichever comes first
+outcome = result.receive()
+
+if outcome == "timeout" {
+    print("Auto-exit after 2 seconds (no Ctrl+C pressed)")
+} else {
+    print("Caught: " + outcome)
+    print("Graceful shutdown complete!")
+}
+
+# Clean up
+sigint.close()
+sigint2.close()
+
+print("")
+print("=== Signal demo complete! ===")

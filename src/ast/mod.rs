@@ -119,6 +119,11 @@ pub enum Stmt {
         body: Vec<Stmt>,
         position: SourcePosition,
     },
+    /// Phase 19: Spawn a concurrent task with share-nothing semantics
+    Spawn {
+        body: Vec<Stmt>,
+        position: SourcePosition,
+    },
 }
 
 /// A property declaration inside a graph body: name: value
@@ -262,6 +267,11 @@ pub enum Expr {
         error: Box<Expr>,  // Error value/message to raise
         position: SourcePosition,
     },
+    /// Phase 19.3: Spawn actor expression — returns an actor reference
+    SpawnActor {
+        expr: Box<Expr>,  // The graph instantiation expression
+        position: SourcePosition,
+    },
     Match {
         value: Box<Expr>,
         arms: Vec<MatchArm>,
@@ -320,6 +330,7 @@ impl Expr {
             Expr::Match { position, .. } => position,
             Expr::SuperMethodCall { position, .. } => position,
             Expr::Instantiate { position, .. } => position,
+            Expr::SpawnActor { position, .. } => position,
         }
     }
 }
@@ -572,6 +583,11 @@ fn collect_from_stmt(stmt: &Stmt, properties: &std::collections::HashSet<&String
         }
         Stmt::For { iterable, body, .. } => {
             collect_from_expr(iterable, properties, refs);
+            for s in body {
+                collect_from_stmt(s, properties, refs);
+            }
+        }
+        Stmt::Spawn { body, .. } | Stmt::PrivBlock { body, .. } => {
             for s in body {
                 collect_from_stmt(s, properties, refs);
             }

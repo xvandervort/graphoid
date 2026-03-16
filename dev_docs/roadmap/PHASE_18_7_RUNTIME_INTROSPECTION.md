@@ -107,7 +107,7 @@ print(__MODULE__)  # → "models/player"
 describe "runtime" {
     it "returns version string" {
         v = runtime.version()
-        expect(typeof(v)).to_equal("string")
+        expect(\1.type()).to_equal("string")
     }
 
     it "returns uptime" {
@@ -119,7 +119,7 @@ describe "runtime" {
 describe "modules" {
     it "lists loaded modules" {
         mods = modules.list()
-        expect(typeof(mods)).to_equal("list")
+        expect(\1.type()).to_equal("list")
     }
 }
 
@@ -131,7 +131,7 @@ describe "error.stack" {
         } catch as e {
             trace = e.stack()
         }
-        expect(typeof(trace)).to_equal("list")
+        expect(\1.type()).to_equal("list")
     }
 }
 ```

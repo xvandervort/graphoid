@@ -1,0 +1,95 @@
+# timers.gr - Phase 19.2: Timer demonstration
+#
+# Shows timer.sleep(), timer.after(), timer.every(),
+# timer cancellation, and for..in channel iteration.
+
+print("=== Timer Module Demo ===")
+print("")
+
+# --- timer.sleep() — blocking delay ---
+print("1. timer.sleep() — blocking delay")
+print("   Sleeping for 100ms...")
+timer.sleep(100)
+print("   Done!")
+print("")
+
+# --- timer.after() — one-shot timer ---
+print("2. timer.after() — one-shot timer")
+ch = timer.after(50)
+print("   Waiting for timer...")
+msg = ch.receive()
+print("   Received: " + msg.to_string())
+# Channel is now closed (one-shot)
+msg2 = ch.receive()
+print("   Second receive: " + msg2.type() + " (channel closed)")
+print("")
+
+# --- timer.after() with custom value ---
+print("3. timer.after() with custom value")
+ch = timer.after(50, "wake up!")
+msg = ch.receive()
+print("   Received: " + msg)
+print("")
+
+# --- timer.every() — recurring timer ---
+print("4. timer.every() — recurring ticks")
+ch = timer.every(30)
+count = 0
+for tick in ch {
+    count = count + 1
+    print("   Tick #" + count.to_string())
+    if count == 5 {
+        break
+    }
+}
+ch.close()
+print("   Stopped after 5 ticks")
+print("")
+
+# --- Timer cancellation ---
+print("5. Timer cancellation via channel.close()")
+ch = timer.every(10)
+ch.receive()
+print("   Got first tick, now cancelling...")
+ch.close()
+timer.sleep(50)
+result = ch.try_receive()
+print("   After close + wait: " + result.type() + " (no more ticks)")
+print("")
+
+# --- Spawn + timer pattern ---
+print("6. Spawn + timer pattern")
+results = channel(10)
+spawn {
+    ch = timer.after(30)
+    ch.receive()
+    results.send("task A done")
+}
+spawn {
+    ch = timer.after(60)
+    ch.receive()
+    results.send("task B done")
+}
+msg1 = results.receive()
+msg2 = results.receive()
+print("   " + msg1)
+print("   " + msg2)
+print("")
+
+# --- for..in with spawn producer ---
+print("7. for..in channel with spawn producer")
+data = channel()
+spawn {
+    for i in [10, 20, 30, 40, 50] {
+        data.send(i)
+    }
+    data.close()
+}
+total = 0
+for val in data {
+    total = total + val
+}
+print("   Sum: " + total.to_string())
+print("")
+
+print("=== All timer demos complete! ===")

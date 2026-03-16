@@ -1,0 +1,188 @@
+# concurrency.gr - Spawn + Channels
+#
+# This example demonstrates Graphoid's concurrency model.
+# Topics covered:
+# - Creating channels (unbuffered and buffered)
+# - Sending and receiving values
+# - Spawning concurrent tasks
+# - Share-nothing semantics
+# - Multiple producers pattern
+# - Worker pattern
+
+print("=== Graphoid Concurrency ===")
+print()
+
+# -----------------------------------------------------------------
+# 1. Channels — the communication primitive
+# -----------------------------------------------------------------
+
+print("--- 1. Channels ---")
+
+# Unbuffered channel (send blocks until someone receives)
+ch = channel()
+print("Created unbuffered channel: " + ch.type())
+
+# Buffered channel (send succeeds until buffer is full)
+buf_ch = channel(3)
+buf_ch.send("first")
+buf_ch.send("second")
+buf_ch.send("third")
+
+print("Buffered receive: " + buf_ch.receive())
+print("Buffered receive: " + buf_ch.receive())
+print("Buffered receive: " + buf_ch.receive())
+print()
+
+# -----------------------------------------------------------------
+# 2. try_receive — non-blocking check
+# -----------------------------------------------------------------
+
+print("--- 2. Non-blocking receive ---")
+
+empty_ch = channel()
+result = empty_ch.try_receive()
+print("try_receive on empty: " + result.type())   # none
+
+ready_ch = channel(1)
+ready_ch.send(42)
+result = ready_ch.try_receive()
+print("try_receive with data: " + result.to_string())  # 42
+print()
+
+# -----------------------------------------------------------------
+# 3. Spawn — concurrent task execution
+# -----------------------------------------------------------------
+
+print("--- 3. Spawn basics ---")
+
+ch = channel()
+spawn {
+    # This runs in a separate thread
+    ch.send("hello from spawned task!")
+}
+msg = ch.receive()
+print(msg)
+print()
+
+# -----------------------------------------------------------------
+# 4. Share-nothing semantics
+# -----------------------------------------------------------------
+
+print("--- 4. Share-nothing ---")
+
+counter = 0
+ch = channel()
+
+spawn {
+    # This is a COPY of counter, not a reference
+    counter = counter + 100
+    ch.send(counter)
+}
+
+spawned_value = ch.receive()
+print("Parent counter: " + counter.to_string())          # 0
+print("Spawned counter: " + spawned_value.to_string())    # 100
+print()
+
+# -----------------------------------------------------------------
+# 5. Functions work across spawn boundaries
+# -----------------------------------------------------------------
+
+print("--- 5. Functions in spawned tasks ---")
+
+fn factorial(n) {
+    if n <= 1 { return 1 }
+    return n * factorial(n - 1)
+}
+
+ch = channel()
+spawn {
+    ch.send(factorial(10))
+}
+
+result = ch.receive()
+print("factorial(10) = " + result.to_string())
+print()
+
+# -----------------------------------------------------------------
+# 6. Multiple producers
+# -----------------------------------------------------------------
+
+print("--- 6. Multiple producers ---")
+
+ch = channel()
+
+spawn { ch.send("worker-1 done") }
+spawn { ch.send("worker-2 done") }
+spawn { ch.send("worker-3 done") }
+
+r1 = ch.receive()
+r2 = ch.receive()
+r3 = ch.receive()
+
+print("  " + r1)
+print("  " + r2)
+print("  " + r3)
+print()
+
+# -----------------------------------------------------------------
+# 7. Worker pattern — fan-out computation
+# -----------------------------------------------------------------
+
+print("--- 7. Worker pattern ---")
+
+fn compute_square(ch, n) {
+    ch.send(n * n)
+}
+
+results_ch = channel()
+numbers = [2, 4, 6, 8, 10]
+
+for n in numbers {
+    spawn {
+        compute_square(results_ch, n)
+    }
+}
+
+# Collect all results
+total = 0
+i = 0
+while i < numbers.length() {
+    total = total + results_ch.receive()
+    i = i + 1
+}
+
+print("Sum of squares of " + numbers.to_string() + " = " + total.to_string())
+# 4 + 16 + 36 + 64 + 100 = 220
+print()
+
+# -----------------------------------------------------------------
+# 8. Channel close
+# -----------------------------------------------------------------
+
+print("--- 8. Channel close ---")
+
+ch = channel(3)
+ch.send("alpha")
+ch.send("beta")
+ch.send("gamma")
+ch.close()
+
+# Can still drain after close
+print("After close: " + ch.receive())
+print("After close: " + ch.receive())
+print("After close: " + ch.receive())
+
+# Receive from closed+empty returns none
+result = ch.receive()
+print("Closed + empty: " + result.type())
+
+# Send on closed channel raises error
+try {
+    ch.send("too late")
+} catch as e {
+    print("Caught: " + e.message())
+}
+
+print()
+print("=== Done ===")

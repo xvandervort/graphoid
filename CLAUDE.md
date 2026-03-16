@@ -295,7 +295,8 @@ make install            # Install to ~/.local
 make install PREFIX=/usr/local  # System-wide install
 
 # Testing
-make test               # Run Rust unit tests
+make test               # Run Rust unit tests (cargo test --lib)
+make nextest            # Run Rust tests with nextest (parallel, faster)
 make spec               # Run Graphoid spec tests
 
 # Running Graphoid (after installation)
@@ -307,7 +308,13 @@ gr help                 # Show help
 # During development (without installing)
 cargo build             # Debug build
 cargo test --lib        # Rust tests
+cargo nextest run       # Parallel test runner (preferred)
 ./target/debug/gr file.gr  # Run with debug build
+
+# Analysis & profiling
+tokei                   # Lines of code by language
+hyperfine 'gr file.gr'  # Benchmark execution time
+valgrind ./target/debug/gr file.gr  # Memory debugging
 ```
 
 ### Python Reference Implementation

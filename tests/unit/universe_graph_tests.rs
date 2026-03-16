@@ -402,7 +402,7 @@ fn test_template_returns_template_graph() {
         }
         a = Animal { name: "Rex" }
         t = a.template()
-        is_graph = typeof(t) == "graph"
+        is_graph = t.type() == "graph"
         template_name = t.name
     "#;
     executor.execute_source(code).unwrap();

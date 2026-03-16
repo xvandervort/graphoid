@@ -69,3 +69,4 @@ START_HERE_*.md
 *_TEMP.md
 *.backup
 experiments/
+test.sh

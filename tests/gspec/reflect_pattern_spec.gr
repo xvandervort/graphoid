@@ -8,7 +8,7 @@ describe "reflect.pattern()" {
     describe "map patterns" {
         it "returns a graph with pattern:root and field nodes" {
             p = reflect.pattern({ name: n, age: a })
-            expect(typeof(p)).to_equal("graph")
+            expect(p.type()).to_equal("graph")
             expect(p.has_node("pattern:root")).to_equal(true)
             expect(p.has_node("field:name")).to_equal(true)
             expect(p.has_node("field:age")).to_equal(true)

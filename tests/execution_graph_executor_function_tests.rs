@@ -171,15 +171,15 @@ result = greet("world", "Hi")
 // --- Builtins ---
 
 #[test]
-fn test_builtin_typeof() {
-    let source = r#"result = typeof(42)"#;
+fn test_type_method_num() {
+    let source = r#"result = (42).type()"#;
     let val = eval_var(source, "result");
     assert_eq!(as_string(&val), "num");
 }
 
 #[test]
-fn test_builtin_typeof_string() {
-    let source = r#"result = typeof("hello")"#;
+fn test_type_method_string() {
+    let source = r#"result = "hello".type()"#;
     let val = eval_var(source, "result");
     assert_eq!(as_string(&val), "string");
 }

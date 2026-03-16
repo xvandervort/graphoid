@@ -191,6 +191,12 @@ impl AstToGraphConverter {
                 self.graph.add_edge(node, ExecEdgeType::ValueEdge, err_ref);
                 node
             }
+            Expr::SpawnActor { expr, position } => {
+                let node = self.add_node(arena, AstNodeType::SpawnActorExpr, HashMap::new(), position.clone());
+                let expr_ref = self.convert_expr_in(expr, arena);
+                self.graph.add_edge(node, ExecEdgeType::ValueEdge, expr_ref);
+                node
+            }
             Expr::Match { value, arms, position } => {
                 let node = self.add_node(arena, AstNodeType::MatchExpr, HashMap::new(), position.clone());
                 let val_ref = self.convert_expr_in(value, arena);
@@ -283,6 +289,8 @@ impl AstToGraphConverter {
                 props.insert("is_private".to_string(), AstProperty::Bool(*is_private));
                 props.insert("is_setter".to_string(), AstProperty::Bool(*is_setter));
                 props.insert("is_static".to_string(), AstProperty::Bool(*is_static));
+                // Phase 19: Store original AST body for spawn portability
+                props.insert("body_stmts".to_string(), AstProperty::Stmts(body.clone()));
                 if let Some(recv) = receiver {
                     props.insert("receiver".to_string(), AstProperty::Str(recv.clone()));
                 }
@@ -497,6 +505,11 @@ impl AstToGraphConverter {
                 }
                 node
             }
+            Stmt::Spawn { body, position } => {
+                let mut props = HashMap::new();
+                props.insert("body_stmts".to_string(), AstProperty::Stmts(body.clone()));
+                self.add_node(arena, AstNodeType::SpawnStmt, props, position.clone())
+            }
         }
     }
 
@@ -603,6 +616,8 @@ impl AstToGraphConverter {
         props.insert("is_setter".to_string(), AstProperty::Bool(method.is_setter));
         props.insert("is_private".to_string(), AstProperty::Bool(method.is_private));
         props.insert("param_count".to_string(), AstProperty::Int(method.params.len() as i64));
+        // Phase 19.3: Store AST body for cross-thread execution (actor threads)
+        props.insert("body_stmts".to_string(), AstProperty::Stmts(method.body.clone()));
         let node = self.add_node(arena, AstNodeType::GraphMethodNode, props, method.position.clone());
 
         // Parameters

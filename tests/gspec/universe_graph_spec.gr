@@ -248,7 +248,7 @@ describe "instantiated_from edge" {
         }
         s = Shape { sides: 4 }
         t = s.template()
-        assert(expect(typeof(t)).to_equal("graph"))
+        assert(expect(t.type()).to_equal("graph"))
         assert(expect(t.sides).to_equal(0))
     }
 

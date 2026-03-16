@@ -21,7 +21,7 @@ Then work through the basics in order:
 samples/
 ├── 01-basics/          (4 files)  - Start here!
 ├── 02-intermediate/    (13 files) - Core features
-├── 03-advanced/        (5 files)  - Graph pattern matching
+├── 03-advanced/        (9 files)  - Graph algorithms + concurrency
 ├── 04-modules/         (6 files)  - Code organization
 ├── 05-stdlib/          (5 files)  - Standard library
 └── 06-projects/        (3 projects) - Full applications
@@ -362,6 +362,107 @@ Topics:
 gr samples/03-advanced/variable_length_paths.gr
 ```
 
+### `select.gr` ⭐⭐⭐
+**Channel multiplexing with select()**
+
+Topics:
+- Basic `select()` usage
+- Channel identity comparison (`==`)
+- Timeout handling (`timeout:`)
+- Non-blocking polling (`default: true`)
+- Multi-producer pattern with `spawn`
+
+```bash
+gr samples/03-advanced/select.gr
+```
+
+**Key Concept:** `select(ch1, ch2, ...)` blocks until any channel has data, returning `[source, msg]`. Compare `source == ch1` to identify which channel fired. Use `timeout:` for time-limited waits and `default: true` for non-blocking polls.
+
+### `actors.gr` ⭐⭐⭐
+**Actor-style concurrency with graph-native messaging**
+
+Topics:
+- Defining actor graphs (graph with `on_message`)
+- Spawning actors with `spawn Actor{}`
+- Fire-and-forget messaging (`.send()`)
+- Request-response messaging (`.request()`)
+- State persistence across messages
+- Initial state overrides
+- Graph-native messaging (`g.send(to:)`, `g.broadcast()`, `g.request(to:)`)
+- Actor lifecycle (`.close()`, `.is_closed()`)
+
+```bash
+gr samples/03-advanced/actors.gr
+```
+
+**Key Concept:** A graph with `fn on_message(msg)` IS an actor — no separate `actor` keyword. Actors process messages one at a time with isolated state, and can be stored as graph nodes for graph-native messaging.
+
+### `supervision.gr` ⭐⭐⭐
+**Actor supervision with automatic restart**
+
+Topics:
+- Supervisor template (`graph X from supervisor {}`)
+- Supervising child actors (`.supervise()`)
+- Automatic restart on crash
+- Restart modes (`:permanent`, `:transient`, `:temporary`)
+- Custom strategy and `max_restarts`
+- Actor `.id()` method
+
+```bash
+gr samples/03-advanced/supervision.gr
+```
+
+**Key Concept:** Supervisors monitor child actors and automatically restart them on failure. Use `graph X from supervisor {}` to inherit supervisor behavior, then `.supervise(child, restart: :permanent)` to register children.
+
+### `concurrency.gr` ⭐⭐⭐
+**Spawn + Channels concurrency**
+
+Topics:
+- Creating channels (unbuffered and buffered)
+- Sending and receiving values
+- Spawning concurrent tasks with `spawn { }`
+- Share-nothing semantics
+- Multiple producers pattern
+- Worker pattern (fan-out computation)
+- Channel close and error handling
+
+```bash
+gr samples/03-advanced/concurrency.gr
+```
+
+**Key Concept:** Graphoid uses share-nothing concurrency — spawned tasks get deep copies of captured values, communicating exclusively through channels.
+
+### `timers.gr` ⭐⭐⭐
+**Timer module — sleep, one-shot, and recurring timers**
+
+Topics:
+- `timer.sleep()` - blocking delay
+- `timer.after()` - one-shot timer returning a channel
+- `timer.every()` - recurring timer returning a channel
+- Timer cancellation via `channel.close()`
+- `for..in` channel iteration
+- Spawn + timer patterns
+
+```bash
+gr samples/03-advanced/timers.gr
+```
+
+**Key Concept:** All timer functions return channels — the same primitive used for spawn communication. No callbacks, no promises.
+
+### `signals.gr` ⭐⭐
+**OS signal handling via channels**
+
+Topics:
+- `signal.on(:sigint)` - register signal handler
+- Graceful shutdown pattern
+- Racing signals against timeouts
+
+```bash
+gr samples/03-advanced/signals.gr
+```
+
+**Key Concept:** Signals are channels too — `signal.on(:sigint)` returns a channel that receives when Ctrl+C is pressed.
+
 ---
 
 ## 04-modules/ - Code Organization
@@ -676,10 +777,10 @@ Check if the example uses newer features. The language is in alpha, so some exam
 
 ## Example Statistics
 
-- **Total Examples:** 32 files
+- **Total Examples:** 35 files
 - **Basics:** 4 files (~20 minutes)
 - **Intermediate:** 13 files (~2-3 hours)
-- **Advanced:** 5 files (~1-2 hours)
+- **Advanced:** 8 files (~1-2 hours)
 - **Modules:** 6 files (~1 hour)
 - **Stdlib:** 4 files (~1 hour)
 

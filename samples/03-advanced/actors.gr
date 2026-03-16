@@ -1,0 +1,135 @@
+# actors.gr - Actor-style Concurrency
+#
+# This example demonstrates Graphoid's actor model.
+# Topics covered:
+# - Defining actor graphs (graph with on_message)
+# - Spawning actors with spawn Actor{}
+# - Fire-and-forget messaging (.send)
+# - Request-response messaging (.request)
+# - State persistence across messages
+# - Initial state overrides
+# - Graph-native messaging (send to, broadcast, request)
+
+print("=== Graphoid Actors ===")
+print()
+
+# -----------------------------------------------------------------
+# 1. Basic actor — Echo
+# -----------------------------------------------------------------
+
+print("--- 1. Echo Actor ---")
+
+graph Echo {
+    fn on_message(msg) {
+        return msg
+    }
+}
+
+echo = spawn Echo{}
+print("Actor type: " + echo.type())
+print("Actor: " + echo.to_string())
+
+result = echo.request("hello world")
+print("Echo reply: " + result)
+print()
+
+# -----------------------------------------------------------------
+# 2. Stateful actor — Counter
+# -----------------------------------------------------------------
+
+print("--- 2. Counter Actor ---")
+
+graph Counter {
+    count: 0
+    fn on_message(msg) {
+        if msg == "increment" { count = count + 1 }
+        if msg == "decrement" { count = count - 1 }
+        if msg == "get" { return count }
+    }
+}
+
+counter = spawn Counter{}
+counter.send("increment")
+counter.send("increment")
+counter.send("increment")
+counter.send("decrement")
+result = counter.request("get")
+print("Counter after 3 inc + 1 dec: " + result.to_string())
+
+# -----------------------------------------------------------------
+# 3. Initial state overrides
+# -----------------------------------------------------------------
+
+print()
+print("--- 3. Initial State ---")
+
+c1 = spawn Counter{}
+c2 = spawn Counter{ count: 100 }
+
+c1.send("increment")
+c2.send("increment")
+
+print("c1 (started at 0): " + c1.request("get").to_string())
+print("c2 (started at 100): " + c2.request("get").to_string())
+
+# -----------------------------------------------------------------
+# 4. Actor isolation
+# -----------------------------------------------------------------
+
+print()
+print("--- 4. Actor Isolation ---")
+
+a = spawn Counter{}
+b = spawn Counter{}
+
+a.send("increment")
+a.send("increment")
+a.send("increment")
+b.send("increment")
+
+print("Actor a count: " + a.request("get").to_string())
+print("Actor b count: " + b.request("get").to_string())
+
+# -----------------------------------------------------------------
+# 5. Graph-native messaging
+# -----------------------------------------------------------------
+
+print()
+print("--- 5. Graph-Native Messaging ---")
+
+g = graph{}
+g.add_node("alice", spawn Counter{})
+g.add_node("bob", spawn Counter{})
+g.add_node("metadata", "not an actor")
+
+# Send to specific node
+g.send("increment", to: "alice")
+g.send("increment", to: "alice")
+g.send("increment", to: "bob")
+
+# Request from specific node
+alice_count = g.request("get", to: "alice")
+bob_count = g.request("get", to: "bob")
+print("Alice count: " + alice_count.to_string())
+print("Bob count: " + bob_count.to_string())
+
+# Broadcast to all actors (non-actors silently skipped)
+g.broadcast("increment")
+alice_count = g.request("get", to: "alice")
+bob_count = g.request("get", to: "bob")
+print("After broadcast: Alice=" + alice_count.to_string() + " Bob=" + bob_count.to_string())
+
+# -----------------------------------------------------------------
+# 6. Close
+# -----------------------------------------------------------------
+
+print()
+print("--- 6. Actor Lifecycle ---")
+
+worker = spawn Echo{}
+print("Worker active: " + worker.is_closed().to_string())
+worker.close()
+print("Worker closed: " + worker.is_closed().to_string())
+
+print()
+print("=== Actors Demo Complete ===")

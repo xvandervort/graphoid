@@ -1,0 +1,229 @@
+# actor_spec.gr - Phase 19.3: Actors as Graph Nodes
+#
+# Tests for actor-style concurrency. A graph with fn on_message(msg)
+# IS an actor — no separate actor keyword needed.
+
+describe "Actors" {
+
+    # =====================================================================
+    # Actor creation and type
+    # =====================================================================
+
+    describe "spawn Actor{}" {
+
+        it "returns an actor value" {
+            graph Echo {
+                fn on_message(msg) {
+                    return msg
+                }
+            }
+            a = spawn Echo{}
+            assert(expect(a.type()).to_equal("actor"))
+        }
+
+        it "actors are truthy" {
+            graph Echo {
+                fn on_message(msg) {
+                    return msg
+                }
+            }
+            a = spawn Echo{}
+            result = if a { true } else { false }
+            assert(expect(result).to_equal(true))
+        }
+
+        it "actors have string representation" {
+            graph Echo {
+                fn on_message(msg) {
+                    return msg
+                }
+            }
+            a = spawn Echo{}
+            s = a.to_string()
+            assert(expect(s.starts_with("<actor:Echo#")).to_equal(true))
+        }
+    }
+
+    # =====================================================================
+    # send (fire-and-forget)
+    # =====================================================================
+
+    describe ".send()" {
+
+        it "returns none" {
+            graph Echo {
+                fn on_message(msg) {
+                    return msg
+                }
+            }
+            a = spawn Echo{}
+            result = a.send("hello")
+            assert(expect(result).to_equal(none))
+        }
+    }
+
+    # =====================================================================
+    # request (request-response)
+    # =====================================================================
+
+    describe ".request()" {
+
+        it "returns the value from on_message" {
+            graph Echo {
+                fn on_message(msg) {
+                    return msg
+                }
+            }
+            a = spawn Echo{}
+            result = a.request("hello")
+            assert(expect(result).to_equal("hello"))
+        }
+
+        it "returns computed values" {
+            graph Doubler {
+                fn on_message(msg) {
+                    return msg * 2
+                }
+            }
+            d = spawn Doubler{}
+            assert(expect(d.request(5)).to_equal(10))
+            assert(expect(d.request(21)).to_equal(42))
+        }
+    }
+
+    # =====================================================================
+    # State persistence
+    # =====================================================================
+
+    describe "state" {
+
+        it "persists across messages" {
+            graph Counter {
+                count: 0
+                fn on_message(msg) {
+                    if msg == "increment" { count = count + 1 }
+                    if msg == "get" { return count }
+                }
+            }
+            c = spawn Counter{}
+            c.send("increment")
+            c.send("increment")
+            c.send("increment")
+            result = c.request("get")
+            assert(expect(result).to_equal(3))
+        }
+
+        it "is isolated between actors" {
+            graph Counter {
+                count: 0
+                fn on_message(msg) {
+                    if msg == "increment" { count = count + 1 }
+                    if msg == "get" { return count }
+                }
+            }
+            a = spawn Counter{}
+            b = spawn Counter{}
+            a.send("increment")
+            a.send("increment")
+            b.send("increment")
+            result_a = a.request("get")
+            result_b = b.request("get")
+            assert(expect(result_a).to_equal(2))
+            assert(expect(result_b).to_equal(1))
+        }
+
+        it "supports initial overrides" {
+            graph Counter {
+                count: 0
+                fn on_message(msg) {
+                    if msg == "get" { return count }
+                }
+            }
+            c = spawn Counter{ count: 100 }
+            result = c.request("get")
+            assert(expect(result).to_equal(100))
+        }
+    }
+
+    # =====================================================================
+    # close
+    # =====================================================================
+
+    describe ".close()" {
+
+        it "stops the actor" {
+            graph Echo {
+                fn on_message(msg) {
+                    return msg
+                }
+            }
+            a = spawn Echo{}
+            a.close()
+            assert(expect(a.is_closed()).to_equal(true))
+        }
+    }
+
+    # =====================================================================
+    # Graph-native messaging
+    # =====================================================================
+
+    describe "graph messaging" {
+
+        it "sends to a named node" {
+            graph Echo {
+                fn on_message(msg) {
+                    return msg
+                }
+            }
+            g = graph{}
+            g.add_node("alice", spawn Echo{})
+            g.send("hello", to: "alice")
+            # send is fire-and-forget, just verify no error
+            assert(expect(true).to_equal(true))
+        }
+
+        it "requests from a named node" {
+            graph Echo {
+                fn on_message(msg) {
+                    return msg
+                }
+            }
+            g = graph{}
+            g.add_node("alice", spawn Echo{})
+            result = g.request("hello", to: "alice")
+            assert(expect(result).to_equal("hello"))
+        }
+
+        it "broadcasts to all actor nodes" {
+            graph Counter {
+                count: 0
+                fn on_message(msg) {
+                    if msg == "increment" { count = count + 1 }
+                    if msg == "get" { return count }
+                }
+            }
+            g = graph{}
+            g.add_node("a", spawn Counter{})
+            g.add_node("b", spawn Counter{})
+            g.broadcast("increment")
+            result_a = g.request("get", to: "a")
+            result_b = g.request("get", to: "b")
+            assert(expect(result_a).to_equal(1))
+            assert(expect(result_b).to_equal(1))
+        }
+
+        it "broadcast skips non-actor nodes" {
+            graph Echo {
+                fn on_message(msg) {
+                    return msg
+                }
+            }
+            g = graph{}
+            g.add_node("alice", spawn Echo{})
+            g.add_node("count", 42)
+            g.broadcast("ping")
+            # Should not error on non-actor node
+            assert(expect(true).to_equal(true))
+        }
+    }
+}

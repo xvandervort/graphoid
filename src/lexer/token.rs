@@ -42,6 +42,7 @@ pub enum TokenType {
     Set,         // set keyword for setters
     Static,      // static keyword for class methods (Phase 20)
     When,        // when keyword for guard clauses (Phase 21)
+    Spawn,       // spawn keyword for concurrent tasks (Phase 19)
     Configure,
     Rule,        // rule keyword for declaring rules in graph body
     Precision,
