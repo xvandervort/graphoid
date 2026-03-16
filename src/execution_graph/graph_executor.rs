@@ -1776,12 +1776,6 @@ impl GraphExecutor {
                 }
                 Ok(Some(Value::none()))
             }
-            "typeof" => {
-                if args.len() != 1 {
-                    return Err(GraphoidError::runtime("typeof() requires exactly 1 argument".to_string()));
-                }
-                Ok(Some(Value::string(args[0].type_name().to_string())))
-            }
             "length" => {
                 if args.len() != 1 {
                     return Err(GraphoidError::runtime("length() requires exactly 1 argument".to_string()));

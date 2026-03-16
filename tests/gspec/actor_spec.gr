@@ -6,7 +6,7 @@
 describe "Actors" {
 
     # =====================================================================
-    # Actor creation and typeof
+    # Actor creation and type
     # =====================================================================
 
     describe "spawn Actor{}" {
@@ -18,7 +18,7 @@ describe "Actors" {
                 }
             }
             a = spawn Echo{}
-            assert(expect(typeof(a)).to_equal("actor"))
+            assert(expect(a.type()).to_equal("actor"))
         }
 
         it "actors are truthy" {

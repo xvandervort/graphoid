@@ -52,7 +52,7 @@ describe "Timer" {
 
         it "returns a channel" {
             ch = timer.after(10)
-            assert(expect(typeof(ch)).to_equal("channel"))
+            assert(expect(ch.type()).to_equal("channel"))
             ch.close()
         }
 
@@ -73,7 +73,7 @@ describe "Timer" {
             msg1 = ch.receive()
             msg2 = ch.receive()
             assert(expect(msg1).to_equal(:tick))
-            assert(expect(typeof(msg2)).to_equal("none"))
+            assert(expect(msg2.type()).to_equal("none"))
         }
 
         it "can be cancelled by closing the channel" {
@@ -81,7 +81,7 @@ describe "Timer" {
             ch.close()
             # Should not block — channel is already closed
             msg = ch.receive()
-            assert(expect(typeof(msg)).to_equal("none"))
+            assert(expect(msg.type()).to_equal("none"))
         }
     }
 
@@ -93,7 +93,7 @@ describe "Timer" {
 
         it "returns a channel" {
             ch = timer.every(50)
-            assert(expect(typeof(ch)).to_equal("channel"))
+            assert(expect(ch.type()).to_equal("channel"))
             ch.close()
         }
 
@@ -121,7 +121,7 @@ describe "Timer" {
             ch.close()
             timer.sleep(60)
             result = ch.try_receive()
-            assert(expect(typeof(result)).to_equal("none"))
+            assert(expect(result.type()).to_equal("none"))
         }
     }
 

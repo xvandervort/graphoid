@@ -9,7 +9,7 @@ describe "exception propagation" {
     describe "reflect.call_graph()" {
         it "returns a graph" {
             cg = reflect.call_graph()
-            expect(typeof(cg)).to_equal("graph")
+            expect(cg.type()).to_equal("graph")
         }
 
         it "has function nodes after calling functions" {

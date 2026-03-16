@@ -36,8 +36,8 @@ fn test_channel_buffered() {
 }
 
 #[test]
-fn test_typeof_channel() {
-    let executor = exec("ch = channel()\nt = typeof(ch)");
+fn test_type_method_channel() {
+    let executor = exec("ch = channel()\nt = ch.type()");
     let val = executor.get_variable("t").unwrap();
     assert_eq!(val, Value::string("channel".to_string()));
 }

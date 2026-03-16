@@ -187,7 +187,7 @@ fn test_spawn_actor_returns_actor_type() {
             }
         }
         a = spawn Echo{}
-        t = typeof(a)
+        t = a.type()
     "#);
     assert_eq!(executor.get_variable("t").unwrap(), Value::string("actor".to_string()));
 }

@@ -14,19 +14,19 @@ describe "Signal" {
 
         it "returns a channel for :sigint" {
             ch = signal.on(:sigint)
-            assert(expect(typeof(ch)).to_equal("channel"))
+            assert(expect(ch.type()).to_equal("channel"))
             ch.close()
         }
 
         it "returns a channel for :sigterm" {
             ch = signal.on(:sigterm)
-            assert(expect(typeof(ch)).to_equal("channel"))
+            assert(expect(ch.type()).to_equal("channel"))
             ch.close()
         }
 
         it "returns a channel for :sighup" {
             ch = signal.on(:sighup)
-            assert(expect(typeof(ch)).to_equal("channel"))
+            assert(expect(ch.type()).to_equal("channel"))
             ch.close()
         }
 
@@ -34,8 +34,8 @@ describe "Signal" {
             ch1 = signal.on(:sigterm)
             ch2 = signal.on(:sigterm)
             # Both should be channels, but independent
-            assert(expect(typeof(ch1)).to_equal("channel"))
-            assert(expect(typeof(ch2)).to_equal("channel"))
+            assert(expect(ch1.type()).to_equal("channel"))
+            assert(expect(ch2.type()).to_equal("channel"))
             ch1.close()
             ch2.close()
         }

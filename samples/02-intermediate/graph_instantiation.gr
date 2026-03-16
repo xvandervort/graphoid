@@ -29,12 +29,12 @@ print("Bob adult? " + bob.is_adult().to_string())      # false
 
 # --- Template introspection ---
 t = alice.template()
-print("Template type: " + typeof(t))          # graph
+print("Template type: " + t.type())          # graph
 print("Template default name: " + t.name)     # unnamed
 
 # Non-instances have no template
 g = graph { type: :directed }
-print("Plain graph template: " + typeof(g.template()))  # none
+print("Plain graph template: " + g.template().type())  # none
 
 # --- Inheritance + instantiation ---
 graph Animal {

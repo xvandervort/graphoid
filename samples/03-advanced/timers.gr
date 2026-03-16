@@ -21,7 +21,7 @@ msg = ch.receive()
 print("   Received: " + msg.to_string())
 # Channel is now closed (one-shot)
 msg2 = ch.receive()
-print("   Second receive: " + typeof(msg2) + " (channel closed)")
+print("   Second receive: " + msg2.type() + " (channel closed)")
 print("")
 
 # --- timer.after() with custom value ---
@@ -54,7 +54,7 @@ print("   Got first tick, now cancelling...")
 ch.close()
 timer.sleep(50)
 result = ch.try_receive()
-print("   After close + wait: " + typeof(result) + " (no more ticks)")
+print("   After close + wait: " + result.type() + " (no more ticks)")
 print("")
 
 # --- Spawn + timer pattern ---

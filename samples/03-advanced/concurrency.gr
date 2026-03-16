@@ -20,7 +20,7 @@ print("--- 1. Channels ---")
 
 # Unbuffered channel (send blocks until someone receives)
 ch = channel()
-print("Created unbuffered channel: " + typeof(ch))
+print("Created unbuffered channel: " + ch.type())
 
 # Buffered channel (send succeeds until buffer is full)
 buf_ch = channel(3)
@@ -41,7 +41,7 @@ print("--- 2. Non-blocking receive ---")
 
 empty_ch = channel()
 result = empty_ch.try_receive()
-print("try_receive on empty: " + typeof(result))   # none
+print("try_receive on empty: " + result.type())   # none
 
 ready_ch = channel(1)
 ready_ch.send(42)
@@ -175,7 +175,7 @@ print("After close: " + ch.receive())
 
 # Receive from closed+empty returns none
 result = ch.receive()
-print("Closed + empty: " + typeof(result))
+print("Closed + empty: " + result.type())
 
 # Send on closed channel raises error
 try {

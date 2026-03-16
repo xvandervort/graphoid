@@ -6,7 +6,7 @@ describe "runtime" {
     describe "version" {
         it "returns a string" {
             v = runtime.version()
-            assert(expect(typeof(v)).to_equal("string"))
+            assert(expect(v.type()).to_equal("string"))
         }
 
         it "returns a non-empty version string" {
@@ -23,7 +23,7 @@ describe "runtime" {
     describe "uptime" {
         it "returns a number" {
             t = runtime.uptime()
-            assert(expect(typeof(t)).to_equal("num"))
+            assert(expect(t.type()).to_equal("num"))
         }
 
         it "returns a non-negative value" {
@@ -35,13 +35,13 @@ describe "runtime" {
     describe "memory" {
         it "returns a map" {
             m = runtime.memory()
-            assert(expect(typeof(m)).to_equal("map"))
+            assert(expect(m.type()).to_equal("map"))
         }
 
         it "has a used key with numeric value" {
             m = runtime.memory()
             u = m["used"]
-            assert(expect(typeof(u)).to_equal("num"))
+            assert(expect(u.type()).to_equal("num"))
         }
 
         it "reports non-negative memory usage" {
@@ -53,7 +53,7 @@ describe "runtime" {
     describe "module_count" {
         it "returns a number" {
             c = runtime.module_count()
-            assert(expect(typeof(c)).to_equal("num"))
+            assert(expect(c.type()).to_equal("num"))
         }
 
         it "returns a non-negative count" {
@@ -67,7 +67,7 @@ describe "modules" {
     describe "list" {
         it "returns a list" {
             m = modules.list()
-            assert(expect(typeof(m)).to_equal("list"))
+            assert(expect(m.type()).to_equal("list"))
         }
     }
 
@@ -87,7 +87,7 @@ describe "error.stack" {
         } catch as e {
             trace = e.stack()
         }
-        assert(expect(typeof(trace)).to_equal("list"))
+        assert(expect(trace.type()).to_equal("list"))
     }
 
     it "captures function names in nested calls" {
@@ -117,7 +117,7 @@ describe "error.stack" {
             trace = e.stack()
             frame = trace[0]
         }
-        assert(expect(typeof(frame)).to_equal("map"))
+        assert(expect(frame.type()).to_equal("map"))
         assert(expect(frame["function"]).to_equal("failing_fn"))
     }
 
@@ -142,7 +142,7 @@ describe "error.stack" {
 
 describe "__MODULE__" {
     it "is defined at top level" {
-        assert(expect(typeof(__MODULE__)).to_equal("string"))
+        assert(expect(__MODULE__.type()).to_equal("string"))
     }
 
     it "is a non-empty string" {

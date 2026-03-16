@@ -12,17 +12,17 @@ describe "Concurrency" {
 
         it "creates a channel value" {
             ch = channel()
-            assert(expect(typeof(ch)).to_equal("channel"))
+            assert(expect(ch.type()).to_equal("channel"))
         }
 
         it "creates a buffered channel with capacity" {
             ch = channel(5)
-            assert(expect(typeof(ch)).to_equal("channel"))
+            assert(expect(ch.type()).to_equal("channel"))
         }
 
         it "creates a buffered channel with named capacity" {
             ch = channel(capacity: 3)
-            assert(expect(typeof(ch)).to_equal("channel"))
+            assert(expect(ch.type()).to_equal("channel"))
         }
 
         it "channels are truthy" {
@@ -89,7 +89,7 @@ describe "Concurrency" {
         it "returns none on empty channel" {
             ch = channel()
             result = ch.try_receive()
-            assert(expect(typeof(result)).to_equal("none"))
+            assert(expect(result.type()).to_equal("none"))
         }
 
         it "returns value when data available" {
@@ -121,7 +121,7 @@ describe "Concurrency" {
             ch = channel(1)
             ch.close()
             result = ch.receive()
-            assert(expect(typeof(result)).to_equal("none"))
+            assert(expect(result.type()).to_equal("none"))
         }
 
         it "raises error on send after close" {

@@ -269,7 +269,7 @@ fn test_error_stack_frame_is_map() {
             trace = e.stack()
             frame = trace[0]
         }
-        frame_type = typeof(frame)
+        frame_type = frame.type()
     "#).unwrap();
     let result = executor.get_variable("frame_type").unwrap();
     assert_eq!(result, Value::string("map".to_string()));

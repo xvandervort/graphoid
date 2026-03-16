@@ -333,7 +333,7 @@ fn test_reflect_pattern_returns_graph() {
     let mut executor = Executor::new();
     let code = r#"
         p = reflect.pattern({ name: n })
-        result = typeof(p)
+        result = p.type()
     "#;
     executor.execute_source(code).unwrap();
     assert!(matches!(&executor.env().get("result").unwrap().kind, ValueKind::String(s) if s == "graph"));

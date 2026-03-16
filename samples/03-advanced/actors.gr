@@ -26,7 +26,7 @@ graph Echo {
 }
 
 echo = spawn Echo{}
-print("Actor type: " + typeof(echo))
+print("Actor type: " + echo.type())
 print("Actor: " + echo.to_string())
 
 result = echo.request("hello world")
