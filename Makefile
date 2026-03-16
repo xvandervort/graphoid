@@ -6,6 +6,7 @@
 #   make install PREFIX=/usr/local  Install system-wide
 #   make uninstall                Remove installation
 #   make test                     Run tests
+#   make nextest                  Run tests with nextest (parallel)
 #   make clean                    Clean build artifacts
 #
 
@@ -15,7 +16,7 @@ DATADIR = $(PREFIX)/share/graphoid
 
 CARGO = cargo
 
-.PHONY: build install uninstall test spec clean help
+.PHONY: build install uninstall test nextest spec clean help
 
 build:
 	$(CARGO) build --release
@@ -49,6 +50,9 @@ uninstall:
 test:
 	$(CARGO) test --lib
 
+nextest:
+	$(CARGO) nextest run --lib
+
 spec: build
 	./target/release/gr spec tests/gspec/
 
@@ -63,6 +67,7 @@ help:
 	@echo "  install    Install to PREFIX (default: ~/.local)"
 	@echo "  uninstall  Remove installation"
 	@echo "  test       Run Rust unit tests"
+	@echo "  nextest    Run Rust tests with nextest (parallel)"
 	@echo "  spec       Run Graphoid spec tests"
 	@echo "  clean      Clean build artifacts"
 	@echo ""
