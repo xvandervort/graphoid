@@ -12,5 +12,6 @@ pub mod error;
 pub mod stdlib;
 pub mod namespace;
 pub mod execution_graph;
+pub mod ffi;
 
 pub use error::{GraphoidError, Result};

@@ -1,8 +1,8 @@
 # Graphoid Implementation Roadmap
 
-**Version**: 12.1
-**Last Updated**: March 12, 2026
-**Status**: Phases 0-19.5 Complete. Actor lifecycle bug fixed (Drop cleanup). Phase 19.4 (Module Hot Reload) deferred for planning.
+**Version**: 13.0
+**Last Updated**: March 17, 2026
+**Status**: Phases 0-19.5 + Phase 20a Complete. FFI Foundation working (load C libraries, call functions, manage pointers). typeof() eradicated. Graph messaging bug fixed.
 
 ---
 
@@ -76,7 +76,7 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 | Phase | Name | Priority | Duration | Dependencies |
 |-------|------|----------|----------|--------------|
-| [20](PHASE_20_FFI.md) | Foreign Function Interface | **Critical** | 12-16 days | None |
+| [20](PHASE_20_FFI.md) | Foreign Function Interface | **Critical** | 12-16 days | None | 🔄 Phase 20a Complete |
 | [21](PHASE_21_PACKAGE_MANAGER.md) | Package Manager | **High** | 14-21 days | None |
 | [22](PHASE_22_DATABASE.md) | Database Connectivity | **High** | 7-10 days | Phase 20, 21 |
 
@@ -206,11 +206,12 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 ### Medium-Term (Ecosystem + Compilation)
 
-9. **Phase 20: FFI** - C interop, Rust plugins, syscalls
-10. **Phase 21: Package Manager** - Ecosystem enablement
-11. **Phase 22: Database** - PostgreSQL, SQLite, Redis
-12. **Phase 23: Distributed Primitives** - Serialization, remote refs, routing hooks
-13. **Phase 29: Bytecode VM** - 5-10x performance
+9. ~~**Phase 20a: FFI Foundation**~~ ✅ Complete (Mar 17, 2026) — library loading, function calling, pointers
+10. **Phase 20b: FFI Structs + Callbacks** - cdef parser, struct support, callbacks
+11. **Phase 21: Package Manager** - Ecosystem enablement
+12. **Phase 22: Database** - PostgreSQL, SQLite, Redis
+13. **Phase 23: Distributed Primitives** - Serialization, remote refs, routing hooks
+14. **Phase 29: Bytecode VM** - 5-10x performance
 
 ### Long-Term (Distributed + Self-Hosting)
 
@@ -336,6 +337,7 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 13.0 | 2026-03-17 | Phase 20a (FFI Foundation) complete. typeof() eradicated. Graph messaging bug fixed (user-defined send/request/broadcast methods no longer intercepted). |
 | 12.1 | 2026-03-12 | Actor lifecycle bug fixed (Drop cleanup, liveness checks). Concurrency near-term marked complete. |
 | 11.0 | 2026-02-18 | Phases 15-18 complete. Phase 18.5 split: concurrency parts into Phase 19 sub-phases, non-concurrency into 18.7. Phase 19 broken into 6 sub-phases (19.1-19.6). Concurrency syntax added to language spec. BigNum cleanup complete. |
 | 10.0 | 2026-02-09 | Phases 15-17 complete. Phase 18 in progress. |

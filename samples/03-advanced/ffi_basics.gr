@@ -1,0 +1,106 @@
+# FFI Basics — Phase 20
+# Demonstrates loading C libraries and calling foreign functions
+#
+# `ffi` is available via static dispatch (like timer, signal) — no import needed.
+# If importing explicitly, use `import "ffi" unsafe` to suppress the safety warning.
+
+import "ffi" unsafe
+
+print("=== FFI Basics ===")
+print("")
+
+# --- 1. Platform Information ---
+print("1. Platform Info")
+print("   Platform: " + ffi.platform())
+print("   Arch: " + ffi.arch())
+print("   Pointer size: " + ffi.pointer_size().to_string() + " bytes")
+print("   Endian: " + ffi.endian())
+print("")
+
+# --- 2. Load libc ---
+print("2. Loading libc")
+lib = ffi.c("c")
+print("   Library: " + lib.to_string())
+print("   Name: " + lib.name())
+print("")
+
+# --- 3. Declare and call functions ---
+print("3. Calling C functions")
+
+# abs(int) -> int
+lib.decl("abs", ["int"], "int")
+result = lib.abs(-42)
+print("   abs(-42) = " + result.to_string())
+
+# strlen(char*) -> size_t
+lib.decl("strlen", ["str"], "usize")
+result = lib.strlen("hello world")
+print("   strlen('hello world') = " + result.to_string())
+
+# atoi(char*) -> int
+lib.decl("atoi", ["str"], "int")
+result = lib.atoi("9876")
+print("   atoi('9876') = " + result.to_string())
+
+print("   Declared functions: " + lib.declarations().to_string())
+print("")
+
+# --- 4. Load libm for math ---
+print("4. Math from libm")
+libm = ffi.c("m")
+libm.decl("sqrt", ["double"], "double")
+libm.decl("pow", ["double", "double"], "double")
+libm.decl("ceil", ["double"], "double")
+libm.decl("floor", ["double"], "double")
+
+print("   sqrt(144) = " + libm.sqrt(144.0).to_string())
+print("   pow(2, 10) = " + libm.pow(2.0, 10.0).to_string())
+print("   ceil(3.14) = " + libm.ceil(3.14).to_string())
+print("   floor(3.14) = " + libm.floor(3.14).to_string())
+print("")
+
+# --- 5. Memory Management ---
+print("5. Memory Management")
+buf = ffi.alloc(64)
+print("   Allocated 64 bytes: " + buf.to_string())
+print("   State: " + buf.state().to_string())
+print("   Size: " + buf.size().to_string())
+
+# Write and read a string
+buf.write("Hello from FFI!")
+result = buf.read_str()
+print("   Wrote and read: '" + result + "'")
+
+# Write individual bytes
+buf.set(0, 72)  # 'H'
+buf.set(1, 105) # 'i'
+buf.set(2, 0)   # null terminator
+result = buf.read_str()
+print("   After byte writes: '" + result + "'")
+
+# Free the buffer
+ffi.free(buf)
+print("   After free: " + buf.state().to_string())
+print("")
+
+# --- 6. Error Handling ---
+print("6. Error Handling")
+
+# Double free detection
+try {
+    ffi.free(buf)
+    print("   ERROR: Should have caught double free!")
+} catch as e {
+    print("   Double free caught: " + e.message())
+}
+
+# Use after free detection
+try {
+    buf.read_str()
+    print("   ERROR: Should have caught use after free!")
+} catch as e {
+    print("   Use after free caught: " + e.message())
+}
+
+print("")
+print("=== FFI Basics Complete ===")

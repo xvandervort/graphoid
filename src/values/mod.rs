@@ -15,9 +15,11 @@ pub mod list;
 pub mod hash;
 pub mod channel;
 pub mod actor;
+pub mod foreign;
 
 pub use channel::Channel;
 pub use actor::ActorRef;
+pub use foreign::{ForeignLib, ForeignPtr};
 
 /// Layers that can be compared when using graph.equals() with include:/only: options
 ///
@@ -544,6 +546,12 @@ pub enum ValueKind {
     /// Actor reference (Phase 19.3) - handle to a running actor
     /// Clone creates a reference to the same actor (via Arc-based channel)
     Actor(ActorRef),
+    /// Foreign library (Phase 20) - loaded dynamic library with declared functions
+    /// Clone shares the same library handle (via Arc)
+    ForeignLib(ForeignLib),
+    /// Foreign pointer (Phase 20) - tracked raw pointer with safety state
+    /// Clone shares the same pointer tracking (via Arc)
+    ForeignPtr(ForeignPtr),
 }
 
 // Manual PartialEq implementation for ValueKind
@@ -574,6 +582,8 @@ impl PartialEq for ValueKind {
             (ValueKind::Time(a), ValueKind::Time(b)) => a == b,
             (ValueKind::Channel(a), ValueKind::Channel(b)) => a == b, // Identity comparison via Arc
             (ValueKind::Actor(a), ValueKind::Actor(b)) => a == b,
+            (ValueKind::ForeignLib(a), ValueKind::ForeignLib(b)) => a == b,
+            (ValueKind::ForeignPtr(a), ValueKind::ForeignPtr(b)) => a == b,
             _ => false, // Different variants are not equal
         }
     }
@@ -633,6 +643,14 @@ impl Value {
 
     pub fn actor(a: ActorRef) -> Self {
         Value { kind: ValueKind::Actor(a), frozen: false }
+    }
+
+    pub fn foreign_lib(lib: ForeignLib) -> Self {
+        Value { kind: ValueKind::ForeignLib(lib), frozen: false }
+    }
+
+    pub fn foreign_ptr(ptr: ForeignPtr) -> Self {
+        Value { kind: ValueKind::ForeignPtr(ptr), frozen: false }
     }
 
     pub fn symbol(s: String) -> Self {
@@ -732,6 +750,8 @@ impl Value {
             ValueKind::Time(_) => true, // Time values are always truthy
             ValueKind::Channel(_) => true, // Channels are always truthy
             ValueKind::Actor(_) => true, // Actor references are always truthy
+            ValueKind::ForeignLib(_) => true, // Foreign libs are always truthy
+            ValueKind::ForeignPtr(_) => true, // Foreign pointers are always truthy
         }
     }
 
@@ -840,6 +860,8 @@ impl Value {
             }
             ValueKind::Channel(_) => "<channel>".to_string(),
             ValueKind::Actor(ref a) => a.to_string(),
+            ValueKind::ForeignLib(ref lib) => lib.to_string(),
+            ValueKind::ForeignPtr(ref ptr) => ptr.to_string(),
         }
     }
 
@@ -866,6 +888,8 @@ impl Value {
             ValueKind::Time(_) => "time",
             ValueKind::Channel(_) => "channel",
             ValueKind::Actor(_) => "actor",
+            ValueKind::ForeignLib(_) => "foreign_lib",
+            ValueKind::ForeignPtr(_) => "foreign_ptr",
         }
     }
 

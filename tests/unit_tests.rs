@@ -62,4 +62,5 @@ mod unit {
     pub mod actor_tests;
     pub mod select_tests;
     pub mod supervision_tests;
+    pub mod ffi_tests;
 }

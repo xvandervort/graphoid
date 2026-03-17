@@ -51,6 +51,10 @@ chrono = "0.4"
 # Signal handling (Phase 19.2)
 signal-hook = "0.3"
 
+# FFI (Phase 20)
+libloading = "0.8"     # Dynamic library loading (dlopen/dlsym)
+libffi = "3.2"         # Foreign function calls with runtime signatures
+
 # BigNum support (Phase 1B)
 num-bigint = "0.4"     # Arbitrary precision integers
 num-traits = "0.2"     # Numeric trait abstractions
