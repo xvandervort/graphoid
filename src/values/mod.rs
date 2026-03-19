@@ -19,7 +19,7 @@ pub mod foreign;
 
 pub use channel::Channel;
 pub use actor::ActorRef;
-pub use foreign::{ForeignLib, ForeignPtr};
+pub use foreign::{ForeignLib, ForeignPtr, ForeignStruct, ForeignCallback};
 
 /// Layers that can be compared when using graph.equals() with include:/only: options
 ///
@@ -552,6 +552,12 @@ pub enum ValueKind {
     /// Foreign pointer (Phase 20) - tracked raw pointer with safety state
     /// Clone shares the same pointer tracking (via Arc)
     ForeignPtr(ForeignPtr),
+    /// Foreign struct instance (Phase 20b) - C struct with typed field access
+    /// Clone shares the same underlying memory (via ForeignPtr's Arc)
+    ForeignStruct(ForeignStruct),
+    /// Foreign callback (Phase 20b) - pinned C function pointer wrapping a Graphoid function
+    /// Clone shares the same callback (via Arc)
+    ForeignCallback(ForeignCallback),
 }
 
 // Manual PartialEq implementation for ValueKind
@@ -584,6 +590,8 @@ impl PartialEq for ValueKind {
             (ValueKind::Actor(a), ValueKind::Actor(b)) => a == b,
             (ValueKind::ForeignLib(a), ValueKind::ForeignLib(b)) => a == b,
             (ValueKind::ForeignPtr(a), ValueKind::ForeignPtr(b)) => a == b,
+            (ValueKind::ForeignStruct(a), ValueKind::ForeignStruct(b)) => a == b,
+            (ValueKind::ForeignCallback(a), ValueKind::ForeignCallback(b)) => a == b,
             _ => false, // Different variants are not equal
         }
     }
@@ -651,6 +659,14 @@ impl Value {
 
     pub fn foreign_ptr(ptr: ForeignPtr) -> Self {
         Value { kind: ValueKind::ForeignPtr(ptr), frozen: false }
+    }
+
+    pub fn foreign_struct(fs: ForeignStruct) -> Self {
+        Value { kind: ValueKind::ForeignStruct(fs), frozen: false }
+    }
+
+    pub fn foreign_callback(cb: ForeignCallback) -> Self {
+        Value { kind: ValueKind::ForeignCallback(cb), frozen: false }
     }
 
     pub fn symbol(s: String) -> Self {
@@ -752,6 +768,8 @@ impl Value {
             ValueKind::Actor(_) => true, // Actor references are always truthy
             ValueKind::ForeignLib(_) => true, // Foreign libs are always truthy
             ValueKind::ForeignPtr(_) => true, // Foreign pointers are always truthy
+            ValueKind::ForeignStruct(_) => true, // Foreign structs are always truthy
+            ValueKind::ForeignCallback(_) => true, // Foreign callbacks are always truthy
         }
     }
 
@@ -862,6 +880,8 @@ impl Value {
             ValueKind::Actor(ref a) => a.to_string(),
             ValueKind::ForeignLib(ref lib) => lib.to_string(),
             ValueKind::ForeignPtr(ref ptr) => ptr.to_string(),
+            ValueKind::ForeignStruct(ref fs) => fs.to_string(),
+            ValueKind::ForeignCallback(ref cb) => cb.to_string(),
         }
     }
 
@@ -890,6 +910,8 @@ impl Value {
             ValueKind::Actor(_) => "actor",
             ValueKind::ForeignLib(_) => "foreign_lib",
             ValueKind::ForeignPtr(_) => "foreign_ptr",
+            ValueKind::ForeignStruct(_) => "foreign_struct",
+            ValueKind::ForeignCallback(_) => "foreign_callback",
         }
     }
 

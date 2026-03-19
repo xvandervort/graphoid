@@ -63,4 +63,7 @@ mod unit {
     pub mod select_tests;
     pub mod supervision_tests;
     pub mod ffi_tests;
+    pub mod ffi_cdef_tests;
+    pub mod ffi_struct_tests;
+    pub mod ffi_callback_tests;
 }

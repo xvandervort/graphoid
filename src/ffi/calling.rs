@@ -13,11 +13,32 @@ fn expect_number(arg: &Value, idx: usize, func_name: &str) -> Result<f64, Grapho
     ))
 }
 
+/// Extract a raw pointer from a foreign_ptr, foreign_struct, or none value.
+fn extract_ptr_arg(arg: &Value, idx: usize, func_name: &str) -> Result<*mut u8, GraphoidError> {
+    match &arg.kind {
+        crate::values::ValueKind::ForeignPtr(fp) => {
+            fp.get_ptr().map_err(|e| GraphoidError::runtime(
+                format!("FFI arg {} for '{}': {}", idx, func_name, e)
+            ))
+        }
+        crate::values::ValueKind::ForeignStruct(fs) => {
+            fs.ptr.get_ptr().map_err(|e| GraphoidError::runtime(
+                format!("FFI arg {} for '{}': {}", idx, func_name, e)
+            ))
+        }
+        crate::values::ValueKind::None => Ok(std::ptr::null_mut()),
+        _ => Err(GraphoidError::runtime(
+            format!("FFI arg {} for '{}': expected foreign_ptr, foreign_struct, or none, got {}", idx, func_name, arg.type_name())
+        )),
+    }
+}
+
 /// Call a declared foreign function with the given arguments.
 pub fn call_foreign_function(
     lib: &ForeignLib,
     decl: &FfiDeclaration,
     args: &[Value],
+    globals: &std::collections::HashMap<String, Value>,
 ) -> Result<Value, GraphoidError> {
     if args.len() != decl.params.len() {
         return Err(GraphoidError::runtime(format!(
@@ -65,6 +86,8 @@ pub fn call_foreign_function(
     let mut ptr_vals: Vec<*mut u8> = Vec::new();
     // For string args, we store the pointer to pass
     let mut str_ptrs: Vec<*const i8> = Vec::new();
+    // For callback args: (ptr_vals index, function, signature)
+    let mut callback_slots: Vec<(usize, crate::values::Function, crate::ffi::types::FfiCallbackSig)> = Vec::new();
 
     for (i, (param_type, arg)) in decl.params.iter().zip(args.iter()).enumerate() {
         match param_type {
@@ -117,19 +140,26 @@ pub fn call_foreign_function(
                 ))?;
                 c_strings.push(cs);
             }
-            FfiType::Ptr => {
+            FfiType::Ptr | FfiType::Struct(_) => {
+                ptr_vals.push(extract_ptr_arg(arg, i, &decl.name)?);
+            }
+            FfiType::Callback(ref sig) => {
                 match &arg.kind {
-                    crate::values::ValueKind::ForeignPtr(fp) => {
-                        let p = fp.get_ptr().map_err(|e| GraphoidError::runtime(
-                            format!("FFI arg {} for '{}': {}", i, decl.name, e)
-                        ))?;
-                        ptr_vals.push(p);
+                    crate::values::ValueKind::Function(func) => {
+                        // Will create closure in second pass (need all values collected first)
+                        // For now store a placeholder null — actual pointer set in closure creation pass
+                        ptr_vals.push(std::ptr::null_mut());
+                        // Store (index, function, sig) for closure creation
+                        callback_slots.push((ptr_vals.len() - 1, func.clone(), sig.clone()));
+                    }
+                    crate::values::ValueKind::ForeignCallback(cb) => {
+                        ptr_vals.push(cb.code_ptr() as *mut u8);
                     }
                     crate::values::ValueKind::None => {
                         ptr_vals.push(std::ptr::null_mut());
                     }
                     _ => return Err(GraphoidError::runtime(
-                        format!("FFI arg {} for '{}': expected foreign_ptr or none, got {}", i, decl.name, arg.type_name())
+                        format!("FFI arg {} for '{}': expected function or foreign_callback, got {}", i, decl.name, arg.type_name())
                     )),
                 }
             }
@@ -161,6 +191,14 @@ pub fn call_foreign_function(
     // Build string pointers array (must be done after all CStrings are pushed)
     for cs in &c_strings {
         str_ptrs.push(cs.as_ptr());
+    }
+
+    // Create callback closures and update ptr_vals with actual function pointers
+    let mut _callback_closures: Vec<crate::ffi::callback::CallbackClosure> = Vec::new();
+    for (idx, func, sig) in callback_slots {
+        let closure = crate::ffi::callback::create_callback(&func, &sig, globals)?;
+        ptr_vals[idx] = closure.fn_ptr as *mut u8;
+        _callback_closures.push(closure); // Keep alive for duration of C call
     }
 
     for param_type in &decl.params {
@@ -217,7 +255,7 @@ pub fn call_foreign_function(
                 c_args.push(libffi::middle::arg(&str_ptrs[str_idx]));
                 str_idx += 1;
             }
-            FfiType::Ptr => {
+            FfiType::Ptr | FfiType::Struct(_) | FfiType::Callback(_) => {
                 c_args.push(libffi::middle::arg(&ptr_vals[ptr_idx]));
                 ptr_idx += 1;
             }
@@ -289,7 +327,7 @@ pub fn call_foreign_function(
                     Value::string(cstr.to_string_lossy().into_owned())
                 }
             }
-            FfiType::Ptr => {
+            FfiType::Ptr | FfiType::Struct(_) | FfiType::Callback(_) => {
                 let r: *mut u8 = cif.call(fn_ptr, &c_args);
                 if r.is_null() {
                     Value::none()

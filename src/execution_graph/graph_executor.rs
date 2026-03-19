@@ -2540,6 +2540,7 @@ impl GraphExecutor {
             ValueKind::Actor(ref actor_ref) => self.eval_actor_method(actor_ref, method, &args),
             ValueKind::ForeignLib(ref lib) => self.eval_foreign_lib_method(lib, method, &args),
             ValueKind::ForeignPtr(ref ptr) => self.eval_foreign_ptr_method(ptr, method, &args),
+            ValueKind::ForeignStruct(ref fs) => self.eval_foreign_struct_method(fs, method, &args),
             ValueKind::BigNumber(ref bn) => self.eval_bignum_method(bn, method, &args),
             ValueKind::PatternNode(ref pn) => self.eval_pattern_node_method(pn, method, &args),
             ValueKind::PatternEdge(ref pe) => self.eval_pattern_edge_method(pe, method, &args),
@@ -3347,6 +3348,60 @@ impl GraphExecutor {
                     _ => Err(GraphoidError::type_error("foreign_ptr", args[0].type_name())),
                 }
             }
+            "pin" => {
+                // ffi.pin(function, ["param_types"...], "return_type")
+                if args.len() != 3 {
+                    return Err(GraphoidError::runtime(
+                        "ffi.pin() requires 3 arguments: function, param_types list, return_type".to_string()
+                    ));
+                }
+                let func = match &args[0].kind {
+                    ValueKind::Function(f) => f.clone(),
+                    _ => return Err(GraphoidError::type_error("function", args[0].type_name())),
+                };
+                let param_types = match &args[1].kind {
+                    ValueKind::List(list) => {
+                        let mut types = Vec::new();
+                        for item in list.to_vec() {
+                            let type_str = match &item.kind {
+                                ValueKind::String(s) => s.clone(),
+                                _ => return Err(GraphoidError::runtime(
+                                    "ffi.pin(): param types must be strings".to_string()
+                                )),
+                            };
+                            types.push(crate::ffi::types::FfiType::from_str(&type_str)?);
+                        }
+                        types
+                    }
+                    _ => return Err(GraphoidError::type_error("list", args[1].type_name())),
+                };
+                let return_type_str = match &args[2].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::type_error("string", args[2].type_name())),
+                };
+                let return_type = crate::ffi::types::FfiType::from_str(&return_type_str)?;
+
+                let sig = crate::ffi::types::FfiCallbackSig {
+                    params: param_types,
+                    return_type: Box::new(return_type),
+                };
+                let globals: std::collections::HashMap<String, Value> = self.env.get_all_bindings()
+                    .into_iter().collect();
+                let cb = crate::ffi::callback::create_pinned_callback(&func, &sig, &globals)?;
+                Ok(Value::foreign_callback(cb))
+            }
+            "unpin" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime("ffi.unpin() requires 1 argument (callback)".to_string()));
+                }
+                match &args[0].kind {
+                    ValueKind::ForeignCallback(ref cb) => {
+                        crate::ffi::callback::unpin_callback(cb)?;
+                        Ok(Value::none())
+                    }
+                    _ => Err(GraphoidError::type_error("foreign_callback", args[0].type_name())),
+                }
+            }
             _ => Err(GraphoidError::runtime(format!("ffi has no method '{}'", method))),
         }
     }
@@ -3415,10 +3470,68 @@ impl GraphExecutor {
                     .collect();
                 Ok(Value::list(crate::values::List::from_vec(names)))
             }
+            "structs" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime("lib.structs() takes no arguments".to_string()));
+                }
+                let names: Vec<Value> = lib.struct_def_names().into_iter()
+                    .map(Value::string)
+                    .collect();
+                Ok(Value::list(crate::values::List::from_vec(names)))
+            }
+            "cdef" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime("lib.cdef() requires 1 argument (C declarations string)".to_string()));
+                }
+                let code = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+                let items = crate::ffi::cdef_parser::parse_cdef(&code)?;
+                for item in items {
+                    match item {
+                        crate::ffi::cdef_parser::CdefItem::Function(decl) => {
+                            lib.add_declaration(decl);
+                        }
+                        crate::ffi::cdef_parser::CdefItem::Struct(def) => {
+                            lib.add_struct_def(def);
+                        }
+                        crate::ffi::cdef_parser::CdefItem::OpaqueType(_) => {
+                            // Opaque types are noted but don't need storage —
+                            // they're treated as Ptr in function signatures
+                        }
+                    }
+                }
+                Ok(Value::none())
+            }
+            "new" => {
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime("lib.new() requires 2 arguments: struct_name, field_map".to_string()));
+                }
+                let struct_name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+                let fields_map = match &args[1].kind {
+                    ValueKind::Map(hash) => {
+                        hash.to_hashmap()
+                    }
+                    _ => return Err(GraphoidError::type_error("map", args[1].type_name())),
+                };
+                let def = lib.get_struct_def(&struct_name).ok_or_else(|| {
+                    GraphoidError::runtime(format!(
+                        "Library '{}' has no struct definition '{}'", lib.name(), struct_name
+                    ))
+                })?;
+                let fs = crate::ffi::struct_ops::create_struct(&def, &fields_map, &lib.name())?;
+                Ok(Value::foreign_struct(fs))
+            }
             // Dynamic dispatch: try to call a declared function
             _ => {
                 if let Some(decl) = lib.get_declaration(method) {
-                    crate::ffi::calling::call_foreign_function(lib, &decl, args)
+                    let globals: std::collections::HashMap<String, Value> = self.env.get_all_bindings()
+                        .into_iter().collect();
+                    crate::ffi::calling::call_foreign_function(lib, &decl, args, &globals)
                 } else {
                     Err(GraphoidError::runtime(format!(
                         "Foreign library '{}' has no declared function '{}'", lib.name(), method
@@ -3519,6 +3632,60 @@ impl GraphExecutor {
             }
             _ => Err(GraphoidError::runtime(format!(
                 "foreign_ptr has no method '{}'", method
+            ))),
+        }
+    }
+
+    fn eval_foreign_struct_method(&self, fs: &crate::values::ForeignStruct, method: &str, args: &[Value]) -> Result<Value> {
+        match method {
+            "get" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime("struct.get() requires 1 argument: field_name".to_string()));
+                }
+                let field_name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+                crate::ffi::struct_ops::read_field(fs, &field_name)
+            }
+            "set" => {
+                if args.len() != 2 {
+                    return Err(GraphoidError::runtime("struct.set() requires 2 arguments: field_name, value".to_string()));
+                }
+                let field_name = match &args[0].kind {
+                    ValueKind::String(s) => s.clone(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+                crate::ffi::struct_ops::write_field(fs, &field_name, &args[1])?;
+                Ok(Value::none())
+            }
+            "fields" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime("struct.fields() takes no arguments".to_string()));
+                }
+                let map = crate::ffi::struct_ops::read_all_fields(fs)?;
+                Ok(Value::map(map))
+            }
+            "struct_name" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime("struct.struct_name() takes no arguments".to_string()));
+                }
+                Ok(Value::string(fs.struct_def.name.clone()))
+            }
+            "address" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime("struct.address() takes no arguments".to_string()));
+                }
+                Ok(Value::number(fs.ptr.address() as f64))
+            }
+            "size" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime("struct.size() takes no arguments".to_string()));
+                }
+                Ok(Value::number(fs.struct_def.size as f64))
+            }
+            _ => Err(GraphoidError::runtime(format!(
+                "foreign_struct has no method '{}'", method
             ))),
         }
     }
@@ -6466,7 +6633,21 @@ impl GraphExecutor {
         std::mem::take(&mut self.output_buffer)
     }
 
-    /// Get a reference to the environment.
+    /// Define a variable in the environment (creates or overwrites).
+    pub fn set_variable(&mut self, name: &str, value: Value) {
+        self.env.define(name.to_string(), value);
+    }
+
+    /// Execute a sequence of statements (function body) and return the last value.
+    pub fn execute_function_body(&mut self, body: &[crate::ast::Stmt]) -> Result<Value> {
+        use crate::execution_graph::converter::AstToGraphConverter;
+        let program = crate::ast::Program { statements: body.to_vec() };
+        let mut converter = AstToGraphConverter::new();
+        let root = converter.convert_program(&program);
+        let graph = converter.into_graph();
+        self.execute(graph, root)
+    }
+
     pub fn env(&self) -> &Environment {
         &self.env
     }
