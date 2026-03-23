@@ -73,6 +73,12 @@ pub struct GraphExecutor {
     raise_stack: Option<Vec<String>>,
     /// Phase 19: IDs of actors spawned by this executor (for cleanup on drop)
     spawned_actor_ids: Vec<u64>,
+    /// Phase 20c: counter for unique bridge node IDs
+    bridge_ptr_counter: usize,
+    /// Phase 20c: FFI resource limits
+    ffi_limits: crate::ffi::limits::FfiLimits,
+    /// Phase 20c: FFI resource usage tracking
+    ffi_usage: crate::ffi::limits::FfiUsage,
 }
 
 /// A pattern clause stored as graph references (for pattern-matching functions).
@@ -117,6 +123,9 @@ impl GraphExecutor {
             start_time: Instant::now(),
             raise_stack: None,
             spawned_actor_ids: Vec::new(),
+            bridge_ptr_counter: 0,
+            ffi_limits: crate::ffi::limits::FfiLimits::default(),
+            ffi_usage: crate::ffi::limits::FfiUsage::default(),
         };
         // Phase 18.7: Set __MODULE__ for top-level scripts
         executor.env.define("__MODULE__".to_string(), Value::string("__main__".to_string()));
@@ -198,7 +207,44 @@ impl GraphExecutor {
             let _ = g.add_edge(&node_id, "error:IOError", "subtype_of".to_string(), None, HashMap::new());
         }
 
+        // Foreign type hierarchy (Phase 20c)
+        let foreign_types = [
+            "type:foreign", "type:ForeignLib", "type:ForeignPtr",
+            "type:ForeignStruct", "type:ForeignCallback",
+        ];
+        for ft in &foreign_types {
+            let _ = g.add_node(ft.to_string(), Value::string(ft.to_string()));
+        }
+        let _ = g.add_edge("type:foreign", "type:any", "subtype_of".to_string(), None, HashMap::new());
+        for ft in &["type:ForeignLib", "type:ForeignPtr", "type:ForeignStruct", "type:ForeignCallback"] {
+            let _ = g.add_edge(ft, "type:foreign", "subtype_of".to_string(), None, HashMap::new());
+        }
+
         g
+    }
+
+    /// Register a bridge node for a loaded foreign library.
+    fn register_bridge_lib(&self, lib: &crate::values::ForeignLib) {
+        let inner = lib.inner.lock().unwrap();
+        let node_id = format!("bridge:lib:{}", inner.name);
+        let mut ug = self.universe_graph.borrow_mut();
+        if ug.has_node(&node_id) { return; }
+        let _ = ug.add_node(node_id.clone(), Value::string(inner.name.clone()));
+        let _ = ug.add_edge(&node_id, "type:ForeignLib", "instance_of".to_string(), None, HashMap::new());
+        // Store path as a metadata node
+        let path_node = format!("{}:path", node_id);
+        let _ = ug.add_node(path_node.clone(), Value::string(inner.path.to_string_lossy().into_owned()));
+        let _ = ug.add_edge(&node_id, &path_node, "path".to_string(), None, HashMap::new());
+    }
+
+    /// Register a bridge node for a foreign pointer. Returns the bridge node ID.
+    fn register_bridge_ptr(&mut self, source_call: &str) -> String {
+        self.bridge_ptr_counter += 1;
+        let node_id = format!("bridge:ptr:{}", self.bridge_ptr_counter);
+        let mut ug = self.universe_graph.borrow_mut();
+        let _ = ug.add_node(node_id.clone(), Value::string(source_call.to_string()));
+        let _ = ug.add_edge(&node_id, "type:ForeignPtr", "instance_of".to_string(), None, HashMap::new());
+        node_id
     }
 
     /// Register a module node in the persistent universe graph (idempotent).
@@ -1875,6 +1921,13 @@ impl GraphExecutor {
                         "exec() expects 1 argument (file path), got {}", args.len()
                     )));
                 }
+                // Block execution of tainted data
+                if args[0].tainted {
+                    return Err(GraphoidError::runtime(format!(
+                        "Cannot execute tainted data (source: {})",
+                        args[0].taint_source.as_deref().unwrap_or("foreign code")
+                    )));
+                }
                 let path = match &args[0].kind {
                     ValueKind::String(s) => s.clone(),
                     _ => return Err(GraphoidError::runtime(format!(
@@ -2523,7 +2576,18 @@ impl GraphExecutor {
         }
 
         match &object.kind {
-            ValueKind::String(s) => self.eval_string_method(s, method, &args, object_expr),
+            ValueKind::String(s) => {
+                let result = self.eval_string_method(s, method, &args, object_expr)?;
+                // Propagate taint from receiver string to result
+                if object.tainted {
+                    let mut r = result;
+                    r.tainted = true;
+                    r.taint_source = object.taint_source.clone();
+                    Ok(r)
+                } else {
+                    Ok(result)
+                }
+            }
             ValueKind::List(l) => self.eval_list_method(l, method, &args),
             ValueKind::Map(h) => self.eval_map_method(h, method, &args),
             ValueKind::Graph(g) => {
@@ -2996,6 +3060,97 @@ impl GraphExecutor {
 
                 Ok(Value::graph(g))
             }
+            "bridge" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(
+                        "reflect.bridge() requires exactly 1 argument".to_string()
+                    ));
+                }
+                let ug = self.universe_graph.borrow();
+                let node_id = match &args[0].kind {
+                    ValueKind::ForeignLib(lib) => {
+                        let inner = lib.inner.lock().unwrap();
+                        format!("bridge:lib:{}", inner.name)
+                    }
+                    ValueKind::ForeignPtr(_) | ValueKind::ForeignStruct(_) | ValueKind::ForeignCallback(_) => {
+                        // For pointers we can't easily map back — return summary
+                        return Ok(Value::map({
+                            let mut m = crate::values::Hash::new();
+                            let _ = m.insert("type".to_string(), Value::string(args[0].type_name().to_string()));
+                            let _ = m.insert("tainted".to_string(), Value::boolean(args[0].tainted));
+                            if let Some(ref src) = args[0].taint_source {
+                                let _ = m.insert("taint_source".to_string(), Value::string(src.clone()));
+                            }
+                            m
+                        }));
+                    }
+                    _ => return Ok(Value::none()),
+                };
+                // Look up bridge node in universe graph and return metadata
+                if ug.has_node(&node_id) {
+                    let mut m = crate::values::Hash::new();
+                    let _ = m.insert("node_id".to_string(), Value::string(node_id.clone()));
+                    if let Some(node) = ug.nodes.get(&node_id) {
+                        let _ = m.insert("value".to_string(), node.value.clone());
+                    }
+                    // Collect edges from this node
+                    for (from, to, edge_type) in ug.edge_list() {
+                        if from == node_id {
+                            let val = if let Some(target) = ug.nodes.get(&to) {
+                                target.value.clone()
+                            } else {
+                                Value::string(to)
+                            };
+                            let _ = m.insert(edge_type, val);
+                        }
+                    }
+                    Ok(Value::map(m))
+                } else {
+                    Ok(Value::none())
+                }
+            }
+            "foreign_realm" => {
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(
+                        "reflect.foreign_realm() takes no arguments".to_string()
+                    ));
+                }
+                use crate::values::graph::{Graph, GraphType};
+                let ug = self.universe_graph.borrow();
+                let mut realm = Graph::new(GraphType::Directed);
+                // Copy all bridge:* nodes
+                for (node_id, node) in &ug.nodes {
+                    if node_id.starts_with("bridge:") {
+                        let _ = realm.add_node(node_id.clone(), node.value.clone());
+                    }
+                }
+                // Copy edges between bridge nodes
+                for (from, to, edge_type) in ug.edge_list() {
+                    if from.starts_with("bridge:") {
+                        let _ = realm.add_edge(&from, &to, edge_type, None, HashMap::new());
+                    }
+                }
+                Ok(Value::graph(realm))
+            }
+            "tainted" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(
+                        "reflect.tainted() requires exactly 1 argument".to_string()
+                    ));
+                }
+                Ok(Value::boolean(args[0].tainted))
+            }
+            "taint_source" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(
+                        "reflect.taint_source() requires exactly 1 argument".to_string()
+                    ));
+                }
+                match &args[0].taint_source {
+                    Some(s) => Ok(Value::string(s.clone())),
+                    None => Ok(Value::none()),
+                }
+            }
             _ => Err(GraphoidError::runtime(format!(
                 "reflect does not have method '{}'", method
             ))),
@@ -3316,7 +3471,11 @@ impl GraphExecutor {
                     ValueKind::String(s) => s.clone(),
                     _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
                 };
+                self.ffi_limits.check_libraries(&self.ffi_usage)
+                    .map_err(GraphoidError::runtime)?;
                 let lib = crate::ffi::library::load_library(&name)?;
+                self.register_bridge_lib(&lib);
+                self.ffi_usage.library_count += 1;
                 Ok(Value::foreign_lib(lib))
             }
             "ptr" => {
@@ -3333,7 +3492,14 @@ impl GraphExecutor {
                 let size = args[0].to_number().ok_or_else(|| {
                     GraphoidError::type_error("number", args[0].type_name())
                 })? as usize;
+                self.ffi_limits.check_memory(&self.ffi_usage, size)
+                    .map_err(GraphoidError::runtime)?;
+                self.ffi_limits.check_bridge_nodes(&self.ffi_usage)
+                    .map_err(GraphoidError::runtime)?;
                 let ptr = crate::ffi::pointer::ffi_alloc(size)?;
+                self.register_bridge_ptr("ffi.alloc");
+                self.ffi_usage.allocated_bytes += size;
+                self.ffi_usage.bridge_nodes += 1;
                 Ok(Value::foreign_ptr(ptr))
             }
             "free" => {
@@ -3342,6 +3508,12 @@ impl GraphExecutor {
                 }
                 match &args[0].kind {
                     ValueKind::ForeignPtr(ref fp) => {
+                        // Track freed bytes
+                        if let Ok(inner) = fp.inner.lock() {
+                            if let Some(size) = inner.size {
+                                self.ffi_usage.allocated_bytes = self.ffi_usage.allocated_bytes.saturating_sub(size);
+                            }
+                        }
                         crate::ffi::pointer::ffi_free(fp)?;
                         Ok(Value::none())
                     }
@@ -3350,6 +3522,8 @@ impl GraphExecutor {
             }
             "pin" => {
                 // ffi.pin(function, ["param_types"...], "return_type")
+                self.ffi_limits.check_pinned_callbacks(&self.ffi_usage)
+                    .map_err(GraphoidError::runtime)?;
                 if args.len() != 3 {
                     return Err(GraphoidError::runtime(
                         "ffi.pin() requires 3 arguments: function, param_types list, return_type".to_string()
@@ -3388,6 +3562,7 @@ impl GraphExecutor {
                 let globals: std::collections::HashMap<String, Value> = self.env.get_all_bindings()
                     .into_iter().collect();
                 let cb = crate::ffi::callback::create_pinned_callback(&func, &sig, &globals)?;
+                self.ffi_usage.pinned_callbacks += 1;
                 Ok(Value::foreign_callback(cb))
             }
             "unpin" => {
@@ -3397,10 +3572,47 @@ impl GraphExecutor {
                 match &args[0].kind {
                     ValueKind::ForeignCallback(ref cb) => {
                         crate::ffi::callback::unpin_callback(cb)?;
+                        self.ffi_usage.pinned_callbacks = self.ffi_usage.pinned_callbacks.saturating_sub(1);
                         Ok(Value::none())
                     }
                     _ => Err(GraphoidError::type_error("foreign_callback", args[0].type_name())),
                 }
+            }
+            "limits" => {
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(
+                        "ffi.limits() requires 1 argument (map of limits)".to_string()
+                    ));
+                }
+                match &args[0].kind {
+                    ValueKind::Map(map) => {
+                        let extract = |key: &str| -> Result<Option<usize>> {
+                            match map.get(key) {
+                                Some(v) => Ok(Some(v.to_number().ok_or_else(|| {
+                                    GraphoidError::type_error("number", v.type_name())
+                                })? as usize)),
+                                None => Ok(None),
+                            }
+                        };
+                        if let Some(n) = extract("max_bridge_nodes")? { self.ffi_limits.max_bridge_nodes = Some(n); }
+                        if let Some(n) = extract("max_memory_bytes")? { self.ffi_limits.max_memory_bytes = Some(n); }
+                        if let Some(n) = extract("max_libraries")? { self.ffi_limits.max_libraries = Some(n); }
+                        if let Some(n) = extract("max_pinned_callbacks")? { self.ffi_limits.max_pinned_callbacks = Some(n); }
+                        Ok(Value::none())
+                    }
+                    _ => Err(GraphoidError::type_error("map", args[0].type_name())),
+                }
+            }
+            "trust" => {
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(
+                        "ffi.trust() requires 1-2 arguments: value[, reason: string]".to_string()
+                    ));
+                }
+                let mut trusted = args[0].clone();
+                trusted.tainted = false;
+                trusted.taint_source = None;
+                Ok(trusted)
             }
             _ => Err(GraphoidError::runtime(format!("ffi has no method '{}'", method))),
         }
@@ -3573,7 +3785,7 @@ impl GraphExecutor {
                     return Err(GraphoidError::runtime("ptr.read_str() takes no arguments".to_string()));
                 }
                 let s = crate::ffi::pointer::ptr_read_str(ptr)?;
-                Ok(Value::string(s))
+                Ok(Value::string(s).with_taint("bridge:ptr:read_str".to_string()))
             }
             "write" => {
                 if args.is_empty() || args.len() > 2 {

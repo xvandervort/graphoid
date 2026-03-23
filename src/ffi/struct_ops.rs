@@ -47,7 +47,11 @@ pub fn read_field(fs: &ForeignStruct, field_name: &str) -> Result<Value, Graphoi
     })?;
 
     let raw = fs.ptr.get_ptr().map_err(|e| GraphoidError::runtime(e))?;
-    read_field_raw(raw, field.offset, &field.ffi_type)
+    let mut val = read_field_raw(raw, field.offset, &field.ffi_type)?;
+    // Struct field reads are tainted — data comes from foreign memory
+    val.tainted = true;
+    val.taint_source = Some(format!("bridge:struct:{}:{}", fs.struct_def.name, field_name));
+    Ok(val)
 }
 
 /// Write a value to a struct field.
@@ -66,7 +70,9 @@ pub fn read_all_fields(fs: &ForeignStruct) -> Result<crate::values::hash::Hash, 
     let raw = fs.ptr.get_ptr().map_err(|e| GraphoidError::runtime(e))?;
     let mut map = crate::values::hash::Hash::new();
     for field in &fs.struct_def.fields {
-        let val = read_field_raw(raw, field.offset, &field.ffi_type)?;
+        let mut val = read_field_raw(raw, field.offset, &field.ffi_type)?;
+        val.tainted = true;
+        val.taint_source = Some(format!("bridge:struct:{}:{}", fs.struct_def.name, field.name));
         let _ = map.insert(field.name.clone(), val);
     }
     Ok(map)

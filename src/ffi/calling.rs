@@ -264,7 +264,7 @@ pub fn call_foreign_function(
     }
 
     // Make the call
-    let result = unsafe {
+    let mut result = unsafe {
         match &decl.return_type {
             FfiType::Void => {
                 cif.call::<()>(fn_ptr, &c_args);
@@ -337,6 +337,10 @@ pub fn call_foreign_function(
             }
         }
     };
+
+    // All values returned from foreign calls are tainted
+    result.tainted = true;
+    result.taint_source = Some(format!("bridge:func:{}", decl.name));
 
     Ok(result)
 }

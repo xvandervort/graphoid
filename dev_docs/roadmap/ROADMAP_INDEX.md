@@ -1,8 +1,8 @@
 # Graphoid Implementation Roadmap
 
-**Version**: 14.1
+**Version**: 14.2
 **Last Updated**: March 19, 2026
-**Status**: Phases 0-19.5 + Phase 20a-b Complete. FFI working: library loading, function calling, C struct support, callbacks, cdef parser. LLM fine-tuning plan and training data infrastructure added. Phase 20c (safety) next.
+**Status**: Phases 0-19.5 + Phase 20a-b Complete (committed). FFI working: library loading, function calling, C struct support, callbacks, cdef parser. Design review fixes applied. LLM fine-tuning plan and training data infrastructure added. Phase 20c (safety) next.
 
 ---
 
@@ -74,11 +74,11 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 ### Ecosystem & Interop
 
-| Phase | Name | Priority | Duration | Dependencies |
-|-------|------|----------|----------|--------------|
+| Phase | Name | Priority | Duration | Dependencies | Status |
+|-------|------|----------|----------|--------------|--------|
 | [20](PHASE_20_FFI.md) | Foreign Function Interface | **Critical** | 12-16 days | None | 🔄 Phase 20a-b Complete |
-| [21](PHASE_21_PACKAGE_MANAGER.md) | Package Manager | **High** | 14-21 days | None |
-| [22](PHASE_22_DATABASE.md) | Database Connectivity | **High** | 7-10 days | Phase 20, 21 |
+| [21](PHASE_21_PACKAGE_MANAGER.md) | Package Manager | **High** | 14-21 days | None | |
+| [22](PHASE_22_DATABASE.md) | Database Connectivity | **High** | 7-10 days | Phase 20, 21 | |
 
 ### Distributed Computing
 
@@ -338,6 +338,7 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 14.2 | 2026-03-19 | Phase 20b committed (962a4f7). Design review fixes: callback error logging, globals propagation, env.define for fresh executors, extract_ptr_arg helper, FfiType::from_str struct support, dead code cleanup. |
 | 14.1 | 2026-03-19 | LLM fine-tuning plan (`dev_docs/LLM_FINE_TUNING_PLAN.md`) and training data infrastructure (`training/`). Training data generation added as mandatory dev workflow step. |
 | 14.0 | 2026-03-17 | Phase 20b (cdef parser, C structs, callbacks) complete. lib.cdef() parses C declarations. lib.new() creates struct instances. Call-scoped and persistent callbacks via libffi closures. |
 | 13.0 | 2026-03-17 | Phase 20a (FFI Foundation) complete. typeof() eradicated. Graph messaging bug fixed (user-defined send/request/broadcast methods no longer intercepted). |

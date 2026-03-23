@@ -160,27 +160,42 @@ impl Executor {
 
     /// Applies a scalar binary operation (used by element-wise operations).
     pub(crate) fn apply_scalar_op(&mut self, left: Value, right: Value, op: &BinaryOp) -> Result<Value> {
-        match op {
+        // Capture taint state before consuming operands (avoids cloning)
+        let tainted = left.tainted || right.tainted;
+        let taint_source = if tainted {
+            left.taint_source.clone().or_else(|| right.taint_source.clone())
+        } else {
+            None
+        };
+
+        let mut result = match op {
             // Arithmetic operators
-            BinaryOp::Add => self.eval_add(left, right),
-            BinaryOp::Subtract => self.eval_subtract(left, right),
-            BinaryOp::Multiply => self.eval_multiply(left, right),
-            BinaryOp::Divide => self.eval_divide(left, right),
-            BinaryOp::IntDiv => self.eval_int_div(left, right),
-            BinaryOp::Modulo => self.eval_modulo(left, right),
-            BinaryOp::Power => self.eval_power(left, right),
-            // Comparison operators
-            BinaryOp::Equal => Ok(Value::boolean(left == right)),
-            BinaryOp::NotEqual => Ok(Value::boolean(left != right)),
-            BinaryOp::Less => self.eval_less(left, right),
-            BinaryOp::LessEqual => self.eval_less_equal(left, right),
-            BinaryOp::Greater => self.eval_greater(left, right),
-            BinaryOp::GreaterEqual => self.eval_greater_equal(left, right),
-            _ => Err(GraphoidError::runtime(format!(
+            BinaryOp::Add => self.eval_add(left, right)?,
+            BinaryOp::Subtract => self.eval_subtract(left, right)?,
+            BinaryOp::Multiply => self.eval_multiply(left, right)?,
+            BinaryOp::Divide => self.eval_divide(left, right)?,
+            BinaryOp::IntDiv => self.eval_int_div(left, right)?,
+            BinaryOp::Modulo => self.eval_modulo(left, right)?,
+            BinaryOp::Power => self.eval_power(left, right)?,
+            // Comparison operators — do NOT propagate taint (return fresh booleans)
+            BinaryOp::Equal => return Ok(Value::boolean(left == right)),
+            BinaryOp::NotEqual => return Ok(Value::boolean(left != right)),
+            BinaryOp::Less => return self.eval_less(left, right),
+            BinaryOp::LessEqual => return self.eval_less_equal(left, right),
+            BinaryOp::Greater => return self.eval_greater(left, right),
+            BinaryOp::GreaterEqual => return self.eval_greater_equal(left, right),
+            _ => return Err(GraphoidError::runtime(format!(
                 "Unsupported scalar operation: {:?}",
                 op
             ))),
+        };
+
+        // Propagate taint from operands to arithmetic result
+        if tainted {
+            result.tainted = true;
+            result.taint_source = taint_source;
         }
+        Ok(result)
     }
 
     // Arithmetic helpers

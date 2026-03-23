@@ -1,5 +1,5 @@
 use graphoid::ffi::cdef_parser::{parse_cdef, CdefItem};
-use graphoid::ffi::types::{FfiType, FfiCallbackSig};
+use graphoid::ffi::types::FfiType;
 use graphoid::execution_graph::graph_executor::GraphExecutor;
 use graphoid::values::{Value, ValueKind};
 
@@ -223,14 +223,6 @@ fn exec(source: &str) -> GraphExecutor {
     let mut executor = GraphExecutor::new();
     executor.execute_source(source).unwrap();
     executor
-}
-
-fn exec_err(source: &str) -> String {
-    let mut executor = GraphExecutor::new();
-    match executor.execute_source(source) {
-        Err(e) => e.to_string(),
-        Ok(_) => panic!("Expected error but execution succeeded"),
-    }
 }
 
 #[test]

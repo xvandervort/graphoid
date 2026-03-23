@@ -597,23 +597,27 @@ impl PartialEq for ValueKind {
     }
 }
 
-/// A value with freeze tracking
+/// A value with freeze and taint tracking
 ///
 /// All values (including primitives) can be frozen to prevent modification.
+/// Values originating from foreign code are tainted until explicitly trusted.
 #[derive(Debug, Clone)]
 pub struct Value {
     /// The actual data/kind of this value
     pub kind: ValueKind,
     /// Whether this value is frozen (immutable)
     pub frozen: bool,
+    /// Whether this value originated from foreign (FFI) code
+    pub tainted: bool,
+    /// Source of taint (e.g. "bridge:func:sqrt")
+    pub taint_source: Option<String>,
 }
 
-// Custom PartialEq that only compares the kind, not the frozen status
+// Custom PartialEq that only compares the kind, not metadata (frozen/taint)
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind
-        // Intentionally exclude frozen from equality comparison
-        // Two values with the same data but different frozen status are considered equal
+        // Intentionally exclude frozen and taint from equality comparison
     }
 }
 
@@ -622,102 +626,102 @@ impl Eq for Value {}
 impl Value {
     // Constructors
     pub fn number(n: f64) -> Self {
-        Value { kind: ValueKind::Number(n), frozen: false }
+        Value { kind: ValueKind::Number(n), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn bignum(bn: BigNum) -> Self {
-        Value { kind: ValueKind::BigNumber(bn), frozen: false }
+        Value { kind: ValueKind::BigNumber(bn), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn string(s: String) -> Self {
-        Value { kind: ValueKind::String(s), frozen: false }
+        Value { kind: ValueKind::String(s), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn boolean(b: bool) -> Self {
-        Value { kind: ValueKind::Boolean(b), frozen: false }
+        Value { kind: ValueKind::Boolean(b), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn none() -> Self {
-        Value { kind: ValueKind::None, frozen: false }
+        Value { kind: ValueKind::None, frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn time(timestamp: f64) -> Self {
-        Value { kind: ValueKind::Time(timestamp), frozen: false }
+        Value { kind: ValueKind::Time(timestamp), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn channel(ch: Channel) -> Self {
-        Value { kind: ValueKind::Channel(ch), frozen: false }
+        Value { kind: ValueKind::Channel(ch), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn actor(a: ActorRef) -> Self {
-        Value { kind: ValueKind::Actor(a), frozen: false }
+        Value { kind: ValueKind::Actor(a), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn foreign_lib(lib: ForeignLib) -> Self {
-        Value { kind: ValueKind::ForeignLib(lib), frozen: false }
+        Value { kind: ValueKind::ForeignLib(lib), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn foreign_ptr(ptr: ForeignPtr) -> Self {
-        Value { kind: ValueKind::ForeignPtr(ptr), frozen: false }
+        Value { kind: ValueKind::ForeignPtr(ptr), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn foreign_struct(fs: ForeignStruct) -> Self {
-        Value { kind: ValueKind::ForeignStruct(fs), frozen: false }
+        Value { kind: ValueKind::ForeignStruct(fs), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn foreign_callback(cb: ForeignCallback) -> Self {
-        Value { kind: ValueKind::ForeignCallback(cb), frozen: false }
+        Value { kind: ValueKind::ForeignCallback(cb), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn symbol(s: String) -> Self {
-        Value { kind: ValueKind::Symbol(s), frozen: false }
+        Value { kind: ValueKind::Symbol(s), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn list(l: List) -> Self {
         let frozen = l.graph.is_frozen();
-        Value { kind: ValueKind::List(l), frozen }
+        Value { kind: ValueKind::List(l), frozen, tainted: false, taint_source: None }
     }
 
     pub fn map(h: Hash) -> Self {
         let frozen = h.graph.is_frozen();
-        Value { kind: ValueKind::Map(h), frozen }
+        Value { kind: ValueKind::Map(h), frozen, tainted: false, taint_source: None }
     }
 
     pub fn function(f: Function) -> Self {
-        Value { kind: ValueKind::Function(f), frozen: false }
+        Value { kind: ValueKind::Function(f), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn graph(g: Graph) -> Self {
         let frozen = g.is_frozen();
-        Value { kind: ValueKind::Graph(Rc::new(RefCell::new(g))), frozen }
+        Value { kind: ValueKind::Graph(Rc::new(RefCell::new(g))), frozen, tainted: false, taint_source: None }
     }
 
     pub fn module(m: Module) -> Self {
-        Value { kind: ValueKind::Module(m), frozen: false }
+        Value { kind: ValueKind::Module(m), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn error(e: ErrorObject) -> Self {
-        Value { kind: ValueKind::Error(e), frozen: false }
+        Value { kind: ValueKind::Error(e), frozen: false, tainted: false, taint_source: None }
     }
 
     pub fn pattern_node(variable: Option<String>, node_type: Option<String>) -> Self {
         Value {
             kind: ValueKind::PatternNode(PatternNode { variable, node_type }),
-            frozen: false
+            frozen: false, tainted: false, taint_source: None,
         }
     }
 
     pub fn pattern_edge(edge_type: Option<String>, direction: String) -> Self {
         Value {
             kind: ValueKind::PatternEdge(PatternEdge { edge_type, direction }),
-            frozen: false
+            frozen: false, tainted: false, taint_source: None,
         }
     }
 
     pub fn pattern_path(edge_type: String, min: usize, max: usize, direction: String) -> Self {
         Value {
             kind: ValueKind::PatternPath(PatternPath { edge_type, min, max, direction }),
-            frozen: false
+            frozen: false, tainted: false, taint_source: None,
         }
     }
 
@@ -725,7 +729,7 @@ impl Value {
         let frozen = results.graph.is_frozen();
         Value {
             kind: ValueKind::PatternMatchResults(results),
-            frozen
+            frozen, tainted: false, taint_source: None,
         }
     }
 
@@ -988,7 +992,7 @@ impl Value {
             // Primitive types just clone
             other => other.clone(),
         };
-        Value { kind: new_kind, frozen: false }
+        Value { kind: new_kind, frozen: false, tainted: self.tainted, taint_source: self.taint_source.clone() }
     }
 
     /// Deep-clone this value for cross-thread transfer.
@@ -1052,8 +1056,30 @@ impl Value {
             // Primitives, symbols, errors, etc. — just clone
             other => other.clone(),
         };
-        Value { kind: new_kind, frozen: false }
+        Value { kind: new_kind, frozen: false, tainted: self.tainted, taint_source: self.taint_source.clone() }
     }
+
+    /// Mark this value as tainted with the given source
+    pub fn with_taint(mut self, source: String) -> Self {
+        self.tainted = true;
+        self.taint_source = Some(source);
+        self
+    }
+
+    /// Check if this value is tainted
+    pub fn is_tainted(&self) -> bool {
+        self.tainted
+    }
+}
+
+/// Propagate taint from two operands to a result value.
+/// If either operand is tainted, the result is tainted.
+pub fn propagate_taint(mut result: Value, left: &Value, right: &Value) -> Value {
+    if left.tainted || right.tainted {
+        result.tainted = true;
+        result.taint_source = left.taint_source.clone().or_else(|| right.taint_source.clone());
+    }
+    result
 }
 
 /// Display implementation for user-friendly output.
