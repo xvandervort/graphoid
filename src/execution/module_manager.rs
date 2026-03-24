@@ -118,6 +118,8 @@ impl ModuleManager {
                 let func_value = Value {
                     kind: ValueKind::NativeFunction(func),
                     frozen: false,
+                    tainted: false,
+                    taint_source: None,
                 };
                 env.define(func_name, func_value);
             }

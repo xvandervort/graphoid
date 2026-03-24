@@ -172,6 +172,12 @@ fn fs_write(args: &[Value]) -> Result<Value> {
         });
     }
 
+    // Warn if writing tainted data
+    if args[1].tainted {
+        eprintln!("WARNING: Writing tainted data to filesystem (source: {})",
+            args[1].taint_source.as_deref().unwrap_or("foreign code"));
+    }
+
     let file_id = get_number_arg(args, 0, "write")? as u64;
     let data = get_string_arg(args, 1, "write")?;
 

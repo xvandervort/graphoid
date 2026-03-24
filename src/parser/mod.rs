@@ -765,10 +765,23 @@ impl Parser {
             None
         };
 
+        // Check for 'unsafe' modifier: import "ffi" unsafe
+        let is_unsafe = if let TokenType::Identifier(id) = &self.peek().token_type {
+            if id == "unsafe" {
+                self.advance();
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
         Ok(Stmt::Import {
             module,
             alias,
             selections,
+            is_unsafe,
             position,
         })
     }

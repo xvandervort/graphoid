@@ -1,0 +1,54 @@
+# FFI Safety: Taint Tracking, Bridge Nodes, Resource Limits
+# Phase 20c: Demonstrates safety features for foreign function interface
+
+import "ffi" unsafe
+
+# --- Taint Tracking ---
+# Values returned from C functions are automatically tainted
+
+lib = ffi.c("m")
+lib.decl("sqrt", ["f64"], "f64")
+lib.decl("ceil", ["f64"], "f64")
+
+result = lib.sqrt(16.0)
+print("sqrt(16) = " + result.to_string())
+print("Is tainted? " + reflect.tainted(result).to_string())
+print("Taint source: " + reflect.taint_source(result).to_string())
+
+# --- Taint Propagation ---
+# Taint flows through arithmetic operations
+derived = result + 10
+print("result + 10 = " + derived.to_string())
+print("Derived is tainted? " + reflect.tainted(derived).to_string())
+
+# Comparisons do NOT propagate taint
+comparison = result == 4.0
+print("Comparison tainted? " + reflect.tainted(comparison).to_string())
+
+# --- ffi.trust() ---
+# Explicitly clear taint after validation
+trusted = ffi.trust(result)
+print("After trust, tainted? " + reflect.tainted(trusted).to_string())
+
+# --- Bridge Nodes ---
+# Foreign libraries are tracked as bridge nodes in the universe graph
+bridge = reflect.bridge(lib)
+print("Bridge node: " + bridge["node_id"])
+
+realm = reflect.foreign_realm()
+print("Foreign realm nodes: " + realm.node_count().to_string())
+
+# --- Foreign Type Hierarchy ---
+ug = reflect.universe()
+print("type:foreign exists? " + ug.has_node("type:foreign").to_string())
+print("type:ForeignLib exists? " + ug.has_node("type:ForeignLib").to_string())
+
+# --- Resource Limits ---
+# Set limits to prevent runaway allocations
+ffi.limits({max_memory_bytes: 10000000})
+ptr = ffi.alloc(1024)
+print("Allocated 1024 bytes within limit")
+ffi.free(ptr)
+print("Freed allocation")
+
+print("FFI safety demo complete!")

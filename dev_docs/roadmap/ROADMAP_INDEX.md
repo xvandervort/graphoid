@@ -1,8 +1,8 @@
 # Graphoid Implementation Roadmap
 
-**Version**: 12.1
-**Last Updated**: March 12, 2026
-**Status**: Phases 0-19.5 Complete. Actor lifecycle bug fixed (Drop cleanup). Phase 19.4 (Module Hot Reload) deferred for planning.
+**Version**: 14.2
+**Last Updated**: March 19, 2026
+**Status**: Phases 0-19.5 + Phase 20a-b Complete (committed). FFI working: library loading, function calling, C struct support, callbacks, cdef parser. Design review fixes applied. LLM fine-tuning plan and training data infrastructure added. Phase 20c (safety) next.
 
 ---
 
@@ -74,11 +74,11 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 ### Ecosystem & Interop
 
-| Phase | Name | Priority | Duration | Dependencies |
-|-------|------|----------|----------|--------------|
-| [20](PHASE_20_FFI.md) | Foreign Function Interface | **Critical** | 12-16 days | None |
-| [21](PHASE_21_PACKAGE_MANAGER.md) | Package Manager | **High** | 14-21 days | None |
-| [22](PHASE_22_DATABASE.md) | Database Connectivity | **High** | 7-10 days | Phase 20, 21 |
+| Phase | Name | Priority | Duration | Dependencies | Status |
+|-------|------|----------|----------|--------------|--------|
+| [20](PHASE_20_FFI.md) | Foreign Function Interface | **Critical** | 12-16 days | None | 🔄 Phase 20a-b Complete |
+| [21](PHASE_21_PACKAGE_MANAGER.md) | Package Manager | **High** | 14-21 days | None | |
+| [22](PHASE_22_DATABASE.md) | Database Connectivity | **High** | 7-10 days | Phase 20, 21 | |
 
 ### Distributed Computing
 
@@ -206,11 +206,13 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 ### Medium-Term (Ecosystem + Compilation)
 
-9. **Phase 20: FFI** - C interop, Rust plugins, syscalls
-10. **Phase 21: Package Manager** - Ecosystem enablement
-11. **Phase 22: Database** - PostgreSQL, SQLite, Redis
-12. **Phase 23: Distributed Primitives** - Serialization, remote refs, routing hooks
-13. **Phase 29: Bytecode VM** - 5-10x performance
+9. ~~**Phase 20a: FFI Foundation**~~ ✅ Complete (Mar 17, 2026) — library loading, function calling, pointers
+10. ~~**Phase 20b: FFI Structs + Callbacks**~~ ✅ Complete (Mar 17, 2026) — cdef parser, struct support, callbacks
+11. **Phase 20c: FFI Safety** - taint tracking, bridge nodes, resource limits
+12. **Phase 21: Package Manager** - Ecosystem enablement
+12. **Phase 22: Database** - PostgreSQL, SQLite, Redis
+13. **Phase 23: Distributed Primitives** - Serialization, remote refs, routing hooks
+14. **Phase 29: Bytecode VM** - 5-10x performance
 
 ### Long-Term (Distributed + Self-Hosting)
 
@@ -336,6 +338,10 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 14.2 | 2026-03-19 | Phase 20b committed (962a4f7). Design review fixes: callback error logging, globals propagation, env.define for fresh executors, extract_ptr_arg helper, FfiType::from_str struct support, dead code cleanup. |
+| 14.1 | 2026-03-19 | LLM fine-tuning plan (`dev_docs/LLM_FINE_TUNING_PLAN.md`) and training data infrastructure (`training/`). Training data generation added as mandatory dev workflow step. |
+| 14.0 | 2026-03-17 | Phase 20b (cdef parser, C structs, callbacks) complete. lib.cdef() parses C declarations. lib.new() creates struct instances. Call-scoped and persistent callbacks via libffi closures. |
+| 13.0 | 2026-03-17 | Phase 20a (FFI Foundation) complete. typeof() eradicated. Graph messaging bug fixed (user-defined send/request/broadcast methods no longer intercepted). |
 | 12.1 | 2026-03-12 | Actor lifecycle bug fixed (Drop cleanup, liveness checks). Concurrency near-term marked complete. |
 | 11.0 | 2026-02-18 | Phases 15-18 complete. Phase 18.5 split: concurrency parts into Phase 19 sub-phases, non-concurrency into 18.7. Phase 19 broken into 6 sub-phases (19.1-19.6). Concurrency syntax added to language spec. BigNum cleanup complete. |
 | 10.0 | 2026-02-09 | Phases 15-17 complete. Phase 18 in progress. |

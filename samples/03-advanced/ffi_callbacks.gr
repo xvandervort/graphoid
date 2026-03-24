@@ -1,0 +1,51 @@
+# FFI Callbacks — Phase 20b
+# Demonstrates passing Graphoid functions as C function pointers
+
+import "ffi" unsafe
+
+print("=== FFI Callbacks ===")
+print("")
+
+# --- 1. Pin a callback ---
+print("1. Persistent Callback (pin/unpin)")
+fn my_compare(a, b) {
+    return 0
+}
+cb = ffi.pin(my_compare, ["ptr", "ptr"], "int")
+print("   Callback: " + cb.to_string())
+print("   Type: " + cb.type())
+ffi.unpin(cb)
+print("   Unpinned successfully")
+print("")
+
+# --- 2. Call-scoped callback with qsort ---
+print("2. Call-Scoped Callback (qsort)")
+lib = ffi.c("c")
+lib.cdef("
+    void qsort(void* base, size_t nmemb, size_t size,
+               int (*compar)(const void*, const void*));
+")
+
+# Create buffer with 4 int32s: [40, 10, 30, 20]
+buf = ffi.alloc(16)
+buf.set(0, 40)   buf.set(1, 0)  buf.set(2, 0)  buf.set(3, 0)
+buf.set(4, 10)   buf.set(5, 0)  buf.set(6, 0)  buf.set(7, 0)
+buf.set(8, 30)   buf.set(9, 0)  buf.set(10, 0) buf.set(11, 0)
+buf.set(12, 20)  buf.set(13, 0) buf.set(14, 0) buf.set(15, 0)
+
+# Sort with a no-op comparator (keeps original order)
+fn noop_compare(a, b) { return 0 }
+lib.qsort(buf, 4, 4, noop_compare)
+print("   qsort with callback completed successfully")
+ffi.free(buf)
+print("")
+
+# --- 3. Passing none for callback (NULL) ---
+print("3. NULL Callback")
+buf2 = ffi.alloc(4)
+lib.qsort(buf2, 0, 4, none)
+print("   qsort with NULL comparator (0 elements) — OK")
+ffi.free(buf2)
+print("")
+
+print("=== FFI Callbacks Complete ===")

@@ -71,6 +71,7 @@ pub enum Stmt {
         module: String,
         alias: Option<String>,
         selections: Option<Vec<ImportItem>>,  // Phase 17: None = full import, Some = selective
+        is_unsafe: bool,  // Phase 20: `import "ffi" unsafe` suppresses warnings
         position: SourcePosition,
     },
     ModuleDecl {

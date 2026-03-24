@@ -202,7 +202,17 @@ This is not aspirational - it is the architectural mandate. Every design decisio
 │   │   ├── PHASE_21_PACKAGE_MANAGER.md     # Package management
 │   │   └── PHASE_22-32_*.md                # Database, distributed, compilation
 │   ├── PRODUCTION_TOOLING_SPECIFICATION.md # Testing, debugging, packaging
+│   ├── LLM_FINE_TUNING_PLAN.md            # LLM training plan
 │   └── archive/                            # Archived documentation
+├── training/                    # 🤖 LLM fine-tuning data
+│   ├── scripts/                 # Collection & formatting scripts
+│   ├── raw/                     # Auto-generated CPT corpus
+│   ├── annotated/               # Hand-annotated .gr examples
+│   ├── instruct/                # Instruction pairs (JSONL)
+│   ├── dpo/                     # Anti-pattern preference pairs (JSONL)
+│   ├── rosetta/                 # Cross-language equivalent programs
+│   ├── formatted/               # Ready-to-train outputs
+│   └── eval/                    # GraphoidEval benchmark
 └── docs/                        # 📖 USER DOCUMENTATION (future)
 ```
 
@@ -693,6 +703,7 @@ See `dev_docs/roadmap/ROADMAP_INDEX.md` for the modular roadmap. Each phase has 
 4. ✅ Run the example to verify it works: `gr samples/your_example.gr`
 5. ✅ Update `samples/README.md` with description
 6. ✅ Consider updating `docs/QUICKSTART.md` if it's a major feature
+7. ✅ **Generate LLM training data** (see Training Data Generation below)
 
 **Real Example:**
 When Phase 7 behavior system was implemented:
@@ -776,6 +787,34 @@ pub fn shortest_path(&self, from: &str, to: &str, edge_type: Option<&str>, weigh
 **Why Separate Files**: Keeps source files clean, reduces compilation time for non-test builds, and follows Rust best practices for larger projects.
 
 **Why .gr Integration Tests**: Rust unit tests only verify internal API. They don't test executor integration or user-facing accessibility. A feature that passes Rust tests but fails from .gr files is NOT complete.
+
+### Training Data Generation (LLM Fine-Tuning)
+
+**IMPORTANT**: We are building a training corpus to fine-tune a local LLM for Graphoid. Training data generation is a mandatory part of the development workflow.
+
+**Full plan**: `dev_docs/LLM_FINE_TUNING_PLAN.md`
+**Training data**: `training/` directory
+
+**When implementing a new feature or fixing a bug, generate training data as a byproduct:**
+
+1. **Write 3-5 sample programs per feature** (not just 1) — these become CPT corpus
+2. **Add instruction pairs** to `training/instruct/` (Alpaca JSONL format):
+   - Code generation: "Write a Graphoid function that..." → working code
+   - Bug fixing: "Fix this error..." → corrected code with explanation
+   - Code explanation: "Explain what this code does..." → clear explanation
+3. **Add Rosetta Stone pairs** to `training/rosetta/python_graphoid/`:
+   - Write the same program in both Python and Graphoid (matching filenames, e.g. `foo.py` + `foo.gr`)
+4. **Add anti-pattern pairs** to `training/dpo/` when relevant:
+   - `{"prompt": "...", "chosen": "idiomatic Graphoid", "rejected": "anti-pattern code"}`
+5. **After generating data, run**: `python training/scripts/collect_corpus.py` to rebuild the raw corpus
+
+**Instruction pair format** (`training/instruct/*.jsonl`):
+```json
+{"instruction": "Write a Graphoid function that finds all leaf nodes in a graph", "input": "", "output": "fn leaf_nodes(g) {\n    return g.nodes().filter(n => g.neighbors(n).length() == 0)\n}"}
+```
+
+**Targets**: 500K tokens (CPT) | 5,000 pairs (SFT) | 500 pairs (DPO) | 200 eval problems
+**Check progress**: `python training/scripts/stats.py`
 
 ### Git Workflow
 

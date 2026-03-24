@@ -375,11 +375,14 @@ impl AstToGraphConverter {
             Stmt::Continue { position } => {
                 self.add_node(arena, AstNodeType::ContinueStmt, HashMap::new(), position.clone())
             }
-            Stmt::Import { module, alias, selections, position } => {
+            Stmt::Import { module, alias, selections, is_unsafe, position } => {
                 let mut props = HashMap::new();
                 props.insert("module".to_string(), AstProperty::Str(module.clone()));
                 if let Some(a) = alias {
                     props.insert("alias".to_string(), AstProperty::Str(a.clone()));
+                }
+                if *is_unsafe {
+                    props.insert("is_unsafe".to_string(), AstProperty::Bool(true));
                 }
                 if let Some(ref items) = selections {
                     props.insert("selection_count".to_string(), AstProperty::Int(items.len() as i64));

@@ -1,0 +1,64 @@
+# FFI Structs — Phase 20b
+# Demonstrates C struct creation, field access, and passing to C functions
+
+import "ffi" unsafe
+
+print("=== FFI Structs ===")
+print("")
+
+# --- 1. Define a struct via cdef ---
+print("1. Struct Definition")
+lib = ffi.c("m")
+lib.cdef("
+    struct Point { double x; double y; };
+    double sqrt(double x);
+")
+print("   Registered structs: " + lib.structs().to_string())
+print("")
+
+# --- 2. Create a struct instance ---
+print("2. Create Struct")
+p = lib.new("Point", {x: 3.0, y: 4.0})
+print("   Point: " + p.to_string())
+print("   Type: " + p.type())
+print("   Struct name: " + p.struct_name())
+print("   Size: " + p.size().to_string() + " bytes")
+print("")
+
+# --- 3. Field access ---
+print("3. Field Access")
+print("   x = " + p.get("x").to_string())
+print("   y = " + p.get("y").to_string())
+print("   All fields: " + p.fields().to_string())
+print("")
+
+# --- 4. Modify fields ---
+print("4. Modify Fields")
+p.set("x", 10.0)
+p.set("y", 20.0)
+print("   After set: x=" + p.get("x").to_string() + ", y=" + p.get("y").to_string())
+print("")
+
+# --- 5. Use struct values in computation ---
+print("5. Computation with Struct Fields")
+p2 = lib.new("Point", {x: 3.0, y: 4.0})
+dist = lib.sqrt(p2.get("x") * p2.get("x") + p2.get("y") * p2.get("y"))
+print("   Distance from origin: " + dist.to_string())
+print("")
+
+# --- 6. Integer struct ---
+print("6. Integer Struct")
+libc = ffi.c("c")
+libc.cdef("struct Pair { int32_t a; int32_t b; };")
+pair = libc.new("Pair", {a: 42, b: 99})
+print("   Pair: a=" + pair.get("a").to_string() + ", b=" + pair.get("b").to_string())
+print("")
+
+# --- 7. Pass struct to C ---
+print("7. Pass Struct to C")
+libc.cdef("void* memset(void* s, int c, size_t n);")
+libc.memset(pair, 0, 8)
+print("   After memset(0): a=" + pair.get("a").to_string() + ", b=" + pair.get("b").to_string())
+print("")
+
+print("=== FFI Structs Complete ===")

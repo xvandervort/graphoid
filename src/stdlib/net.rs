@@ -182,6 +182,12 @@ fn net_send(args: &[Value]) -> Result<Value> {
         });
     }
 
+    // Warn if sending tainted data over network
+    if args[1].tainted {
+        eprintln!("WARNING: Sending tainted data over network (source: {})",
+            args[1].taint_source.as_deref().unwrap_or("foreign code"));
+    }
+
     let socket_id = get_number_arg(args, 0, "send")? as u64;
     let data = get_string_arg(args, 1, "send")?;
 
