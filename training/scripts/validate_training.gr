@@ -1,0 +1,571 @@
+# validate_training.gr — Validate Graphoid training data for correctness
+#
+# Usage:
+#   gr training/scripts/validate_training.gr                  # full validation
+#   gr training/scripts/validate_training.gr --recent         # only recent/new files
+#   gr training/scripts/validate_training.gr --stats          # just show stats
+#   gr training/scripts/validate_training.gr --exec           # include execution checks
+#   gr training/scripts/validate_training.gr --coverage       # show coverage report
+#
+# Validation layers:
+#   L1: JSONL format (always)
+#   L2: Field completeness (always)
+#   L3: Code execution via exec() (with --exec flag)
+#   L4: Coverage audit (with --coverage flag)
+
+import "io"
+import "json"
+import "fs"
+import "os"
+import "optparse"
+
+# --- Configuration ---
+TRAINING_DIR = "training"
+TEMP_FILE = "/tmp/_graphoid_validate_snippet.gr"
+
+# Feature groups for coverage audit
+FEATURE_GROUPS = {
+    "graph_creation": ["graph {", "graph{", "tree{", ":directed", ":undirected", ":dag"],
+    "graph_nodes": ["add_node", "get_node", "remove_node", "has_node"],
+    "graph_edges": ["add_edge", "remove_edge", "edge_count"],
+    "graph_query": ["neighbors", "has_path", "shortest_path", "bfs", "dfs"],
+    "graph_pattern": [".match(", "node(", "edge(type:", "path(type:"],
+    "graph_rules": ["add_rule", "with_ruleset", ":no_cycles", ":single_root"],
+    "graph_subgraph": [".extract(", ".delete(", "add_subgraph", ".clone()"],
+    "lists": ["append", "prepend", "insert", "remove", "pop", "first()", "last()"],
+    "list_functional": [".map(", ".filter(", ".reject(", ".reduce(", ".each("],
+    "list_named": [":double", ":square", ":upper", ":even", ":odd", ":positive"],
+    "list_elementwise": [".*", ".+", ".-", "./", ".^"],
+    "list_behavior": ["add_rule(:", "add_mapping_rule", "validate_range"],
+    "maps": ["has_key", ".keys()", ".values()", ".size()"],
+    "sort_dedup": [".sort()", ".reverse()", ".uniq()", ".compact()"],
+    "bang_methods": ["append!", "sort!", "reverse!", "map!", "filter!"],
+    "clg": ["graph ", " from ", "configure {", "readable:", "writable:"],
+    "when_dispatch": ["when ", "fn name() when"],
+    "string_ops": [".split(", ".join(", ".replace(", ".trim()", "string.generate"],
+    "type_constraints": ["list<", "tree<", "hash<"],
+    "concurrency": ["spawn", "channel()", ".send(", ".request("],
+    "pattern_match": ["match ", "edge(type:", "node("],
+    "error_handling": ["try {", "catch ", "raise "],
+    "ffi": ["ffi.c(", "lib.decl", "ffi.trust", "ffi.limits", "reflect.tainted"],
+    "modules": ["import ", "priv fn", "priv {"],
+    "testing": ["describe ", "it ", "expect(", "to_equal"]
+}
+
+# --- Helper: recursive directory walk ---
+fn walk_dir(path) {
+    results = []
+    entries = fs.list_dir(path)
+    for entry in entries {
+        full = path + "/" + entry
+        if fs.is_dir(full) {
+            sub = walk_dir(full)
+            for s in sub {
+                results.append!(s)
+            }
+        } else {
+            results.append!(full)
+        }
+    }
+    return results
+}
+
+# --- Helper: find files by extension ---
+fn find_files(dir, ext) {
+    if not fs.exists(dir) {
+        return []
+    }
+    all = walk_dir(dir)
+    return all.filter(f => f.ends_with(ext))
+}
+
+# --- L1+L2: Validate JSONL format and fields ---
+fn validate_jsonl(file_path, expected_fields) {
+    lines = io.read_lines(file_path)
+    results = {"total": 0, "valid": 0, "errors": []}
+
+    line_num = 0
+    for line in lines {
+        line_num = line_num + 1
+        if line.trim() == "" {
+            # skip blank lines
+        } else {
+            results["total"] = results["total"] + 1
+            try {
+                obj = json.parse(line)
+                # Check expected fields
+                missing = []
+                for field in expected_fields {
+                    if not obj.has_key(field) {
+                        missing.append!(field)
+                    }
+                }
+                if missing.length() > 0 {
+                    results["errors"].append!(file_path + ":" + line_num.to_string() + " missing fields: " + missing.join(", "))
+                } else {
+                    results["valid"] = results["valid"] + 1
+                }
+            } catch as e {
+                results["errors"].append!(file_path + ":" + line_num.to_string() + " invalid JSON: " + e.to_string())
+            }
+        }
+    }
+    return results
+}
+
+# --- L3: Extract and execute code snippets ---
+fn validate_code_execution(file_path, code_field) {
+    lines = io.read_lines(file_path)
+    total = 0
+    passed = 0
+    failed = 0
+    skipped = 0
+    errors = []
+
+    line_num = 0
+    for line in lines {
+        line_num = line_num + 1
+        if line.trim() != "" {
+            obj = none
+            try {
+                obj = json.parse(line)
+            } catch as e {
+                skipped = skipped + 1
+            }
+
+            code = ""
+            if obj != none {
+                if obj.has_key(code_field) {
+                    code = obj[code_field]
+                }
+            }
+
+            if code == "" || code == none {
+                skipped = skipped + 1
+            } else {
+                # Check if code looks executable (not just explanation text)
+                is_code = code.contains("=") || code.contains("fn ") || code.contains("print") || code.contains("graph") || code.contains("import")
+                if not is_code {
+                    skipped = skipped + 1
+                } else {
+                    total = total + 1
+                    # Write snippet to temp file and exec()
+                    io.write_file(TEMP_FILE, code)
+                    try {
+                        exec(TEMP_FILE)
+                        passed = passed + 1
+                    } catch as e {
+                        failed = failed + 1
+                        err_msg = e.to_string()
+                        if err_msg.length() > 120 {
+                            err_msg = err_msg.substring(0, 120) + "..."
+                        }
+                        errors.append!(file_path + ":" + line_num.to_string() + " " + err_msg)
+                    }
+                }
+            }
+        }
+    }
+    if fs.exists(TEMP_FILE) {
+        io.write_file(TEMP_FILE, "")
+    }
+    return {"total": total, "passed": passed, "failed": failed, "skipped": skipped, "errors": errors}
+}
+
+# --- L4: Coverage audit ---
+fn coverage_audit(instruct_dir, dpo_dir) {
+    report = {}
+
+    # Collect all code text from training data
+    all_code = ""
+    instruct_files = find_files(instruct_dir, ".jsonl")
+    for f in instruct_files {
+        lines = io.read_lines(f)
+        for line in lines {
+            if line.trim() != "" {
+                try {
+                    obj = json.parse(line)
+                    if obj.has_key("output") {
+                        all_code = all_code + " " + obj["output"]
+                    }
+                    if obj.has_key("instruction") {
+                        all_code = all_code + " " + obj["instruction"]
+                    }
+                } catch as e {
+                    # skip
+                }
+            }
+        }
+    }
+
+    dpo_files = find_files(dpo_dir, ".jsonl")
+    for f in dpo_files {
+        lines = io.read_lines(f)
+        for line in lines {
+            if line.trim() != "" {
+                try {
+                    obj = json.parse(line)
+                    if obj.has_key("chosen") {
+                        all_code = all_code + " " + obj["chosen"]
+                    }
+                    if obj.has_key("rejected") {
+                        all_code = all_code + " " + obj["rejected"]
+                    }
+                } catch as e {
+                    # skip
+                }
+            }
+        }
+    }
+
+    # Check each feature group
+    for group in FEATURE_GROUPS.keys() {
+        markers = FEATURE_GROUPS[group]
+        hits = 0
+        for marker in markers {
+            if all_code.contains(marker) {
+                hits = hits + 1
+            }
+        }
+        coverage_pct = 0
+        if markers.length() > 0 {
+            coverage_pct = (hits * 100) / markers.length()
+        }
+        report[group] = {"hits": hits, "total": markers.length(), "pct": coverage_pct}
+    }
+
+    return report
+}
+
+# --- Stats (replaces stats.py) ---
+fn count_gr_files(base_dir) {
+    dirs = ["stdlib", "samples", "tests/gspec", "tests/integration", "training/annotated", "training/rosetta"]
+    total = 0
+    for d in dirs {
+        path = base_dir + "/" + d
+        if fs.exists(path) {
+            files = find_files(path, ".gr")
+            count = files.length()
+            total = total + count
+            padding = string.generate(" ", 30 - d.length())
+            print("  " + d + "/" + padding + count.to_string() + " files")
+        } else {
+            padding = string.generate(" ", 30 - d.length())
+            print("  " + d + "/" + padding + "- (not found)")
+        }
+    }
+    return total
+}
+
+fn count_jsonl_entries(dir) {
+    total = 0
+    if not fs.exists(dir) {
+        return 0
+    }
+    files = find_files(dir, ".jsonl")
+    for f in files {
+        lines = io.read_lines(f)
+        count = 0
+        for line in lines {
+            if line.trim() != "" {
+                count = count + 1
+            }
+        }
+        total = total + count
+        # Extract just the filename
+        parts = f.split("/")
+        fname = parts.last()
+        padding = string.generate(" ", 30 - fname.length())
+        print("  " + fname + padding + count.to_string() + " entries")
+    }
+    return total
+}
+
+fn rosetta_pair_count(rosetta_dir) {
+    if not fs.exists(rosetta_dir) {
+        return 0
+    }
+    pairs = 0
+    entries = fs.list_dir(rosetta_dir)
+    for entry in entries {
+        subdir = rosetta_dir + "/" + entry
+        if fs.is_dir(subdir) {
+            files = fs.list_dir(subdir)
+            gr_stems = []
+            py_stems = []
+            for f in files {
+                if f.ends_with(".gr") {
+                    gr_stems.append!(f.replace(".gr", ""))
+                }
+                if f.ends_with(".py") {
+                    py_stems.append!(f.replace(".py", ""))
+                }
+            }
+            for stem in gr_stems {
+                if py_stems.contains(stem) {
+                    pairs = pairs + 1
+                }
+            }
+        }
+    }
+    return pairs
+}
+
+fn show_stats(base_dir) {
+    print(string.generate("=", 60))
+    print("GRAPHOID TRAINING CORPUS STATISTICS")
+    print(string.generate("=", 60))
+
+    print("\n--- .gr Source Files ---")
+    total_files = count_gr_files(base_dir)
+    padding = string.generate(" ", 30 - 5)
+    print("  TOTAL" + padding + total_files.to_string() + " files")
+
+    print("\n--- Raw Corpus ---")
+    corpus_path = base_dir + "/training/raw/graphoid_corpus.txt"
+    if fs.exists(corpus_path) {
+        text = io.read_file(corpus_path)
+        chars = text.length()
+        tokens = chars / 4
+        print("  Size: " + chars.to_string() + " chars (~" + tokens.to_string() + " tokens)")
+        pct = (tokens * 100) / 500000
+        if pct > 100 { pct = 100 }
+        print("  Progress to 500K token target: " + pct.to_string() + "%")
+    } else {
+        print("  Not yet generated. Run: gr training/scripts/collect_corpus.gr")
+    }
+
+    print("\n--- Instruction Pairs (SFT) ---")
+    instruct_total = count_jsonl_entries(base_dir + "/training/instruct")
+    if instruct_total > 0 {
+        pct = (instruct_total * 100) / 5000
+        if pct > 100 { pct = 100 }
+        print("  Progress to 5K pair target: " + pct.to_string() + "%")
+    }
+
+    print("\n--- Preference Pairs (DPO) ---")
+    dpo_total = count_jsonl_entries(base_dir + "/training/dpo")
+    if dpo_total > 0 {
+        pct = (dpo_total * 100) / 500
+        if pct > 100 { pct = 100 }
+        print("  Progress to 500 pair target: " + pct.to_string() + "%")
+    }
+
+    print("\n--- Rosetta Stone Pairs ---")
+    pairs = rosetta_pair_count(base_dir + "/training/rosetta")
+    print("  Cross-language pairs: " + pairs.to_string())
+
+    print("\n--- Eval Benchmark ---")
+    eval_path = base_dir + "/training/eval/graphoid_eval.jsonl"
+    if fs.exists(eval_path) {
+        lines = io.read_lines(eval_path)
+        count = lines.filter(l => l.trim() != "").length()
+        print("  Eval problems: " + count.to_string())
+    } else {
+        print("  Not yet created.")
+    }
+
+    print("\n" + string.generate("=", 60))
+    print("TARGETS: 500K tokens (CPT) | 5K pairs (SFT) | 500 pairs (DPO) | 200 eval")
+    print(string.generate("=", 60))
+}
+
+# --- Main ---
+args = os.args()
+parsed = optparse.parse_args(args)
+do_exec = optparse.has_flag(parsed, "exec")
+do_coverage = optparse.has_flag(parsed, "coverage")
+do_stats = optparse.has_flag(parsed, "stats")
+do_recent = optparse.has_flag(parsed, "recent")
+
+# Determine base directory (where training/ lives)
+base_dir = os.getcwd()
+
+if do_stats {
+    show_stats(base_dir)
+} else {
+    print(string.generate("=", 60))
+    print("GRAPHOID TRAINING DATA VALIDATION")
+    if do_recent {
+        print("  Mode: recent changes only")
+    } else {
+        print("  Mode: full corpus")
+    }
+    print(string.generate("=", 60))
+
+    # --- L1+L2: Format validation ---
+    print("\n--- L1/L2: JSONL Format & Field Validation ---")
+    instruct_dir = base_dir + "/training/instruct"
+    dpo_dir = base_dir + "/training/dpo"
+
+    total_entries = 0
+    total_valid = 0
+    all_errors = []
+
+    # Validate instruction files
+    instruct_files = find_files(instruct_dir, ".jsonl")
+    for f in instruct_files {
+        parts = f.split("/")
+        fname = parts.last()
+        r = validate_jsonl(f, ["instruction", "output"])
+        total_entries = total_entries + r["total"]
+        total_valid = total_valid + r["valid"]
+        for err in r["errors"] {
+            all_errors.append!(err)
+        }
+        status = "OK"
+        if r["errors"].length() > 0 {
+            status = r["errors"].length().to_string() + " errors"
+        }
+        print("  " + fname + ": " + r["total"].to_string() + " entries, " + status)
+    }
+
+    # Validate DPO files
+    dpo_files = find_files(dpo_dir, ".jsonl")
+    for f in dpo_files {
+        parts = f.split("/")
+        fname = parts.last()
+        r = validate_jsonl(f, ["prompt", "chosen", "rejected"])
+        total_entries = total_entries + r["total"]
+        total_valid = total_valid + r["valid"]
+        for err in r["errors"] {
+            all_errors.append!(err)
+        }
+        status = "OK"
+        if r["errors"].length() > 0 {
+            status = r["errors"].length().to_string() + " errors"
+        }
+        print("  " + fname + ": " + r["total"].to_string() + " entries, " + status)
+    }
+
+    print("\n  Format: " + total_valid.to_string() + "/" + total_entries.to_string() + " valid")
+    if all_errors.length() > 0 {
+        print("\n  Errors:")
+        for err in all_errors {
+            print("    " + err)
+        }
+    }
+
+    # --- L3: Execution validation ---
+    if do_exec {
+        print("\n--- L3: Code Execution Validation ---")
+
+        exec_total = 0
+        exec_passed = 0
+        exec_failed = 0
+        exec_skipped = 0
+        exec_errors = []
+
+        # Check instruction outputs
+        for f in instruct_files {
+            parts = f.split("/")
+            fname = parts.last()
+            r = validate_code_execution(f, "output")
+            exec_total = exec_total + r["total"]
+            exec_passed = exec_passed + r["passed"]
+            exec_failed = exec_failed + r["failed"]
+            exec_skipped = exec_skipped + r["skipped"]
+            for err in r["errors"] {
+                exec_errors.append!(err)
+            }
+            print("  " + fname + " outputs: " + r["passed"].to_string() + "/" + r["total"].to_string() + " passed, " + r["skipped"].to_string() + " skipped")
+        }
+
+        # Check DPO chosen examples
+        for f in dpo_files {
+            parts = f.split("/")
+            fname = parts.last()
+            r = validate_code_execution(f, "chosen")
+            exec_total = exec_total + r["total"]
+            exec_passed = exec_passed + r["passed"]
+            exec_failed = exec_failed + r["failed"]
+            exec_skipped = exec_skipped + r["skipped"]
+            for err in r["errors"] {
+                exec_errors.append!(err)
+            }
+            print("  " + fname + " chosen: " + r["passed"].to_string() + "/" + r["total"].to_string() + " passed, " + r["skipped"].to_string() + " skipped")
+        }
+
+        print("\n  Execution: " + exec_passed.to_string() + "/" + exec_total.to_string() + " passed")
+        if exec_errors.length() > 0 {
+            print("\n  Failures:")
+            for err in exec_errors {
+                print("    " + err)
+            }
+        }
+    } else {
+        print("\n--- L3: Code Execution (skipped, use --exec to enable) ---")
+    }
+
+    # --- L4: Coverage audit ---
+    if do_coverage {
+        print("\n--- L4: Feature Coverage Audit ---")
+        report = coverage_audit(instruct_dir, dpo_dir)
+
+        covered = 0
+        total_groups = 0
+        gaps = []
+
+        for group in FEATURE_GROUPS.keys() {
+            total_groups = total_groups + 1
+            info = report[group]
+            bar_len = info["pct"] / 5
+            bar = string.generate("#", bar_len) + string.generate(".", 20 - bar_len)
+            padding = string.generate(" ", 20 - group.length())
+            print("  " + group + padding + " [" + bar + "] " + info["hits"].to_string() + "/" + info["total"].to_string())
+            if info["pct"] > 0 {
+                covered = covered + 1
+            }
+            if info["pct"] == 0 {
+                gaps.append!(group)
+            }
+        }
+
+        print("\n  Coverage: " + covered.to_string() + "/" + total_groups.to_string() + " feature groups have training data")
+        if gaps.length() > 0 {
+            print("  Gaps (no data): " + gaps.join(", "))
+        }
+    } else {
+        print("\n--- L4: Coverage Audit (skipped, use --coverage to enable) ---")
+    }
+
+    # --- Rosetta pair check ---
+    print("\n--- Rosetta Stone Pairs ---")
+    rosetta_dir = base_dir + "/training/rosetta"
+    if fs.exists(rosetta_dir) {
+        entries = fs.list_dir(rosetta_dir)
+        for entry in entries {
+            subdir = rosetta_dir + "/" + entry
+            if fs.is_dir(subdir) {
+                files = fs.list_dir(subdir)
+                gr_files = files.filter(f => f.ends_with(".gr"))
+                py_files = files.filter(f => f.ends_with(".py"))
+                # Check for orphans (gr without py or vice versa)
+                for gf in gr_files {
+                    stem = gf.replace(".gr", "")
+                    if not py_files.contains(stem + ".py") {
+                        print("  WARNING: " + entry + "/" + gf + " has no matching .py file")
+                    }
+                }
+                for pf in py_files {
+                    stem = pf.replace(".py", "")
+                    if not gr_files.contains(stem + ".gr") {
+                        print("  WARNING: " + entry + "/" + pf + " has no matching .gr file")
+                    }
+                }
+                pairs = 0
+                for gf in gr_files {
+                    stem = gf.replace(".gr", "")
+                    if py_files.contains(stem + ".py") {
+                        pairs = pairs + 1
+                    }
+                }
+                print("  " + entry + ": " + pairs.to_string() + " matched pairs")
+            }
+        }
+    }
+
+    print("\n" + string.generate("=", 60))
+    print("Done.")
+    print(string.generate("=", 60))
+}

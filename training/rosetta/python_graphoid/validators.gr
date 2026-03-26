@@ -1,0 +1,41 @@
+# Data Validation — Graphoid implementation
+# Graphoid has built-in behavior rules for automatic validation.
+
+# --- Clamping values to a range ---
+scores = [50, 110, 95, 130, 85, 70]
+result = scores.add_rule(:validate_range, 60, 100)
+print("Clamped: " + result.to_string())  # [60, 100, 95, 100, 85, 70]
+
+# Rules are retroactive AND apply to future appends automatically
+# No need to remember to re-validate after every change
+
+# --- Replacing none values ---
+data = [1, none, 3, none, 5]
+clean = data.add_rule(:none_to_zero)
+print("Cleaned: " + clean.to_string())  # [1, 0, 3, 0, 5]
+
+# --- Preventing duplicates ---
+items = [1, 2, 3, 2, 4, 3, 5]
+unique = items.add_rule(:no_duplicates)
+print("Unique: " + unique.to_string())  # [1, 2, 3, 4, 5]
+
+# --- Force uppercase ---
+names = ["alice", "bob", "carol"]
+upper_names = names.add_rule(:uppercase)
+print("Upper: " + upper_names.to_string())  # ["ALICE", "BOB", "CAROL"]
+
+# --- Chaining operations ---
+data = [1, none, -3, none, 5.7]
+result = data.add_rule(:none_to_zero)
+             .add_rule(:positive)
+             .add_rule(:round_to_int)
+print("Chained: " + result.to_string())  # [1, 0, 3, 0, 6]
+
+# Graphoid advantages:
+# - One-line rules vs multi-line Python functions
+# - Retroactive: existing elements transformed immediately
+# - Proactive: future appends also validated
+# - Chainable: .add_rule(:a).add_rule(:b)
+# - No external library needed
+
+print("Validation demo complete!")

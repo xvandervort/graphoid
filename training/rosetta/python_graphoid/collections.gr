@@ -1,0 +1,76 @@
+# Collection Operations — Graphoid implementation
+# Graphoid has built-in functional methods and element-wise operators.
+
+# --- List creation and basic ops ---
+numbers = [1, 2, 3, 4, 5]
+print("First: " + numbers.first().to_string())
+print("Last: " + numbers.last().to_string())
+print("Length: " + numbers.length().to_string())
+print("Contains 3? " + numbers.contains(3).to_string())
+
+# --- Functional operations ---
+# Graphoid uses .map(), .filter(), .reject() — no comprehensions needed
+doubled = numbers.map(x => x * 2)
+print("Doubled: " + doubled.to_string())
+
+evens = numbers.filter(x => x % 2 == 0)
+print("Evens: " + evens.to_string())
+
+odds = numbers.filter(:odd)   # Named predicate shorthand
+print("Odds: " + odds.to_string())
+
+total = numbers.reduce(0, (acc, x) => acc + x)
+print("Sum: " + total.to_string())
+
+# Chaining is natural — no intermediate variables needed
+result = numbers.filter(x => x > 2).map(x => x * 10)
+print("Filter>2 then *10: " + result.to_string())
+
+# --- Immutability (default in Graphoid) ---
+items = [3, 1, 4]
+sorted_items = items.sort()     # returns new list (original unchanged)
+items.sort!()                   # explicit mutation with !
+print("Sorted: " + sorted_items.to_string())
+
+reversed_items = items.reverse()
+print("Reversed: " + reversed_items.to_string())
+
+unique = [3, 1, 4, 1, 5].uniq()
+print("Unique: " + unique.to_string())
+
+# --- Element-wise operations ---
+# Graphoid has built-in element-wise operators — no numpy needed
+a = [1, 2, 3]
+print("a * 3: " + (a .* 3).to_string())
+print("a + 10: " + (a .+ 10).to_string())
+
+b = [4, 5, 6]
+print("a + b: " + (a .+ b).to_string())
+
+# Celsius to Fahrenheit — one expression
+temps_c = [0, 10, 20, 30]
+temps_f = temps_c .* 1.8 .+ 32
+print("Fahrenheit: " + temps_f.to_string())
+
+# --- Maps ---
+person = {"name": "Alice", "age": 30, "city": "Portland"}
+print("Name: " + person["name"].to_string())
+print("Has age? " + person.has_key("age").to_string())
+print("Keys: " + person.keys().to_string())
+
+# Remove key (returns new map, original unchanged)
+without_city = person.remove("city")
+print("Without city: " + without_city.to_string())
+
+# --- Sorting, dedup, compact ---
+data = [3, 1, none, 4, 1, none, 5]
+cleaned = data.compact()         # remove none values
+print("Compact: " + cleaned.to_string())
+
+deduped = cleaned.uniq()
+print("Unique: " + deduped.to_string())
+
+final = deduped.sort()
+print("Sorted unique: " + final.to_string())
+
+print("Collections demo complete!")

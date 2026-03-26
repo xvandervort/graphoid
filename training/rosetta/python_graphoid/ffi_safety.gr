@@ -1,0 +1,37 @@
+# FFI Safety — Graphoid implementation
+# Demonstrates taint tracking, trust, bridge nodes, and resource limits
+
+# --- Load library and call function ---
+lib = ffi.c("m")
+lib.decl("sqrt", ["f64"], "f64")
+
+result = lib.sqrt(16.0)
+print("sqrt(16) = " + result.to_string())
+
+# Graphoid automatically tracks taint on foreign data
+print("Is tainted? " + reflect.tainted(result).to_string())
+print("Taint source: " + reflect.taint_source(result).to_string())
+
+# --- Taint propagation ---
+derived = result + 10
+print("result + 10 = " + derived.to_string())
+print("Derived is tainted? " + reflect.tainted(derived).to_string())
+
+# --- ffi.trust() clears taint after validation ---
+trusted = ffi.trust(result)
+print("After trust, tainted? " + reflect.tainted(trusted).to_string())
+
+# --- Bridge nodes track foreign entities in the universe graph ---
+bridge = reflect.bridge(lib)
+print("Bridge node: " + bridge["node_id"])
+
+realm = reflect.foreign_realm()
+print("Foreign realm nodes: " + realm.node_count().to_string())
+
+# --- Resource limits prevent runaway allocations ---
+ffi.limits({max_memory_bytes: 10000000})
+ptr = ffi.alloc(1024)
+print("Allocated 1024 bytes within limit")
+ffi.free(ptr)
+
+print("FFI safety demo complete!")
