@@ -305,6 +305,7 @@ impl GraphExecutor {
             is_setter: false,
             is_static: false,
             guard: None,
+            is_private: false,
         };
         let toplevel_id = self.function_graph.borrow_mut().register_function(toplevel_func);
         self.function_graph.borrow_mut().push_call(toplevel_id, Vec::new());
@@ -1300,6 +1301,7 @@ impl GraphExecutor {
             is_setter: false,
             is_static,
             guard: None,
+            is_private: false,
         };
 
         // Register in function graph for tracking
@@ -2432,6 +2434,7 @@ impl GraphExecutor {
             is_setter: false,
             is_static: false,
             guard: None,
+            is_private: false,
         };
 
         Ok(Value::function(func))
@@ -6266,12 +6269,8 @@ impl GraphExecutor {
         let mut method_variant_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
         for mi in method_infos {
             {
-                // Private methods are renamed with underscore prefix
-                let registered_name = if mi.is_private {
-                    format!("_{}", mi.method_name)
-                } else {
-                    mi.method_name.clone()
-                };
+                // Register under original name; privacy enforced at dispatch time via is_private
+                let registered_name = mi.method_name.clone();
 
                 // Get variant index for this method name to ensure unique func_id
                 let variant_idx = *method_variant_counts.get(&registered_name).unwrap_or(&0);
@@ -6297,6 +6296,7 @@ impl GraphExecutor {
                     is_setter: false,
                     is_static: mi.is_static,
                     guard: None,  // Guard evaluated at dispatch time via graph_method_guards
+                    is_private: mi.is_private,
                 };
 
                 graph.attach_method(registered_name, func);
@@ -6762,6 +6762,7 @@ impl GraphExecutor {
             is_setter: false,
             is_static: false,
             guard: None,
+            is_private: false,
         }
     }
 
@@ -6800,6 +6801,7 @@ impl GraphExecutor {
             is_setter: true,
             is_static: false,
             guard: None,
+            is_private: false,
         }
     }
 

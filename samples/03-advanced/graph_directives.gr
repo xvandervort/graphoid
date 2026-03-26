@@ -146,7 +146,7 @@ graph BankAccount {
 
     fn get_balance_with_interest() {
         # Can call private method from within the graph
-        return balance + _calculate_interest()
+        return balance + calculate_interest()
     }
 
     fn get_statement() {

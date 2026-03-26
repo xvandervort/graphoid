@@ -315,6 +315,40 @@ match value {
 }
 ```
 
+### match with Expressions
+
+Match arm bodies support full expressions — function calls, arithmetic, method calls, indexing, and even nested match:
+
+```graphoid
+fn double(n) { return n * 2 }
+
+fn compute(op, value) {
+    return match op {
+        "double" => double(value),
+        "square" => value * value,
+        "negate" => -value,
+        "describe" => "value is " + value.to_string(),
+        _ => value
+    }
+}
+
+print(compute("double", 5))    # 10
+print(compute("square", 4))    # 16
+print(compute("describe", 42)) # "value is 42"
+```
+
+Match arms can also construct lists and maps:
+
+```graphoid
+fn make_range(size) {
+    return match size {
+        "small" => [1, 2, 3],
+        "large" => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        _ => []
+    }
+}
+```
+
 ## Guard Clauses
 
 Use early returns to avoid deep nesting:

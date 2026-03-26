@@ -2818,6 +2818,7 @@ impl Graph {
     ///     is_setter: false,
     ///     is_static: false,
     ///     guard: None,
+    ///     is_private: false,
     /// };
     /// g.attach_method("add".to_string(), func);
     ///

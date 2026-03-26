@@ -212,6 +212,7 @@ fn test_ordering_custom_function() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
 
     let mut list = List::new();
@@ -275,6 +276,7 @@ fn test_ordering_reverse() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
 
     let mut list = List::new();

@@ -469,7 +469,7 @@ graph TaskGraph(:dag) {
 }
 
 #[test]
-fn test_exec_graph_private_method_renamed() {
+fn test_exec_graph_private_method_registered_under_original_name() {
     let source = r#"
 graph Secret {
     priv fn helper() {
@@ -484,9 +484,8 @@ graph Secret {
     match &secret.kind {
         ValueKind::Graph(g) => {
             let g = g.borrow();
-            // Private method should be renamed with underscore prefix
-            assert!(g.has_method("_helper"));
-            assert!(!g.has_method("helper"));
+            // Private method registered under original name; privacy via is_private flag
+            assert!(g.has_method("helper"));
         }
         _ => panic!("Expected graph"),
     }
@@ -1028,7 +1027,7 @@ graph Secret {
 }
 
 s = Secret.clone()
-result = s._internal_helper()
+result = s.internal_helper()
 "#;
     let mut executor = Executor::new();
     let result = executor.execute_source(source);
@@ -1063,8 +1062,8 @@ result = s.get_secret()
 }
 
 #[test]
-fn test_priv_fn_called_internally_via_underscore() {
-    // Private method called internally via underscore prefix
+fn test_priv_fn_called_internally_by_name() {
+    // Private method called internally by original name
     let source = r#"
 graph Secret {
     priv fn helper() {
@@ -1072,7 +1071,7 @@ graph Secret {
     }
 
     fn public_method() {
-        return _helper()  # Call via underscore prefix internally
+        return helper()
     }
 }
 

@@ -517,6 +517,7 @@ fn make_test_function(name: &str) -> Function {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     }
 }
 

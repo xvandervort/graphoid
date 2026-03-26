@@ -18,6 +18,9 @@ pub struct Parser {
     /// When true, disables parsing ClassName {} as instantiation in postfix()
     /// Used when parsing graph parent expressions where {} is the graph body
     disable_brace_instantiation: bool,
+    /// When true, postfix() will not skip newlines to find postfix operators.
+    /// Used in match arm bodies where a newline ends the arm expression.
+    disable_newline_skip_in_postfix: bool,
 }
 
 impl Parser {
@@ -26,6 +29,7 @@ impl Parser {
             tokens,
             current: 0,
             disable_brace_instantiation: false,
+            disable_newline_skip_in_postfix: false,
         }
     }
 
@@ -1049,10 +1053,37 @@ impl Parser {
                 // static fn - already consumed static
                 let method = self.parse_graph_method(is_private, false, true)?;
                 methods.push(method);
+            } else if is_private && self.check(&TokenType::LeftBrace) {
+                // priv { fn ...; fn ... } block in graph body
+                self.advance(); // consume '{'
+                self.skip_newlines();
+                while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+                    self.skip_newlines();
+                    let block_is_static = self.match_token(&TokenType::Static);
+                    if self.match_token(&TokenType::Func) {
+                        let method = self.parse_graph_method(true, false, block_is_static)?;
+                        methods.push(method);
+                    } else if self.match_token(&TokenType::Set) {
+                        let method = self.parse_graph_method(true, true, false)?;
+                        methods.push(method);
+                    } else {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected 'fn' or 'set' inside 'priv' block in graph body".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+                    self.skip_newlines();
+                }
+                if !self.match_token(&TokenType::RightBrace) {
+                    return Err(GraphoidError::SyntaxError {
+                        message: "Expected '}' after priv block in graph body".to_string(),
+                        position: self.peek().position(),
+                    });
+                }
             } else if is_private {
-                // priv without fn/set - error
+                // priv without fn/set/{ - error
                 return Err(GraphoidError::SyntaxError {
-                    message: "Expected 'fn' or 'set' after 'priv' in graph body".to_string(),
+                    message: "Expected 'fn', 'set', or '{' after 'priv' in graph body".to_string(),
                     position: self.peek().position(),
                 });
             } else if let TokenType::Identifier(id) = &self.peek().token_type {
@@ -2475,7 +2506,10 @@ impl Parser {
             let checkpoint = self.current;
 
             // Skip newlines to allow method chaining across lines
-            while self.match_token(&TokenType::Newline) {}
+            // (disabled in match arm bodies where newlines delimit arms)
+            if !self.disable_newline_skip_in_postfix {
+                while self.match_token(&TokenType::Newline) {}
+            }
 
             // Check if we have a postfix operator
             // LeftBrace is only a postfix for CLG instantiation (e.g., Point { x: 10 })
@@ -3748,8 +3782,12 @@ impl Parser {
                 });
             }
 
-            // Parse body expression (using primary() to avoid consuming postfix ops across newlines)
-            let body = self.primary()?;
+            // Parse body expression — full expressions allowed (binary ops, calls, methods)
+            // Disable newline-skipping in postfix to prevent `[` on next line being
+            // parsed as indexing when it's actually the start of the next arm's pattern.
+            self.disable_newline_skip_in_postfix = true;
+            let body = self.expression()?;
+            self.disable_newline_skip_in_postfix = false;
 
             arms.push(MatchArm {
                 pattern,

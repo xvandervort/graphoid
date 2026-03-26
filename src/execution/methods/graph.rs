@@ -110,20 +110,20 @@ impl Executor {
         // Phase 21: Get all method variants and evaluate guards to find the matching one
         let method_variants = graph.get_method_variants(method);
         if !method_variants.is_empty() {
-            // Phase 15: Private method check (convention-based: underscore prefix)
-            // Methods starting with _ are private and can only be called from within the same graph's methods
-            if method.starts_with('_') {
-                // Check if we're inside a method of this graph
-                let graph_var_name = if let Expr::Variable { name, .. } = object_expr {
-                    Some(name.clone())
-                } else {
-                    None
-                };
-
+            // Private method check: methods marked is_private can only be called
+            // from within the same graph's methods (via self or method context)
+            let has_private_variant = method_variants.iter().any(|f| f.is_private);
+            if has_private_variant {
                 let is_self_call = if let Expr::Variable { name, .. } = object_expr {
                     name == "self"
                 } else {
                     false
+                };
+
+                let graph_var_name = if let Expr::Variable { name, .. } = object_expr {
+                    Some(name.clone())
+                } else {
+                    None
                 };
 
                 // Allow if:

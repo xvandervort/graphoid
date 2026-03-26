@@ -1,8 +1,8 @@
 # Graphoid Implementation Roadmap
 
-**Version**: 14.2
-**Last Updated**: March 19, 2026
-**Status**: Phases 0-19.5 + Phase 20a-b Complete (committed). FFI working: library loading, function calling, C struct support, callbacks, cdef parser. Design review fixes applied. LLM fine-tuning plan and training data infrastructure added. Phase 20c (safety) next.
+**Version**: 15.1
+**Last Updated**: March 25, 2026
+**Status**: Phases 0-20c Complete (committed). Bug fixes: match arm expression bodies, priv fn in graphs. LLM training data sessions 1-4 of 6 complete (152 SFT, 30 DPO, 10 Rosetta pairs). 1,649 Rust tests, 848 gspec tests. Phase 21 (Package Manager) next.
 
 ---
 
@@ -76,7 +76,7 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 | Phase | Name | Priority | Duration | Dependencies | Status |
 |-------|------|----------|----------|--------------|--------|
-| [20](PHASE_20_FFI.md) | Foreign Function Interface | **Critical** | 12-16 days | None | 🔄 Phase 20a-b Complete |
+| [20](PHASE_20_FFI.md) | Foreign Function Interface | **Critical** | 12-16 days | None | ✅ Complete (20a-c) |
 | [21](PHASE_21_PACKAGE_MANAGER.md) | Package Manager | **High** | 14-21 days | None | |
 | [22](PHASE_22_DATABASE.md) | Database Connectivity | **High** | 7-10 days | Phase 20, 21 | |
 
@@ -208,7 +208,7 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 9. ~~**Phase 20a: FFI Foundation**~~ ✅ Complete (Mar 17, 2026) — library loading, function calling, pointers
 10. ~~**Phase 20b: FFI Structs + Callbacks**~~ ✅ Complete (Mar 17, 2026) — cdef parser, struct support, callbacks
-11. **Phase 20c: FFI Safety** - taint tracking, bridge nodes, resource limits
+11. ~~**Phase 20c: FFI Safety**~~ ✅ Complete (Mar 23, 2026) — taint tracking, bridge nodes, resource limits
 12. **Phase 21: Package Manager** - Ecosystem enablement
 12. **Phase 22: Database** - PostgreSQL, SQLite, Redis
 13. **Phase 23: Distributed Primitives** - Serialization, remote refs, routing hooks
@@ -338,6 +338,7 @@ See [PHASE_19_CONCURRENCY.md](PHASE_19_CONCURRENCY.md) for full specification.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 15.0 | 2026-03-23 | Phase 20c committed (1fc4ea9). FFI safety: taint tracking on Value, propagation through arithmetic/strings, reflect.tainted/taint_source/bridge/foreign_realm, ffi.trust/limits, exec blocking, fs.write/net.send warnings, bridge nodes in universe graph, foreign type hierarchy, FfiLimits/FfiUsage. Training data plan created. |
 | 14.2 | 2026-03-19 | Phase 20b committed (962a4f7). Design review fixes: callback error logging, globals propagation, env.define for fresh executors, extract_ptr_arg helper, FfiType::from_str struct support, dead code cleanup. |
 | 14.1 | 2026-03-19 | LLM fine-tuning plan (`dev_docs/LLM_FINE_TUNING_PLAN.md`) and training data infrastructure (`training/`). Training data generation added as mandatory dev workflow step. |
 | 14.0 | 2026-03-17 | Phase 20b (cdef parser, C structs, callbacks) complete. lib.cdef() parses C declarations. lib.new() creates struct instances. Call-scoped and persistent callbacks via libffi closures. |

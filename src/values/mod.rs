@@ -234,6 +234,8 @@ pub struct Function {
     /// Phase 21: Optional guard expression for structure-based dispatch.
     /// When present, this function only matches if the guard evaluates to true.
     pub guard: Option<Box<Expr>>,
+    /// Whether this function is private (only callable from within the same graph).
+    pub is_private: bool,
 }
 
 impl PartialEq for Function {
@@ -1043,6 +1045,7 @@ impl Value {
                     is_setter: func.is_setter,
                     is_static: func.is_static,
                     guard: func.guard.clone(),
+                    is_private: func.is_private,
                 })
             }
             ValueKind::Channel(ch) => {
