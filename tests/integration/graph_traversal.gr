@@ -1,0 +1,99 @@
+# Integration test: graph traversal and query methods
+# Tests bfs, dfs, neighbors, nodes_within, has_key, flatten
+
+failures = 0
+
+fn check(condition, label) {
+    if condition == false {
+        print("FAIL: " + label)
+        failures = failures + 1
+    }
+}
+
+print("=== Graph Traversal Methods ===")
+
+g = graph { type: :directed }
+g.add_node("A", 1)
+g.add_node("B", 2)
+g.add_node("C", 3)
+g.add_node("D", 4)
+g.add_edge("A", "B", "link")
+g.add_edge("B", "C", "link")
+g.add_edge("A", "D", "other")
+
+# BFS
+bfs_order = g.bfs("A")
+print("bfs from A:", bfs_order)
+check(bfs_order[0] == "A", "BFS starts at A")
+check(bfs_order.length() == 4, "BFS visits all 4 nodes")
+check(bfs_order.contains("B"), "BFS includes B")
+check(bfs_order.contains("C"), "BFS includes C")
+check(bfs_order.contains("D"), "BFS includes D")
+
+bfs_leaf = g.bfs("C")
+check(bfs_leaf.length() == 1, "BFS from leaf returns 1 node")
+
+bfs_none = g.bfs("Z")
+check(bfs_none.length() == 0, "BFS from nonexistent returns empty")
+
+# DFS
+dfs_order = g.dfs("A")
+print("dfs from A:", dfs_order)
+check(dfs_order[0] == "A", "DFS starts at A")
+check(dfs_order.length() == 4, "DFS visits all 4 nodes")
+
+# Neighbors
+neighbors_a = g.neighbors("A")
+print("neighbors of A:", neighbors_a)
+check(neighbors_a.length() == 2, "A has 2 neighbors")
+check(neighbors_a.contains("B"), "A neighbors include B")
+check(neighbors_a.contains("D"), "A neighbors include D")
+
+neighbors_c = g.neighbors("C")
+check(neighbors_c.length() == 0, "C has no outgoing neighbors")
+
+neighbors_z = g.neighbors("Z")
+check(neighbors_z.length() == 0, "Nonexistent node has no neighbors")
+
+# has_key
+check(g.has_key("A") == true, "has_key finds existing node")
+check(g.has_key("Z") == false, "has_key returns false for missing")
+
+# nodes_within
+within_0 = g.nodes_within("A", 0)
+check(within_0.length() == 1, "0 hops = just start node")
+
+within_1 = g.nodes_within("A", 1)
+print("nodes within 1 hop of A:", within_1)
+check(within_1.contains("A"), "within 1 includes A")
+check(within_1.contains("B"), "within 1 includes B")
+check(within_1.contains("D"), "within 1 includes D")
+
+within_2 = g.nodes_within("A", 2)
+check(within_2.length() == 4, "within 2 hops reaches all nodes")
+
+within_link = g.nodes_within("A", 2, "link")
+print("nodes within 2 hops via 'link':", within_link)
+check(within_link.contains("B"), "link filter includes B")
+check(within_link.contains("C"), "link filter includes C")
+
+print("")
+print("=== List flatten ===")
+
+result = [[1, 2], [3, 4], 5].flatten()
+print("flatten [[1,2],[3,4],5]:", result)
+check(result.length() == 5, "flatten produces 5 elements")
+
+nested = [[1, [2, 3]], [4]].flatten()
+print("flatten [[1,[2,3]],[4]]:", nested)
+check(nested.length() == 3, "flatten is one-level only")
+
+check([].flatten().length() == 0, "flatten empty is empty")
+check([1, 2, 3].flatten().length() == 3, "flatten flat is unchanged")
+
+print("")
+if failures == 0 {
+    print("ALL TESTS PASSED")
+} else {
+    print(failures.to_string() + " TESTS FAILED")
+}

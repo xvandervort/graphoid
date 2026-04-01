@@ -836,9 +836,22 @@ impl Graph {
     }
 
     /// Get neighbors of a node (O(1) lookup, O(degree) iteration)
+    /// If edge_type is Some, only returns neighbors connected via that edge type
     pub fn neighbors(&self, id: &str) -> Vec<String> {
         if let Some(node) = self.nodes.get(id) {
             node.neighbors.keys().cloned().collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get neighbors filtered by edge type
+    pub fn neighbors_by_type(&self, id: &str, edge_type: &str) -> Vec<String> {
+        if let Some(node) = self.nodes.get(id) {
+            node.neighbors.iter()
+                .filter(|(_, info)| info.edge_type == edge_type)
+                .map(|(id, _)| id.clone())
+                .collect()
         } else {
             Vec::new()
         }

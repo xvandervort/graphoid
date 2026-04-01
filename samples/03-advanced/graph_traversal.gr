@@ -1,0 +1,75 @@
+# Graph Traversal & Query Methods
+# Demonstrates bfs, dfs, neighbors, nodes_within, has_key, and list flatten
+
+print("=== Building a Network ===")
+
+net = graph { type: :directed }
+net.add_node("gateway", "Internet Gateway")
+net.add_node("firewall", "Firewall")
+net.add_node("web1", "Web Server 1")
+net.add_node("web2", "Web Server 2")
+net.add_node("app", "App Server")
+net.add_node("db", "Database")
+net.add_node("cache", "Redis Cache")
+
+net.add_edge("gateway", "firewall", "route")
+net.add_edge("firewall", "web1", "route")
+net.add_edge("firewall", "web2", "route")
+net.add_edge("web1", "app", "route")
+net.add_edge("web2", "app", "route")
+net.add_edge("app", "db", "data")
+net.add_edge("app", "cache", "data")
+
+print(net.node_count(), "nodes,", net.edge_count(), "edges")
+
+# --- BFS: explore layer by layer ---
+print("\n=== BFS from gateway ===")
+bfs_order = net.bfs("gateway")
+print(bfs_order)
+# gateway -> firewall -> web1, web2 -> app -> db, cache
+
+# --- DFS: explore depth-first ---
+print("\n=== DFS from gateway ===")
+dfs_order = net.dfs("gateway")
+print(dfs_order)
+
+# --- Neighbors: direct connections ---
+print("\n=== Neighbors ===")
+print("firewall connects to:", net.neighbors("firewall"))  # [web1, web2]
+print("app connects to:", net.neighbors("app"))            # [db, cache]
+print("db connects to:", net.neighbors("db"))              # [] (leaf node)
+print("app 'data' neighbors:", net.neighbors("app", "data"))  # [db, cache]
+print("app 'route' neighbors:", net.neighbors("app", :route)) # [] (no route edges from app)
+
+# --- has_key: check node existence ---
+print("\n=== has_key ===")
+print("has gateway?", net.has_key("gateway"))   # true
+print("has monitor?", net.has_key("monitor"))   # false
+
+# --- nodes_within: proximity queries ---
+print("\n=== Nodes Within N Hops ===")
+print("1 hop from firewall:", net.nodes_within("firewall", 1))
+print("2 hops from firewall:", net.nodes_within("firewall", 2))
+
+# With edge type filter: only follow "data" edges
+print("2 hops from app via 'data':", net.nodes_within("app", 2, "data"))
+
+# --- flatten: unpack nested lists ---
+print("\n=== List Flatten ===")
+
+# Collect neighbors-of-neighbors
+layer1 = net.neighbors("firewall")
+print("Direct:", layer1)
+
+layer2 = layer1.map(fn(node) { return net.neighbors(node) })
+print("Nested:", layer2)
+
+flat = layer2.flatten()
+print("Flattened:", flat)  # [app, app] — both web servers connect to app
+
+unique = flat.uniq()
+print("Unique:", unique)   # [app]
+
+# Practical: find all nodes 2 hops from firewall using neighbors + flatten
+all_reachable = [layer1, layer2.flatten()].flatten().uniq()
+print("All reachable from firewall (2 hops):", all_reachable)
