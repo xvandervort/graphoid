@@ -614,6 +614,108 @@ impl Executor {
 
                 Ok(Value::list(List::from_vec(path_values)))
             }
+            "bfs" => {
+                // Breadth-first traversal starting from a node
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "bfs() expects 1 argument (start_node), but got {}",
+                        args.len()
+                    )));
+                }
+                let start = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+                let order = graph.bfs(start);
+                let list: Vec<Value> = order.into_iter().map(Value::string).collect();
+                Ok(Value::list(List::from_vec(list)))
+            }
+            "dfs" => {
+                // Depth-first traversal starting from a node
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "dfs() expects 1 argument (start_node), but got {}",
+                        args.len()
+                    )));
+                }
+                let start = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+                let order = graph.dfs(start);
+                let list: Vec<Value> = order.into_iter().map(Value::string).collect();
+                Ok(Value::list(List::from_vec(list)))
+            }
+            "neighbors" => {
+                // Get neighbors of a node
+                // neighbors(node_id) - all neighbors
+                // neighbors(node_id, edge_type) - neighbors via specific edge type
+                if args.is_empty() || args.len() > 2 {
+                    return Err(GraphoidError::runtime(format!(
+                        "neighbors() expects 1-2 arguments (node_id, [edge_type]), but got {}",
+                        args.len()
+                    )));
+                }
+                let node_id = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+                let neighbor_ids = if args.len() == 2 {
+                    let edge_type = match &args[1].kind {
+                        ValueKind::String(s) => s.as_str(),
+                        ValueKind::Symbol(s) => s.as_str(),
+                        _ => return Err(GraphoidError::type_error("string or symbol", args[1].type_name())),
+                    };
+                    graph.neighbors_by_type(node_id, edge_type)
+                } else {
+                    graph.neighbors(node_id)
+                };
+                let list: Vec<Value> = neighbor_ids.into_iter().map(Value::string).collect();
+                Ok(Value::list(List::from_vec(list)))
+            }
+            "nodes_within" => {
+                // Find all nodes within N hops of a starting node
+                // nodes_within(node_id, hops) or nodes_within(node_id, hops, edge_type)
+                if args.len() < 2 || args.len() > 3 {
+                    return Err(GraphoidError::runtime(format!(
+                        "nodes_within() expects 2-3 arguments (node_id, hops, [edge_type]), but got {}",
+                        args.len()
+                    )));
+                }
+                let start = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+                let hops = match &args[1].kind {
+                    ValueKind::Number(n) => *n as usize,
+                    _ => return Err(GraphoidError::type_error("number", args[1].type_name())),
+                };
+                let edge_type = if args.len() == 3 {
+                    match &args[2].kind {
+                        ValueKind::String(s) => Some(s.clone()),
+                        _ => return Err(GraphoidError::type_error("string", args[2].type_name())),
+                    }
+                } else {
+                    None
+                };
+                let node_ids = graph.nodes_within(start, hops, edge_type.as_deref());
+                let list: Vec<Value> = node_ids.into_iter().map(Value::string).collect();
+                Ok(Value::list(List::from_vec(list)))
+            }
+            "has_key" => {
+                // Alias for has_node — spec lists has_key under graph type
+                if args.len() != 1 {
+                    return Err(GraphoidError::runtime(format!(
+                        "has_key() expects 1 argument (node_id), but got {}",
+                        args.len()
+                    )));
+                }
+                let node_id = match &args[0].kind {
+                    ValueKind::String(s) => s.as_str(),
+                    _ => return Err(GraphoidError::type_error("string", args[0].type_name())),
+                };
+                Ok(Value::boolean(graph.has_node(node_id)))
+            }
             "match" => {
                 // Graph pattern matching with explicit syntax
                 // g.match(node(...), edge(...), node(...))

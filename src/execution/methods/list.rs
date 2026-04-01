@@ -600,6 +600,30 @@ impl Executor {
                     .collect();
                 Ok(Value::list(List::from_vec(compacted)))
             }
+            "flatten" => {
+                // Flatten one level of nesting
+                if !args.is_empty() {
+                    return Err(GraphoidError::runtime(format!(
+                        "Method 'flatten' expects 0 arguments, but got {}",
+                        args.len()
+                    )));
+                }
+
+                let mut flattened: Vec<Value> = Vec::new();
+                for item in elements.iter() {
+                    match &item.kind {
+                        ValueKind::List(inner_list) => {
+                            for sub_item in inner_list.to_vec() {
+                                flattened.push(sub_item);
+                            }
+                        }
+                        _ => {
+                            flattened.push(item.clone());
+                        }
+                    }
+                }
+                Ok(Value::list(List::from_vec(flattened)))
+            }
             "select" => {
                 // select is an alias for filter
                 if args.len() != 1 {
