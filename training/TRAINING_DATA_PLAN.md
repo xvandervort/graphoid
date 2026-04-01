@@ -205,19 +205,32 @@ After each session, update this table:
 | 3 | Functions & Error Handling | 32 | 6 | 2 | Done |
 | 4 | Behaviors & CLG | 29 | 6 | 2 | Done |
 | 5 | Modules & Stdlib | 35 | 6 | 3 | Done |
-| 6 | FFI, Testing & Eval | 30 | 8 | 2 | Done (no eval yet) |
+| 6 | FFI, Testing & Eval | 30 | 8 | 2 | Done |
+| 7 | Gap-fill (5 weak areas) | 43 | 8 | — | Done |
+| — | Eval Benchmark | — | — | — | 200 problems |
 
-### Validation Status (2026-03-31)
+**Totals**: 260 SFT | 52 DPO | 15 Rosetta | 200 Eval
 
-Full validation (L1-L4): **241/255 execution passes** (94.5%)
-- Format: 261/261 valid
+### Validation Status (2026-04-01)
+
+Full validation (L1-L4): **292/306 execution passes** (95.4%)
+- Format: 312/312 valid
 - All 14 remaining failures are expected:
   - 13 gspec entries use `describe`/`it` (require spec runner, not direct exec)
   - 1 fictional `mylib` in `dpo/ffi_safety.jsonl:1`
-- Parser fix: added anonymous `fn()` expression support — `expect(fn() { ... }).to_raise()` now works
-- Fixed: `modules.jsonl:27` file I/O example (write-then-read pattern)
 - Coverage: 25/25 feature groups have training data
-- Gaps needing more data: `type_constraints` (1/3), `list_behavior` (2/3), `graph_query` (3/5), `lists` (6/7), `list_elementwise` (4/5)
+
+### Gap-Fill Session 7 (2026-04-01)
+
+Addressed 5 identified weak areas with runtime-verified training data:
+- `type_constraints`: 5 SFT pairs (was 1/3, now 6/3)
+- `list_behavior`: 8 SFT pairs (was 2/3, now 10/3)
+- `graph_query`: 10 SFT pairs (was 3/5, now 13/5)
+- `lists`: 14 SFT pairs (was 6/7, now 20/7)
+- `list_elementwise`: 6 SFT pairs (was 4/5, now 10/5)
+- 8 DPO preference pairs across all gap areas
+- 200 eval benchmark problems (8 categories x 25)
+- All code verified against actual gr runtime (no `flatten`, `has_edge`, `neighbors`, `bfs`, `dfs` on graphs)
 
 ## Per-Session Workflow
 
