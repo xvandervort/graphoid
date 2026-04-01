@@ -3506,6 +3506,62 @@ impl Parser {
             return Ok(Expr::Map { entries, position });
         }
 
+        // Anonymous function expression: fn(params) { body }
+        if self.match_token(&TokenType::Func) {
+            let position = self.previous_position();
+            if !self.match_token(&TokenType::LeftParen) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '(' after 'fn' in anonymous function".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+            let mut params = Vec::new();
+            if !self.check(&TokenType::RightParen) {
+                loop {
+                    if let TokenType::Identifier(name) = &self.peek().token_type {
+                        params.push(name.clone());
+                        self.advance();
+                        if !self.match_token(&TokenType::Comma) {
+                            break;
+                        }
+                    } else {
+                        return Err(GraphoidError::SyntaxError {
+                            message: "Expected parameter name".to_string(),
+                            position: self.peek().position(),
+                        });
+                    }
+                }
+            }
+            if !self.match_token(&TokenType::RightParen) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected ')' after parameters".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+            if !self.match_token(&TokenType::LeftBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '{' for anonymous function body".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+            let statements = self.block()?;
+            if !self.match_token(&TokenType::RightBrace) {
+                return Err(GraphoidError::SyntaxError {
+                    message: "Expected '}' after anonymous function body".to_string(),
+                    position: self.peek().position(),
+                });
+            }
+            let body = Box::new(Expr::Block {
+                statements,
+                position: position.clone(),
+            });
+            return Ok(Expr::Lambda {
+                params,
+                body,
+                position,
+            });
+        }
+
         // Parenthesized expressions
         if self.match_token(&TokenType::LeftParen) {
             let expr = self.expression()?;

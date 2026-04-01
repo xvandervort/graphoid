@@ -1,0 +1,76 @@
+# Rosetta Stone: Module Imports — Graphoid
+# Demonstrates: importing, selective imports, aliases, privacy
+
+# --- Full module import ---
+import "math"
+import "json"
+import "os"
+
+# Using fully qualified names
+radius = 5.0
+area = math.pi * radius * radius
+print("Circle area: " + area.to_string())
+
+circumference = 2 * math.pi * radius
+print("Circumference: " + circumference.to_string())
+
+# --- Selective imports ---
+# Import only specific names from a module
+import "math" { sqrt, ceil, floor }
+
+diagonal = sqrt(3 * 3 + 4 * 4)
+print("Diagonal: " + diagonal.to_string())
+print("Ceil of 2.3: " + ceil(2.3).to_string())
+print("Floor of 2.7: " + floor(2.7).to_string())
+
+# --- Built-in aliases (no explicit alias needed) ---
+# "statistics" is automatically available as "stats"
+# "random" is automatically available as "rand"
+# "constants" is automatically available as "const"
+# "regex" is automatically available as "re"
+import "statistics"
+
+scores = [88, 92, 75, 95, 80]
+# Access via module name
+print("Mean score: " + statistics.mean(scores).to_string())
+print("Median score: " + statistics.median(scores).to_string())
+
+# --- JSON usage ---
+data = {"name": "Alice", "age": 30, "languages": ["Python", "Graphoid"]}
+json_str = json.to_string(data)
+print("JSON: " + json_str)
+
+parsed = json.parse(json_str)
+print("Name from JSON: " + parsed["name"])
+
+# --- Privacy with priv keyword (enforced, not convention) ---
+priv fn internal_helper(x) {
+    return x * 2
+}
+
+fn public_api(value) {
+    # Private helper is accessible here (same scope)
+    result = internal_helper(value)
+    return result + 1
+}
+
+print("Public API result: " + public_api(10).to_string())
+
+# --- Error handling on import ---
+try {
+    import "nonexistent_module"
+} catch as e {
+    print("Module not found — using fallback")
+}
+
+# --- Using os module ---
+cwd = os.cwd()
+print("Current directory: " + cwd)
+
+# --- Summary ---
+# Graphoid imports:
+#   import "module"              — full module (quotes required)
+#   import "module" { name }     — selective import
+#   Built-in aliases             — rand, stats, const, re (automatic)
+#   priv fn / priv { }           — privacy (enforced by language)
+#   try/catch as e               — error handling on import

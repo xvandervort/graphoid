@@ -204,8 +204,20 @@ After each session, update this table:
 | 2 | Concurrency & Actors | 29 | 6 | 2 | Done |
 | 3 | Functions & Error Handling | 32 | 6 | 2 | Done |
 | 4 | Behaviors & CLG | 29 | 6 | 2 | Done |
-| 5 | Modules & Stdlib | | | | |
-| 6 | FFI, Testing & Eval | | | | |
+| 5 | Modules & Stdlib | 35 | 6 | 3 | Done |
+| 6 | FFI, Testing & Eval | 30 | 8 | 2 | Done (no eval yet) |
+
+### Validation Status (2026-03-31)
+
+Full validation (L1-L4): **241/255 execution passes** (94.5%)
+- Format: 261/261 valid
+- All 14 remaining failures are expected:
+  - 13 gspec entries use `describe`/`it` (require spec runner, not direct exec)
+  - 1 fictional `mylib` in `dpo/ffi_safety.jsonl:1`
+- Parser fix: added anonymous `fn()` expression support — `expect(fn() { ... }).to_raise()` now works
+- Fixed: `modules.jsonl:27` file I/O example (write-then-read pattern)
+- Coverage: 25/25 feature groups have training data
+- Gaps needing more data: `type_constraints` (1/3), `list_behavior` (2/3), `graph_query` (3/5), `lists` (6/7), `list_elementwise` (4/5)
 
 ## Per-Session Workflow
 

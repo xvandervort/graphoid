@@ -1,0 +1,94 @@
+# Rosetta Stone: FFI / C Interop — Graphoid (ffi module)
+# IMPORTANT: import "ffi" unsafe is required
+
+import "ffi" unsafe
+
+# =============================================================
+# 1. Loading a shared library
+# =============================================================
+
+# ffi.c() loads by name (auto-resolves libm.so.6 etc.)
+lib = ffi.c("m")
+
+# =============================================================
+# 2. Declaring and calling functions
+# =============================================================
+
+# Declare: name, [arg types], return type
+lib.decl("sqrt", ["f64"], "f64")
+lib.decl("pow", ["f64", "f64"], "f64")
+lib.decl("ceil", ["f64"], "f64")
+
+result = lib.sqrt(16.0)
+print("sqrt(16.0) = " + result.to_string())    # 4.0
+
+result = lib.pow(2.0, 10.0)
+print("pow(2.0, 10.0) = " + result.to_string()) # 1024.0
+
+print("ceil(3.2) = " + lib.ceil(3.2).to_string()) # 4.0
+
+# =============================================================
+# 3. Struct definition and usage
+# =============================================================
+
+# cdef parses C declarations
+lib.cdef("struct Point { double x; double y; };")
+
+# Instantiate with field values
+p = lib.new("Point", {x: 3.0, y: 4.0})
+print("Point: (" + p.get("x").to_string() + ", " + p.get("y").to_string() + ")")
+
+dist = lib.sqrt(p.get("x") * p.get("x") + p.get("y") * p.get("y"))
+print("Distance: " + dist.to_string())  # 5.0
+
+# Modify fields
+p.set("x", 10.0)
+print("Modified x: " + p.get("x").to_string())
+
+# =============================================================
+# 4. Memory allocation
+# =============================================================
+
+buf = ffi.alloc(256)
+print("Buffer size: " + buf.size().to_string())
+
+buf.write("Hello from Graphoid")
+print("Buffer: " + buf.read_str())
+
+ffi.free(buf)
+
+# =============================================================
+# 5. Callbacks
+# =============================================================
+
+fn compare(a, b) {
+    return a - b
+}
+
+# Pin for persistent use, unpin when done
+cb = ffi.pin(compare, ["i32", "i32"], "i32")
+ffi.unpin(cb)
+
+# =============================================================
+# 6. Platform info
+# =============================================================
+
+print("Platform: " + ffi.platform())
+print("Pointer size: " + ffi.pointer_size().to_string() + " bytes")
+
+# =============================================================
+# 7. Taint tracking — Graphoid's unique safety feature
+# =============================================================
+
+# All FFI return values are automatically tainted
+tainted_val = lib.sqrt(25.0)
+print("Tainted: " + reflect.tainted(tainted_val).to_string())  # true
+
+# Use ffi.trust() after validation to clear taint
+clean_val = ffi.trust(tainted_val)
+print("After trust: " + reflect.tainted(clean_val).to_string())  # false
+
+# Summary:
+# ffi: ffi.c(), lib.decl(), lib.cdef(), lib.new()
+# ffi.alloc/free, ffi.pin/unpin, ffi.platform/arch/pointer_size
+# Safety: reflect.tainted(), ffi.trust() — automatic taint tracking

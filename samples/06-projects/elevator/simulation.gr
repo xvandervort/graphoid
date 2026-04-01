@@ -67,10 +67,10 @@ graph Simulation {
         _building.step()
 
         # Check for boarding opportunities
-        _do_boarding()
+        do_boarding()
 
         # Check for arrivals
-        _do_arrivals()
+        do_arrivals()
 
         return self
     }

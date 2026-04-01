@@ -1,8 +1,8 @@
 # Graphoid Implementation Roadmap
 
-**Version**: 15.1
-**Last Updated**: March 25, 2026
-**Status**: Phases 0-20c Complete (committed). Bug fixes: match arm expression bodies, priv fn in graphs. LLM training data sessions 1-4 of 6 complete (152 SFT, 30 DPO, 10 Rosetta pairs). 1,649 Rust tests, 848 gspec tests. Phase 21 (Package Manager) next.
+**Version**: 15.2
+**Last Updated**: March 26, 2026
+**Status**: Phases 0-20c Complete (committed). Bug fixes: match arm expression bodies, priv fn dispatch (uncommitted). LLM training data all 6 sessions complete (217 SFT, 44 DPO, 15 Rosetta pairs). 1,633 Rust unit tests, 848 gspec tests, 88 samples. Phase 21 (Package Manager) next.
 
 ---
 

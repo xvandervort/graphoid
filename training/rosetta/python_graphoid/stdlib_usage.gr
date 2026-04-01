@@ -1,0 +1,89 @@
+# Rosetta Stone: Standard Library Usage — Graphoid
+# Demonstrates: json, statistics, random, regex, time
+
+import "json"
+import "statistics"
+import "random"
+import "regex"
+import "time"
+import "os"
+
+# ===== JSON =====
+print("=== JSON ===")
+
+# json.parse() instead of json.loads()
+json_str = '{"name": "Alice", "scores": [95, 87, 92], "active": true}'
+data = json.parse(json_str)
+print("Name: " + data["name"])
+print("First score: " + data["scores"][0].to_string())
+
+# json.to_string() instead of json.dumps()
+output = {"result": "success", "count": 3, "items": ["apple", "banana"]}
+print(json.to_string(output))
+
+nested = json.parse('{"users": [{"id": 1, "name": "Bob"}, {"id": 2, "name": "Carol"}]}')
+for user in nested["users"] {
+    print("  User " + user["id"].to_string() + ": " + user["name"])
+}
+
+# ===== Statistics =====
+print("")
+print("=== Statistics ===")
+
+scores = [88, 92, 75, 95, 80, 85, 90, 78]
+print("Mean:   " + statistics.mean(scores).to_string())
+print("Median: " + statistics.median(scores).to_string())
+print("Stdev:  " + statistics.stdev(scores).to_string())
+print("Min:    " + scores.min().to_string())
+print("Max:    " + scores.max().to_string())
+
+# ===== Random =====
+# Module accessed via 'rand' prefix
+print("")
+print("=== Random ===")
+
+dice = rand.randint(1, 6)
+print("Dice roll: " + dice.to_string())
+
+colors = ["red", "green", "blue", "yellow"]
+picked = rand.choice(colors)
+print("Picked color: " + picked)
+
+sample = rand.sample([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 5)
+print("Sample: " + sample.to_string())
+
+# ===== Regex =====
+# Built-in alias: regex -> re
+print("")
+print("=== Regex ===")
+
+text = "Contact support@example.com or sales@example.com"
+emails = re.find_all("[\\w.]+@[\\w.]+", text)
+print("Emails: " + emails.to_string())
+
+phone = "555-123-4567"
+if re.match("\\d{3}-\\d{3}-\\d{4}", phone) {
+    print("Valid phone: " + phone)
+}
+
+censored = re.replace("[\\w.]+@[\\w.]+", text, "[REDACTED]")
+print("Censored: " + censored)
+
+# ===== Time =====
+print("")
+print("=== Time ===")
+
+now = time.now()
+print("Current time: " + now.to_string())
+
+timestamp = os.system_timestamp()
+print("Unix timestamp: " + timestamp.to_string())
+
+# --- Summary ---
+# Graphoid stdlib:
+#   json.parse(str), json.to_string(obj)         (not loads/dumps)
+#   statistics.mean(), .median(), .stdev()
+#   rand.choice(), rand.randint(), .shuffle()     (random module)
+#   re.find_all(), .match(), .replace()           (alias for regex)
+#   time.now(), os.system_timestamp()
+#   .to_string() for all value-to-string conversion

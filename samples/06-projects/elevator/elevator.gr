@@ -116,7 +116,7 @@ graph Elevator {
 
     fn step() {
         if is_emergency() {
-            _handle_emergency_step()
+            handle_emergency_step()
             return self
         }
 
@@ -125,7 +125,7 @@ graph Elevator {
                 return self
             }
 
-            next_floor = _choose_next_floor()
+            next_floor = choose_next_floor()
 
             if next_floor > _floor {
                 _direction = "up"
@@ -144,7 +144,7 @@ graph Elevator {
             _floor = _floor + 1
             print("  Floor " + _floor.to_string())
 
-            if _should_stop() {
+            if should_stop() {
                 _state = "doors_opening"
                 print("  Stopping - opening doors")
             }
@@ -153,14 +153,14 @@ graph Elevator {
             _floor = _floor - 1
             print("  Floor " + _floor.to_string())
 
-            if _should_stop() {
+            if should_stop() {
                 _state = "doors_opening"
                 print("  Stopping - opening doors")
             }
 
         } else if _state == "doors_opening" {
             _state = "doors_open"
-            _remove_current_floor_request()
+            remove_current_floor_request()
             print("  Doors open")
 
         } else if _state == "doors_open" {

@@ -70,7 +70,7 @@ graph Building {
         }
 
         # Find best elevator using dispatch algorithm
-        best_elevator_id = _dispatch(floor, direction)
+        best_elevator_id = dispatch(floor, direction)
 
         if best_elevator_id == none {
             print("  No elevator available for floor " + floor.to_string())
@@ -127,7 +127,7 @@ graph Building {
         step_count = 0
         max_steps = 200
 
-        while _any_active() && step_count < max_steps {
+        while any_active() && step_count < max_steps {
             step()
             step_count = step_count + 1
         }
@@ -193,7 +193,7 @@ graph Building {
                 continue
             }
 
-            score = _calculate_score(elevator, floor, direction)
+            score = calculate_score(elevator, floor, direction)
 
             if score < best_score {
                 best_score = score
