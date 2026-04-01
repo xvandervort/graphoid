@@ -268,9 +268,9 @@ graph LeafsAnalyzer {
 
     # Generate comprehensive report
     fn report() {
-        print("=" + _repeat("=", 50))
+        print("=" + repeat("=", 50))
         print("  " + team_name + " - 10 Year Analysis")
-        print("=" + _repeat("=", 50))
+        print("=" + repeat("=", 50))
         print("")
 
         print("Period: " + first_season() + " to " + last_season())
@@ -283,17 +283,17 @@ graph LeafsAnalyzer {
         print("Total Losses: " + total_losses().to_string())
         print("Total OT Losses: " + total_ot_losses().to_string())
         win_pct = (total_wins() * 100) / (total_wins() + total_losses() + total_ot_losses())
-        print("Win Percentage: " + _format_pct(win_pct))
+        print("Win Percentage: " + format_pct(win_pct))
         print("")
 
         # Home vs Away
         print("--- HOME vs AWAY ---")
         ha = home_away_comparison()
         print("Home Record: " + ha["home_wins"].to_string() + "-" + ha["home_losses"].to_string())
-        print("Home Win %: " + _format_pct(ha["home_win_pct"]))
+        print("Home Win %: " + format_pct(ha["home_win_pct"]))
         print("Away Record: " + ha["away_wins"].to_string() + "-" + ha["away_losses"].to_string())
-        print("Away Win %: " + _format_pct(ha["away_win_pct"]))
-        print("Home Ice Advantage: +" + _format_pct(ha["home_advantage"]))
+        print("Away Win %: " + format_pct(ha["away_win_pct"]))
+        print("Home Ice Advantage: +" + format_pct(ha["home_advantage"]))
         print("")
 
         # Best/Worst seasons
@@ -312,8 +312,8 @@ graph LeafsAnalyzer {
         # Points statistics
         print("--- POINTS ANALYSIS ---")
         pts_stats = points_statistics()
-        print("Average Points/Season: " + _format_num(pts_stats["mean"]))
-        print("Std Deviation: " + _format_num(pts_stats["std_dev"]))
+        print("Average Points/Season: " + format_num(pts_stats["mean"]))
+        print("Std Deviation: " + format_num(pts_stats["std_dev"]))
         print("Min: " + pts_stats["min"].to_string() + " | Max: " + pts_stats["max"].to_string())
         print("")
 
@@ -321,8 +321,8 @@ graph LeafsAnalyzer {
         print("--- GOALS ANALYSIS ---")
         gf_stats = goals_for_statistics()
         ga_stats = goals_against_statistics()
-        print("Goals For - Avg: " + _format_num(gf_stats["mean"]) + ", Range: " + gf_stats["min"].to_string() + "-" + gf_stats["max"].to_string())
-        print("Goals Against - Avg: " + _format_num(ga_stats["mean"]) + ", Range: " + ga_stats["min"].to_string() + "-" + ga_stats["max"].to_string())
+        print("Goals For - Avg: " + format_num(gf_stats["mean"]) + ", Range: " + gf_stats["min"].to_string() + "-" + gf_stats["max"].to_string())
+        print("Goals Against - Avg: " + format_num(ga_stats["mean"]) + ", Range: " + ga_stats["min"].to_string() + "-" + ga_stats["max"].to_string())
         most_gf = most_goals_season()
         print("Most Prolific: " + most_gf["season"] + " with " + most_gf["goals_for"].to_string() + " goals")
         print("")
@@ -331,7 +331,7 @@ graph LeafsAnalyzer {
         print("--- FIGHTING ANALYSIS ---")
         fight_stats = fights_statistics()
         print("Total Fights (10 seasons): " + total_fights().to_string())
-        print("Average Fights/Season: " + _format_num(fight_stats["mean"]))
+        print("Average Fights/Season: " + format_num(fight_stats["mean"]))
         most_f = most_fights_season()
         least_f = least_fights_season()
         print("Most Fights: " + most_f["season"] + " (" + most_f["fights"].to_string() + " fights)")
@@ -342,7 +342,7 @@ graph LeafsAnalyzer {
         # Playoff analysis
         print("--- PLAYOFF PERFORMANCE ---")
         playoffs = playoff_record()
-        print("Made Playoffs: " + playoffs["made_playoffs"].to_string() + "/" + season_count().to_string() + " seasons (" + _format_pct(playoffs["playoff_rate"]) + ")")
+        print("Made Playoffs: " + playoffs["made_playoffs"].to_string() + "/" + season_count().to_string() + " seasons (" + format_pct(playoffs["playoff_rate"]) + ")")
         print("First Round Exits: " + playoffs["round1_exits"].to_string())
         print("Advanced Past Round 1: " + playoffs["advanced_past_round1"].to_string())
         print("")
@@ -361,7 +361,7 @@ graph LeafsAnalyzer {
         }
 
         print("")
-        print("=" + _repeat("=", 50))
+        print("=" + repeat("=", 50))
     }
 
     # Private helper methods

@@ -91,4 +91,103 @@ describe "Pattern Matching" {
             assert(expect(get_head_rest([])).to_be_none())
         }
     }
+
+    describe "expression bodies in match arms" {
+        it "supports binary operations" {
+            fn double_match(x) {
+                return match x { 1 => x * 2, 2 => x + 10, _ => 0 }
+            }
+            assert(expect(double_match(1)).to_equal(2))
+            assert(expect(double_match(2)).to_equal(12))
+            assert(expect(double_match(99)).to_equal(0))
+        }
+
+        it "supports function calls" {
+            fn helper(n) { return n * 3 }
+            fn call_match(x) {
+                return match x { 1 => helper(x), 2 => helper(10), _ => 0 }
+            }
+            assert(expect(call_match(1)).to_equal(3))
+            assert(expect(call_match(2)).to_equal(30))
+        }
+
+        it "supports method calls" {
+            fn len_match(x) {
+                return match x { "hi" => "hi".length(), "hello" => "hello".length(), _ => 0 }
+            }
+            assert(expect(len_match("hi")).to_equal(2))
+            assert(expect(len_match("hello")).to_equal(5))
+        }
+
+        it "supports parenthesized expressions" {
+            fn paren_match(x) {
+                return match x { 2 => (x + 1) * 3, _ => 0 }
+            }
+            assert(expect(paren_match(2)).to_equal(9))
+        }
+
+        it "supports comparisons" {
+            fn cmp_match(x) {
+                return match x { 1 => 10 > 5, _ => false }
+            }
+            assert(expect(cmp_match(1)).to_be_truthy())
+        }
+
+        it "supports index access" {
+            items = [10, 20, 30]
+            fn idx_match(x) {
+                return match x { 0 => items[0], 1 => items[1], _ => items[2] }
+            }
+            assert(expect(idx_match(0)).to_equal(10))
+            assert(expect(idx_match(1)).to_equal(20))
+            assert(expect(idx_match(9)).to_equal(30))
+        }
+
+        it "supports nested match" {
+            fn nested(x, y) {
+                return match x { 1 => match y { "a" => 100, _ => 0 }, _ => -1 }
+            }
+            assert(expect(nested(1, "a")).to_equal(100))
+            assert(expect(nested(1, "b")).to_equal(0))
+            assert(expect(nested(2, "a")).to_equal(-1))
+        }
+
+        it "supports list construction" {
+            fn list_match(x) {
+                return match x { 1 => [x, x * 2, x * 3], _ => [] }
+            }
+            result = list_match(1)
+            assert(expect(result.length()).to_equal(3))
+            assert(expect(result[0]).to_equal(1))
+            assert(expect(result[2]).to_equal(3))
+        }
+
+        it "supports map construction" {
+            fn map_match(x) {
+                return match x { 1 => {"val": x + 10}, _ => {} }
+            }
+            result = map_match(1)
+            assert(expect(result["val"]).to_equal(11))
+        }
+
+        it "supports chained arithmetic" {
+            fn chain_match(x) {
+                return match x {
+                    1 => x + 1 + 2 + 3,
+                    2 => x * 2 * 3,
+                    _ => 0
+                }
+            }
+            assert(expect(chain_match(1)).to_equal(7))
+            assert(expect(chain_match(2)).to_equal(12))
+        }
+
+        it "supports variable binding with expression body" {
+            fn bind_match(x) {
+                return match x { n => n * n }
+            }
+            assert(expect(bind_match(5)).to_equal(25))
+            assert(expect(bind_match(10)).to_equal(100))
+        }
+    }
 }

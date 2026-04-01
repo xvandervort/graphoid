@@ -1,0 +1,52 @@
+# Tree Operations — Graphoid implementation
+# Graphoid has a built-in tree type with automatic structural rules.
+# No class boilerplate needed.
+
+# --- Build an organizational hierarchy ---
+# tree{} enforces no_cycles, single_root, connected automatically
+org = tree{}
+
+org.add_node("ceo", "CEO")
+org.add_node("vp_eng", "VP Engineering")
+org.add_node("vp_sales", "VP Sales")
+org.add_node("lead_be", "Backend Lead")
+org.add_node("lead_fe", "Frontend Lead")
+org.add_node("dev1", "Developer 1")
+org.add_node("dev2", "Developer 2")
+
+org.add_edge("ceo", "vp_eng", "reports_to")
+org.add_edge("ceo", "vp_sales", "reports_to")
+org.add_edge("vp_eng", "lead_be", "reports_to")
+org.add_edge("vp_eng", "lead_fe", "reports_to")
+org.add_edge("lead_be", "dev1", "reports_to")
+org.add_edge("lead_be", "dev2", "reports_to")
+
+# --- Query the tree ---
+print("Total nodes: " + org.node_count().to_string())
+
+# Find leaf nodes (nodes with no outgoing edges)
+leaves = org.nodes().filter(id => org.neighbors(id).length() == 0)
+print("Leaves: " + leaves.join(", "))
+
+# Find a node
+vp = org.get_node("vp_eng")
+print("Found: " + vp)
+
+# Direct reports
+reports = org.neighbors("vp_eng")
+print("Direct reports: " + reports.join(", "))
+
+# Path from CEO to developer
+path = org.shortest_path("ceo", "dev1")
+print("Path CEO->dev1: " + path.join(" -> "))
+
+# BFS traversal gives level-order
+levels = org.bfs("ceo")
+print("Level order: " + levels.join(", "))
+
+# The tree ruleset prevents structural violations automatically:
+# - Adding an edge that creates a cycle is rejected
+# - Adding a second root is rejected
+# No manual validation needed.
+
+print("Tree operations demo complete!")

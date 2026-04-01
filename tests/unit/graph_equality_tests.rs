@@ -142,6 +142,7 @@ fn test_graph_with_methods_equals_graph_without() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
     g2.attach_method("get_value".to_string(), func);
 
@@ -301,6 +302,7 @@ fn test_equals_include_methods_same() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
     g1.attach_method("test".to_string(), func1);
 
@@ -317,6 +319,7 @@ fn test_equals_include_methods_same() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
     g2.attach_method("test".to_string(), func2);
 
@@ -345,6 +348,7 @@ fn test_equals_include_methods_different() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
     g1.attach_method("foo".to_string(), func1);
 
@@ -361,6 +365,7 @@ fn test_equals_include_methods_different() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
     g2.attach_method("bar".to_string(), func2);
 
@@ -464,6 +469,7 @@ fn test_equals_only_methods() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
     g1.attach_method("calculate".to_string(), func1);
 
@@ -480,6 +486,7 @@ fn test_equals_only_methods() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
     g2.attach_method("calculate".to_string(), func2);
 

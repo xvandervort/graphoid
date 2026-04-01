@@ -1,0 +1,81 @@
+# Class-Like Graphs — Graphoid implementation
+# Graphoid uses graph declarations instead of classes.
+# No __init__, no @property, no explicit self.
+
+# --- Basic CLG with properties ---
+graph Person {
+    configure {
+        readable: :name
+        accessible: :age
+    }
+    name: "Unknown"
+    age: 0
+
+    fn greet() {
+        return "Hi, I'm " + name
+    }
+}
+
+alice = Person { name: "Alice", age: 30 }
+print(alice.greet())  # "Hi, I'm Alice"
+print(alice.name())   # "Alice"
+alice.set_age(31)
+print(alice.age())    # 31
+
+# --- Inheritance ---
+graph Animal {
+    name: "unknown"
+    sound: "..."
+
+    fn speak() {
+        return name + " says " + sound
+    }
+}
+
+graph Dog from Animal {
+    sound: "woof!"
+    breed: "unknown"
+
+    fn fetch() {
+        return name + " fetches!"
+    }
+}
+
+fido = Dog { name: "Fido", breed: "Labrador" }
+print(fido.speak())   # "Fido says woof!"
+print(fido.fetch())   # "Fido fetches!"
+
+# --- Validation in methods ---
+graph BankAccount {
+    configure { readable: :balance }
+    balance: 0
+
+    fn deposit(amount) {
+        if amount <= 0 {
+            raise ValueError("Deposit must be positive")
+        }
+        balance = balance + amount
+    }
+
+    fn withdraw(amount) {
+        if amount > balance {
+            raise ValueError("Insufficient funds")
+        }
+        balance = balance - amount
+    }
+}
+
+acct = BankAccount { balance: 1000 }
+acct.deposit(500)
+print("Balance: " + acct.balance().to_string())  # 1500
+acct.withdraw(200)
+print("Balance: " + acct.balance().to_string())  # 1300
+
+# Graphoid advantages:
+# - No __init__ boilerplate — use instantiation syntax
+# - configure { readable: } auto-generates getters
+# - configure { accessible: } auto-generates getters + setters
+# - Properties use implicit self — no explicit self.name
+# - Inheritance is just `graph Child from Parent`
+
+print("CLG demo complete!")

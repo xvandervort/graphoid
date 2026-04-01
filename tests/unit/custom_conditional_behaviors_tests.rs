@@ -44,6 +44,7 @@ fn create_double_fn() -> Function {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     }
 }
 
@@ -70,6 +71,7 @@ fn create_negate_fn() -> Function {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     }
 }
 
@@ -97,6 +99,7 @@ fn create_is_negative_fn() -> Function {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     }
 }
 
@@ -145,6 +148,7 @@ fn test_custom_function_with_closure() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
 
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
@@ -181,6 +185,7 @@ fn test_custom_function_type_specific() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
 
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
@@ -223,6 +228,7 @@ fn test_custom_function_error_handling() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
 
     let rule = RuleInstance::new(RuleSpec::CustomFunction {
@@ -353,6 +359,7 @@ fn test_conditional_without_fallback() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
 
     // func(x) { return x * x }
@@ -378,6 +385,7 @@ fn test_conditional_without_fallback() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
 
     let rule = RuleInstance::new(RuleSpec::Conditional {
@@ -475,6 +483,7 @@ fn test_conditional_chain() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
 
     // func(x) { return 10 }
@@ -495,6 +504,7 @@ fn test_conditional_chain() {
         is_setter: false,
         is_static: false,
         guard: None,
+        is_private: false,
     };
 
     let behavior1 = RuleInstance::new(RuleSpec::Conditional {

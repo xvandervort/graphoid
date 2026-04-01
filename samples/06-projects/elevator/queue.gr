@@ -59,7 +59,7 @@ graph Queue {
         old_head = _head_id
 
         # Find next node (if any)
-        next_id = _find_next(_head_id)
+        next_id = find_next(_head_id)
 
         if next_id == none {
             # Queue is now empty
@@ -90,7 +90,7 @@ graph Queue {
             if node_value == value {
                 return true
             }
-            current = _find_next(current)
+            current = find_next(current)
         }
         return false
     }
@@ -101,7 +101,7 @@ graph Queue {
         while current != none {
             value = self.get_node(current)
             result = result.append(value)
-            current = _find_next(current)
+            current = find_next(current)
         }
         return result
     }

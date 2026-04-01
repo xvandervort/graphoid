@@ -1,0 +1,72 @@
+# Concurrency — Graphoid implementation
+# Graphoid has built-in spawn, channels, actors, and supervision.
+
+# --- Spawn a task ---
+# spawn is a keyword, share-nothing semantics
+ch = channel()
+spawn {
+    ch.send("hello from spawned task!")
+}
+msg = ch.receive()
+print(msg)  # "hello from spawned task!"
+
+# --- Channel communication ---
+# Channels are first-class values with send/receive/close
+numbers = channel()
+spawn {
+    i = 0
+    while i < 5 {
+        numbers.send(i)
+        i = i + 1
+    }
+    numbers.close()  # close signals "done" (for..in stops)
+}
+
+total = 0
+for val in numbers {
+    total = total + val
+}
+print("Sum: " + total.to_string())  # Sum: 10
+
+# --- Actor pattern (built-in!) ---
+# Any graph with on_message is an actor — no boilerplate
+graph Counter {
+    count: 0
+    fn on_message(msg) {
+        if msg == "increment" {
+            count = count + 1
+        }
+        if msg == "get" {
+            return count
+        }
+    }
+}
+
+counter = spawn Counter{}
+counter.send("increment")
+counter.send("increment")
+result = counter.request("get")
+print("Count: " + result.to_string())  # Count: 2
+counter.close()
+
+# --- Select (built-in!) ---
+ch1 = channel(1)
+ch2 = channel(1)
+spawn { ch1.send("from ch1") }
+
+result = select(ch1, ch2, timeout: 1000)
+if result[0] == ch1 {
+    print("Got: " + result[1])
+}
+
+# --- Timers (built-in, channel-based) ---
+tick = timer.after(50)
+tick.receive()
+print("Timer fired!")
+
+# --- Signals (built-in, channel-based) ---
+# sigch = signal.on(:sigint)
+# msg = sigch.receive()  # blocks until SIGINT
+# sigch.close()
+
+print("Concurrency demo complete!")

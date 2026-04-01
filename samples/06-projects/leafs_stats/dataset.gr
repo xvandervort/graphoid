@@ -30,7 +30,7 @@ graph DataSet {
     }
 
     fn sum() {
-        return _calculate_sum()
+        return calculate_sum()
     }
 
     fn mean() {
@@ -39,7 +39,7 @@ graph DataSet {
     }
 
     fn variance() {
-        return _calculate_variance()
+        return calculate_variance()
     }
 
     fn std_dev() {
@@ -48,11 +48,11 @@ graph DataSet {
     }
 
     fn min() {
-        return _find_min()
+        return find_min()
     }
 
     fn max() {
-        return _find_max()
+        return find_max()
     }
 
     fn range() {
@@ -97,7 +97,7 @@ graph DataSet {
         if count() == 0 { return none }
         if q < 0 || q > 1 { return none }
 
-        sorted = _sort_data()
+        sorted = sort_data()
         pos = q * (count() - 1)
         lower = pos.down()
         upper = lower + 1
@@ -176,7 +176,7 @@ graph DataSet {
 
         sorted = []
         for value in data {
-            sorted = _insert_sorted(sorted, value)
+            sorted = insert_sorted(sorted, value)
         }
         return sorted
     }

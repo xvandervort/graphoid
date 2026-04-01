@@ -1,0 +1,136 @@
+# Rosetta Stone: Testing Patterns — Graphoid (gspec)
+# Run with: gr spec testing.gr
+
+# --- Basic assertions ---
+
+describe "basic assertions" {
+    it "adds numbers" {
+        expect(2 + 2).to_equal(4)
+    }
+
+    it "concatenates strings" {
+        expect("hello" + " " + "world").to_equal("hello world")
+    }
+
+    it "checks list length" {
+        items = [1, 2, 3]
+        expect(items.length()).to_equal(3)
+    }
+
+    it "checks truthy values" {
+        expect(true).to_be_truthy()
+        expect(1).to_be_truthy()
+        expect("nonempty").to_be_truthy()
+    }
+
+    it "checks falsy values" {
+        expect(false).to_be_falsy()
+        expect(0).to_be_falsy()
+        expect("").to_be_falsy()
+        expect(none).to_be_falsy()
+    }
+}
+
+
+# --- Grouped tests with before_each (= setup_method) ---
+
+fn calc_add(a, b) { return a + b }
+
+fn calc_divide(a, b) {
+    if b == 0 { raise RuntimeError("division by zero") }
+    return a / b
+}
+
+describe "Calculator" {
+    describe "add" {
+        it "adds two positive numbers" {
+            expect(calc_add(2, 3)).to_equal(5)
+        }
+
+        it "adds negative numbers" {
+            expect(calc_add(-1, -2)).to_equal(-3)
+        }
+    }
+
+    describe "divide" {
+        it "divides evenly" {
+            expect(calc_divide(10, 2)).to_equal(5)
+        }
+    }
+}
+
+
+# --- Exception testing (pytest.raises → to_raise) ---
+
+describe "Calculator errors" {
+    it "raises on divide by zero" {
+        expect(fn() { calc_divide(10, 0) }).to_raise("RuntimeError")
+    }
+}
+
+
+# --- Approximate matching (pytest.approx → to_be_close_to) ---
+
+describe "approximation" {
+    it "handles float division" {
+        result = calc_divide(10, 3)
+        expect(result).to_be_close_to(3.333, 0.01)
+    }
+}
+
+
+# --- Skipping tests (pytest.mark.skip → xit) ---
+
+xit "future feature not yet implemented" {
+    expect(false).to_be_truthy()
+}
+
+
+# --- Unrolled parameterized tests ---
+
+describe "parameterized addition" {
+    it "1 + 1 = 2" { expect(1 + 1).to_equal(2) }
+    it "0 + 0 = 0" { expect(0 + 0).to_equal(0) }
+    it "-1 + 1 = 0" { expect(-1 + 1).to_equal(0) }
+}
+
+
+# --- Multiple assertions ---
+
+describe "multiple assertions" {
+    it "checks list operations" {
+        items = [3, 1, 4, 1, 5]
+        expect(items.length()).to_equal(5)
+        expect(items.min()).to_equal(1)
+        expect(items.max()).to_equal(5)
+    }
+
+    it "checks string operations" {
+        s = "Hello, World!"
+        expect(s.length()).to_equal(13)
+        expect(s.upper()).to_equal("HELLO, WORLD!")
+        expect(s.starts_with("Hello")).to_be_truthy()
+        expect(s.contains("World")).to_be_truthy()
+    }
+}
+
+
+# --- Shared setup via before_each (= @pytest.fixture) ---
+
+describe "sample list operations" {
+    before_each {
+        sample_list = [10, 20, 30, 40, 50]
+    }
+
+    it "sums to 150" {
+        expect(sample_list.sum()).to_equal(150)
+    }
+
+    it "contains 30" {
+        expect(sample_list.contains(30)).to_be_truthy()
+    }
+}
+
+# Summary:
+# gspec uses: describe/context/it, before_each, expect().to_raise()
+# expect().to_be_close_to(), xit for skip, .negate() for negation

@@ -1,0 +1,65 @@
+# Actor Pattern — Graphoid implementation
+# Actors are built-in: any graph with on_message is an actor.
+
+# --- Counter actor ---
+graph Counter {
+    count: 0
+
+    fn on_message(msg) {
+        if msg == "increment" {
+            count = count + 1
+        }
+        if msg == "get" {
+            return count
+        }
+    }
+}
+
+# --- Calculator actor ---
+graph Calculator {
+    fn on_message(msg) {
+        op = msg["op"]
+        a = msg["a"]
+        b = msg["b"]
+        if op == "add" {
+            return a + b
+        }
+        if op == "multiply" {
+            return a * b
+        }
+        return "unknown"
+    }
+}
+
+# --- Usage ---
+print("=== Counter ===")
+c = spawn Counter{}
+c.send("increment")
+c.send("increment")
+c.send("increment")
+# .request() blocks until on_message returns — no sleep needed
+result = c.request("get")
+print("Count: " + result.to_string())  # 3
+c.close()
+
+print("\n=== Counter with initial state ===")
+c2 = spawn Counter{ count: 100 }
+c2.send("increment")
+result = c2.request("get")
+print("Count: " + result.to_string())  # 101
+c2.close()
+
+print("\n=== Calculator ===")
+calc = spawn Calculator{}
+result = calc.request({"op": "add", "a": 3, "b": 4})
+print("3 + 4 = " + result.to_string())  # 7
+result = calc.request({"op": "multiply", "a": 5, "b": 6})
+print("5 * 6 = " + result.to_string())  # 30
+calc.close()
+
+# Supervision is built-in too:
+# graph MySupervisor from supervisor { ... }
+# sup = spawn MySupervisor{}
+# sup.supervise(worker, restart: :permanent)
+
+print("\nActor demo complete!")

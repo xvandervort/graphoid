@@ -1,0 +1,84 @@
+# Rosetta Stone: String Operations — Graphoid
+# Demonstrates: case, whitespace, splitting, patterns, generation
+
+# --- Case conversion ---
+greeting = "Hello, World!"
+print(greeting.upper())        # "HELLO, WORLD!"
+print(greeting.lower())        # "hello, world!"
+
+# --- Whitespace handling ---
+# Graphoid uses trim() instead of strip()
+padded = "   extra spaces   "
+print(padded.trim())           # "extra spaces"
+
+# --- Length ---
+msg = "Graphoid"
+print("Length: " + msg.length().to_string())  # 8
+
+# --- Splitting and joining ---
+csv_line = "apple,banana,cherry,date"
+fruits = csv_line.split(",")
+print(fruits)                  # [apple, banana, cherry, date]
+
+rejoined = fruits.join(" | ")
+print(rejoined)                # "apple | banana | cherry | date"
+
+# --- Starts with / ends with ---
+# Graphoid uses snake_case: starts_with, ends_with
+filename = "report_2026.pdf"
+print(filename.starts_with("report"))  # true
+print(filename.ends_with(".pdf"))      # true
+
+# --- Search and contains ---
+sentence = "The quick brown fox jumps over the lazy dog"
+print(sentence.contains("fox"))        # true
+print(sentence.index_of("fox"))        # 16
+
+# --- Replace ---
+original = "I like cats and cats like me"
+replaced = original.replace("cats", "dogs")
+print(replaced)  # "I like dogs and dogs like me"
+
+# --- Slicing / substring ---
+# Graphoid uses .substring(start, length)
+text = "Hello, Graphoid!"
+print(text.substring(0, 5))    # "Hello"
+print(text.substring(7, 8))    # "Graphoid"
+
+# --- String concatenation (no f-strings; use + operator) ---
+name = "Alice"
+age = 30
+print("Name: " + name + ", Age: " + age.to_string())
+
+# --- String generation (Graphoid-specific) ---
+# string.generate(str, count) for repetition
+separator = string.generate("-", 40)
+print(separator)  # "----------------------------------------"
+padding = string.generate(" ", 10)
+print("|" + padding + "centered" + padding + "|")
+
+# string.generate(from_char, to_char) for character sequences
+lowercase = string.generate("a", "z")
+print(lowercase)   # "abcdefghijklmnopqrstuvwxyz"
+digits = string.generate("0", "9")
+print(digits)      # "0123456789"
+
+# --- String conversion ---
+# Use .to_string() method (NOT string() function — string is a keyword)
+num = 42
+as_str = num.to_string()
+print("The answer is " + as_str)
+
+# --- Summary ---
+# Graphoid string ops:
+#   .upper(), .lower()
+#   .trim()                                 (not strip)
+#   .split(sep), list.join(sep)
+#   .starts_with(), .ends_with()            (snake_case)
+#   .contains(), .index_of()
+#   .replace(old, new)
+#   .substring(start, length)               (not slicing)
+#   + operator for concatenation            (no f-strings)
+#   string.generate(str, count)             (repetition)
+#   string.generate(from, to)              (char sequences)
+#   .to_string() for conversion             (not string())

@@ -1,0 +1,58 @@
+# Graph Traversal — Graphoid implementation
+# Graphoid has built-in graph types — no external library needed.
+
+# --- Create a directed graph ---
+g = graph { type: :directed }
+
+# Add nodes with data
+g.add_node("alice", "Alice")
+g.add_node("bob", "Bob")
+g.add_node("carol", "Carol")
+g.add_node("dave", "Dave")
+g.add_node("eve", "Eve")
+
+# Add edges with type labels
+g.add_edge("alice", "bob", "FRIEND")
+g.add_edge("alice", "carol", "FRIEND")
+g.add_edge("bob", "carol", "FRIEND")
+g.add_edge("bob", "dave", "FRIEND")
+g.add_edge("carol", "eve", "FRIEND")
+
+# --- Basic queries ---
+print("Nodes: " + g.nodes().join(", "))
+print("Edge count: " + g.edge_count().to_string())
+print("Has alice? " + g.has_node("alice").to_string())
+
+# --- Neighbors ---
+alice_friends = g.neighbors("alice")
+print("Alice's friends: " + alice_friends.join(", "))
+
+# --- Path finding ---
+print("Path alice->eve exists? " + g.has_path("alice", "eve").to_string())
+shortest = g.shortest_path("alice", "eve")
+print("Shortest path: " + shortest.join(" -> "))
+
+# --- BFS and DFS ---
+bfs_order = g.bfs("alice")
+print("BFS from alice: " + bfs_order.join(", "))
+
+dfs_order = g.dfs("alice")
+print("DFS from alice: " + dfs_order.join(", "))
+
+# --- Mutual friends ---
+alice_friends = g.neighbors("alice")
+bob_friends = g.neighbors("bob")
+mutual = alice_friends.filter(f => bob_friends.contains(f))
+print("Mutual friends of alice and bob: " + mutual.join(", "))
+
+# --- Subgraph ---
+# Extract only FRIEND edges from alice's perspective
+sub = g.extract(none, (src, dest, et) => src == "alice" && et == "FRIEND", true)
+print("Alice's neighborhood: " + sub.nodes().join(", "))
+
+# --- Cycle detection ---
+# Graphoid: use rules — enforced automatically, no explicit check needed
+dag = graph{}.with_ruleset(:dag)
+# dag.add_edge that creates a cycle would be rejected
+
+print("Graph traversal demo complete!")

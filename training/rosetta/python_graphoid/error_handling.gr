@@ -1,0 +1,83 @@
+# Error Handling — Graphoid implementation
+# Graphoid uses try/catch/raise with named error types.
+# Note: catch uses 'as' keyword (required).
+
+# --- Basic try/catch ---
+try {
+    result = 10 / 0
+} catch as e {
+    print("Error: " + e.message())
+}
+
+# --- Multiple catch clauses ---
+fn risky(input_val) {
+    if input_val == "type" {
+        raise TypeError("wrong type")
+    }
+    if input_val == "value" {
+        raise ValueError("bad value")
+    }
+    if input_val == "io" {
+        raise IOError("disk full")
+    }
+    return "ok"
+}
+
+try {
+    risky("value")
+} catch TypeError as e {
+    print("Type: " + e.message())
+} catch ValueError as e {
+    print("Value: " + e.message())
+} catch IOError as e {
+    print("IO: " + e.message())
+} catch as e {
+    print("Other: " + e.message())
+}
+
+# --- try/finally ---
+# finally always runs, even after an error
+try {
+    print("doing work")
+} finally {
+    print("cleanup always runs")
+}
+
+# --- Raising errors ---
+fn validate_age(age) {
+    if age < 0 {
+        raise ValueError("Age cannot be negative")
+    }
+    if age > 150 {
+        raise ValueError("Age unrealistically high")
+    }
+    return true
+}
+
+try {
+    validate_age(-5)
+} catch ValueError as e {
+    print("Validation failed: " + e.message())
+}
+
+# --- Error object methods ---
+try {
+    raise ValueError("test error")
+} catch as e {
+    print(e.type())       # "ValueError"
+    print(e.message())    # "test error"
+}
+
+# --- Re-raising ---
+try {
+    try {
+        raise ValueError("original")
+    } catch as e {
+        print("Caught: " + e.message())
+        raise e  # re-raise the same error
+    }
+} catch as e {
+    print("Re-caught: " + e.message())
+}
+
+print("Error handling demo complete!")

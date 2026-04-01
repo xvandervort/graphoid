@@ -1,0 +1,47 @@
+# spec.gr - Testing DSL for use in .gr files
+#
+# Usage: import "spec"
+# Provides describe, context, it, expect, assert, before_each, after_each
+# For the full spec runner, use: gr spec [path]
+
+import "gspec"
+
+# Create the test runner
+__spec_runner__ = gspec.TestRunner.clone()
+
+# DSL functions that delegate to the runner
+fn describe(name, block) {
+    __spec_runner__.describe(name, block)
+}
+
+fn context(name, block) {
+    __spec_runner__.context(name, block)
+}
+
+fn it(description, block) {
+    __spec_runner__.it(description, block)
+}
+
+fn xit(description, block) {
+    __spec_runner__.xit(description, block)
+}
+
+fn pending(description) {
+    __spec_runner__.pending(description)
+}
+
+fn before_each(hook) {
+    __spec_runner__.before_each(hook)
+}
+
+fn after_each(hook) {
+    __spec_runner__.after_each(hook)
+}
+
+fn expect(value) {
+    return gspec.expect(value)
+}
+
+fn assert(result) {
+    return gspec.assert(result)
+}

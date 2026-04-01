@@ -1,0 +1,85 @@
+# Pattern Matching — Graphoid implementation
+# Graphoid has match expressions and pattern-matching function clauses.
+
+# --- Basic match on values ---
+fn classify(x) {
+    return match x {
+        0 => "zero",
+        1 => "one",
+        2 => "two",
+        _ => "other"
+    }
+}
+
+print(classify(0))   # "zero"
+print(classify(99))  # "other"
+
+# --- Match on strings ---
+fn respond(cmd) {
+    return match cmd {
+        "start" => "Starting...",
+        "stop" => "Stopping...",
+        _ => "Unknown: " + cmd
+    }
+}
+
+print(respond("start"))  # "Starting..."
+print(respond("quit"))   # "Unknown: quit"
+
+# --- List destructuring ---
+fn describe_list(lst) {
+    return match lst {
+        [] => "empty",
+        [x] => "single: " + x.to_string(),
+        [x, y] => "pair: " + x.to_string() + ", " + y.to_string(),
+        [first, ...rest] => "first=" + first.to_string() + " rest=" + rest.to_string()
+    }
+}
+
+print(describe_list([]))         # "empty"
+print(describe_list([42]))       # "single: 42"
+print(describe_list([1, 2]))     # "pair: 1, 2"
+print(describe_list([1, 2, 3]))  # "first=1 rest=[2, 3]"
+
+# --- Guards (Graphoid uses pipe-pattern clauses with 'if') ---
+fn classify_number(n) {
+    |0| => "zero"
+    |n| if n > 0 => "positive"
+    |n| if n < 0 => "negative"
+}
+
+print(classify_number(5))   # "positive"
+print(classify_number(-3))  # "negative"
+print(classify_number(0))   # "zero"
+
+# --- Recursive with match ---
+fn sum_list(lst) {
+    return match lst {
+        [] => 0,
+        [first, ...rest] => first + sum_list(rest)
+    }
+}
+
+print(sum_list([1, 2, 3, 4, 5]))  # 15
+
+# --- Factorial with pipe-pattern clauses ---
+fn factorial(n) {
+    |0| => 1
+    |n| if n > 0 => n * factorial(n - 1)
+}
+
+print(factorial(5))  # 120
+
+# --- Pattern matching on tagged lists ---
+fn process(data) {
+    return match data {
+        ["error", msg] => "Error: " + msg,
+        ["ok", value] => "Got: " + value.to_string(),
+        _ => "Unknown format"
+    }
+}
+
+print(process(["ok", 42]))           # "Got: 42"
+print(process(["error", "timeout"]))  # "Error: timeout"
+
+print("Pattern matching demo complete!")

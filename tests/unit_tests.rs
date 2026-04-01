@@ -67,4 +67,6 @@ mod unit {
     pub mod ffi_struct_tests;
     pub mod ffi_callback_tests;
     pub mod ffi_safety_tests;
+    pub mod match_expression_tests;
+    pub mod priv_graph_method_tests;
 }
